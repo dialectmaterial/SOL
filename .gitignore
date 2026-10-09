@@ -2,6 +2,12 @@
 sources/
 georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf
 
+# Local, non-redistributable Cambridge corpus and conversion intermediates.
+local-corpus/
+local-corpus.building/
+local-corpus.building-*/
+.sol-corpus-work/
+
 # Python-generated files
 __pycache__/
 *.py[cod]
