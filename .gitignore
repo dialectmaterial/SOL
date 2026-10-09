@@ -1,0 +1,7 @@
+# The supplied Cambridge PDF is copyrighted source material, not repository content.
+sources/
+georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf
+
+# Python-generated files
+__pycache__/
+*.py[cod]
