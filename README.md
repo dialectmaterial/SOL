@@ -1,8 +1,10 @@
-# `sol` — Hegel's *Science of Logic* in the terminal
+# `sol` — SoL Organizes Logic
+
+## Hegel's *Science of Logic* in the terminal
 
 `sol` is a page-aware reader for the supplied Cambridge edition of Hegel's
-*Science of Logic*. It selects only Hegel's main text: George di Giovanni's
-introduction, front matter, appendix, bibliography, and index are excluded.
+*Science of Logic*. It selects only Hegel's main text. The introduction, front matter,
+appendix, bibliography, and index are excluded.
 
 Every reading states its virtual location, the edition's printed page, and PDF
 page, then folds prose to a comfortable terminal width.
