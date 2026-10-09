@@ -1,4 +1,4 @@
-# `sol` — Soul Organizes Logic
+# `sol` — Sol Organizes Logic
 
 ## Hegel's *Science of Logic* in the terminal
 
