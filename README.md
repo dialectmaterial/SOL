@@ -1,69 +1,24 @@
-# `sol` — Sol Organizes Logic
+# SOL: Sol Organizes Logic
 
-## Hegel's *Science of Logic* in the terminal
+## Hegel’s *Science of Logic* in the terminal
 
-SOL reads a local, human-editable Markdown corpus through its generated JSONL
-index. The corpus preserves book structure, paragraphs, emphasis, notes,
-editorial material, bibliography, index, and source provenance. Ordinary reading
-does not extract the PDF every time the program starts.
+SOL begins with a reader for Hegel’s *Science of Logic*. Its larger ambition is to become an environment for studying how texts, concepts, and knowledge are organized, bringing philosophy into conversation with computational linguistics, machine learning, and operating systems.
 
-The default terminal view contains Hegel's main text, prefaces, introduction,
-and Remarks under `/BEING`, `/ESSENCE`, and `/CONCEPT`. Editorial prose, notes,
-and references remain in the complete corpus, but are not mixed into random
-Hegel quotations. Ordered reading includes separately flagged formulas.
+The reader uses a human editable Markdown corpus and a generated JSONL index. Ordinary reading does not extract the PDF every time SOL starts. The corpus preserves the book’s structure, paragraph boundaries, emphasis, notes, editorial material, bibliography, index, and source references.
 
-Each passage shows its virtual location, heading, book/PDF page range, and
-permanent corpus UUID. Text wraps to the terminal width. The conversion is a
-candidate transcription with an audit trail—not a claim that every paragraph,
-italic span, note attribution, or mathematical expression has been proofread.
+The terminal presents Hegel’s text through three roots: `/BEING`, `/ESSENCE`, and `/CONCEPT`. Editorial prose, notes, and references remain available in the complete corpus but are kept separate from random Hegel quotations.
 
-See [the corpus contract](CORPUS.md) for the complete format, correction workflow,
-provenance, note relationships, and validation limits.
+Each passage displays its location, heading, printed and PDF page references, and permanent identifier. Text wraps to fit the terminal. The transcription remains reviewable, particularly where mathematical notation or note attribution needs attention.
 
-## Keep this edition's corpus private
+See [the corpus contract](CORPUS.md) for the format, indexing rules, and correction workflow.
 
-The supplied Cambridge/di Giovanni translation is not licensed for public
-redistribution. Keep its PDF, generated Markdown, JSONL, source crops, and
-conversion cache local and excluded from Git. Publish SOL's code and synthetic
-tests, not the copyrighted corpus. Your lawful access conditions still apply.
+## Getting started
 
-## One-time local conversion
+Python 3.10 or newer is required. Reading an existing corpus uses Python’s standard library and the accompanying SOL modules.
 
-Python 3.10 or newer is required. Conversion additionally needs Poppler's PDF
-tools and `markdown-it-py`; reading an existing index uses only Python's standard
-library and the accompanying SOL modules.
+Keep the project files together. The executable is `sol.py`, but its corpus reader also needs `sol_corpus_contract.py`. The conversion helpers should remain alongside them.
 
-On Debian/Ubuntu, from the project directory:
-
-```sh
-sudo apt install poppler-utils
-python3 -m venv .venv
-. .venv/bin/activate
-python3 -m pip install -r requirements-corpus.txt
-python3 sol_corpus.py convert --pdf sources/georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf
-```
-
-If `local-corpus/` already exists, do not convert again. Edit its canonical
-Markdown and rebuild the index instead:
-
-```sh
-python3 sol_corpus.py index local-corpus
-python3 sol_corpus_contract.py local-corpus --check
-```
-
-The converter refuses to overwrite an existing corpus. It records source
-coverage and review issues, including the supplied PDF's missing front-matter
-printed pages **l** and **lxix**. Accounting for the available PDF is not proof
-that it contains the complete published edition.
-
-## Make `sol` available in the terminal
-
-Keep the project files together. `sol.py` is the executable, but it is no longer
-a self-contained single file: its corpus reader requires
-`sol_corpus_contract.py` beside it. The converter's other helper modules must
-also remain in the project directory.
-
-Replace `/absolute/path/to/SOL/sol.py` below with your script's actual path:
+To make `sol` available in the terminal, replace the example path with your project’s actual location:
 
 ```sh
 chmod +x /absolute/path/to/SOL/sol.py
@@ -71,19 +26,50 @@ mkdir -p ~/.local/bin
 ln -s /absolute/path/to/SOL/sol.py ~/.local/bin/sol
 ```
 
-If that link already points to your script, leave it alone; edits update the
-command too. Ensure `~/.local/bin` is in your `PATH`, then open a new terminal.
-You can also use `python3 /absolute/path/to/SOL/sol.py` directly.
+If that link already points to your script, leave it unchanged. Ensure `~/.local/bin` is in your `PATH`.
 
-`sol` looks for `local-corpus/corpus.json` in the **current working directory**,
-not beside the script. Run it from the project directory for flag-free reading.
-From elsewhere, select the corpus explicitly:
+SOL looks for `local-corpus/corpus.json` in the current working directory. Run it from the project directory to read without supplying a flag:
+
+```sh
+sol
+```
+
+From another directory, select the corpus explicitly:
 
 ```sh
 sol --corpus /absolute/path/to/SOL/local-corpus
 ```
 
-## Read and navigate
+You can also run `python3 sol.py` directly from the project directory.
+
+## Preparing and maintaining the corpus
+
+Conversion requires Poppler’s PDF tools and `markdown-it-py`. Rebuilding the index requires the Markdown parser but does not need to extract the PDF again.
+
+On Debian or Ubuntu, run these commands from the project directory:
+
+```sh
+sudo apt install poppler-utils python3-venv
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install -r requirements-corpus.txt
+python3 sol_corpus.py convert --pdf sources/georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf
+```
+
+The importer is tied to the specifically audited source PDF. Other editions or files need deliberate adaptation.
+
+If `local-corpus/` already exists, do not convert it again. Make corrections in its canonical Markdown, then rebuild and validate:
+
+```sh
+python3 sol_corpus.py index local-corpus
+python3 sol_corpus_contract.py local-corpus --check
+```
+
+The converter refuses to overwrite an existing corpus. Permanent identifiers must survive corrections so that references, annotations, and experiments remain meaningful.
+
+The source PDF is missing printed front matter pages **l** and **lxix**. These gaps are recorded explicitly rather than filled with invented text. Complex mathematical passages retain source images for review.
+
+## Reading and navigation
 
 ```sh
 sol
@@ -95,15 +81,11 @@ sol --cat /concept/foreword
 sol --shell
 ```
 
-`--read` chooses a random prose paragraph within a directory or file. `--first`
-starts at its first passage in book order. `--cat` prints a complete virtual
-file in order. `--width` accepts 20–240 columns. Formula-only records are retained
-for ordered reading but excluded from random quotation selection. A paragraph
-mixing prose and uncertain mathematics remains a paragraph; when flagged
-`random_eligible: false`, it stays in sequential reading and `cat` but is also
-excluded from random quotations. Its source facsimile supports visual review.
+`--read` selects a random paragraph within a location. `--first` begins in book order. `--cat` prints a complete virtual file. `--width` accepts values between 20 and 240 columns.
 
-An interactive example:
+Some paragraphs containing uncertain mathematics are excluded from random quotations but remain available through ordered reading. Their source images support checking the transcription.
+
+The interactive reader treats the book as a virtual filesystem:
 
 ```text
 sol:/$ cd being
@@ -115,101 +97,94 @@ sol:/BEING/i-determinateness-quality/2-existence$ next
 sol:/BEING/i-determinateness-quality/2-existence$ previous
 ```
 
-Sections, chapters, subdivisions, and Remarks are explicit virtual nodes.
-Divisions with children are directories; their own prose appears as
-`00-introduction.txt`. Leaf divisions are text files. These are navigation
-paths, not a requirement to create a separate physical file for every heading.
-The canonical Markdown retains the edition's fuller volume/shared-preface
-hierarchy behind the three-doctrine convenience view.
+Sections, chapters, subdivisions, and Remarks appear as explicit nodes. Divisions containing other divisions are directories. Their introductory prose appears as `00-introduction.txt`; divisions without children become text files.
 
-The corpus paths follow the book's labels—for example `i-`, `1-`, and `a-`—rather
-than the legacy reader's artificial `05-` and `02-` prefixes. Paths are
-case-insensitive. Arabic-number and A–D prefixes and `.txt` may be omitted when
-the remaining name is unambiguous: `existence` resolves to `2-existence`.
-The examples retain Roman section prefixes as listed by `ls`. Tab completion
-is available with Python's optional standard-library `readline` module.
+These paths organize navigation. They do not require a separate physical file for every heading. The canonical corpus preserves the fuller volume and preface hierarchy behind the three doctrine view.
 
-| Shell command | Meaning |
-| --- | --- |
-| `ls [PATH]` | List a location. |
-| `cd PATH` | Change location; `/` and `..` work. |
-| `pwd` | Show the current virtual path. |
-| `tree [PATH]` | Show a location and its descendants. |
-| `read [PATH]` | Select a random prose passage and start a reading sequence. |
-| `first [PATH]` | Start the selection in book order. |
-| `next` | Read the next passage in the selection. |
-| `previous` or `prev` | Read the previous passage. |
-| `cat FILE` | Print the complete file in source order. |
-| `help` | Show help. |
-| `exit` or `quit` | Leave SOL. |
+Paths are insensitive to case. Numbered, lettered, Roman, and Greek prefixes can be omitted when the result is unambiguous. For example, `existence` resolves to `2-existence`.
 
-`read` and `first` establish the scope for `next` and `previous`. Changing
-directory resets that selection. With no selection, `next` starts at the first
-passage in the current directory; `previous` asks you to start first. Reaching
-an end reports it without jumping elsewhere. `cat` leaves the cursor unchanged.
+Inside the reader, `ls` lists a location, `cd` changes it, `pwd` shows the current path, and `tree` displays its descendants. Both `/` and `..` work.
 
-## Legacy PDF fallback
+`read` begins with a random passage; `first` begins in source order. Both establish a selection for `next` and `previous`. Changing directory resets that selection. Reaching its end does not jump elsewhere.
 
-If the default local corpus has no manifest, SOL can still use the original
-Cambridge PDF. It looks for this filename in the working directory, then in
-its `sources/` subdirectory:
+`cat` prints a complete file without moving the reading cursor. Use `help` for guidance and `exit` or `quit` to leave. Tab completion is available through Python’s optional `readline` module.
+
+## PDF fallback
+
+When no default corpus manifest exists, SOL can read the original PDF. It looks in the working directory, then in `sources/`, for:
 
 ```text
 georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf
 ```
 
-Explicitly choose that mode with:
+You can select a PDF explicitly:
 
 ```sh
 sol --pdf /absolute/path/to/file.pdf
 ```
 
-`--pdf` and `--corpus` cannot be combined. A present but invalid/stale corpus
-produces a correction/reindexing error; it never silently falls back to the PDF.
-The legacy mode requires Poppler, has a less complete hierarchy, and omits the
-footnote apparatus. Its page-based paragraph IDs are deterministic for that
-extractor version but can change with extraction improvements. They are not the
-permanent UUIDs embedded in canonical Markdown.
+The PDF reader requires Poppler and has a less complete hierarchy and note apparatus. Its identifiers are not the permanent corpus UUIDs.
 
-## Project layout and verification
+`--pdf` and `--corpus` cannot be combined. An existing but invalid corpus produces an error rather than silently switching to PDF extraction.
 
-| File | Responsibility |
-| --- | --- |
-| `sol.py` | CLI, reader model, virtual filesystem, wrapping, and legacy PDF fallback. |
-| `sol_corpus.py` | One-time importer and indexing command. |
-| `sol_corpus_contract.py` | Canonical records, CommonMark indexing, graph/provenance validation, and integrity checks. |
-| `sol_corpus_structure.py` | Edition-specific structural anchors and hierarchy audit. |
-| `sol_corpus_notes.py` | Footnote segmentation. |
-| `sol_corpus_references.py` | Bibliography/index segmentation and column reading order. |
-| `tests/` | Synthetic fixtures and optional checks against the local PDF. |
+## Project organization and verification
 
-`load_corpus_book(corpus_path)` returns a `Book` with its tree and ordered
-`Passage` records. The full JSONL includes additional canonical content categories
-for scripts and classifiers, with attribution, parents, source spans, and links.
+`sol.py` contains the reader, command interface, virtual filesystem, text wrapping, and PDF fallback.
 
-Run the synthetic tests:
+`sol_corpus.py` provides conversion and indexing. `sol_corpus_contract.py` defines canonical records, Markdown parsing, validation, and integrity checks.
+
+`sol_corpus_structure.py`, `sol_corpus_notes.py`, and `sol_corpus_references.py` handle the source hierarchy, footnotes, bibliography, and index.
+
+The generated JSONL exposes text, identifiers, attribution, parent relationships, and source references for scripts, classifiers, and agents.
+
+After installing the corpus dependencies, run the tests:
 
 ```sh
 python3 -m unittest discover -s tests -v
 ```
 
-Source-specific tests can be enabled locally without putting book excerpts in
-the test files:
+To include checks against the source PDF:
 
 ```sh
 SOL_TEST_PDF="$PWD/sources/georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf" python3 -m unittest discover -s tests -v
 ```
 
-Coverage, graph, and formatting tests are safeguards, not substitutes for human
-proofreading. Complex mathematics remains flagged for visual review; inspect
-the preserved source facsimile/PDF when its layout matters. Corrections can retain
-retired UUIDs as `retired_record` tombstones with redirects rather than silently
-reusing or deleting their identities. Exclude tombstones from classifier text.
+Validation supports proofreading; it does not replace it. When records need to be merged or retired, their identifiers can remain as tombstones with redirects. Classifiers should exclude those historical records from their input text.
 
-## Future packaging
+## Future packaging and direction
 
-A later `pyproject.toml` can package these modules and expose
-`sol = "sol:main"` as a console-script entry. The copyrighted corpus must not be
-bundled without redistribution rights. Search, annotations, and evaluated
-classification should build on the stable corpus contract before expanding the
-shell or operating-system ambitions.
+SOL should develop gradually, with each stage providing something useful and understandable before the next begins. The following are directions for development, not features already implemented.
+
+### A research reader
+
+The next step is searching, bookmarks, annotations, and convenient passage references built on the existing permanent identifiers.
+
+A command such as `search "ground"` could return passages with their locations and page references. Exact word searches, searches for recurring expressions, and conceptual searches should remain distinguishable. A semantic match should explain how it was found rather than presenting similarity as certainty.
+
+Annotations could connect passages without modifying the underlying transcription. Reading sequences and saved selections could make an interpretation reproducible and shareable.
+
+### An experimental text laboratory
+
+Begin with transparent measurements: word frequencies, concordances, vocabulary differences between doctrines, and recurring expressions. Then introduce classification, clustering, and topic modeling.
+
+Each method should answer a research question. Three questions provide a useful foundation:
+
+1. **Can a model recover the book’s explicit organization?** Predicting Being, Essence, or Concept from a paragraph introduces supervised classification and evaluation.
+
+2. **What organization does a model discover independently?** Clustering passages without chapter labels introduces unsupervised learning and the interpretation of discovered patterns.
+
+3. **Where do learned patterns depart from Hegel’s organization?** Comparing similar vocabulary across distant divisions brings statistical relationships into conversation with philosophical structure.
+
+Experiments should record their corpus version, preprocessing, settings, and evaluation procedure. Statistical similarity is evidence to investigate, not a substitute for interpreting Hegel’s argument.
+
+### A reproducible environment
+
+Once the reader and experiments are useful, their dependencies and configuration should become reproducible.
+
+Python packaging can provide a `pyproject.toml`, optional dependencies for conversion and analysis, and a console entry such as `sol = "sol:main"`. Installation should become straightforward without coupling every reader to every experimental tool.
+
+A Nix development environment could then bring the reader, corpus tools, and selected research workflows together. From there, SOL could grow into a curated environment and eventually a NixOS distribution with a distinctive purpose: organizing and investigating knowledge.
+
+The terminal interface may develop into a richer shell for navigating texts and running experiments. An adapted terminal emulator could follow if those workflows genuinely benefit from it.
+
+SOL's ambition is to connect existing tools through an increasingly coherent environment, while keeping its methods inspectable and its development an opportunity to learn.
