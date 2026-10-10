@@ -152,7 +152,7 @@ class CorpusReaderTests(unittest.TestCase):
             status, _, stderr = self.run_main([])
         self.assertEqual(status, 2)
         self.assertIn("rebuild the index", stderr)
-        self.assertIn("sol_corpus_contract.py", stderr)
+        self.assertIn("-m sol_corpus_contract", stderr)
 
     def test_invalid_reader_path_is_rejected(self) -> None:
         self.pairs[2][0]["reader_path"] = "/BEING/../wrong.txt"

@@ -13,6 +13,8 @@ from collections import Counter
 from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import cached_property
+import json
+import os
 import random
 import re
 import shlex
@@ -34,6 +36,7 @@ FIRST_TEXT_PAGE = 80
 LAST_TEXT_PAGE = 826
 PRINTED_PAGE_OFFSET = 73
 XML_NS = {"p": "http://www.w3.org/1999/xhtml"}
+VERSION = "0.1.0"
 
 
 @dataclass
@@ -66,6 +69,8 @@ class Passage:
     heading: str = ""
     kind: str = "paragraph"
     random_eligible: bool = True
+    transcription_status: str = ""
+    facsimile_labels: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -129,12 +134,54 @@ class Page:
 class Book:
     root: Node
     passages: list[Passage]
+    redirects: dict[str, str] = field(default_factory=dict)
 
     def selection(self, path: tuple[str, ...]) -> list[Passage]:
         matches = [p for p in self.passages if p.path[:len(path)] == path]
         if not matches:
             raise ValueError("this location has no prose")
         return matches
+
+    def find_passage(self, identifier: str) -> Passage:
+        """Resolve an exact ID, retired ID, or unambiguous prefix."""
+        identifier = identifier.strip().casefold()
+        if not identifier:
+            raise ValueError("a passage identifier is required")
+        by_id = {passage.identifier.casefold(): passage for passage in self.passages}
+        redirects = {key.casefold(): value.casefold() for key, value in self.redirects.items()}
+        candidates = [key for key in (*by_id, *redirects) if key.startswith(identifier)]
+        if identifier in by_id or identifier in redirects:
+            target = identifier
+        elif len(candidates) == 1:
+            target = candidates[0]
+        elif len(candidates) > 1:
+            raise ValueError("ambiguous identifier; use more of the passage ID")
+        else:
+            raise ValueError(f"no passage with identifier: {identifier}")
+        seen: set[str] = set()
+        while target in redirects:
+            if target in seen:
+                raise ValueError("invalid passage redirect cycle")
+            seen.add(target)
+            target = redirects[target]
+        if target not in by_id:
+            raise ValueError("this identifier does not refer to a readable Hegel passage")
+        return by_id[target]
+
+    def search(self, query: str, path: tuple[str, ...] = (),
+               whole_word: bool = False, limit: int = 20) -> list[Passage]:
+        """Literal Unicode search in a subtree, preserving book order."""
+        if not query.strip():
+            raise ValueError("search requires a nonempty query")
+        if not 1 <= limit <= 1000:
+            raise ValueError("search limit must be between 1 and 1000")
+        pattern = re.escape(unicodedata.normalize("NFC", query.strip()).casefold())
+        if whole_word:
+            pattern = rf"(?<!\w){pattern}(?!\w)"
+        expression = re.compile(pattern)
+        return [passage for passage in self.selection(path)
+                if expression.search(unicodedata.normalize("NFC", presentation_text(
+                    passage.text, passage.facsimile_labels)).casefold())][:limit]
 
 
 # Directories are divisions that contain further divisions. Files are passages
@@ -856,7 +903,7 @@ def load_corpus_book(corpus: Path) -> Book:
     try:
         records = load_index(corpus, verify=True)
     except CorpusError as error:
-        instruction = f"python3 sol_corpus_contract.py {shlex.quote(str(corpus))}"
+        instruction = f"{shlex.quote(sys.executable)} -m sol_corpus_contract {shlex.quote(str(corpus))}"
         raise ValueError(
             f"Cannot use local corpus {corpus}: {error}\n"
             f"After correcting canonical Markdown if necessary, rebuild the index with:\n{instruction}"
@@ -948,6 +995,9 @@ def load_corpus_book(corpus: Path) -> Book:
             record["plain_text"], first["pdf_page"], printed(first, record["id"]),
             node, path, last["pdf_page"], printed(last, record["id"]),
             record["id"], record.get("heading", title), record["type"], eligible,
+            record.get("transcription_status", ""),
+            tuple(re.findall(r"(?m)^!\[(Source facsimile, printed page [0-9ivxlcdm]+)\]"
+                             r"\((?:\.\./)*assets/[^\s)]+\.png\)\s*$", record.get("markdown", ""))),
         ))
 
     for path, node in nodes.items():
@@ -960,7 +1010,9 @@ def load_corpus_book(corpus: Path) -> Book:
         )))
     if not passages:
         raise ValueError("The local corpus contains no indexed Hegel main-text paragraphs for the reader")
-    return Book(root, passages)
+    redirects = {record["id"]: record["redirect_id"] for record in records
+                 if record["type"] == "retired_record"}
+    return Book(root, passages, redirects)
 
 
 # 5. Navigation and display: no PDF extraction details belong in the shell.
@@ -988,22 +1040,167 @@ def page_range(start: int, end: int) -> str:
     return str(start) if start == end else f"{start}–{end}"
 
 
-def render_passage(passage: Passage, width: int) -> str:
-    metadata = (
-        f"Book pp. {page_range(passage.printed_page, passage.end_printed_page)} · "
-        f"PDF pp. {page_range(passage.pdf_page, passage.end_pdf_page)} · "
-        f"{passage.identifier}"
-    )
+def source_line(passage: Passage) -> str:
+    book_label = "p." if passage.printed_page == passage.end_printed_page else "pp."
+    pdf_label = "p." if passage.pdf_page == passage.end_pdf_page else "pp."
+    return (f"Book {book_label} {page_range(passage.printed_page, passage.end_printed_page)} · "
+            f"PDF {pdf_label} {page_range(passage.pdf_page, passage.end_pdf_page)}")
+
+
+def fold_path(path: tuple[str, ...], width: int) -> str:
+    """Prefer path-component boundaries over splitting directory names."""
+    if len(display_path(path)) <= width:
+        return display_path(path)
+    lines: list[str] = []
+    current = "/"
+    for index, component in enumerate(path):
+        token = component + ("/" if index < len(path) - 1 else "")
+        if len(current) + len(token) <= width:
+            current += token
+            continue
+        if current not in {"/", "  "}:
+            lines.append(current)
+            current = "  "
+        wrapped = textwrap.wrap(token, width=width, initial_indent=current,
+                                subsequent_indent="  ", break_on_hyphens=True)
+        lines.extend(wrapped[:-1])
+        current = wrapped[-1]
+    lines.append(current)
+    return "\n".join(lines)
+
+
+def presentation_text(text: str, facsimile_labels: tuple[str, ...] = ()) -> str:
+    """Exclude generated facsimile captions from the terminal prose only."""
+    for label in facsimile_labels:
+        text = re.sub(r"(?m)^[ \t]*" + re.escape(label) + r"[ \t]*$", "", text)
+    return text.strip()
+
+
+def fold_body(text: str, width: int) -> str:
+    """Wrap meaningful lines independently, including hanging list indents."""
+    lines = []
+    for line in text.strip().splitlines():
+        if not line.strip():
+            if lines and lines[-1] != "":
+                lines.append("")
+            continue
+        match = re.match(r"^(\s*)(?:(?:[-*+]|\d+[.)])\s+)?", line)
+        indent = match.group(0) if match else ""
+        continuation = " " * min(len(indent), max(0, width - 4))
+        lines.append(textwrap.fill(line, width=width, subsequent_indent=continuation,
+                                   replace_whitespace=False, expand_tabs=False,
+                                   break_on_hyphens=False))
+    return "\n".join(lines)
+
+
+def render_passage(passage: Passage, width: int, plain: bool = False,
+                   color: bool = False) -> str:
+    body = fold_body(presentation_text(passage.text, passage.facsimile_labels), width)
+    if plain:
+        return body
+    metadata = source_line(passage)
     title = passage.heading or passage.node.title
+    def styled(value: str, code: str) -> str:
+        return f"\x1b[{code}m{value}\x1b[0m" if color else value
     return "\n".join((
-        textwrap.fill(display_path(passage.path), width=width, break_on_hyphens=False),
-        textwrap.fill(title, width=width, break_on_hyphens=False),
-        textwrap.fill(metadata, width=width),
+        styled(textwrap.fill(title, width=width, break_on_hyphens=False), "1"),
+        styled(fold_path(passage.path, width), "2"),
+        styled(textwrap.fill(metadata, width=width, break_on_hyphens=False), "2"),
+        styled(textwrap.fill(f"ID {passage.identifier}", width=width, break_on_hyphens=False), "2"),
         *(() if passage.random_eligible and passage.kind != "formula" else
-          ("Math transcription needs source review; see the Markdown facsimile.",)),
-        "─" * width,
-        textwrap.fill(passage.text, width=width, break_long_words=True, break_on_hyphens=False),
+          (textwrap.fill("Math transcription needs source review; see the Markdown facsimile.", width=width),)),
+        "",
+        body,
     ))
+
+
+def passage_data(passage: Passage) -> dict:
+    return {
+        "id": passage.identifier, "type": passage.kind,
+        "heading": passage.heading or passage.node.title, "path": display_path(passage.path),
+        "text": presentation_text(passage.text, passage.facsimile_labels),
+        "printed_page": passage.printed_page, "end_printed_page": passage.end_printed_page,
+        "pdf_page": passage.pdf_page, "end_pdf_page": passage.end_pdf_page,
+        "random_eligible": passage.random_eligible,
+        "transcription_status": passage.transcription_status or None,
+    }
+
+
+def context_passages(book: Book, passage: Passage, radius: int) -> list[Passage]:
+    if not 0 <= radius <= 10:
+        raise ValueError("context must be between 0 and 10 paragraphs on each side")
+    index = next((i for i, item in enumerate(book.passages)
+                  if item.identifier == passage.identifier), None)
+    if index is None:
+        raise ValueError("this passage is not in the book")
+    return book.passages[max(0, index - radius):index + radius + 1]
+
+
+def render_context(book: Book, passage: Passage, radius: int, width: int,
+                   plain: bool = False, color: bool = False) -> str:
+    return "\n\n".join(render_passage(item, width, plain, color)
+                        for item in context_passages(book, passage, radius))
+
+
+def render_search_results(passages: list[Passage], query: str, width: int,
+                          whole_word: bool = False) -> str:
+    if not passages:
+        return f"No matches for {query!r}."
+    lines = [f"{len(passages)} result(s) for {query!r}. Showing up to the selected limit.", ""]
+    for number, passage in enumerate(passages, 1):
+        text = unicodedata.normalize("NFC", " ".join(presentation_text(
+            passage.text, passage.facsimile_labels).split()))
+        pattern = re.escape(unicodedata.normalize("NFC", query.strip()).casefold())
+        if whole_word:
+            pattern = rf"(?<!\w){pattern}(?!\w)"
+        found = re.search(pattern, text.casefold())
+        # Case folding can expand a character, as with German sharp s. Map
+        # the match back to the displayed text rather than using its offset.
+        offsets = [index for index, character in enumerate(text)
+                   for _ in character.casefold()]
+        match_start = offsets[found.start()] if found and found.start() < len(offsets) else 0
+        start = max(0, match_start - 35) if found else 0
+        if start and text[start - 1] != " ":
+            boundary = text.find(" ", start, match_start)
+            start = boundary + 1 if boundary != -1 else match_start
+        end = min(len(text), start + 180)
+        if end < len(text):
+            boundary = text.rfind(" ", start, end)
+            if boundary > start:
+                end = boundary
+        excerpt = ("..." if start else "") + text[start:end]
+        if end < len(text):
+            excerpt += "..."
+        lines.extend((textwrap.fill(f"{number}. {passage.heading or passage.node.title}", width=width),
+                      fold_path(passage.path, width),
+                      textwrap.fill(source_line(passage), width=width),
+                      textwrap.fill(f"ID {passage.identifier}", width=width, break_on_hyphens=False),
+                      textwrap.fill(excerpt, width=width, break_on_hyphens=False), ""))
+    return "\n".join(lines).rstrip()
+
+
+def location_data(book: Book, node: Node, path: tuple[str, ...]) -> dict:
+    passages = [item for item in book.passages if item.path[:len(path)] == path]
+    return {
+        "title": node.title, "path": display_path(path), "directory": node.is_directory,
+        "children": len(node.children), "passages": len(passages),
+        "printed_page": min((item.printed_page for item in passages), default=None),
+        "end_printed_page": max((item.end_printed_page for item in passages), default=None),
+        "pdf_page": min((item.pdf_page for item in passages), default=None),
+        "end_pdf_page": max((item.end_pdf_page for item in passages), default=None),
+        "pending_review": sum(not item.random_eligible or item.kind == "formula" for item in passages),
+    }
+
+
+def render_info(book: Book, node: Node, path: tuple[str, ...], width: int = 80) -> str:
+    data = location_data(book, node, path)
+    lines = [data["title"], data["path"],
+             f"{data['passages']} passages · {data['children']} children · "
+             f"{data['pending_review']} awaiting source review"]
+    if data["printed_page"] is not None:
+        lines.append(f"Book pp. {page_range(data['printed_page'], data['end_printed_page'])} · "
+                     f"PDF pp. {page_range(data['pdf_page'], data['end_pdf_page'])}")
+    return "\n".join(textwrap.fill(line, width=width, break_on_hyphens=False) for line in lines)
 
 
 def alias(name: str) -> str:
@@ -1055,19 +1252,73 @@ def render_listing(node: Node) -> str:
     )
 
 
-def render_tree(node: Node = ROOT, prefix: str = "", include_self: bool = True) -> str:
+def render_tree(node: Node = ROOT, prefix: str = "", include_self: bool = True,
+                depth: int | None = None, ascii_only: bool = False) -> str:
+    if depth is not None and not 0 <= depth <= 32:
+        raise ValueError("tree depth must be between 0 and 32")
     lines = []
     if include_self:
         lines.append(("/" if not node.name else node.name + ("/" if node.is_directory else ""))
                      + f"  {node.title}")
+    if depth == 0:
+        if node.children:
+            lines.append(prefix + ("    ..." if ascii_only else "    …"))
+        result = "\n".join(lines)
+        return unicodedata.normalize("NFKD", result).encode("ascii", "backslashreplace").decode() if ascii_only else result
     for index, child in enumerate(node.children):
         last = index == len(node.children) - 1
-        connector, extension = ("└── ", "    ") if last else ("├── ", "│   ")
+        if ascii_only:
+            connector, extension = ("`-- ", "    ") if last else ("+-- ", "|   ")
+        else:
+            connector, extension = ("└── ", "    ") if last else ("├── ", "│   ")
         suffix = "/" if child.is_directory else ""
-        lines.append(f"{prefix}{connector}{child.name}{suffix}  · p. {child.start_page}")
+        separator = "  p. " if ascii_only else "  · p. "
+        lines.append(f"{prefix}{connector}{child.name}{suffix}{separator}{child.start_page}")
         if child.children:
-            lines.extend(render_tree(child, prefix + extension, False).splitlines())
-    return "\n".join(lines)
+            lines.extend(render_tree(child, prefix + extension, False,
+                                     None if depth is None else depth - 1, ascii_only).splitlines())
+    result = "\n".join(lines)
+    return unicodedata.normalize("NFKD", result).encode("ascii", "backslashreplace").decode() if ascii_only else result
+
+
+def render_visual_help(book: Book | None = None, width: int = 80, depth: int = 2,
+                       node: Node | None = None) -> str:
+    """A portable ASCII manual using the actual loaded navigation tree."""
+    title = r""" ___   ___   _
+/ __| / _ \ | |
+\__ \| (_) || |__
+|___/ \___/ |____|
+
+SOL: SOL Organizes Logic
+
+PROJECT ROADMAP
+SOL
+ |
+ +-- BEING    CLI, reader, virtual shell  [current work]
+ +-- ESSENCE  applications, terminal emulator, classifiers
+ `-- CONCEPT  operating system, NixOS, Hyprland
+
+BOOK TREE"""
+    outline = render_tree(node or (book.root if book is not None else ROOT),
+                          depth=depth, ascii_only=True)
+    notice = "" if book is not None else "\nAbbreviated fallback outline. Load a corpus for the full book structure.\n"
+    guide = (
+        "Directories contain divisions. Their own prose is 00-introduction.txt; "
+        "leaf divisions are text files. An ellipsis marks deeper hidden divisions.\n\n"
+        "READ: first [PATH], read [PATH], next, previous, cat FILE\n"
+        "EXPLORE: ls [PATH], tree [PATH] --depth N, info [PATH]\n"
+        "NAVIGATE: cd PATH, up, cd -, pwd\n"
+        "RESEARCH: search QUERY [PATH] --word --limit N, open ID|RESULT, context N\n\n"
+        "Example: cd /essence; search \"ground\" --word; open 1; context 2\n"
+        "Type each example command separately inside sol --shell.\n"
+        "CLI: sol --search \"ground\" --within /essence --word\n"
+        "CLI: sol --passage ID --context 2; sol --info /being\n"
+        "OUTPUT: --plain for passage text; --json for structured CLI results\n"
+        "Type help for command syntax; exit to leave."
+    )
+    folded = "\n".join(textwrap.fill(line, width=width, break_on_hyphens=False)
+                        if line else "" for line in guide.splitlines())
+    return "\n".join((title, outline, notice, folded))
 
 
 @dataclass
@@ -1076,6 +1327,20 @@ class ReadingSession:
     book: Book
     path: tuple[str, ...] = ()
     cursor: int | None = None
+
+    def current(self) -> Passage:
+        if self.cursor is None:
+            raise ValueError("no current paragraph; use first, read, or open")
+        return self.book.selection(self.path)[self.cursor]
+
+    def open(self, identifier: str) -> Passage:
+        passage = self.book.find_passage(identifier)
+        if self.cursor is None or passage.path[:len(self.path)] != self.path:
+            self.path = passage.path
+        matches = self.book.selection(self.path)
+        self.cursor = next(index for index, item in enumerate(matches)
+                           if item.identifier == passage.identifier)
+        return passage
 
     def read(self, path: tuple[str, ...], first: bool = False) -> Passage:
         matches = self.book.selection(path)
@@ -1111,7 +1376,8 @@ def install_completion(root: Node, get_cwd):
         return lambda: None
     old_completer = readline.get_completer()
     old_delimiters = readline.get_completer_delims()
-    commands = ("ls", "cd", "pwd", "tree", "read", "first", "next", "previous", "cat", "help", "exit")
+    commands = ("ls", "cd", "up", "pwd", "tree", "read", "first", "next", "previous",
+                "cat", "search", "open", "context", "info", "where", "visual-help", "help", "exit")
     def complete(text: str, state: int):
         try:
             buffer = readline.get_line_buffer()
@@ -1137,25 +1403,53 @@ def install_completion(root: Node, get_cwd):
     return restore
 
 
-SHELL_HELP = """ls [PATH]      list files and divisions
-cd [PATH]      navigate (.. goes up; / goes to root)
-pwd            print the current path
-tree [PATH]    show the nested outline
-read [PATH]    read a random paragraph and set the reading cursor
-first [PATH]   start reading the selection in book order
-next           read the next paragraph in the same selection
-previous       return to the previous paragraph
-cat FILE       display the complete file in book order
-help           show these commands
-exit           leave SOL
-Paths accept lowercase names without numeric prefixes; Tab completes full names."""
+SHELL_HELP = """ls [PATH]                         list files and divisions
+cd [PATH]                         navigate (/ root; .. parent; - previous)
+up                                move to the parent directory
+pwd                               print the current directory
+tree [PATH] --depth N              show the outline; default is the full tree
+read [PATH]                        read randomly and set the reading cursor
+first [PATH]                       start the selection in book order
+next / previous                   move within the reading selection
+cat FILE                          display the complete file in book order
+search QUERY [PATH] --word --limit N
+                                  literal search (default: current subtree)
+open ID|RESULT                    open a passage or latest search result
+context [N]                       neighbors in book order (default 1; maximum 10)
+where                             show current passage and reading position
+info [PATH]                       title, pages, counts, and pending review
+visual-help [PATH] --depth N       ASCII guide and book tree (default depth 2)
+help / exit                       show commands / leave SOL
+Search does not move the reading cursor. Context can cross file boundaries.
+Quote multiword queries. Paths accept aliases; Tab completes full names.
+This is a book-navigation shell: type one command per line."""
 
 
-def run_shell(book: Book, width: int) -> int:
+class ShellParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise ValueError(message)
+
+
+def shell_options(verb: str, arguments: list[str]) -> argparse.Namespace:
+    parser = ShellParser(prog=verb, add_help=False)
+    if verb == "search":
+        parser.add_argument("query")
+        parser.add_argument("path", nargs="?")
+        parser.add_argument("--word", action="store_true")
+        parser.add_argument("--limit", type=int, default=20)
+    else:
+        parser.add_argument("path", nargs="?")
+        parser.add_argument("--depth", type=int, default=2 if verb == "visual-help" else None)
+    return parser.parse_args(arguments)
+
+
+def run_shell(book: Book, width: int, plain: bool = False, color: bool = False) -> int:
     cwd: tuple[str, ...] = ()
+    previous_cwd: tuple[str, ...] | None = None
+    results: list[Passage] = []
     session = ReadingSession(book)
     restore = install_completion(book.root, lambda: cwd)
-    print("SOL — Soul Organizes Logic. Type 'help'; Tab completes paths.")
+    print("SOL. Type 'visual-help' for the guide; 'help' for commands.")
     try:
         while True:
             try:
@@ -1171,38 +1465,87 @@ def run_shell(book: Book, width: int) -> int:
                 if not parts:
                     continue
                 verb, arguments = parts[0], parts[1:]
+                if verb in {"search", "tree", "visual-help"}:
+                    options = shell_options(verb, arguments)
+                    node, path = resolve_path(options.path, cwd, book.root)
+                    if verb == "search":
+                        matches = book.search(options.query, path, options.word, options.limit)
+                        results = matches
+                        print(render_search_results(matches, options.query, width, options.word))
+                    elif verb == "tree":
+                        print(render_tree(node, depth=options.depth))
+                    else:
+                        print(render_visual_help(book, width, options.depth, node))
+                    continue
                 if len(arguments) > 1:
-                    raise ValueError("expected at most one path")
+                    raise ValueError(f"{verb} expects at most one argument")
                 argument = arguments[0] if arguments else None
                 if verb in {"exit", "quit"}:
+                    if argument is not None:
+                        raise ValueError(f"{verb} does not take an argument")
                     return 0
                 if verb == "help":
+                    if argument is not None:
+                        raise ValueError("help does not take an argument")
                     print(SHELL_HELP)
                 elif verb == "pwd":
+                    if argument is not None:
+                        raise ValueError("pwd does not take an argument")
                     print(display_path(cwd))
                 elif verb in {"next", "previous", "prev"}:
-                    if argument:
+                    if argument is not None:
                         raise ValueError(f"{verb} does not take a path")
-                    print(render_passage(session.move(1 if verb == "next" else -1), width))
-                elif verb == "cd":
-                    node, path = resolve_path(argument or "/", cwd, book.root)
+                    print(render_passage(session.move(1 if verb == "next" else -1), width, plain, color))
+                elif verb in {"cd", "up"}:
+                    if verb == "up" and argument is not None:
+                        raise ValueError("up does not take an argument")
+                    if verb == "cd" and argument == "-":
+                        if previous_cwd is None:
+                            raise ValueError("no previous directory")
+                        node, path = resolve_path(display_path(previous_cwd), (), book.root)
+                    else:
+                        node, path = resolve_path(".." if verb == "up" else argument or "/", cwd, book.root)
                     if not node.is_directory:
                         raise ValueError("not a directory")
+                    if path != cwd:
+                        previous_cwd = cwd
                     cwd = path
                     session.path, session.cursor = cwd, None
-                elif verb in {"ls", "tree", "read", "first", "cat"}:
+                elif verb == "open":
+                    if argument is None:
+                        raise ValueError("open requires a passage ID or search result number")
+                    if argument.isdecimal():
+                        number = int(argument)
+                        if not 1 <= number <= len(results):
+                            raise ValueError("no such result in the latest search")
+                        identifier = results[number - 1].identifier
+                    else:
+                        identifier = argument
+                    print(render_passage(session.open(identifier), width, plain, color))
+                elif verb == "context":
+                    radius = 1 if argument is None else int(argument)
+                    print(render_context(book, session.current(), radius, width, plain, color))
+                elif verb == "where":
+                    if argument is not None:
+                        raise ValueError("where does not take an argument")
+                    current = session.current()
+                    print(render_info(book, current.node, current.path, width))
+                    print(f"ID {current.identifier}")
+                    print(f"Position {session.cursor + 1} of {len(book.selection(session.path))} "
+                          f"in {display_path(session.path)}")
+                elif verb in {"ls", "read", "first", "cat", "info"}:
                     node, path = resolve_path(argument, cwd, book.root)
                     if verb == "ls":
                         print(render_listing(node))
-                    elif verb == "tree":
-                        print(render_tree(node))
+                    elif verb == "info":
+                        print(render_info(book, node, path, width))
                     elif verb in {"read", "first"}:
-                        print(render_passage(session.read(path, verb == "first"), width))
+                        print(render_passage(session.read(path, verb == "first"), width, plain, color))
                     else:
                         if node.is_directory:
                             raise ValueError("cat takes a file; use first or read for a directory")
                         for passage in book.selection(path):
-                            print(render_passage(passage, width), end="\n\n")
+                            print(render_passage(passage, width, plain, color), end="\n\n")
                 else:
                     raise ValueError(f"unknown command: {verb}; type help")
             except ValueError as error:
@@ -1220,19 +1563,81 @@ def default_pdf() -> Path:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sol", description="Read and navigate Hegel's Science of Logic.")
+    parser.add_argument("command", nargs="?", choices=("visual-help",), help="open the ASCII manual")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--structure", action="store_true", help="show the outline (prefer the indexed local corpus)")
+    mode.add_argument("--visual-help", action="store_true", help="ASCII manual, roadmap, and book tree")
     mode.add_argument("--shell", action="store_true", help="open the interactive reader")
     mode.add_argument("--read", metavar="PATH", help="read a random paragraph within a virtual path")
     mode.add_argument("--first", metavar="PATH", help="read the first paragraph within a virtual path")
     mode.add_argument("--cat", metavar="FILE", help="display a virtual file completely, in book order")
+    mode.add_argument("--search", metavar="QUERY", help="literal case-insensitive passage search")
+    mode.add_argument("--passage", metavar="ID", help="open a passage by exact ID or unique prefix")
+    mode.add_argument("--info", metavar="PATH", help="show location, source range, and passage counts")
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--corpus", type=Path, metavar="DIRECTORY",
                         help="canonical local corpus (default: ./local-corpus when corpus.json exists)")
     source.add_argument("--pdf", type=Path, metavar="PATH",
                         help=f"explicit PDF fallback (otherwise ./{PDF_FILENAME}, then ./sources/{PDF_FILENAME})")
     parser.add_argument("--width", type=int, metavar="COLUMNS", help="line width (20–240; default fits the terminal, up to 88)")
+    parser.add_argument("--within", metavar="PATH", help="restrict --search to this subtree")
+    parser.add_argument("--word", action="store_true", help="whole-word --search rather than substring")
+    parser.add_argument("--limit", type=int, metavar="N", help="maximum search results (1–1000; default 20)")
+    parser.add_argument("--context", type=int, metavar="N", help="neighbors around --passage (0–10 on each side)")
+    parser.add_argument("--depth", type=int, metavar="N", help="outline depth (0–32; visual-help default 2)")
+    output = parser.add_mutually_exclusive_group()
+    output.add_argument("--plain", action="store_true", help="passage text without metadata or ANSI styling")
+    output.add_argument("--json", action="store_true", help="structured output for scripts")
     return parser
+
+
+def validate_options(args: argparse.Namespace) -> None:
+    if args.command:
+        actions = (args.structure, args.visual_help, args.shell, args.read is not None,
+                   args.first is not None, args.cat is not None, args.search is not None,
+                   args.passage is not None, args.info is not None)
+        if any(actions):
+            raise ValueError("visual-help cannot be combined with another action")
+        args.visual_help = True
+    if args.search is None and (args.word or args.within is not None or args.limit is not None):
+        raise ValueError("--word, --within, and --limit require --search")
+    if args.search is not None and not args.search.strip():
+        raise ValueError("search requires a nonempty query")
+    if args.limit is not None and not 1 <= args.limit <= 1000:
+        raise ValueError("--limit must be between 1 and 1000")
+    if args.context is not None:
+        if args.passage is None:
+            raise ValueError("--context requires --passage")
+        if not 0 <= args.context <= 10:
+            raise ValueError("--context must be between 0 and 10")
+    if args.depth is not None:
+        if not args.structure and not args.visual_help:
+            raise ValueError("--depth requires --structure or visual-help")
+        if not 0 <= args.depth <= 32:
+            raise ValueError("--depth must be between 0 and 32")
+    if args.json and (args.shell or args.visual_help):
+        raise ValueError("--json is available for reading, search, info, and structure")
+
+
+def tree_data(node: Node, depth: int | None = None) -> dict:
+    return {
+        "title": node.title, "path": display_path(node_path(node)), "name": node.name,
+        "directory": node.is_directory, "printed_page": node.start_page,
+        "truncated": depth == 0 and bool(node.children),
+        "children": [] if depth == 0 else [
+            tree_data(child, None if depth is None else depth - 1) for child in node.children
+        ],
+    }
+
+
+def terminal_color() -> bool:
+    return bool(sys.stdout.isatty() and "NO_COLOR" not in os.environ
+                and os.environ.get("TERM") != "dumb")
+
+
+def emit_json(value: object) -> None:
+    print(json.dumps(value, ensure_ascii=False, indent=2))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1243,15 +1648,23 @@ def main(argv: list[str] | None = None) -> int:
     corpus = (args.corpus or Path.cwd() / "local-corpus").expanduser()
     pdf = (args.pdf or default_pdf()).expanduser()
     try:
+        validate_options(args)
         width = sensible_width(args.width)
+        color = terminal_color() and not args.plain and not args.json
         if not pdf_explicit and (corpus_explicit or (corpus / "corpus.json").is_file()):
             book = load_corpus_book(corpus)
         else:
+            if args.visual_help and not pdf_explicit:
+                print(render_visual_help(width=width, depth=2 if args.depth is None else args.depth))
+                return 0
             if args.structure and not pdf.is_file():
                 if pdf_explicit:
                     raise ValueError(f"PDF not found: {pdf}")
-                print(render_tree())
-                print("\nTop-level outline only. Supply a local corpus or the Cambridge PDF for subdivisions.")
+                if args.json:
+                    emit_json({"outline": tree_data(ROOT, args.depth), "abbreviated": True})
+                else:
+                    print(render_tree(depth=args.depth))
+                    print("\nAbbreviated outline. Supply a local corpus or the Cambridge PDF for subdivisions.")
                 return 0
             if not pdf.is_file():
                 raise ValueError(
@@ -1261,19 +1674,58 @@ def main(argv: list[str] | None = None) -> int:
                 )
             book = load_book(pdf)
         if args.structure:
-            print(render_tree(book.root))
+            if args.json:
+                emit_json({"outline": tree_data(book.root, args.depth), "abbreviated": False})
+            else:
+                print(render_tree(book.root, depth=args.depth))
+        elif args.visual_help:
+            print(render_visual_help(book, width, 2 if args.depth is None else args.depth))
         elif args.shell:
-            return run_shell(book, width)
+            return run_shell(book, width, args.plain, color)
+        elif args.search is not None:
+            _, path = resolve_path(args.within, (), book.root)
+            passages = book.search(args.search, path, args.word,
+                                   20 if args.limit is None else args.limit)
+            if args.json:
+                emit_json([passage_data(passage) for passage in passages])
+            elif args.plain:
+                print("\n\n".join(render_passage(passage, width, plain=True) for passage in passages))
+            else:
+                print(render_search_results(passages, args.search, width, args.word))
+        elif args.info is not None:
+            node, path = resolve_path(args.info, (), book.root)
+            if args.json:
+                emit_json(location_data(book, node, path))
+            else:
+                print(render_info(book, node, path, width))
+        elif args.passage is not None:
+            passage = book.find_passage(args.passage)
+            if args.context is not None:
+                if args.json:
+                    emit_json([passage_data(item) for item in context_passages(book, passage, args.context)])
+                else:
+                    print(render_context(book, passage, args.context, width, args.plain, color))
+            elif args.json:
+                emit_json(passage_data(passage))
+            else:
+                print(render_passage(passage, width, args.plain, color))
         elif args.cat is not None:
             node, path = resolve_path(args.cat, (), book.root)
             if node.is_directory:
                 raise ValueError("--cat takes a virtual file")
-            for passage in book.selection(path):
-                print(render_passage(passage, width), end="\n\n")
+            if args.json:
+                emit_json([passage_data(passage) for passage in book.selection(path)])
+            else:
+                for passage in book.selection(path):
+                    print(render_passage(passage, width, args.plain, color), end="\n\n")
         else:
             value = args.first if args.first is not None else args.read
             _, path = resolve_path(value, (), book.root)
-            print(render_passage(ReadingSession(book).read(path, args.first is not None), width))
+            passage = ReadingSession(book).read(path, args.first is not None)
+            if args.json:
+                emit_json(passage_data(passage))
+            else:
+                print(render_passage(passage, width, args.plain, color))
         return 0
     except ValueError as error:
         print(f"sol: {error}", file=sys.stderr)
@@ -1283,12 +1735,24 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
 
-if __name__ == "__main__":
+def cli(argv: list[str] | None = None) -> int:
+    """Console entry shared by pipx and direct script execution."""
     try:
-        raise SystemExit(main())
+        status = main(argv)
+        sys.stdout.flush()
+        return status
     except KeyboardInterrupt:
         print("\nsol: interrupted", file=sys.stderr)
-        raise SystemExit(130)
+        return 130
     except BrokenPipeError:
-        # Piping a long cat/tree output to head is normal terminal use.
-        raise SystemExit(0)
+        # Avoid a second broken-pipe error while Python flushes at shutdown.
+        try:
+            with open(os.devnull, "w") as sink:
+                os.dup2(sink.fileno(), sys.stdout.fileno())
+        except (OSError, AttributeError, ValueError):
+            pass
+        return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(cli())

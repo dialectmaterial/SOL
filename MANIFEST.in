@@ -1,0 +1,14 @@
+include README.md CORPUS.md requirements-corpus.txt pyproject.toml MANIFEST.in
+include sol.py sol_corpus.py sol_corpus_contract.py
+include sol_corpus_notes.py sol_corpus_references.py sol_corpus_structure.py
+recursive-include tests *.py
+exclude AGENTS.md
+prune sources
+prune local-corpus
+prune local-corpus.building
+prune local-corpus.building-*
+prune .sol-corpus-work
+prune .venv
+prune build
+prune dist
+global-exclude *.pdf *.png *.jpg *.jpeg *.zip *.jsonl *.py[cod]

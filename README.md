@@ -1,190 +1,210 @@
-# SOL: Sol Organizes Logic
+# SOL: SOL Organizes Logic
 
 ## Hegel’s *Science of Logic* in the terminal
 
-SOL begins with a reader for Hegel’s *Science of Logic*. Its larger ambition is to become an environment for studying how texts, concepts, and knowledge are organized, bringing philosophy into conversation with computational linguistics, machine learning, and operating systems.
+SOL stands for SOL Organizes Logic, a recursive acronym in the style of GNU. The project is a reader and virtual shell for Hegel’s *Science of Logic*. Its larger ambition is an environment for investigating how texts, concepts, and knowledge are organized, connecting philosophy with computational linguistics, machine learning, and operating systems.
 
-The reader uses a human editable Markdown corpus and a generated JSONL index. Ordinary reading does not extract the PDF every time SOL starts. The corpus preserves the book’s structure, paragraph boundaries, emphasis, notes, editorial material, bibliography, index, and source references.
+The reader uses readable Markdown and a generated JSONL index. Each passage retains its permanent identifier, location, attribution, printed pages, and PDF pages. Ordinary reading does not extract the PDF again.
 
-The terminal presents Hegel’s text through three roots: `/BEING`, `/ESSENCE`, and `/CONCEPT`. Editorial prose, notes, and references remain available in the complete corpus but are kept separate from random Hegel quotations.
+The shell presents the book through `/BEING`, `/ESSENCE`, and `/CONCEPT`. Sections and subdivisions become directories; their own introductory prose appears as `00-introduction.txt`. Divisions without children become virtual text files. The canonical corpus preserves the fuller volume hierarchy, editorial material, notes, bibliography, and index.
 
-Each passage displays its location, heading, printed and PDF page references, and permanent identifier. Text wraps to fit the terminal. The transcription remains reviewable, particularly where mathematical notation or note attribution needs attention.
+## Install with pipx
 
-See [the corpus contract](CORPUS.md) for the format, indexing rules, and correction workflow.
+Python 3.10 or newer is required. From your project directory, install SOL into its own environment:
 
-## Getting started
+~~~sh
+pipx install .
+pipx ensurepath
+sol --version
+~~~
 
-Python 3.10 or newer is required. Reading an existing corpus uses Python’s standard library and the accompanying SOL modules.
+If pipx is not installed, Debian and Ubuntu users can install it with `sudo apt install pipx`. After `ensurepath`, open a new terminal if necessary.
 
-Keep the project files together. The executable is `sol.py`, but its corpus reader also needs `sol_corpus_contract.py`. The conversion helpers should remain alongside them.
+The reader uses Python’s standard library. To include the Markdown parser for conversion and index rebuilding, install the optional corpus dependencies instead:
 
-To make `sol` available in the terminal, replace the example path with your project’s actual location:
+~~~sh
+pipx install '.[corpus]'
+~~~
 
-```sh
-chmod +x /absolute/path/to/SOL/sol.py
-mkdir -p ~/.local/bin
-ln -s /absolute/path/to/SOL/sol.py ~/.local/bin/sol
-```
+An existing installation can be refreshed with `pipx reinstall sol-organizes-logic`. The package supplies three commands: `sol`, `sol-corpus`, and `sol-corpus-check`.
 
-If that link already points to your script, leave it unchanged. Ensure `~/.local/bin` is in your `PATH`.
+If you previously created a `~/.local/bin/sol` symlink, inspect it before installing:
 
-SOL looks for `local-corpus/corpus.json` in the current working directory. Run it from the project directory to read without supplying a flag:
+~~~sh
+readlink ~/.local/bin/sol
+~~~
 
-```sh
+If its target is your previous SOL script, preserve that link under another name, then install:
+
+~~~sh
+mv -n ~/.local/bin/sol ~/.local/bin/sol-before-pipx
+pipx install '.[corpus]'
+~~~
+
+The rename preserves the old link and does not overwrite an existing backup. If the name is still occupied, inspect it before proceeding.
+
+After this release has been pushed to GitHub, installation directly from the repository will also work:
+
+~~~sh
+pipx install git+https://github.com/dialectmaterial/SOL.git
+~~~
+
+## Choose the text
+
+SOL looks for `local-corpus/corpus.json` in the working directory. From the project directory, simply run:
+
+~~~sh
 sol
-```
+~~~
 
-From another directory, select the corpus explicitly:
+From elsewhere, select your corpus:
 
-```sh
+~~~sh
 sol --corpus /absolute/path/to/SOL/local-corpus
-```
+~~~
 
-You can also run `python3 sol.py` directly from the project directory.
+When no default corpus exists, SOL looks for `georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf` in the working directory, then in `sources/`. You can select a PDF with `--pdf PATH`. PDF extraction requires Poppler, and its reader has a less complete hierarchy and different identifiers.
 
-## Preparing and maintaining the corpus
+An existing invalid or stale corpus produces an actionable error. `--corpus` and `--pdf` cannot be combined.
 
-Conversion requires Poppler’s PDF tools and `markdown-it-py`. Rebuilding the index requires the Markdown parser but does not need to extract the PDF again.
+## Read, search, and inspect
 
-On Debian or Ubuntu, run these commands from the project directory:
-
-```sh
-sudo apt install poppler-utils python3-venv
-python3 -m venv .venv
-. .venv/bin/activate
-python3 -m pip install -r requirements-corpus.txt
-python3 sol_corpus.py convert --pdf sources/georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf
-```
-
-The importer is tied to the specifically audited source PDF. Other editions or files need deliberate adaptation.
-
-If `local-corpus/` already exists, do not convert it again. Make corrections in its canonical Markdown, then rebuild and validate:
-
-```sh
-python3 sol_corpus.py index local-corpus
-python3 sol_corpus_contract.py local-corpus --check
-```
-
-The converter refuses to overwrite an existing corpus. Permanent identifiers must survive corrections so that references, annotations, and experiments remain meaningful.
-
-The source PDF is missing printed front matter pages **l** and **lxix**. These gaps are recorded explicitly rather than filled with invented text. Complex mathematical passages retain source images for review.
-
-## Reading and navigation
-
-```sh
+~~~sh
 sol
 sol --width 72
-sol --structure
+sol --structure --depth 2
 sol --read /being/i-determinateness-quality/existence
 sol --first /being/i-determinateness-quality/being
 sol --cat /concept/foreword
+sol --search "ground" --within /essence --word --limit 8
+sol --info /concept/iii-the-idea
+sol visual-help
 sol --shell
-```
+~~~
 
-`--read` selects a random paragraph within a location. `--first` begins in book order. `--cat` prints a complete virtual file. `--width` accepts values between 20 and 240 columns.
+`--read` selects a random paragraph within a location. `--first` starts in book order, and `--cat` prints a complete virtual file. `--width` controls wrapping between 20 and 240 columns. Default output keeps the heading, path, source pages, and full identifier visible. Meaningful list and schema lines remain separate.
 
-Some paragraphs containing uncertain mathematics are excluded from random quotations but remain available through ordered reading. Their source images support checking the transcription.
+Search is literal and case insensitive. `--word` matches whole words rather than fragments; `--within` restricts the search to a subtree, and `--limit` bounds the displayed results.
 
-The interactive reader treats the book as a virtual filesystem:
+Use `--passage ID` to return to a passage by its identifier or an unambiguous prefix. Add `--context 2` to read neighboring paragraphs in book order, including across subdivision boundaries. Context accepts 0 to 10 passages on each side. `--info PATH` summarizes a location.
 
-```text
-sol:/$ cd being
-sol:/BEING$ cd i-determinateness-quality
-sol:/BEING/i-determinateness-quality$ cd existence
-sol:/BEING/i-determinateness-quality/2-existence$ ls
-sol:/BEING/i-determinateness-quality/2-existence$ first
-sol:/BEING/i-determinateness-quality/2-existence$ next
-sol:/BEING/i-determinateness-quality/2-existence$ previous
-```
+For other terminal tools, `--plain` prints passage text without decorative formatting or ANSI codes. `--json` supplies structured output:
 
-Sections, chapters, subdivisions, and Remarks appear as explicit nodes. Divisions containing other divisions are directories. Their introductory prose appears as `00-introduction.txt`; divisions without children become text files.
+~~~sh
+sol --cat /concept/foreword --plain | less
+sol --search "infinity" --within /being --json
+~~~
 
-These paths organize navigation. They do not require a separate physical file for every heading. The canonical corpus preserves the fuller volume and preface hierarchy behind the three doctrine view.
+With `--json`, a single passage is an object; search, complete file, and context results are arrays in book order. Context includes the selected passage. Each passage carries its identifier, path, text, page references, and review status.
 
-Paths are insensitive to case. Numbered, lettered, Roman, and Greek prefixes can be omitted when the result is unambiguous. For example, `existence` resolves to `2-existence`.
+`visual-help` and `--visual-help` open an ASCII guide containing the project roadmap, book outline, and navigation examples. Use `--depth` from 0 to 32 to control how much of an outline appears.
 
-Inside the reader, `ls` lists a location, `cd` changes it, `pwd` shows the current path, and `tree` displays its descendants. Both `/` and `..` work.
+## Work inside the virtual shell
 
-`read` begins with a random passage; `first` begins in source order. Both establish a selection for `next` and `previous`. Changing directory resets that selection. Reaching its end does not jump elsewhere.
+Start with `sol --shell`. Paths accept lowercase names and omit numbering prefixes when the result is unambiguous. Tab completion is available through Python’s optional `readline` module.
 
-`cat` prints a complete file without moving the reading cursor. Use `help` for guidance and `exit` or `quit` to leave. Tab completion is available through Python’s optional `readline` module.
+~~~text
+cd being
+cd i-determinateness-quality
+cd existence
+ls
+info
+first
+next
+previous
+context 1
+where
+up
+cd -
+~~~
 
-## PDF fallback
+`ls` lists the current location, `pwd` displays its path, and `tree [PATH] --depth N` shows descendants. `up` moves to the parent; `cd -` returns to the previous directory. Both `/` and `..` work.
 
-When no default corpus manifest exists, SOL can read the original PDF. It looks in the working directory, then in `sources/`, for:
+`read` and `first` establish a reading selection. `next` and `previous` move within it; changing directory resets that selection. Reaching its boundary does not jump elsewhere. `cat FILE` prints a complete file without moving the cursor.
 
-```text
-georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf
-```
+Search the current subtree, then open a result and inspect its surroundings:
 
-You can select a PDF explicitly:
+~~~text
+cd /essence
+search "ground" --word --limit 6
+open 1
+context 2
+next
+~~~
 
-```sh
-sol --pdf /absolute/path/to/file.pdf
-```
+`search QUERY [PATH]` also accepts an explicit subtree. `open` accepts a full identifier, a unique prefix, or a result number from the latest search. `context [N]` defaults to one neighboring paragraph on each side, accepts 0 to 10, and leaves the cursor unchanged. `where` displays the current passage and its position within the reading selection.
 
-The PDF reader requires Poppler and has a less complete hierarchy and note apparatus. Its identifiers are not the permanent corpus UUIDs.
+Use `info [PATH]` for a location summary, `visual-help [PATH] --depth N` for a scoped guide, `help` for command syntax, and `exit` or `quit` to leave.
 
-`--pdf` and `--corpus` cannot be combined. An existing but invalid corpus produces an error rather than silently switching to PDF extraction.
+A useful comparison workflow is to search a term in one doctrine, inspect the surrounding prose, then repeat the search in another. Permanent identifiers let you record those observations and return to exactly the same passages.
 
-## Project organization and verification
+## Maintain and review the corpus
 
-`sol.py` contains the reader, command interface, virtual filesystem, text wrapping, and PDF fallback.
+Canonical Markdown is the correction surface. The JSONL index is generated from it; see [the corpus contract](CORPUS.md) for the representation and validation rules.
 
-`sol_corpus.py` provides conversion and indexing. `sol_corpus_contract.py` defines canonical records, Markdown parsing, validation, and integrity checks.
+With the corpus dependencies installed, rebuild after a correction:
 
-`sol_corpus_structure.py`, `sol_corpus_notes.py`, and `sol_corpus_references.py` handle the source hierarchy, footnotes, bibliography, and index.
+~~~sh
+sol-corpus index local-corpus
+sol-corpus-check local-corpus --check
+~~~
 
-The generated JSONL exposes text, identifiers, attribution, parent relationships, and source references for scripts, classifiers, and agents.
+For an initial conversion, install Poppler and use the audited source PDF:
 
-After installing the corpus dependencies, run the tests:
+~~~sh
+sudo apt install poppler-utils
+sol-corpus convert --pdf sources/georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf
+~~~
 
-```sh
+Conversion refuses to overwrite an existing corpus. Other editions require deliberate adaptation. The source is missing printed front matter pages l and lxix; these gaps are recorded explicitly.
+
+Mathematical passages awaiting review remain available through ordered reading and direct opening, with a warning. They are excluded from random quotations. Their Markdown records include source images.
+
+Four useful places to begin checking are printed pages 209 to 210, PDF pages 282 to 283, on fractions and infinite series; printed pages 224 to 225, PDF pages 297 to 298, on Newton’s differential product; printed page 252, PDF page 325, on Lagrange, Kepler, and powers; and printed page 374, PDF page 447, on signs in Opposition.
+
+For the Newton passage:
+
+~~~sh
+sol --passage acb6db0e-f9af-4e5f-8053-913bc542ad0b --context 1
+~~~
+
+Compare the prose with its Markdown facsimile before correcting a symbol or exponent. Preserve the identifier, then rebuild the index. Mathematical display improvements should follow checked transcriptions.
+
+For development checks, use a separate environment in the project directory:
+
+~~~sh
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install -r requirements-corpus.txt
 python3 -m unittest discover -s tests -v
-```
+~~~
 
-To include checks against the source PDF:
+## Where SOL is going
 
-```sh
-SOL_TEST_PDF="$PWD/sources/georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf" python3 -m unittest discover -s tests -v
-```
+The roadmap follows the three doctrines as a way of organizing development.
 
-Validation supports proofreading; it does not replace it. When records need to be merged or retired, their identifiers can remain as tombstones with redirects. Classifiers should exclude those historical records from their input text.
+### BEING: the reader and virtual shell
 
-## Future packaging and direction
+The current focus is SOL as a command line application: random quotations, careful formatting, reading, search, and a virtual terminal interface for navigating the book.
 
-SOL should develop gradually, with each stage providing something useful and understandable before the next begins. The following are directions for development, not features already implemented.
+Next come saved reading sequences, bookmarks, annotations, and richer links between passages. Permanent identifiers provide their foundation. Exact textual searches should remain distinguishable from any future conceptual search.
 
-### A research reader
+This stage should make reading more productive while keeping the corpus inspectable and the interface small enough to understand and modify.
 
-The next step is searching, bookmarks, annotations, and convenient passage references built on the existing permanent identifiers.
+### ESSENCE: applications and experiments
 
-A command such as `search "ground"` could return passages with their locations and page references. Exact word searches, searches for recurring expressions, and conceptual searches should remain distinguishable. A semantic match should explain how it was found rather than presenting similarity as certainty.
+SOL can become a text laboratory through concordances, word frequencies, vocabulary comparisons, and recurring expressions. Classification, topic modeling, machine learning, and deep learning can follow clear research questions.
 
-Annotations could connect passages without modifying the underlying transcription. Reading sequences and saved selections could make an interpretation reproducible and shareable.
+Can a model recover Being, Essence, or Concept from a paragraph? What organization emerges when chapter labels are withheld? Where do statistical similarities cross Hegel’s explicit divisions?
 
-### An experimental text laboratory
+Each experiment should record its corpus version, preprocessing, settings, and evaluation. The results support interpretation and comparison. They should remain connected to the passages and questions that produced them.
 
-Begin with transparent measurements: word frequencies, concordances, vocabulary differences between doctrines, and recurring expressions. Then introduce classification, clustering, and topic modeling.
+An actual terminal emulator, or a modification of an existing one, belongs here once the reading and research workflows clarify what it needs to provide.
 
-Each method should answer a research question. Three questions provide a useful foundation:
+### CONCEPT: an operating system
 
-1. **Can a model recover the book’s explicit organization?** Predicting Being, Essence, or Concept from a paragraph introduces supervised classification and evaluation.
+The longer ambition is a NixOS distribution, with Hyprland as a possible desktop foundation, bringing the reader and selected applications into a coherent environment.
 
-2. **What organization does a model discover independently?** Clustering passages without chapter labels introduces unsupervised learning and the interpretation of discovered patterns.
+A reproducible development environment is the bridge: first a useful application, then a curated collection of tools, and eventually an operating system with a distinctive purpose.
 
-3. **Where do learned patterns depart from Hegel’s organization?** Comparing similar vocabulary across distant divisions brings statistical relationships into conversation with philosophical structure.
-
-Experiments should record their corpus version, preprocessing, settings, and evaluation procedure. Statistical similarity is evidence to investigate, not a substitute for interpreting Hegel’s argument.
-
-### A reproducible environment
-
-Once the reader and experiments are useful, their dependencies and configuration should become reproducible.
-
-Python packaging can provide a `pyproject.toml`, optional dependencies for conversion and analysis, and a console entry such as `sol = "sol:main"`. Installation should become straightforward without coupling every reader to every experimental tool.
-
-A Nix development environment could then bring the reader, corpus tools, and selected research workflows together. From there, SOL could grow into a curated environment and eventually a NixOS distribution with a distinctive purpose: organizing and investigating knowledge.
-
-The terminal interface may develop into a richer shell for navigating texts and running experiments. An adapted terminal emulator could follow if those workflows genuinely benefit from it.
-
-SOL's ambition is to connect existing tools through an increasingly coherent environment, while keeping its methods inspectable and its development an opportunity to learn.
+For now, development stays with BEING. Each improvement should provide a usable result and an opportunity to learn the systems beneath it.
