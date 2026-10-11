@@ -7,6 +7,7 @@ SOL stands for SOL Organizes Logic, a recursive acronym. It is a reader and virt
 Its organizing concern is the idea itself, in Hegel’s technical sense:
 
 > "But the adequate concept is something higher; it properly denotes the agreement of the concept with reality, and this is not the concept as such but the idea."
+
 Hegel@SOL:/CONCEPT/i-subjectivity/1-the-concept/b-the-particular-concept/remark.txt$
 
 Organization here means the articulation and development of logical determinations through Being, Essence, and Concept. The software provides ways to read and investigate this movement; its classifications and interfaces do not replace the immanent development.
