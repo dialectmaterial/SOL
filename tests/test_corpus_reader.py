@@ -106,6 +106,30 @@ class CorpusReaderTests(unittest.TestCase):
         self.assertIn(self.ids[4], rendered)
         self.assertTrue(all(len(line) <= 40 for line in rendered.splitlines()))
 
+    def test_reader_retains_full_canonical_records_and_note_attribution(self) -> None:
+        book = sol.load_corpus_book(self.corpus)
+        self.assertEqual(book.corpus_directory, self.corpus.resolve())
+        self.assertEqual(len(book.canonical_records), len(self.pairs))
+        passage = book.canonical_records[self.ids[4]]
+        self.assertIn("*synthetic*", passage["markdown"])
+        self.assertEqual(passage["parent_id"], self.ids[3])
+        self.assertEqual(passage["note_ids"], [self.ids[6]])
+        self.assertEqual(book.canonical_records[self.ids[6]]["attribution"]["role"], "editorial_note")
+
+    def test_json_exposes_canonical_metadata_without_mutating_the_book(self) -> None:
+        status, stdout, stderr = self.run_main(["--passage", self.ids[4], "--json"])
+        self.assertEqual(status, 0, stderr)
+        canonical = json.loads(stdout)["canonical"]
+        self.assertEqual(canonical["id"], self.ids[4])
+        self.assertIn("*synthetic*", canonical["markdown"])
+        self.assertEqual(canonical["document"], "sample.md")
+        self.assertEqual(len(canonical["sources"]), 2)
+        self.assertEqual(canonical["attribution"]["author"], "G. W. F. Hegel")
+        book = sol.load_corpus_book(self.corpus)
+        exported = sol.passage_data(book.passages[1], book)
+        exported["canonical"]["attribution"]["author"] = "Changed only in exported data"
+        self.assertEqual(book.canonical_records[self.ids[4]]["attribution"]["author"], "G. W. F. Hegel")
+
     def test_sequential_navigation_includes_formula_and_random_does_not(self) -> None:
         book = sol.load_corpus_book(self.corpus)
         _, path = sol.resolve_path("/being/sample/sample-leaf", (), book.root)

@@ -259,12 +259,26 @@ The reader's ordered `cat` and sequential navigation include Hegel's formula
 records as well as prose. A mixed prose/mathematics record keeps its `paragraph`
 type with `contains_math: true` rather than losing its prose classification.
 Uncertain cases can have `random_eligible: false`; this is an actual JSON boolean,
-not the string `"false"`. Random quotations exclude formula-only records and these
-explicitly ineligible review-pending passages. Both remain in ordered reading,
+not the string `"false"`. `contains_math` is also a JSON boolean. Random quotations
+exclude formula-only records and explicitly ineligible passages. Both remain in ordered reading,
 with source facsimiles where needed. Classifiers should use the review and
 attribution metadata to choose their own deliberate inclusion policy. Notes,
 editorial material, bibliography, and index entries remain available in the full
 corpus rather than being mixed into those quotations.
+
+`transcription_status`, when supplied, is an extensible lower-case token such as
+`needs_review`, `needs_visual_review`, or `reviewed`. The reader warns and counts
+pending source review for the first two statuses, independently of formula type
+or random eligibility. An absent status is not proof of verification. Reader
+titles and headings must be strings; `reader_path` must be an absolute virtual
+path, not a host filesystem path.
+
+The reader retains the full verified canonical record graph, including notes and
+editorial records that it does not quote by default. Corpus-backed `sol --json`
+passages expose their indexed record under `canonical`, retaining Markdown,
+attribution, parent IDs, note links, and all source references. The top-level
+`text` is a reader presentation, not a replacement for canonical Markdown;
+`needs_source_review` exposes the reader's explicit pending-status check.
 
 ## Manifest and generated JSONL
 

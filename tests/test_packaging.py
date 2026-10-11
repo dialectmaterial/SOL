@@ -28,6 +28,7 @@ ENTRY_POINTS = {
 }
 PUBLIC_FILES = {
     "pyproject.toml", "MANIFEST.in", "README.md", "CORPUS.md",
+    "INTERFACE_RESEARCH.md", "WORKSPACE_PLAN.md",
     "requirements-corpus.txt",
 } | {module + ".py" for module in MODULES}
 

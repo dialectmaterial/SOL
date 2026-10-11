@@ -289,6 +289,60 @@ class TerminalTests(unittest.TestCase):
         self.assertNotIn(self.first.identifier, rendered)
         self.assertTrue(all(len(line) <= 44 for line in rendered.splitlines()))
 
+    def test_source_review_property_uses_explicit_transcription_status(self):
+        for status, expected in (
+                ('', False), ('reviewed', False), ('verified_by_user', False),
+                ('needs_review', True), ('needs_visual_review', True)):
+            for kind in ('paragraph', 'formula'):
+                for eligible in (False, True):
+                    with self.subTest(status=status, kind=kind, eligible=eligible):
+                        passage = replace(self.first, kind=kind, random_eligible=eligible,
+                                          transcription_status=status)
+                        self.assertIs(passage.needs_source_review, expected)
+
+    def test_read_and_search_warn_for_pending_status_even_when_random_eligible(self):
+        for status in ('needs_review', 'needs_visual_review'):
+            with self.subTest(status=status):
+                passage = replace(self.first, random_eligible=True, transcription_status=status)
+                self.assertIn('source review', sol.render_passage(passage, 80).casefold())
+                self.assertIn('source review',
+                              sol.render_search_results([passage], 'ground', 80).casefold())
+                self.assertNotIn('source review',
+                                 sol.render_passage(passage, 80, plain=True).casefold())
+                self.assertEqual(sol.passage_data(passage)['transcription_status'], status)
+
+    def test_formula_and_random_exclusion_alone_do_not_claim_pending_review(self):
+        for kind, eligible, status in (
+                ('formula', True, ''), ('formula', False, 'reviewed'),
+                ('paragraph', False, ''), ('paragraph', False, 'verified_by_user')):
+            with self.subTest(kind=kind, eligible=eligible, status=status):
+                passage = replace(self.first, kind=kind, random_eligible=eligible,
+                                  transcription_status=status)
+                self.assertNotIn('source review', sol.render_passage(passage, 80).casefold())
+                self.assertNotIn('source review',
+                                 sol.render_search_results([passage], 'ground', 80).casefold())
+
+    def test_info_counts_review_status_not_kind_or_random_eligibility(self):
+        self.book.passages = [
+            replace(self.first, kind='formula', transcription_status='reviewed'),
+            replace(self.second, random_eligible=False),
+            replace(self.third, random_eligible=True, transcription_status='needs_review'),
+            replace(self.fourth, random_eligible=True, transcription_status='needs_visual_review'),
+        ]
+        self.assertEqual(sol.location_data(self.book, self.book.root, ())['pending_review'], 2)
+        being, path = sol.resolve_path('/being', (), self.book.root)
+        self.assertEqual(sol.location_data(self.book, being, path)['pending_review'], 1)
+
+    def test_reviewed_formula_stays_sequential_but_is_not_random_prose(self):
+        formula = replace(self.second, kind='formula', transcription_status='reviewed')
+        self.book.passages[1] = formula
+        session = sol.ReadingSession(self.book)
+        session.read(('BEING',), first=True)
+        self.assertIs(session.move(1), formula)
+        with patch('sol.random.choice', side_effect=lambda indices: indices[-1]) as choose:
+            self.assertIs(session.read(('BEING',)), self.third)
+        self.assertEqual(choose.call_args.args[0], [0, 2])
+
     def test_presentation_preserves_lists_and_schema_lines(self):
         passage = sol.Passage('An invented list follows.\n\n1. First item.\n2. Second item.\n\nSubject    Predicate\nA          B',
                               82, 9, self.third.node, self.third.path, 82, 9, self.third.identifier)
@@ -323,6 +377,46 @@ class TerminalTests(unittest.TestCase):
         self.assertEqual(status, 0)
         paths = [line for line in output.splitlines() if line.startswith('/')]
         self.assertEqual(paths, ['/BEING/01-quality', '/BEING', '/BEING/01-quality'])
+        self.assertNotIn('sol: ', output)
+
+    def test_shell_same_directory_navigation_preserves_cursor_and_search_results(self):
+        session = sol.ReadingSession(self.book)
+        commands = [
+            'cd /being', 'first', 'search ground --word --limit 2',
+            'cd .', 'cd /being', 'cd /BEING', 'where', 'next', 'where',
+            'open 2', 'where', 'pwd', 'exit',
+        ]
+        with patch('sol.ReadingSession', return_value=session):
+            status, output = self.run_shell(commands)
+        self.assertEqual(status, 0)
+        for position in (1, 2, 3):
+            self.assertIn(f'Position {position} of 3 in /BEING', output)
+        self.assertEqual(session.path, ('BEING',))
+        self.assertIs(session.current(), self.third)
+        self.assertTrue(output.endswith('/BEING\n'))
+        self.assertNotIn('sol: ', output)
+
+    def test_shell_root_noop_navigation_preserves_reading_selection(self):
+        session = sol.ReadingSession(self.book)
+        with patch('sol.ReadingSession', return_value=session):
+            status, output = self.run_shell([
+                'first', 'next', 'cd /', 'up', 'cd .', 'where', 'pwd', 'exit',
+            ])
+        self.assertEqual(status, 0)
+        self.assertIn('Position 2 of 4 in /', output)
+        self.assertEqual(session.path, ())
+        self.assertIs(session.current(), self.second)
+        self.assertTrue(output.endswith('/\n'))
+        self.assertNotIn('sol: ', output)
+
+    def test_shell_noop_navigation_does_not_replace_previous_directory(self):
+        status, output = self.run_shell([
+            'cd /essence', 'cd /being', 'cd .', 'cd /being',
+            'cd -', 'pwd', 'cd -', 'pwd', 'exit',
+        ])
+        self.assertEqual(status, 0)
+        paths = [line for line in output.splitlines() if line.startswith('/')]
+        self.assertEqual(paths, ['/ESSENCE', '/BEING'])
         self.assertNotIn('sol: ', output)
 
     def test_shell_search_then_open_number_sets_cursor(self):

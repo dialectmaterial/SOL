@@ -109,11 +109,19 @@ def _validate_metadata(metadata: Any) -> None:
         _valid_id(metadata["redirect_id"], "redirect_id")
     if not _is_int(metadata["order"]) or metadata["order"] < 0:
         raise CorpusError("Record order must be a nonnegative integer")
-    if "random_eligible" in metadata and not isinstance(metadata["random_eligible"], bool):
-        raise CorpusError("random_eligible must be a boolean")
-    for field in ("title", "label", "path"):
+    for field in ("random_eligible", "contains_math"):
+        if field in metadata and not isinstance(metadata[field], bool):
+            raise CorpusError(f"{field} must be a boolean")
+    if "transcription_status" in metadata and (
+        not isinstance(metadata["transcription_status"], str)
+        or not re.fullmatch(r"[a-z][a-z0-9_]*", metadata["transcription_status"])
+    ):
+        raise CorpusError("transcription_status must be a lower-case extensible status name")
+    for field in ("title", "label", "path", "reader_path", "reader_title", "heading"):
         if field in metadata and not isinstance(metadata[field], str):
             raise CorpusError(f"{field} must be a string")
+    if "reader_path" in metadata and not metadata["reader_path"].startswith("/"):
+        raise CorpusError("reader_path must be an absolute virtual path")
     attribution = metadata["attribution"]
     if not isinstance(attribution, dict) or not {"author", "status", "role"} <= attribution.keys():
         raise CorpusError("attribution requires author, status, and role")

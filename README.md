@@ -10,7 +10,7 @@ Its organizing concern is the idea itself, in Hegel’s technical sense:
 
 Hegel@SOL:/CONCEPT/i-subjectivity/1-the-concept/b-the-particular-concept/remark.txt$
 
-Organization here means the articulation and development of logical determinations through Being, Essence, and Concept. The software provides ways to read and investigate this movement; its classifications and interfaces.
+Organization here means the articulation and development of logical determinations through Being, Essence, and Concept. The software provides ways to read and investigate this movement; its classifications and interfaces are instruments of inquiry, not substitutes for the argument.
 
 The reader uses readable Markdown and a generated JSONL index. Each passage retains its permanent identifier, location, attribution, printed pages, and PDF pages.
 
@@ -118,7 +118,7 @@ sol --cat /concept/foreword --plain | less
 sol --search "infinity" --within /being --json
 ~~~
 
-With `--json`, a single passage is an object; search, complete file, and context results are arrays in book order. Context includes the selected passage. Each passage carries its identifier, path, text, page references, and review status.
+With `--json`, a single passage is an object; search, complete file, and context results are arrays in book order. Context includes the selected passage. Each passage carries its identifier, path, text, page references, and review status. Corpus-backed passages also include a `canonical` record containing the Markdown, attribution, note links, and full source references. Scripts can inspect this information without parsing decorated output.
 
 `visual-help` and `--visual-help` open an ASCII guide containing the project roadmap, book outline, and navigation examples. Use `--depth` from 0 to 32 to control how much of an outline appears.
 
@@ -145,7 +145,7 @@ cd -
 
 `ls` lists the current location, `pwd` displays its path, and `tree [PATH] --depth N` shows descendants. `up` moves to the parent; `cd -` returns to the previous directory. Both `/` and `..` work.
 
-`read` and `first` establish a reading selection. `next` and `previous` move within it; changing directory resets that selection. Reaching its boundary does not jump elsewhere. `cat FILE` prints a complete file without moving the cursor.
+`read` and `first` establish a reading selection. `next` and `previous` move within it; changing to another directory resets that selection. Entering `cd .` or the current directory preserves it. Reaching its boundary does not jump elsewhere. `cat FILE` prints a complete file without moving the cursor.
 
 Search the current subtree, then open a result and inspect its surroundings:
 
@@ -183,7 +183,7 @@ sol-corpus convert --pdf Hegel-SOL.pdf
 
 Conversion refuses to overwrite an existing corpus. Other editions require deliberate adaptation. The source is missing printed front matter pages l and lxix; these gaps are recorded explicitly.
 
-Mathematical passages awaiting review remain available through ordered reading and direct opening, with a warning. They are excluded from random quotations. Their Markdown records include source images.
+Mathematical passages awaiting review remain available through ordered reading and direct opening, with a warning that also appears in search results. They are excluded from random quotations. Their Markdown records include source images. Source-review status is separate from random eligibility: a reviewed formula is not labelled unreviewed merely because it is excluded from random quotations.
 
 Four useful places to begin checking are printed pages 209 to 210, PDF pages 282 to 283, on fractions and infinite series; printed pages 224 to 225, PDF pages 297 to 298, on Newton’s differential product; printed page 252, PDF page 325, on Lagrange, Kepler, and powers; and printed page 374, PDF page 447, on signs in Opposition.
 
@@ -213,6 +213,8 @@ The roadmap follows the three doctrines as a way of organizing development.
 The current focus is SOL as a command line application: random quotations, careful formatting, reading, search, and a virtual terminal interface for navigating the book.
 
 Next come saved reading sequences, bookmarks, annotations, and richer links between passages. Permanent identifiers provide their foundation. Exact textual searches should remain distinguishable from any future conceptual search.
+
+[The workspace plan](WORKSPACE_PLAN.md) develops reading continuity, attributed annotations, comparison, a source-review desk, and relations beyond the tree. These remain proposed features. [The separate interface investigation](INTERFACE_RESEARCH.md) compares prompt_toolkit, Rich, Textual, curses, and external readers without adding them as dependencies.
 
 This stage should make reading more productive while keeping the corpus inspectable and the interface small enough to understand and modify.
 

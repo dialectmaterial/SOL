@@ -75,6 +75,11 @@ class Passage:
     transcription_status: str = ""
     facsimile_labels: tuple[str, ...] = ()
 
+    @property
+    def needs_source_review(self) -> bool:
+        """Transcription quality is independent of quotation eligibility/type."""
+        return self.transcription_status in {"needs_review", "needs_visual_review"}
+
 
 @dataclass(frozen=True)
 class Word:
@@ -138,6 +143,8 @@ class Book:
     root: Node
     passages: list[Passage]
     redirects: dict[str, str] = field(default_factory=dict)
+    canonical_records: dict[str, dict] = field(default_factory=dict, repr=False, compare=False)
+    corpus_directory: Path | None = field(default=None, repr=False, compare=False)
 
     def selection(self, path: tuple[str, ...]) -> list[Passage]:
         matches = [p for p in self.passages if p.path[:len(path)] == path]
@@ -1021,7 +1028,11 @@ def load_corpus_book(corpus: Path) -> Book:
         raise ValueError("The local corpus contains no indexed Hegel main-text paragraphs for the reader")
     redirects = {record["id"]: record["redirect_id"] for record in records
                  if record["type"] == "retired_record"}
-    return Book(root, passages, redirects)
+    # Keep the complete verified record graph beside the convenient reader view.
+    # Markdown, attribution, notes, source rectangles and retirement history must
+    # not disappear merely because the terminal presents Hegel's prose as text.
+    return Book(root, passages, redirects,
+                {record["id"]: record for record in records}, corpus.resolve())
 
 
 # 5. Navigation and display: no PDF extraction details belong in the shell.
@@ -1116,15 +1127,16 @@ def render_passage(passage: Passage, width: int, plain: bool = False,
         styled(fold_path(passage.path, width), "2"),
         styled(textwrap.fill(metadata, width=width, break_on_hyphens=False), "2"),
         styled(textwrap.fill(f"ID {passage.identifier}", width=width, break_on_hyphens=False), "2"),
-        *(() if passage.random_eligible and passage.kind != "formula" else
-          (textwrap.fill("Math transcription needs source review; see the Markdown facsimile.", width=width),)),
+        *((textwrap.fill(
+            "Transcription needs source review; compare the canonical Markdown with its source.", width=width),)
+          if passage.needs_source_review else ()),
         "",
         body,
     ))
 
 
-def passage_data(passage: Passage) -> dict:
-    return {
+def passage_data(passage: Passage, book: Book | None = None) -> dict:
+    result = {
         "id": passage.identifier, "type": passage.kind,
         "heading": passage.heading or passage.node.title, "path": display_path(passage.path),
         "text": presentation_text(passage.text, passage.facsimile_labels),
@@ -1132,7 +1144,11 @@ def passage_data(passage: Passage) -> dict:
         "pdf_page": passage.pdf_page, "end_pdf_page": passage.end_pdf_page,
         "random_eligible": passage.random_eligible,
         "transcription_status": passage.transcription_status or None,
+        "needs_source_review": passage.needs_source_review,
     }
+    if book is not None and passage.identifier in book.canonical_records:
+        result["canonical"] = deepcopy(book.canonical_records[passage.identifier])
+    return result
 
 
 def context_passages(book: Book, passage: Passage, radius: int) -> list[Passage]:
@@ -1184,6 +1200,8 @@ def render_search_results(passages: list[Passage], query: str, width: int,
                       fold_path(passage.path, width),
                       textwrap.fill(source_line(passage), width=width),
                       textwrap.fill(f"ID {passage.identifier}", width=width, break_on_hyphens=False),
+                      *((textwrap.fill("Source review pending: " + passage.transcription_status, width=width),)
+                        if passage.needs_source_review else ()),
                       textwrap.fill(excerpt, width=width, break_on_hyphens=False), ""))
     return "\n".join(lines).rstrip()
 
@@ -1197,7 +1215,7 @@ def location_data(book: Book, node: Node, path: tuple[str, ...]) -> dict:
         "end_printed_page": max((item.end_printed_page for item in passages), default=None),
         "pdf_page": min((item.pdf_page for item in passages), default=None),
         "end_pdf_page": max((item.end_pdf_page for item in passages), default=None),
-        "pending_review": sum(not item.random_eligible or item.kind == "formula" for item in passages),
+        "pending_review": sum(item.needs_source_review for item in passages),
     }
 
 
@@ -1619,8 +1637,8 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False) 
                         raise ValueError("not a directory")
                     if path != cwd:
                         previous_cwd = cwd
-                    cwd = path
-                    session.path, session.cursor = cwd, None
+                        cwd = path
+                        session.path, session.cursor = cwd, None
                 elif verb == "open":
                     if argument is None:
                         raise ValueError("open requires a passage ID or search result number")
@@ -1931,7 +1949,7 @@ def main(argv: list[str] | None = None) -> int:
             passages = book.search(args.search, path, args.word,
                                    20 if args.limit is None else args.limit)
             if args.json:
-                emit_json([passage_data(passage) for passage in passages])
+                emit_json([passage_data(passage, book) for passage in passages])
             elif args.plain:
                 print("\n\n".join(render_passage(passage, width, plain=True) for passage in passages))
             else:
@@ -1946,11 +1964,11 @@ def main(argv: list[str] | None = None) -> int:
             passage = book.find_passage(args.passage)
             if args.context is not None:
                 if args.json:
-                    emit_json([passage_data(item) for item in context_passages(book, passage, args.context)])
+                    emit_json([passage_data(item, book) for item in context_passages(book, passage, args.context)])
                 else:
                     print(render_context(book, passage, args.context, width, args.plain, color))
             elif args.json:
-                emit_json(passage_data(passage))
+                emit_json(passage_data(passage, book))
             else:
                 print(render_passage(passage, width, args.plain, color))
         elif args.cat is not None:
@@ -1958,7 +1976,7 @@ def main(argv: list[str] | None = None) -> int:
             if node.is_directory:
                 raise ValueError("--cat takes a virtual file")
             if args.json:
-                emit_json([passage_data(passage) for passage in book.selection(path)])
+                emit_json([passage_data(passage, book) for passage in book.selection(path)])
             else:
                 for passage in book.selection(path):
                     print(render_passage(passage, width, args.plain, color), end="\n\n")
@@ -1967,7 +1985,7 @@ def main(argv: list[str] | None = None) -> int:
             _, path = resolve_path(value, (), book.root)
             passage = ReadingSession(book).read(path, args.first is not None)
             if args.json:
-                emit_json(passage_data(passage))
+                emit_json(passage_data(passage, book))
             else:
                 print(render_passage(passage, width, args.plain, color))
         return 0

@@ -212,6 +212,64 @@ class CorpusContractTests(unittest.TestCase):
                 with self.assertRaisesRegex(contract.CorpusError, 'random_eligible.*bool'):
                     contract.render_record({**self.paragraph, 'random_eligible': malformed}, 'Prose.')
 
+    def test_optional_math_flag_is_an_actual_boolean(self) -> None:
+        for value in (False, True):
+            with self.subTest(value=value):
+                parsed = contract.parse_document(contract.render_record(
+                    {**self.paragraph, 'contains_math': value}, 'Invented mathematical prose.'))[0]
+                self.assertIs(parsed['contains_math'], value)
+        for malformed in ('false', 0, 1, None, [], {}):
+            with self.subTest(value=malformed):
+                with self.assertRaisesRegex(contract.CorpusError, 'contains_math.*bool'):
+                    contract.render_record({**self.paragraph, 'contains_math': malformed}, 'Prose.')
+
+    def test_transcription_status_is_an_extensible_nonempty_word_token(self) -> None:
+        for status in ('needs_review', 'needs_visual_review', 'reviewed', 'verified_by_user', 'review_2'):
+            with self.subTest(status=status):
+                parsed = contract.parse_document(contract.render_record(
+                    {**self.paragraph, 'transcription_status': status}, 'Invented reviewed prose.'))[0]
+                self.assertEqual(parsed['transcription_status'], status)
+        for malformed in ('', ' ', 'Needs_review', 'needs review', 'needs-review',
+                          '2_review', None, 0, [], {'invalid': 'object'}):
+            with self.subTest(value=malformed):
+                with self.assertRaisesRegex(contract.CorpusError, 'transcription_status'):
+                    contract.render_record({**self.paragraph, 'transcription_status': malformed}, 'Prose.')
+
+    def test_human_edited_review_metadata_is_rejected_during_parsing(self) -> None:
+        metadata = {**self.paragraph, 'contains_math': True, 'transcription_status': 'needs_review'}
+        encoded = contract.render_record(metadata, 'Invented prose for validation.')
+        for original, malformed, field in (
+                ('"contains_math":true', '"contains_math":"false"', 'contains_math'),
+                ('"transcription_status":"needs_review"',
+                 '"transcription_status":{"invalid":"object"}', 'transcription_status')):
+            with self.subTest(field=field):
+                self.assertIn(original, encoded)
+                edited = encoded.replace(original, malformed, 1)
+                with self.assertRaisesRegex(contract.CorpusError, field):
+                    contract.parse_document(edited)
+
+    def test_optional_reader_path_requires_an_absolute_string(self) -> None:
+        for path in ('/BEING', '/BEING/01-sample/00-introduction.txt', '/ESSENCE'):
+            with self.subTest(path=path):
+                parsed = contract.parse_document(contract.render_record(
+                    {**self.paragraph, 'reader_path': path}, 'Invented reader prose.'))[0]
+                self.assertEqual(parsed['reader_path'], path)
+        for malformed in ('', 'BEING', './BEING', None, 0, [], {}):
+            with self.subTest(value=malformed):
+                with self.assertRaisesRegex(contract.CorpusError, 'reader_path'):
+                    contract.render_record({**self.paragraph, 'reader_path': malformed}, 'Prose.')
+
+    def test_optional_reader_and_heading_metadata_require_strings(self) -> None:
+        for field in ('reader_title', 'heading', 'title', 'label', 'path'):
+            with self.subTest(field=field):
+                parsed = contract.parse_document(contract.render_record(
+                    {**self.paragraph, field: 'A synthetic description'}, 'Invented reader prose.'))[0]
+                self.assertEqual(parsed[field], 'A synthetic description')
+            for malformed in (None, 0, False, [], {}):
+                with self.subTest(field=field, value=malformed):
+                    with self.assertRaisesRegex(contract.CorpusError, field):
+                        contract.render_record({**self.paragraph, field: malformed}, 'Prose.')
+
     def test_retired_record_requires_valid_redirect_uuid(self) -> None:
         retired = {**self.paragraph, 'type': 'retired_record'}
         with self.assertRaisesRegex(contract.CorpusError, 'retired_record requires'):
