@@ -33,13 +33,20 @@ python3 -m pip install -r requirements-corpus.txt
 From the project directory, create the local candidate conversion:
 
 ```sh
-python3 sol_corpus.py convert --pdf sources/georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf
+python3 sol_corpus.py convert --pdf Hegel-SOL.pdf
 ```
 
 The default destination is `local-corpus/`. Read its manifest and audit information
 before treating the extraction as an authoritative transcription. Open the
 Markdown alongside the PDF, especially where the audit reports ambiguity or a
 mathematical layout.
+
+The reader and converter look for `Hegel-SOL.pdf` in the working directory, then
+in `sources/`; `--pdf PATH` can select another filename. Renaming the PDF does not
+change its SHA-256 fingerprint or the identifiers in an existing corpus. The
+manifest's source filename records the name used at import, not a live path that
+the reader needs to open. Leave that historical provenance intact and do not
+reconvert an existing corpus merely because its source PDF has been renamed.
 
 After making canonical Markdown corrections, rebuild the index:
 

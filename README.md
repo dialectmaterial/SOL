@@ -2,17 +2,27 @@
 
 ## Hegel’s *Science of Logic* in the terminal
 
-SOL stands for SOL Organizes Logic, a recursive acronym in the style of GNU. The project is a reader and virtual shell for Hegel’s *Science of Logic*. Its larger ambition is an environment for investigating how texts, concepts, and knowledge are organized, connecting philosophy with computational linguistics, machine learning, and operating systems.
+SOL stands for SOL Organizes Logic, a recursive acronym in the style of GNU. It is a reader and virtual shell for Hegel’s *Science of Logic*, with a longer ambition connecting speculative philosophy, computational linguistics, machine learning, and operating systems.
+
+Its organizing concern is the Idea itself, in Hegel’s technical sense: the unity of Concept and objectivity. Organization here means the articulation and development of logical determinations through Being, Essence, and Concept, including their mediation and sublation. The software provides ways to read and investigate this movement; its classifications and interfaces do not replace the immanent development of the Concept.
+
+> The idea is the *adequate concept* …
+
+Hegel, “The idea,” printed p. 670, PDF p. 743. All quotations here are from George di Giovanni’s 2010 translation of *The Science of Logic*; this first quotation is an excerpt.
 
 The reader uses readable Markdown and a generated JSONL index. Each passage retains its permanent identifier, location, attribution, printed pages, and PDF pages. Ordinary reading does not extract the PDF again.
 
 The shell presents the book through `/BEING`, `/ESSENCE`, and `/CONCEPT`. Sections and subdivisions become directories; their own introductory prose appears as `00-introduction.txt`. Divisions without children become virtual text files. The canonical corpus preserves the fuller volume hierarchy, editorial material, notes, bibliography, and index.
 
+SOL’s book shell is an application running inside a terminal, not a replacement for Bash or Zsh and not yet a terminal emulator. Its virtual paths refer to the book, not the host filesystem.
+
 ## Install with pipx
 
-Python 3.10 or newer is required. From your project directory, install SOL into its own environment:
+Python 3.10 or newer is required. For a new checkout, clone the repository and install SOL into its own environment:
 
 ~~~sh
+git clone https://github.com/dialectmaterial/SOL.git
+cd SOL
 pipx install .
 pipx ensurepath
 sol --version
@@ -43,7 +53,7 @@ pipx install '.[corpus]'
 
 The rename preserves the old link and does not overwrite an existing backup. If the name is still occupied, inspect it before proceeding.
 
-After this release has been pushed to GitHub, installation directly from the repository will also work:
+Alternatively, install directly from the GitHub repository:
 
 ~~~sh
 pipx install git+https://github.com/dialectmaterial/SOL.git
@@ -51,19 +61,21 @@ pipx install git+https://github.com/dialectmaterial/SOL.git
 
 ## Choose the text
 
-SOL looks for `local-corpus/corpus.json` in the working directory. From the project directory, simply run:
+The book is supplied locally; installing SOL does not download it. SOL looks for `local-corpus/corpus.json` in the working directory. From a project directory containing the corpus, simply run:
 
 ~~~sh
 sol
 ~~~
 
-From elsewhere, select your corpus:
+From elsewhere, select the corpus:
 
 ~~~sh
 sol --corpus /absolute/path/to/SOL/local-corpus
 ~~~
 
-When no default corpus exists, SOL looks for `georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf` in the working directory, then in `sources/`. You can select a PDF with `--pdf PATH`. PDF extraction requires Poppler, and its reader has a less complete hierarchy and different identifiers.
+When no default corpus exists, SOL looks for `Hegel-SOL.pdf` in the working directory, then in `sources/`. `--pdf PATH` can select a PDF with any filename. PDF extraction requires Poppler, and its reader has a less complete hierarchy and different identifiers.
+
+Renaming the PDF does not require reconverting an existing corpus. Its source fingerprint and permanent passage identifiers do not depend on the filename; the manifest retains the name used at import as historical provenance.
 
 An existing invalid or stale corpus produces an actionable error. `--corpus` and `--pdf` cannot be combined.
 
@@ -153,7 +165,7 @@ For an initial conversion, install Poppler and use the audited source PDF:
 
 ~~~sh
 sudo apt install poppler-utils
-sol-corpus convert --pdf sources/georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf
+sol-corpus convert --pdf Hegel-SOL.pdf
 ~~~
 
 Conversion refuses to overwrite an existing corpus. Other editions require deliberate adaptation. The source is missing printed front matter pages l and lxix; these gaps are recorded explicitly.
@@ -185,6 +197,10 @@ The roadmap follows the three doctrines as a way of organizing development.
 
 ### BEING: the reader and virtual shell
 
+> It is pure indeterminateness and emptiness.
+
+Hegel, “Being,” printed p. 59, PDF p. 132.
+
 The current focus is SOL as a command line application: random quotations, careful formatting, reading, search, and a virtual terminal interface for navigating the book.
 
 Next come saved reading sequences, bookmarks, annotations, and richer links between passages. Permanent identifiers provide their foundation. Exact textual searches should remain distinguishable from any future conceptual search.
@@ -192,6 +208,10 @@ Next come saved reading sequences, bookmarks, annotations, and richer links betw
 This stage should make reading more productive while keeping the corpus inspectable and the interface small enough to understand and modify.
 
 ### ESSENCE: applications and experiments
+
+> The truth of being is essence.
+
+Hegel, “Essence,” printed p. 337, PDF p. 410.
 
 SOL can become a text laboratory through concordances, word frequencies, vocabulary comparisons, and recurring expressions. Classification, topic modeling, machine learning, and deep learning can follow clear research questions.
 

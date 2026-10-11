@@ -31,7 +31,7 @@ from pathlib import Path
 # This index is specific to the Cambridge di Giovanni edition supplied with the
 # project. Its printed page 7 is PDF page 80; page 827 begins the editor's
 # appendix, so it is deliberately outside the readable corpus.
-PDF_FILENAME = "georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf"
+PDF_FILENAME = "Hegel-SOL.pdf"
 FIRST_TEXT_PAGE = 80
 LAST_TEXT_PAGE = 826
 PRINTED_PAGE_OFFSET = 73

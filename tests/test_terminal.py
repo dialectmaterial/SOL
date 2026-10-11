@@ -6,6 +6,7 @@ from dataclasses import replace
 import io
 import json
 from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -99,6 +100,31 @@ class TerminalTests(unittest.TestCase):
         self.assertEqual(rendered.replace('\n  ', ''), sol.display_path(path))
         self.assertTrue(all(len(line) <= 44 for line in rendered.splitlines()))
         self.assertIn('\n  1-shine/', rendered)
+
+    def test_pdf_discovery_prefers_short_name_in_working_directory(self):
+        with tempfile.TemporaryDirectory(prefix='sol-pdf-name-') as directory:
+            root = Path(directory)
+            source = root / 'sources' / 'Hegel-SOL.pdf'
+            source.parent.mkdir()
+            source.write_bytes(b'Synthetic source fixture')
+            direct = root / 'Hegel-SOL.pdf'
+            direct.write_bytes(b'Synthetic working fixture')
+            with patch('sol.Path.cwd', return_value=root):
+                self.assertEqual(sol.default_pdf(), direct)
+
+    def test_pdf_discovery_uses_short_name_in_sources(self):
+        with tempfile.TemporaryDirectory(prefix='sol-pdf-name-') as directory:
+            root = Path(directory)
+            source = root / 'sources' / 'Hegel-SOL.pdf'
+            source.parent.mkdir()
+            source.write_bytes(b'Synthetic source fixture')
+            with patch('sol.Path.cwd', return_value=root):
+                self.assertEqual(sol.default_pdf(), source)
+
+    def test_missing_pdf_diagnostic_uses_short_name(self):
+        status, _, stderr = self.run_main([], allow_source=False)
+        self.assertEqual(status, 2)
+        self.assertIn('Hegel-SOL.pdf', stderr)
 
     def test_search_rejects_empty_query_and_invalid_limit(self):
         for query, limit in [('', 20), ('   ', 20), ('ground', 0), ('ground', -1)]:

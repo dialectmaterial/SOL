@@ -45,7 +45,7 @@ class PackagingTests(unittest.TestCase):
         for source in (root / "tests").glob("*.py"):
             shutil.copy2(source, tests / source.name)
         # Synthetic sentinels exercise archive exclusions without copying the book.
-        for relative in ("sources/source.pdf", "local-corpus/hegel/chapter.md",
+        for relative in ("Hegel-SOL.pdf", "sources/source.pdf", "local-corpus/hegel/chapter.md",
                          "local-corpus/index.jsonl", ".sol-corpus-work/layout.xml",
                          "AGENTS.md"):
             sentinel = cls.stage / relative

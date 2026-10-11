@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
+import io
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
@@ -29,6 +32,52 @@ def page(number, *spans):
 def reference_line(value, column=0):
     return {"pdf_page": value["pdf_page"], "column": column,
             "x": value["x"], "y": value["y"], "spans": [value], "text": value["text"]}
+
+
+class PDFNamingTests(unittest.TestCase):
+    def test_converter_discovers_the_same_short_named_pdf_as_the_reader(self):
+        with tempfile.TemporaryDirectory(prefix="sol-converter-name-") as directory:
+            root = Path(directory)
+            source = root / "sources" / "Hegel-SOL.pdf"
+            source.parent.mkdir()
+            source.write_bytes(b"Synthetic source fixture")
+            for selected in (source, root / "Hegel-SOL.pdf"):
+                if selected.parent == root:
+                    selected.write_bytes(b"Synthetic working fixture")
+                with self.subTest(selected=selected), \
+                        patch("sol.Path.cwd", return_value=root), \
+                        patch.object(converter, "convert", return_value={}) as convert, \
+                        contextlib.redirect_stdout(io.StringIO()):
+                    converter.main(["convert"])
+                    self.assertEqual(convert.call_args.args[0], selected)
+
+    def test_converter_still_accepts_explicit_alternative_filename(self):
+        with patch.object(converter, "convert", return_value={}) as convert, \
+                contextlib.redirect_stdout(io.StringIO()):
+            converter.main(["convert", "--pdf", "alternative-edition-name.pdf"])
+        self.assertEqual(convert.call_args.args[0], Path("alternative-edition-name.pdf"))
+
+    def test_rename_preserves_fingerprint_and_reuses_layout_cache(self):
+        with tempfile.TemporaryDirectory(prefix="sol-rename-cache-") as directory:
+            root = Path(directory)
+            original, renamed = root / "original.pdf", root / "Hegel-SOL.pdf"
+            data = b"Synthetic identical PDF bytes; extraction is mocked by the cache."
+            original.write_bytes(data)
+            renamed.write_bytes(data)
+            fingerprint = hashlib.sha256(data).hexdigest()
+            work = root / "work"
+            work.mkdir()
+            inventory = "".join(f'<page number="{number}" width="430" height="646" />'
+                                for number in range(1, 864))
+            (work / (fingerprint + ".xml")).write_text(
+                "<pdf2xml>" + inventory + "</pdf2xml>", encoding="utf-8")
+            with patch.object(converter, "AUDITED_SOURCE_SHA256", fingerprint), \
+                    patch.object(converter.subprocess, "run") as extraction:
+                before = converter.load_layout(original, work)
+                after = converter.load_layout(renamed, work)
+            self.assertEqual(before, after)
+            self.assertEqual(after[1], fingerprint)
+            extraction.assert_not_called()
 
 
 class ConversionTextTests(unittest.TestCase):

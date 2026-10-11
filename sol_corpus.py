@@ -23,8 +23,8 @@ import xml.etree.ElementTree as ET
 from sol_corpus_contract import CorpusError, new_id, reindex, render_record
 from sol_corpus_notes import extract_notes
 from sol_corpus_structure import build_hierarchy
+from sol import PDF_FILENAME as PDF_NAME, default_pdf
 
-PDF_NAME = "georg_wilhelm_friedrich_hegel__the_science_of_logic.pdf"
 AUDITED_SOURCE_SHA256 = "f48a2272a6daa80f2742de91e271a2b4b8a93d0a29193b6f02a6e3c010fc0e26"
 GAPS = [
     {"printed_page": "l", "before_pdf_page": 50, "after_pdf_page": 51,
@@ -872,7 +872,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     create = commands.add_parser("convert", help="one-time conversion of the inspected Cambridge PDF")
-    create.add_argument("--pdf", type=Path, default=Path("sources") / PDF_NAME)
+    create.add_argument("--pdf", type=Path, default=default_pdf(),
+                        help=f"source PDF (otherwise ./{PDF_NAME}, then ./sources/{PDF_NAME})")
     create.add_argument("--output", type=Path, default=Path("local-corpus"))
     create.add_argument("--work", type=Path, default=Path(".sol-corpus-work"))
     index = commands.add_parser("index", help="regenerate JSONL after canonical Markdown corrections")
