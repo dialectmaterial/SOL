@@ -1318,6 +1318,7 @@ BOOK TREE"""
         "EXPLORE: ls [PATH], tree [PATH] --depth N, info [PATH]\n"
         "NAVIGATE: cd PATH, up, cd -, pwd\n"
         "RESEARCH: search QUERY [PATH] --word --limit N, open ID|RESULT, context N\n\n"
+        "IDENTITY: neofetch (ASCII Hegel and the SOL concept preview)\n\n"
         "Example: cd /essence; search \"ground\" --word; open 1; context 2\n"
         "Type each example command separately inside sol --shell.\n"
         "CLI: sol --search \"ground\" --within /essence --word\n"
@@ -1328,6 +1329,101 @@ BOOK TREE"""
     folded = "\n".join(textwrap.fill(line, width=width, break_on_hyphens=False)
                         if line else "" for line in guide.splitlines())
     return "\n".join((title, outline, notice, folded))
+
+
+# Hand-drawn ASCII bust: swept-back hair, high forehead, and cravat.
+HEGEL_ASCII = r'''          .-""""""-.
+      _.-'  _.._    '-._
+    .'  .-''    ''-.    '.
+   /  .'            '.   \
+  /  /                \   \
+ (  |   _          _   |  )
+  \ |  /_\        /_\  | /
+   \|   .     |    .   |/
+    |        /         |
+    |       (__)       |
+    |    .--------.    |
+     \     '----'     /
+      '.            .'
+        '-.______.-'
+     _____/|    |\_____
+    /    / | /\ | \    \
+   /    /  |/  \|  \    \
+  /____/   / /\ \   \____\
+       G. W. F. Hegel'''
+
+HEGEL_ASCII_SMALL = r'''      .-""""-.
+    .' .-~~-. '.
+   / .'      '. \
+  ( |  _    _  | )
+   \|  .    .  |/
+    |    /     |
+    |   (_)    |
+    |  .---.   |
+     \  '-'   /
+      '.___.'
+    ___|/|\|___
+   /   /==\    \
+  /___/ || \____\
+  G. W. F. Hegel'''
+
+# Project identity, not measurements of the host machine. Edit these later.
+NEOFETCH_PLACEHOLDERS = (
+    ("Kernel", "dialectic [placeholder]"),
+    ("Packages", "[placeholder]"),
+    ("Terminal", "[placeholder]"),
+    ("Theme", "[placeholder]"),
+)
+
+
+def render_neofetch(book: Book, cwd: tuple[str, ...] = (), width: int = 80,
+                    color: bool = False) -> str:
+    """An in-world SOL identity card; never inspect or claim to be the host OS."""
+    width = sensible_width(width)
+    portrait = HEGEL_ASCII.splitlines()
+    if max(map(len, portrait)) > width:
+        portrait = HEGEL_ASCII_SMALL.splitlines()
+    portrait_width = max(map(len, portrait))
+    gap = 3
+    side_by_side = width - portrait_width - gap >= 32
+    panel_width = width - portrait_width - gap if side_by_side else width
+    fields = (
+        ("OS", "SOL (concept preview)"),
+        ("Shell", f"SOL-shell {VERSION}"),
+        ("Stage", "BEING"),
+        *NEOFETCH_PLACEHOLDERS,
+        ("Logic", "Being / Essence / Concept"),
+        ("Passages", f"{len(book.passages):,}"),
+        ("Location", display_path(cwd)),
+    )
+    panel = ["SOL@Idea", "--------"]
+    for label, value in fields:
+        panel.extend(textwrap.wrap(f"{label}: {value}", width=panel_width,
+                                   subsequent_indent="  ", break_on_hyphens=False))
+
+    def styled(value: str, code: str = "36") -> str:
+        return f"\x1b[{code}m{value}\x1b[0m" if color and value.strip() else value
+
+    def panel_style(line: str) -> str:
+        if line in {"SOL@Idea", "--------"}:
+            return styled(line, "1;36")
+        if any(line.startswith(label + ":") for label, _ in fields):
+            label, value = line.split(":", 1)
+            return styled(label + ":", "1;36") + value
+        return line
+
+    if not side_by_side:
+        return "\n".join([*(styled(line) for line in portrait), "",
+                          *(panel_style(line) for line in panel)])
+    rows = []
+    for index in range(max(len(portrait), len(panel))):
+        left = portrait[index] if index < len(portrait) else ""
+        right = panel[index] if index < len(panel) else ""
+        if right:
+            rows.append(styled(left.ljust(portrait_width)) + " " * gap + panel_style(right))
+        else:
+            rows.append(styled(left))
+    return "\n".join(rows)
 
 
 @dataclass
@@ -1386,7 +1482,7 @@ def install_completion(root: Node, get_cwd):
     old_completer = readline.get_completer()
     old_delimiters = readline.get_completer_delims()
     commands = ("ls", "cd", "up", "pwd", "tree", "read", "first", "next", "previous",
-                "cat", "search", "open", "context", "info", "where", "visual-help", "help", "exit")
+                "cat", "search", "open", "context", "info", "where", "visual-help", "neofetch", "help", "exit")
     def complete(text: str, state: int):
         try:
             buffer = readline.get_line_buffer()
@@ -1428,6 +1524,7 @@ context [N]                       neighbors in book order (default 1; maximum 10
 where                             show current passage and reading position
 info [PATH]                       title, pages, counts, and pending review
 visual-help [PATH] --depth N       ASCII guide and book tree (default depth 2)
+neofetch                          ASCII Hegel and SOL's concept-preview identity
 help / exit                       show commands / leave SOL
 Search does not move the reading cursor. Context can cross file boundaries.
 Quote multiword queries. Paths accept aliases; Tab completes full names.
@@ -1497,6 +1594,10 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False) 
                     if argument is not None:
                         raise ValueError("help does not take an argument")
                     print(SHELL_HELP)
+                elif verb == "neofetch":
+                    if argument is not None:
+                        raise ValueError("neofetch does not take an argument")
+                    print(render_neofetch(book, cwd, width, color and not plain))
                 elif verb == "pwd":
                     if argument is not None:
                         raise ValueError("pwd does not take an argument")
