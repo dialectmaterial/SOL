@@ -10,7 +10,7 @@ Its organizing concern is the idea itself, in Hegel’s technical sense:
 
 Hegel@SOL:/CONCEPT/i-subjectivity/1-the-concept/b-the-particular-concept/remark.txt$
 
-Organization here means the articulation and development of logical determinations through Being, Essence, and Concept. The software provides ways to read and investigate this movement; its classifications and interfaces do not replace the immanent development.
+Organization here means the articulation and development of logical determinations through Being, Essence, and Concept. The software provides ways to read and investigate this movement; its classifications and interfaces.
 
 The reader uses readable Markdown and a generated JSONL index. Each passage retains its permanent identifier, location, attribution, printed pages, and PDF pages. Ordinary reading does not extract the PDF again.
 
@@ -88,9 +88,7 @@ The setting lives in `$XDG_CONFIG_HOME/sol/config.json`, or `~/.config/sol/confi
 
 Discovery prefers `--corpus`, then the `SOL_CORPUS` environment variable, the working directory's `local-corpus`, the saved default, the source checkout remembered by a local pipx installation, and finally a corpus alongside a directly run `sol.py`. A missing or stale selected corpus produces an actionable error rather than switching sources silently.
 
-Ordinary reading never extracts a PDF. For the slower legacy reader, explicitly use `sol --pdf /path/to/Hegel-SOL.pdf`. It requires Poppler, has a less complete hierarchy, and uses different identifiers from the Markdown corpus. `--corpus` and `--pdf` cannot be combined.
-
-Renaming the PDF does not require reconverting an existing corpus. Its source fingerprint and permanent passage identifiers do not depend on the filename; the manifest retains the name used at import as historical provenance.
+Ordinary reading never extracts a PDF. Renaming the PDF does not require reconverting an existing corpus. Its source fingerprint and permanent passage identifiers do not depend on the filename; the manifest retains the name used at import as historical provenance.
 
 ## Read, search, and inspect
 
@@ -236,6 +234,7 @@ A reproducible development environment is the bridge: first a useful application
 
 For now, development stays with BEING. Each improvement should provide a usable result and an opportunity to learn the systems beneath it.
 
+#### Appendix: Hegel on the question of computational externality for the concept
 
 > "What first led to this wayward attempt is above all the quantitative relation in
 which universality, particularity, and singularity are supposed to stand to one
@@ -273,4 +272,5 @@ applies, namely that what in the symbols is the echo of a higher determination i
 recognized to be such only by virtue of the concept, and it is only by shedding the
 sensuous standbys that were supposed to express it that one comes closer to the
 concept."
+
 Hegel@SOL:/CONCEPT/i-subjectivity/1-the-concept/b-the-particular-concept/remark.txt$
