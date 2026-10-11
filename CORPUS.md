@@ -41,8 +41,9 @@ before treating the extraction as an authoritative transcription. Open the
 Markdown alongside the PDF, especially where the audit reports ambiguity or a
 mathematical layout.
 
-The reader and converter look for `Hegel-SOL.pdf` in the working directory, then
-in `sources/`; `--pdf PATH` can select another filename. Renaming the PDF does not
+The converter looks for `Hegel-SOL.pdf` in the working directory, then in
+`sources/`; its `--pdf PATH` can select another filename. The ordinary reader
+uses the indexed corpus and does not open the PDF. Renaming the PDF does not
 change its SHA-256 fingerprint or the identifiers in an existing corpus. The
 manifest's source filename records the name used at import, not a live path that
 the reader needs to open. Leave that historical provenance intact and do not
@@ -68,11 +69,36 @@ python3 sol.py --structure
 python3 sol.py --corpus local-corpus --shell
 ```
 
-Without flags, the reader prefers `./local-corpus` when its `corpus.json` exists.
-It verifies the generated index and does not parse the PDF or require
-`markdown-it-py`. An invalid or stale corpus produces an error rather than silently
-falling back to PDF extraction. Explicit `--pdf PATH` selects the legacy PDF reader;
-`--pdf` and `--corpus` are mutually exclusive.
+The installed reader can remember a default corpus independently of the working
+directory:
+
+```sh
+sol --set-corpus /absolute/path/to/SOL/local-corpus
+cd ~
+sol
+```
+
+This validates the corpus before saving its absolute path in
+`$XDG_CONFIG_HOME/sol/config.json`, with `~/.config/sol/config.json` as the default
+location. It stores a location, not a copy of the corpus. Run the command again if
+the corpus moves. `python3 sol.py --set-corpus DIRECTORY` supplies the same setting
+when running directly from the checkout.
+
+Reader discovery proceeds through an explicit `--corpus`, the `SOL_CORPUS`
+environment variable, `./local-corpus`, the saved default, a local pipx
+installation's remembered source checkout, and a corpus alongside a directly run
+`sol.py`. A local `pipx install .` can therefore find the checkout's corpus from
+another directory without packaging its private contents. An installation from
+GitHub should use `--set-corpus` to locate separately supplied local text. Refresh
+installed code with `pipx reinstall sol-organizes-logic` after an update.
+
+Reading verifies the generated index and does not parse the PDF or require
+`markdown-it-py`. A missing, invalid, or stale selected corpus produces an error
+rather than silently trying another source. Ordinary reading never falls back to
+PDF extraction. Explicit `--pdf PATH` selects the slower legacy PDF reader, whose
+identifiers are separate from corpus UUIDs; `--pdf` and `--corpus` are mutually
+exclusive. Help, version information, and the visual guide remain usable without
+a corpus, and the structure command can show an abbreviated outline.
 
 Do not rerun the initial conversion over an existing canonical corpus. That risks
 discarding corrections and allocating new IDs. Correct the existing Markdown and
@@ -166,6 +192,12 @@ IDs are allocated once when records enter the canonical corpus. They are not
 derived from titles, page numbers, order, or text hashes. Changing text, emphasis,
 a heading, or its position must not change the record's ID. Hashes serve integrity
 checks only; they are not identity.
+
+Permanence applies within that corpus, not across independent initial conversions.
+Two conversions of the same PDF can assign different UUIDs to equivalent passages.
+To share a reference with someone using a different conversion, include its edition,
+printed and PDF pages, logical location, and a distinctive search phrase alongside
+the ID. Rebuilding an existing corpus index preserves the IDs in its Markdown.
 
 When editing:
 

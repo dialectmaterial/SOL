@@ -2,8 +2,8 @@
 """SOL: a terminal reader for the Cambridge *Science of Logic*.
 
 Canonical local Markdown is indexed once and read through a verified JSONL
-index using standard-library Python. Poppler remains available for the legacy
-PDF fallback. Corpus/PDF loading and the terminal interface stay separate.
+index using standard-library Python. Poppler remains available for explicit
+legacy PDF reading. Corpus/PDF loading and the terminal interface stay separate.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from collections import Counter
 from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import cached_property
+from importlib import metadata as package_metadata
 import json
 import os
 import random
@@ -22,8 +23,10 @@ import shutil
 import statistics
 import subprocess
 import sys
+import tempfile
 import textwrap
 import unicodedata
+from urllib.parse import unquote, urlsplit
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -903,6 +906,12 @@ def load_corpus_book(corpus: Path) -> Book:
     try:
         records = load_index(corpus, verify=True)
     except CorpusError as error:
+        if not (corpus / "corpus.json").is_file():
+            raise ValueError(
+                f"Cannot use local corpus {corpus}: corpus.json not found.\n"
+                "Select its actual location with sol --set-corpus DIRECTORY or --corpus DIRECTORY.\n"
+                "If SOL_CORPUS is set, update or unset that environment override."
+            ) from error
         instruction = f"{shlex.quote(sys.executable)} -m sol_corpus_contract {shlex.quote(str(corpus))}"
         raise ValueError(
             f"Cannot use local corpus {corpus}: {error}\n"
@@ -1561,6 +1570,115 @@ def default_pdf() -> Path:
     return direct if direct.is_file() or not local_source.is_file() else local_source
 
 
+def config_path() -> Path:
+    """Keep the corpus pointer outside the package, following the XDG layout."""
+    configured = os.environ.get("XDG_CONFIG_HOME")
+    directory = Path(configured).expanduser() if configured else Path.home() / ".config"
+    if not directory.is_absolute():
+        raise ValueError("XDG_CONFIG_HOME must be an absolute directory")
+    return directory / "sol" / "config.json"
+
+
+def configured_corpus() -> Path | None:
+    path = config_path()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError, UnicodeError) as error:
+        raise ValueError(f"Cannot read SOL configuration {path}: {error}\n"
+                         "Reset it with sol --set-corpus DIRECTORY.") from error
+    value = data.get("corpus") if isinstance(data, dict) else None
+    if not isinstance(value, str) or not value or not Path(value).is_absolute():
+        raise ValueError(f"Invalid SOL configuration {path}: corpus must be an absolute path.\n"
+                         "Reset it with sol --set-corpus DIRECTORY.")
+    return Path(value)
+
+
+def installed_project_directory() -> Path | None:
+    """Recover a local pip/pipx checkout, without putting its corpus in a wheel.
+
+    PEP 610 records a local-directory install's file URL in direct_url.json.
+    Archive and remote Git installations do not identify a persistent checkout.
+    """
+    try:
+        origin = package_metadata.distribution("sol-organizes-logic").read_text("direct_url.json")
+        if not origin:
+            return None
+        data = json.loads(origin)
+        if not isinstance(data, dict) or not isinstance(data.get("dir_info"), dict):
+            return None
+        if "archive_info" in data or "vcs_info" in data:
+            return None
+        url = data.get("url")
+        if not isinstance(url, str):
+            return None
+        parsed = urlsplit(url)
+        if (parsed.scheme != "file" or parsed.netloc not in {"", "localhost"}
+                or parsed.query or parsed.fragment):
+            return None
+        decoded = unquote(parsed.path, errors="strict")
+        if os.name == "nt" and re.match(r"^/[A-Za-z]:/", decoded):
+            decoded = decoded[1:]
+        directory = Path(decoded)
+        if not directory.is_absolute():
+            return None
+        subdirectory = data.get("subdirectory", "")
+        if not isinstance(subdirectory, str):
+            return None
+        relative = Path(subdirectory)
+        if relative.is_absolute() or ".." in relative.parts:
+            return None
+        return directory / relative
+    except (package_metadata.PackageNotFoundError, OSError, ValueError, TypeError):
+        return None
+
+
+def discover_corpus(explicit: Path | None = None) -> Path | None:
+    """Select a canonical corpus independently of the shell's working directory.
+
+    An explicitly selected or saved location must never silently change sources
+    when broken. Auto-discovered locations are used only when a manifest exists.
+    """
+    if explicit is not None:
+        return explicit.expanduser()
+    environment = os.environ.get("SOL_CORPUS")
+    if environment:
+        return Path(environment).expanduser()
+    local = Path.cwd() / "local-corpus"
+    if (local / "corpus.json").is_file():
+        return local
+    saved = configured_corpus()
+    if saved is not None:
+        return saved
+    project = installed_project_directory()
+    candidates = ([project / "local-corpus"] if project is not None else [])
+    candidates.append(Path(__file__).resolve().parent / "local-corpus")
+    return next((candidate for candidate in candidates if (candidate / "corpus.json").is_file()), None)
+
+
+def save_corpus(directory: Path) -> tuple[Path, Path]:
+    """Validate first, then atomically save a portable absolute corpus pointer."""
+    corpus = directory.expanduser().resolve()
+    load_corpus_book(corpus)
+    path = config_path()
+    temporary = None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix=".config-", suffix=".tmp", delete=False) as stream:
+            temporary = Path(stream.name)
+            json.dump({"version": 1, "corpus": str(corpus)}, stream, indent=2)
+            stream.write("\n")
+        temporary.replace(path)
+    except OSError as error:
+        raise ValueError(f"Cannot save SOL configuration {path}: {error}") from error
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
+    return corpus, path
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sol", description="Read and navigate Hegel's Science of Logic.")
     parser.add_argument("command", nargs="?", choices=("visual-help",), help="open the ASCII manual")
@@ -1575,11 +1693,13 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--search", metavar="QUERY", help="literal case-insensitive passage search")
     mode.add_argument("--passage", metavar="ID", help="open a passage by exact ID or unique prefix")
     mode.add_argument("--info", metavar="PATH", help="show location, source range, and passage counts")
+    mode.add_argument("--set-corpus", type=Path, metavar="DIRECTORY",
+                      help="validate and remember the default corpus for reading from any directory")
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--corpus", type=Path, metavar="DIRECTORY",
-                        help="canonical local corpus (default: ./local-corpus when corpus.json exists)")
+                        help="canonical corpus for this run (otherwise discover a local or saved corpus)")
     source.add_argument("--pdf", type=Path, metavar="PATH",
-                        help=f"explicit PDF fallback (otherwise ./{PDF_FILENAME}, then ./sources/{PDF_FILENAME})")
+                        help="explicit legacy PDF reading (slow; not used for ordinary reading)")
     parser.add_argument("--width", type=int, metavar="COLUMNS", help="line width (20–240; default fits the terminal, up to 88)")
     parser.add_argument("--within", metavar="PATH", help="restrict --search to this subtree")
     parser.add_argument("--word", action="store_true", help="whole-word --search rather than substring")
@@ -1596,7 +1716,7 @@ def validate_options(args: argparse.Namespace) -> None:
     if args.command:
         actions = (args.structure, args.visual_help, args.shell, args.read is not None,
                    args.first is not None, args.cat is not None, args.search is not None,
-                   args.passage is not None, args.info is not None)
+                   args.passage is not None, args.info is not None, args.set_corpus is not None)
         if any(actions):
             raise ValueError("visual-help cannot be combined with another action")
         args.visual_help = True
@@ -1618,6 +1738,8 @@ def validate_options(args: argparse.Namespace) -> None:
             raise ValueError("--depth must be between 0 and 32")
     if args.json and (args.shell or args.visual_help):
         raise ValueError("--json is available for reading, search, info, and structure")
+    if args.set_corpus is not None and (args.corpus is not None or args.pdf is not None):
+        raise ValueError("--set-corpus cannot be combined with --corpus or --pdf")
 
 
 def tree_data(node: Node, depth: int | None = None) -> dict:
@@ -1643,36 +1765,57 @@ def emit_json(value: object) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    pdf_explicit = args.pdf is not None
-    corpus_explicit = args.corpus is not None
-    corpus = (args.corpus or Path.cwd() / "local-corpus").expanduser()
-    pdf = (args.pdf or default_pdf()).expanduser()
     try:
         validate_options(args)
+        if args.set_corpus is not None:
+            corpus, configuration = save_corpus(args.set_corpus)
+            if args.json:
+                emit_json({"corpus": str(corpus), "configuration": str(configuration)})
+            else:
+                print(f"Default corpus: {corpus}\nSaved in: {configuration}")
+            return 0
         width = sensible_width(args.width)
         color = terminal_color() and not args.plain and not args.json
-        if not pdf_explicit and (corpus_explicit or (corpus / "corpus.json").is_file()):
+        if args.visual_help and args.corpus is None and args.pdf is None:
+            # The guide must still explain setup when an automatic source is broken.
+            try:
+                corpus = discover_corpus()
+                book = load_corpus_book(corpus) if corpus is not None else None
+            except ValueError as error:
+                print(f"sol: {error}\nShowing the abbreviated visual guide.", file=sys.stderr)
+                book = None
+            print(render_visual_help(book, width, 2 if args.depth is None else args.depth))
+            return 0
+        corpus = None if args.pdf is not None else discover_corpus(args.corpus)
+        if corpus is not None:
             book = load_corpus_book(corpus)
+        elif args.pdf is not None:
+            pdf = args.pdf.expanduser()
+            if args.passage and re.fullmatch(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", args.passage):
+                raise ValueError("A canonical passage UUID requires the Markdown corpus, not --pdf.\n"
+                                 "Use sol --set-corpus DIRECTORY, then rerun without --pdf. "
+                                 "The legacy PDF reader has different passage identifiers.")
+            if not pdf.is_file():
+                raise ValueError(f"PDF not found: {pdf}")
+            book = load_book(pdf)
         else:
-            if args.visual_help and not pdf_explicit:
+            if args.visual_help:
                 print(render_visual_help(width=width, depth=2 if args.depth is None else args.depth))
                 return 0
-            if args.structure and not pdf.is_file():
-                if pdf_explicit:
-                    raise ValueError(f"PDF not found: {pdf}")
+            if args.structure:
                 if args.json:
                     emit_json({"outline": tree_data(ROOT, args.depth), "abbreviated": True})
                 else:
                     print(render_tree(depth=args.depth))
-                    print("\nAbbreviated outline. Supply a local corpus or the Cambridge PDF for subdivisions.")
+                    print("\nAbbreviated outline. Select a corpus with --set-corpus DIRECTORY for subdivisions.")
                 return 0
-            if not pdf.is_file():
-                raise ValueError(
-                    f"No local corpus at {corpus}, and PDF not found: {pdf}\n"
-                    f"Create the local corpus, put {PDF_FILENAME} in the current directory "
-                    "or sources/, or use --corpus DIRECTORY / --pdf PATH."
-                )
-            book = load_book(pdf)
+            raise ValueError(
+                "No local Markdown corpus found.\n"
+                "Select an existing corpus once with sol --set-corpus DIRECTORY, "
+                "or use --corpus DIRECTORY / SOL_CORPUS.\n"
+                f"For an initial import: sol-corpus convert --pdf {PDF_FILENAME}\n"
+                "PDF extraction is never automatic; --pdf PATH explicitly selects the slow legacy reader."
+            )
         if args.structure:
             if args.json:
                 emit_json({"outline": tree_data(book.root, args.depth), "abbreviated": False})

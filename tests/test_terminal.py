@@ -47,6 +47,7 @@ class TerminalTests(unittest.TestCase):
         effect = None if allow_source else AssertionError('No source should load')
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr), \
                 patch('sol.Path.cwd', return_value=Path('/synthetic-missing-directory')), \
+                patch('sol.discover_corpus', side_effect=lambda explicit=None: explicit), \
                 patch('sol.load_corpus_book', return_value=self.book, side_effect=effect), \
                 patch('sol.load_book', side_effect=AssertionError('PDF extraction forbidden')):
             try:

@@ -61,23 +61,34 @@ pipx install git+https://github.com/dialectmaterial/SOL.git
 
 ## Choose the text
 
-The book is supplied locally; installing SOL does not download it. SOL looks for `local-corpus/corpus.json` in the working directory. From a project directory containing the corpus, simply run:
+The book is supplied locally; installing SOL does not download it or copy the private corpus into the package. A local `pipx install .` remembers the source checkout through installer metadata, so its `local-corpus` can be found from another directory. From a project containing the corpus, simply run:
 
 ~~~sh
 sol
 ~~~
 
-From elsewhere, select the corpus:
+Select a different corpus for one invocation:
 
 ~~~sh
 sol --corpus /absolute/path/to/SOL/local-corpus
 ~~~
 
-When no default corpus exists, SOL looks for `Hegel-SOL.pdf` in the working directory, then in `sources/`. `--pdf PATH` can select a PDF with any filename. PDF extraction requires Poppler, and its reader has a less complete hierarchy and different identifiers.
+For an installation from GitHub, or to choose a lasting default, save the corpus location once. SOL validates it and stores an absolute path:
+
+~~~sh
+sol --set-corpus /absolute/path/to/SOL/local-corpus
+cd ~
+sol
+sol --info /being
+~~~
+
+The setting lives in `$XDG_CONFIG_HOME/sol/config.json`, or `~/.config/sol/config.json` when that environment variable is unset. If you move the corpus, run `--set-corpus` again. After updating the installed code, use `pipx reinstall sol-organizes-logic` before checking it from home.
+
+Discovery prefers `--corpus`, then the `SOL_CORPUS` environment variable, the working directory's `local-corpus`, the saved default, the source checkout remembered by a local pipx installation, and finally a corpus alongside a directly run `sol.py`. A missing or stale selected corpus produces an actionable error rather than switching sources silently.
+
+Ordinary reading never extracts a PDF. For the slower legacy reader, explicitly use `sol --pdf /path/to/Hegel-SOL.pdf`. It requires Poppler, has a less complete hierarchy, and uses different identifiers from the Markdown corpus. `--corpus` and `--pdf` cannot be combined.
 
 Renaming the PDF does not require reconverting an existing corpus. Its source fingerprint and permanent passage identifiers do not depend on the filename; the manifest retains the name used at import as historical provenance.
-
-An existing invalid or stale corpus produces an actionable error. `--corpus` and `--pdf` cannot be combined.
 
 ## Read, search, and inspect
 
@@ -98,7 +109,7 @@ sol --shell
 
 Search is literal and case insensitive. `--word` matches whole words rather than fragments; `--within` restricts the search to a subtree, and `--limit` bounds the displayed results.
 
-Use `--passage ID` to return to a passage by its identifier or an unambiguous prefix. Add `--context 2` to read neighboring paragraphs in book order, including across subdivision boundaries. Context accepts 0 to 10 passages on each side. `--info PATH` summarizes a location.
+Use `--passage ID` to return to a passage by its identifier or an unambiguous prefix. IDs remain permanent within their corpus; an independent initial conversion allocates its own IDs. Add `--context 2` to read neighboring paragraphs in book order, including across subdivision boundaries. Context accepts 0 to 10 passages on each side. `--info PATH` summarizes a location.
 
 For other terminal tools, `--plain` prints passage text without decorative formatting or ANSI codes. `--json` supplies structured output:
 
@@ -110,6 +121,8 @@ sol --search "infinity" --within /being --json
 With `--json`, a single passage is an object; search, complete file, and context results are arrays in book order. Context includes the selected passage. Each passage carries its identifier, path, text, page references, and review status.
 
 `visual-help` and `--visual-help` open an ASCII guide containing the project roadmap, book outline, and navigation examples. Use `--depth` from 0 to 32 to control how much of an outline appears.
+
+Help, version information, and the visual guide remain available without a corpus. `--structure` can show an abbreviated outline until the text is configured.
 
 ## Work inside the virtual shell
 
@@ -174,13 +187,13 @@ Mathematical passages awaiting review remain available through ordered reading a
 
 Four useful places to begin checking are printed pages 209 to 210, PDF pages 282 to 283, on fractions and infinite series; printed pages 224 to 225, PDF pages 297 to 298, on Newton’s differential product; printed page 252, PDF page 325, on Lagrange, Kepler, and powers; and printed page 374, PDF page 447, on signs in Opposition.
 
-For the Newton passage:
+Find the Newton passage by its text and location, rather than an identifier belonging to someone else's conversion:
 
 ~~~sh
-sol --passage acb6db0e-f9af-4e5f-8053-913bc542ad0b --context 1
+sol --search "remarkable procedure of Newton" --within /BEING/ii-magnitude-quantity/2-quantum --limit 5
 ~~~
 
-Compare the prose with its Markdown facsimile before correcting a symbol or exponent. Preserve the identifier, then rebuild the index. Mathematical display improvements should follow checked transcriptions.
+Copy the displayed identifier into `sol --passage ID --context 1`, replacing `ID` with that value. The target begins on printed page 224; its continuation reaches page 225. Compare the prose with its Markdown facsimile before correcting a symbol or exponent. Preserve the identifier, then rebuild the index. Mathematical display improvements should follow checked transcriptions.
 
 For development checks, use a separate environment in the project directory:
 

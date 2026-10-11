@@ -20,6 +20,15 @@ class CorpusReaderTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.cwd = Path(self.temporary.name)
+        environment = patch.dict("os.environ", {"XDG_CONFIG_HOME": str(self.cwd / "config")}, clear=True)
+        environment.start()
+        self.addCleanup(environment.stop)
+        origin = patch("sol.installed_project_directory", return_value=None)
+        origin.start()
+        self.addCleanup(origin.stop)
+        script = patch("sol.__file__", str(self.cwd / "not-a-checkout" / "sol.py"))
+        script.start()
+        self.addCleanup(script.stop)
         self.corpus = self.cwd / "local-corpus"
         self.corpus.mkdir()
         self.ids = [contract.new_id() for _ in range(11)]
@@ -63,9 +72,9 @@ class CorpusReaderTests(unittest.TestCase):
         (self.corpus / "sample.md").write_text("\n".join(contract.render_record(metadata, body) for metadata, body in self.pairs), encoding="utf-8")
         contract.reindex(self.corpus)
 
-    def run_main(self, arguments: list[str]) -> tuple[int, str, str]:
+    def run_main(self, arguments: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
         stdout, stderr = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr), patch("sol.Path.cwd", return_value=self.cwd):
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr), patch("sol.Path.cwd", return_value=cwd or self.cwd):
             status = sol.main(arguments)
         return status, stdout.getvalue(), stderr.getvalue()
 
@@ -153,6 +162,139 @@ class CorpusReaderTests(unittest.TestCase):
         self.assertEqual(status, 2)
         self.assertIn("rebuild the index", stderr)
         self.assertIn("-m sol_corpus_contract", stderr)
+
+    def test_saved_corpus_and_uuid_work_from_another_directory_without_pdf(self) -> None:
+        with patch("sol.load_book", side_effect=AssertionError("PDF extraction forbidden")):
+            status, _, stderr = self.run_main(["--set-corpus", str(self.corpus)])
+            self.assertEqual(status, 0, stderr)
+            status, stdout, stderr = self.run_main(
+                ["--passage", self.ids[4], "--context", "1", "--json"], cwd=self.cwd / "elsewhere")
+        self.assertEqual(status, 0, stderr)
+        self.assertEqual([row["id"] for row in json.loads(stdout)], [self.ids[2], self.ids[4], self.ids[5]])
+        saved = json.loads(sol.config_path().read_text(encoding="utf-8"))
+        self.assertEqual(saved["corpus"], str(self.corpus.resolve()))
+
+    def test_relative_set_corpus_is_resolved_when_saved(self) -> None:
+        # Path.resolve delegates to os.getcwd for relative inputs.
+        with patch("os.getcwd", return_value=str(self.cwd)):
+            status, stdout, stderr = self.run_main(["--set-corpus", "local-corpus", "--json"])
+        self.assertEqual(status, 0, stderr)
+        self.assertEqual(json.loads(stdout)["corpus"], str(self.corpus))
+        status, stdout, stderr = self.run_main(["--passage", self.ids[2], "--json"], cwd=self.cwd / "elsewhere")
+        self.assertEqual(status, 0, stderr)
+        self.assertEqual(json.loads(stdout)["id"], self.ids[2])
+
+    def test_invalid_set_corpus_preserves_previous_setting(self) -> None:
+        status, _, stderr = self.run_main(["--set-corpus", str(self.corpus)])
+        self.assertEqual(status, 0, stderr)
+        original = sol.config_path().read_bytes()
+        status, _, stderr = self.run_main(["--set-corpus", str(self.cwd / "missing")])
+        self.assertEqual(status, 2)
+        self.assertIn("Cannot use local corpus", stderr)
+        self.assertEqual(sol.config_path().read_bytes(), original)
+
+    def test_missing_saved_corpus_errors_without_install_or_pdf_fallback(self) -> None:
+        configuration = sol.config_path()
+        configuration.parent.mkdir(parents=True)
+        configuration.write_text(json.dumps({"corpus": str(self.cwd / "missing")}), encoding="utf-8")
+        with patch("sol.load_book", side_effect=AssertionError("PDF extraction forbidden")), \
+                patch("sol.installed_project_directory", side_effect=AssertionError("No source substitution")):
+            status, _, stderr = self.run_main([], cwd=self.cwd / "elsewhere")
+        self.assertEqual(status, 2)
+        self.assertIn(str(self.cwd / "missing"), stderr)
+        self.assertIn("--set-corpus", stderr)
+
+    def test_visual_help_survives_broken_automatic_configuration(self) -> None:
+        configuration = sol.config_path()
+        configuration.parent.mkdir(parents=True)
+        for content in ("{broken", json.dumps({"corpus": str(self.cwd / "missing")})):
+            with self.subTest(content=content), \
+                    patch("sol.load_book", side_effect=AssertionError("PDF extraction forbidden")):
+                configuration.write_text(content, encoding="utf-8")
+                status, stdout, stderr = self.run_main(["visual-help"], cwd=self.cwd / "elsewhere")
+                self.assertEqual(status, 0, stderr)
+                self.assertIn("BEING", stdout)
+                self.assertIn("abbreviated visual guide", stderr)
+        status, _, stderr = self.run_main(["visual-help", "--corpus", str(self.cwd / "missing")])
+        self.assertEqual(status, 2)
+        self.assertIn("Cannot use local corpus", stderr)
+
+    def test_environment_override_and_explicit_override_precedence(self) -> None:
+        with patch.dict("os.environ", {"SOL_CORPUS": str(self.cwd / "missing")}):
+            status, _, stderr = self.run_main([])
+            self.assertEqual(status, 2)
+            self.assertIn(str(self.cwd / "missing"), stderr)
+            status, stdout, stderr = self.run_main(["--corpus", str(self.corpus), "--passage", self.ids[2]])
+            self.assertEqual(status, 0, stderr)
+            self.assertIn(self.ids[2], stdout)
+        with patch.dict("os.environ", {"SOL_CORPUS": str(self.corpus)}):
+            status, stdout, stderr = self.run_main(["--passage", self.ids[2]], cwd=self.cwd / "elsewhere")
+        self.assertEqual(status, 0, stderr)
+        self.assertIn(self.ids[2], stdout)
+
+    def test_cwd_corpus_precedes_saved_default(self) -> None:
+        configuration = sol.config_path()
+        configuration.parent.mkdir(parents=True)
+        configuration.write_text(json.dumps({"corpus": str(self.cwd / "missing")}), encoding="utf-8")
+        status, stdout, stderr = self.run_main(["--passage", self.ids[2]])
+        self.assertEqual(status, 0, stderr)
+        self.assertIn(self.ids[2], stdout)
+
+    def test_explicit_pdf_bypasses_invalid_configuration_and_environment(self) -> None:
+        pdf = self.cwd / "explicit.pdf"
+        pdf.write_bytes(b"Synthetic placeholder; loader is mocked")
+        book = sol.load_corpus_book(self.corpus)
+        configuration = sol.config_path()
+        configuration.parent.mkdir(parents=True)
+        configuration.write_text("{broken", encoding="utf-8")
+        with patch.dict("os.environ", {"SOL_CORPUS": str(self.cwd / "missing")}), \
+                patch("sol.load_book", return_value=book) as loader:
+            status, _, stderr = self.run_main(["--pdf", str(pdf)])
+        self.assertEqual(status, 0, stderr)
+        loader.assert_called_once_with(pdf)
+
+    def test_uuid_in_pdf_mode_explains_distinct_identifiers_before_extraction(self) -> None:
+        with patch("sol.load_book", side_effect=AssertionError("PDF extraction forbidden")):
+            status, _, stderr = self.run_main(["--pdf", "missing.pdf", "--passage", self.ids[2]])
+        self.assertEqual(status, 2)
+        self.assertIn("UUID requires the Markdown corpus", stderr)
+
+    def test_corpus_absence_never_automatically_extracts_present_pdf(self) -> None:
+        elsewhere = self.cwd / "elsewhere"
+        elsewhere.mkdir()
+        (elsewhere / sol.PDF_FILENAME).write_bytes(b"Synthetic PDF placeholder")
+        with patch("sol.load_book", side_effect=AssertionError("PDF extraction forbidden")):
+            status, _, stderr = self.run_main([], cwd=elsewhere)
+            self.assertEqual(status, 2)
+            self.assertIn("--set-corpus", stderr)
+            status, stdout, stderr = self.run_main(["--structure", "--json"], cwd=elsewhere)
+        self.assertEqual(status, 0, stderr)
+        self.assertTrue(json.loads(stdout)["abbreviated"])
+
+    def test_malformed_and_relative_configuration_are_actionable(self) -> None:
+        configuration = sol.config_path()
+        configuration.parent.mkdir(parents=True)
+        for content in ("{broken", "[]", '{"corpus":"local-corpus"}'):
+            with self.subTest(content=content):
+                configuration.write_text(content, encoding="utf-8")
+                status, _, stderr = self.run_main([], cwd=self.cwd / "elsewhere")
+                self.assertEqual(status, 2)
+                self.assertIn("--set-corpus", stderr)
+                status, _, stderr = self.run_main(["--corpus", str(self.corpus)])
+                self.assertEqual(status, 0, stderr)
+
+    def test_configuration_write_error_is_actionable(self) -> None:
+        with patch("sol.Path.mkdir", side_effect=PermissionError("Synthetic permission failure")):
+            status, _, stderr = self.run_main(["--set-corpus", str(self.corpus)])
+        self.assertEqual(status, 2)
+        self.assertIn("Cannot save SOL configuration", stderr)
+
+    def test_script_adjacent_corpus_is_discovered_from_another_directory(self) -> None:
+        with patch("sol.__file__", str(self.cwd / "sol.py")), \
+                patch("sol.load_book", side_effect=AssertionError("PDF extraction forbidden")):
+            status, stdout, stderr = self.run_main(["--passage", self.ids[2]], cwd=self.cwd / "elsewhere")
+        self.assertEqual(status, 0, stderr)
+        self.assertIn(self.ids[2], stdout)
 
     def test_invalid_reader_path_is_rejected(self) -> None:
         self.pairs[2][0]["reader_path"] = "/BEING/../wrong.txt"
