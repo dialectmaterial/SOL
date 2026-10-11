@@ -12,7 +12,7 @@ Hegel@SOL:/CONCEPT/i-subjectivity/1-the-concept/b-the-particular-concept/remark.
 
 Organization here means the articulation and development of logical determinations through Being, Essence, and Concept. The software provides ways to read and investigate this movement; its classifications and interfaces.
 
-The reader uses readable Markdown and a generated JSONL index. Each passage retains its permanent identifier, location, attribution, printed pages, and PDF pages. Ordinary reading does not extract the PDF again.
+The reader uses readable Markdown and a generated JSONL index. Each passage retains its permanent identifier, location, attribution, printed pages, and PDF pages.
 
 The shell presents the book through `/BEING`, `/ESSENCE`, and `/CONCEPT`. Sections and subdivisions become directories; their own introductory prose appears as `00-introduction.txt`. Divisions without children become virtual text files. The canonical corpus preserves the fuller volume hierarchy, editorial material, notes, bibliography, and index.
 
@@ -234,7 +234,7 @@ A reproducible development environment is the bridge: first a useful application
 
 For now, development stays with BEING. Each improvement should provide a usable result and an opportunity to learn the systems beneath it.
 
-#### Appendix: Hegel on the question of computational externality for the concept
+### Appendix: Hegel on the question of computational externality for the concept
 
 > "What first led to this wayward attempt is above all the quantitative relation in
 which universality, particularity, and singularity are supposed to stand to one
