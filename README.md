@@ -2,7 +2,7 @@
 
 ## Hegel’s *Science of Logic* in the terminal
 
-SOL stands for SOL Organizes Logic, a recursive acronym. It is a reader and virtual shell for Hegel’s *Science of Logic*. Its larger ambition is to become an environment for studying how texts, concepts, and the idea are organized, bringing philosophy into conversation with computational linguistics, machine learning, deep learning and operating systems.
+SOL is a recursive acronym that stands for SOL Organizes Logic. It is a reader and virtual shell for Hegel’s *Science of Logic*. Its larger ambition is to become an environment for studying how texts, concepts, and the idea are organized, bringing philosophy into conversation with computational linguistics, machine learning, deep learning and operating systems.
 
 Its organizing concern is the idea itself, in Hegel’s technical sense:
 
