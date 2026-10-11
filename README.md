@@ -2,13 +2,14 @@
 
 ## Hegel’s *Science of Logic* in the terminal
 
-SOL stands for SOL Organizes Logic, a recursive acronym in the style of GNU. It is a reader and virtual shell for Hegel’s *Science of Logic*, with a longer ambition connecting speculative philosophy, computational linguistics, machine learning, and operating systems.
+SOL stands for SOL Organizes Logic, a recursive acronym. It is a reader and virtual shell for Hegel’s *Science of Logic*. Its larger ambition is to become an environment for studying how texts, concepts, and the idea are organized, bringing philosophy into conversation with computational linguistics, machine learning, deep learning and operating systems.
 
-Its organizing concern is the Idea itself, in Hegel’s technical sense: the unity of Concept and objectivity. Organization here means the articulation and development of logical determinations through Being, Essence, and Concept, including their mediation and sublation. The software provides ways to read and investigate this movement; its classifications and interfaces do not replace the immanent development of the Concept.
+Its organizing concern is the idea itself, in Hegel’s technical sense:
 
-> The idea is the *adequate concept* …
+> "But the adequate concept is something higher; it properly denotes the agreement of the concept with reality, and this is not the concept as such but the idea."
+Hegel@SOL:/CONCEPT/i-subjectivity/1-the-concept/b-the-particular-concept/remark.txt$
 
-Hegel, “The idea,” printed p. 670, PDF p. 743. All quotations here are from George di Giovanni’s 2010 translation of *The Science of Logic*; this first quotation is an excerpt.
+Organization here means the articulation and development of logical determinations through Being, Essence, and Concept. The software provides ways to read and investigate this movement; its classifications and interfaces do not replace the immanent development.
 
 The reader uses readable Markdown and a generated JSONL index. Each passage retains its permanent identifier, location, attribution, printed pages, and PDF pages. Ordinary reading does not extract the PDF again.
 
@@ -210,10 +211,6 @@ The roadmap follows the three doctrines as a way of organizing development.
 
 ### BEING: the reader and virtual shell
 
-> It is pure indeterminateness and emptiness.
-
-Hegel, “Being,” printed p. 59, PDF p. 132.
-
 The current focus is SOL as a command line application: random quotations, careful formatting, reading, search, and a virtual terminal interface for navigating the book.
 
 Next come saved reading sequences, bookmarks, annotations, and richer links between passages. Permanent identifiers provide their foundation. Exact textual searches should remain distinguishable from any future conceptual search.
@@ -221,10 +218,6 @@ Next come saved reading sequences, bookmarks, annotations, and richer links betw
 This stage should make reading more productive while keeping the corpus inspectable and the interface small enough to understand and modify.
 
 ### ESSENCE: applications and experiments
-
-> The truth of being is essence.
-
-Hegel, “Essence,” printed p. 337, PDF p. 410.
 
 SOL can become a text laboratory through concordances, word frequencies, vocabulary comparisons, and recurring expressions. Classification, topic modeling, machine learning, and deep learning can follow clear research questions.
 
@@ -241,3 +234,42 @@ The longer ambition is a NixOS distribution, with Hyprland as a possible desktop
 A reproducible development environment is the bridge: first a useful application, then a curated collection of tools, and eventually an operating system with a distinctive purpose.
 
 For now, development stays with BEING. Each improvement should provide a usable result and an opportunity to learn the systems beneath it.
+
+
+> "What first led to this wayward attempt is above all the quantitative relation in
+which universality, particularity, and singularity are supposed to stand to one
+another: universal means, more extensive than particular and singular; and
+particular, more extensive than singular. The concept is concrete and the richest
+in determination, because it is the ground and the totality of the previous
+determinations, of the categories of being and the determinations of reflection;
+these, therefore, are certain also to come up in it. But its nature is totally
+misunderstood if such determinations are retained in it in their former abstraction
+– if the wider extent of the universal is understood to mean that the universal is
+a more, or a greater quantum, than the particular and the singular. As absolute
+ground, it is the possibility of quantity, but no less so of quality, that is, its
+determinations are no less qualitatively distinct; therefore they are already
+viewed in contravention to their truth when they are posited in the form of
+quantity alone. So, too, a reflective determination is a relative, something in
+which the opposite shines reflectively; unlike a quantum, its relation is not
+external. But the concept is more than all this; its determinations are determinate
+concepts, themselves essentially the totality of all determinations. It is,
+therefore, entirely inappropriate, in order to grasp such an inner totality, to
+want to apply numerical and spatial relations in which the terms fall apart; such
+relations are rather the last and the worst medium that could be used. Natural
+relations, as for instance “magnetism” or “color tonality” would make infinitely
+higher and truer symbols for the purpose. Since the human being has in language a
+means of designation that is appropriate to reason, it is otiose to look for a less
+perfect means of representation to bother oneself with. It is essentially only
+spirit that can grasp the concept as concept, for the latter is not just the
+property of spirit but its pure self. It is futile to want to fix it by means of
+spatial figures and algebraic signs for the sake of the outer eye and a
+non-conceptual, mechanical manipulation, such as a calculus. Also anything else
+that might be supposed to serve as symbol, like the symbols for the nature of God,
+can at best elicit only intimations and echoes of the concept; if, however, one
+insists on employing such symbols for expressing and cognizing the concept, then it
+is not their external nature which is fit for the task; the reverse relation
+applies, namely that what in the symbols is the echo of a higher determination is
+recognized to be such only by virtue of the concept, and it is only by shedding the
+sensuous standbys that were supposed to express it that one comes closer to the
+concept."
+Hegel@SOL:/CONCEPT/i-subjectivity/1-the-concept/b-the-particular-concept/remark.txt$
