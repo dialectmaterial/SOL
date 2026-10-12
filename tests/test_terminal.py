@@ -198,8 +198,8 @@ class TerminalTests(unittest.TestCase):
         self.book.root.title = 'A synthetic α outline'
         self.assertTrue(sol.render_tree(self.book.root, depth=0, ascii_only=True).isascii())
 
-    def test_visual_help_ascii_and_three_stage_roadmap(self):
-        rendered = sol.render_visual_help(self.book, width=80, depth=2)
+    def test_guide_ascii_and_three_stage_roadmap(self):
+        rendered = sol.render_guide(self.book, width=80, depth=2)
         self.assertTrue(rendered.isascii())
         self.assertIn('SOL: SOL Organizes Logic', rendered)
         for word in ('SOL', 'BEING', 'ESSENCE', 'CONCEPT', '01-quality'):
@@ -477,7 +477,7 @@ class TerminalTests(unittest.TestCase):
         status, output = self.run_shell(['help', 'exit'])
         self.assertEqual(status, 0)
         self.assertIn("neofetch                          ASCII Hegel and SOL's concept-preview identity", output)
-        self.assertIn('IDENTITY: neofetch', sol.render_visual_help(self.book))
+        self.assertIn('neofetch', sol.render_guide(self.book))
 
     def test_shell_plain_retains_neofetch_art_without_color(self):
         status, output = self.run_shell(['neofetch', 'exit'], plain=True, color=True)
@@ -491,7 +491,7 @@ class TerminalTests(unittest.TestCase):
         with patch('builtins.input', side_effect=['neofetch', 'exit']), \
                 patch('sol.install_completion', return_value=lambda: None), \
                 patch('sol.terminal_color', return_value=True):
-            status, output, error = self.run_main(['--corpus', 'synthetic', '--shell', '--plain'])
+            status, output, error = self.run_main(['--corpus', 'synthetic', '-n', '--plain'])
         self.assertEqual(status, 0, error)
         self.assertNotIn('\x1b', output)
         self.assertIn(sol.HEGEL_ASCII.splitlines()[0], output)
@@ -531,8 +531,8 @@ class TerminalTests(unittest.TestCase):
         self.assertEqual((info['printed_page'], info['end_printed_page']), (7, 9))
         self.assertEqual(info['path'], '/BEING')
 
-    def test_cli_visual_help_without_source(self):
-        status, output, error = self.run_main(['visual-help', '--depth', '1'], allow_source=False)
+    def test_cli_guide_without_source(self):
+        status, output, error = self.run_main(['guide', '--depth', '1'], allow_source=False)
         self.assertEqual(status, 0, error)
         self.assertIn('SOL', output)
         self.assertTrue(output.isascii())

@@ -1318,45 +1318,79 @@ def render_tree(node: Node = ROOT, prefix: str = "", include_self: bool = True,
     return unicodedata.normalize("NFKD", result).encode("ascii", "backslashreplace").decode() if ascii_only else result
 
 
-def render_visual_help(book: Book | None = None, width: int = 80, depth: int = 2,
-                       node: Node | None = None) -> str:
-    """A portable ASCII manual using the actual loaded navigation tree."""
+def render_guide(book: Book | None = None, width: int = 80, depth: int = 1,
+                 node: Node | None = None) -> str:
+    """A compact, source-independent starting point for the virtual reader.
+
+    The default reveals the three doctrines, not an overwhelming full outline.
+    Explicit depth and node arguments use the loaded tree without reading files.
+    """
+    width = sensible_width(width)
     title = r""" ___   ___   _
 / __| / _ \ | |
 \__ \| (_) || |__
 |___/ \___/ |____|
-
 SOL: SOL Organizes Logic
 
 PROJECT ROADMAP
-SOL
- |
- +-- BEING    CLI, reader, virtual shell  [current work]
- +-- ESSENCE  applications, terminal emulator, classifiers
- `-- CONCEPT  operating system, NixOS, Hyprland
++-- BEING    CLI, reader, virtual shell [current]
++-- ESSENCE  applications, terminal emulator, classifiers
+`-- CONCEPT  operating system, NixOS, Hyprland
 
 BOOK TREE"""
-    outline = render_tree(node or (book.root if book is not None else ROOT),
-                          depth=depth, ascii_only=True)
-    notice = "" if book is not None else "\nAbbreviated fallback outline. Load a corpus for the full book structure.\n"
-    guide = (
-        "Directories contain divisions. Their own prose is 00-introduction.txt; "
-        "leaf divisions are text files. An ellipsis marks deeper hidden divisions.\n\n"
-        "READ: first [PATH], read [PATH], next, previous, cat FILE\n"
-        "EXPLORE: ls [PATH], tree [PATH] --depth N, info [PATH]\n"
-        "NAVIGATE: cd PATH, up, cd -, pwd\n"
-        "RESEARCH: search QUERY [PATH] --word --limit N, open ID|RESULT, context N\n\n"
-        "IDENTITY: neofetch (ASCII Hegel and the SOL concept preview)\n\n"
-        "Example: cd /essence; search \"ground\" --word; open 1; context 2\n"
-        "Type each example command separately inside sol --shell.\n"
-        "CLI: sol --search \"ground\" --within /essence --word\n"
-        "CLI: sol --passage ID --context 2; sol --info /being\n"
-        "OUTPUT: --plain for passage text; --json for structured CLI results\n"
-        "Type help for command syntax; exit to leave."
+    selected = node or (book.root if book is not None else ROOT)
+    outline = render_tree(selected, depth=depth, ascii_only=True)
+    starting = """START IN YOUR TERMINAL
+  sol       start the reader; choose a workspace and actor
+  sol -n    temporary reader, without a saved workspace
+  sol -r    print one random quotation and leave
+
+INSIDE SOL: enter these commands one at a time
+  cd /being
+  ls
+  first
+  next
+  where
+  search "ground" --word --limit 3
+  open 1
+  context 1
+
+WITH A WORKSPACE
+  bookmark add beginning
+  note add "A personal interpretation, not Hegel's text."
+  note draft
+Personal notes require an actor. Passage IDs preserve references across sessions.
+Actor means the name recorded on your personal notes, not the book's author.
+note draft uses the enhanced prompt: Ctrl-S saves, Ctrl-C cancels.
+
+KEEP EXPLORING
+  guide --depth 2   reveal more of the tree (or guide PATH --depth N)
+  help             see command syntax
+  neofetch         ASCII Hegel and SOL's concept preview
+  tree --depth 3   explore divisions without the guide
+  exit             leave SOL
+
+Directories are divisions; files contain passages. '...' hides deeper divisions.
+Search is literal and case-insensitive; --word matches whole words, not concepts.
+Book paths are virtual: SOL never runs your host shell or edits canonical text.
+Workspace notes and checkpoints stay local; backups and exports are your choice."""
+    if book is None:
+        starting += """\n\nCORPUS SETUP (the tree above is an abbreviated fallback)
+  sol --set-corpus DIRECTORY
+Use an existing converted corpus. For explicit conversion: sol-corpus --help.
+Reading never performs PDF conversion automatically."""
+    # Preserve command indentation and avoid filling source tree lines as prose.
+    folded = "\n".join(
+        textwrap.fill(line, width=width, subsequent_indent="  " if line.startswith("  ") else "",
+                      break_on_hyphens=False) if line else ""
+        for line in starting.splitlines()
     )
-    folded = "\n".join(textwrap.fill(line, width=width, break_on_hyphens=False)
-                        if line else "" for line in guide.splitlines())
-    return "\n".join((title, outline, notice, folded))
+    title = "\n".join(textwrap.fill(line, width=width, subsequent_indent="    ",
+                                    break_on_hyphens=False) if line else ""
+                      for line in title.splitlines())
+    outline = "\n".join(textwrap.fill(line, width=width, subsequent_indent="    ",
+                                      break_on_hyphens=False) for line in outline.splitlines())
+    return "\n".join((title, outline, "", folded))
 
 
 # Hand-drawn ASCII bust: swept-back hair, high forehead, and cravat.
@@ -1510,7 +1544,7 @@ def install_completion(root: Node, get_cwd, workspace: bool = False):
     old_completer = readline.get_completer()
     old_delimiters = readline.get_completer_delims()
     commands = ("ls", "cd", "up", "pwd", "tree", "read", "first", "next", "previous",
-                "cat", "search", "open", "context", "info", "where", "visual-help", "neofetch", "help", "exit")
+                "cat", "search", "open", "context", "info", "where", "guide", "neofetch", "help", "exit")
     if workspace:
         commands += ("workspace", "resume", "bookmark", "note", "compare", "review", "relate")
     def complete(text: str, state: int):
@@ -1553,7 +1587,7 @@ open ID|RESULT                    open a passage or latest search result
 context [N]                       neighbors in book order (default 1; maximum 10)
 where                             show current passage and reading position
 info [PATH]                       title, pages, counts, and pending review
-visual-help [PATH] --depth N       ASCII guide and book tree (default depth 2)
+guide [PATH] --depth N             beginner guide and book tree (default depth 1)
 neofetch                          ASCII Hegel and SOL's concept-preview identity
 help / exit                       show commands / leave SOL
 Search does not move the reading cursor. Context can cross file boundaries.
@@ -1575,16 +1609,17 @@ def shell_options(verb: str, arguments: list[str]) -> argparse.Namespace:
         parser.add_argument("--limit", type=int, default=20)
     else:
         parser.add_argument("path", nargs="?")
-        parser.add_argument("--depth", type=int, default=2 if verb == "visual-help" else None)
+        parser.add_argument("--depth", type=int, default=1 if verb == "guide" else None)
     return parser.parse_args(arguments)
 
 
 def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
-              workspace_reader=None, read_command=None, write_output=None) -> int:
+              workspace_reader=None, read_command=None, write_output=None,
+              ui_mode="basic", editing_mode="emacs", draft_reader=None) -> int:
     """Run the linear shell through replaceable, synchronous input/output seams.
 
-    A future prompt adapter owns its completion and accepts one command at a time;
-    workspace operations remain unchanged. No UI dependency is imported here.
+    The optional adapter owns completion and accepts one command at a time;
+    workspace operations remain unchanged. No third-party UI is required here.
     write_output follows print's calling convention, including end= for cat.
     """
     cwd: tuple[str, ...] = ()
@@ -1593,10 +1628,14 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
     session = ReadingSession(book)
     emit = write_output if write_output is not None else print
     restore = lambda: None
+    adapter = None
     try:
-        emit("SOL. Type 'visual-help' for the guide; 'help' for commands.")
+        emit("SOL. Type 'guide' to get started; 'help' for commands.")
         if workspace_reader is not None:
-            emit(f"Workspace: {workspace_reader.store.path.stem}. Authored writes require --actor NAME.")
+            from sol_workspace_reader import safe_output
+            emit(f"Workspace: {workspace_reader.store.path.stem}")
+            emit("Actor: " + safe_output(workspace_reader.actor) if workspace_reader.actor else
+                 "No actor selected; authored writes require --actor NAME.")
             if workspace_reader.store.get_state() is not None:
                 try:
                     cwd, previous_cwd, passage, message = workspace_reader.restore(session)
@@ -1606,6 +1645,13 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                 except ValueError as error:
                     emit(f"sol: saved position not restored: {error}\n"
                          "The reference is retained. Inspect the workspace or deliberately start another reading.")
+        if read_command is None and ui_mode != "basic":
+            from sol_prompt import create_adapter
+            adapter = create_adapter(book, lambda: cwd, workspace_reader, mode=ui_mode,
+                                     plain=plain, editing_mode=editing_mode)
+            if adapter is not None:
+                read_command = adapter.read_command
+                draft_reader = adapter.read_draft
         if read_command is None:
             restore = install_completion(book.root, lambda: cwd, workspace=workspace_reader is not None)
         while True:
@@ -1626,6 +1672,35 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                 if not parts:
                     continue
                 verb, arguments = parts[0], parts[1:]
+                if verb == "note" and arguments and arguments[0] == "draft":
+                    if workspace_reader is None:
+                        raise ValueError("note draft requires a workspace and actor")
+                    if draft_reader is None:
+                        raise ValueError("note draft requires the enhanced prompt in an interactive terminal; "
+                                         "install .[shell] or use note add \"TEXT\"")
+                    draft_options = ShellParser(prog="note draft", add_help=False)
+                    draft_options.add_argument("--on", dest="identifier")
+                    options = draft_options.parse_args(arguments[1:])
+                    workspace_reader.require_author()
+                    reference = workspace_reader.current_reference(session, options.identifier)
+                    inspected_digest = reference.record['content_sha256']
+                    inspected_target = reference.target_id
+                    draft_actor = workspace_reader.actor
+                    emit("Personal annotation draft. Ctrl-S saves; Ctrl-C cancels. Drafts are not stored in history.")
+                    try:
+                        body = draft_reader("Personal note: ")
+                    except (KeyboardInterrupt, EOFError):
+                        emit("Draft cancelled; nothing was saved.")
+                        continue
+                    workspace_reader.require_author()
+                    if workspace_reader.actor != draft_actor or workspace_reader.store.actor != draft_actor:
+                        raise ValueError("annotation actor changed during drafting; nothing was saved")
+                    accepted = workspace_reader.current_reference(session, reference.requested_id)
+                    if accepted.target_id != inspected_target or accepted.record['content_sha256'] != inspected_digest:
+                        raise ValueError("annotation target changed during drafting; nothing was saved")
+                    record = workspace_reader.store.add_annotation(reference.requested_id, body, inspected_digest)
+                    emit(f"Personal annotation saved: {record['id']}\n{workspace_reader.authored(record)}")
+                    continue
                 if verb == "resume":
                     if len(arguments) > 1:
                         raise ValueError("resume takes at most one checkpoint revision")
@@ -1652,7 +1727,7 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                     if outcome.text:
                         emit(safe_output(outcome.text))
                     continue
-                if verb in {"search", "tree", "visual-help"}:
+                if verb in {"search", "tree", "guide"}:
                     options = shell_options(verb, arguments)
                     node, path = resolve_path(options.path, cwd, book.root)
                     if verb == "search":
@@ -1662,7 +1737,7 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                     elif verb == "tree":
                         emit(render_tree(node, depth=options.depth))
                     else:
-                        emit(render_visual_help(book, width, options.depth, node))
+                        emit(render_guide(book, width, options.depth, node))
                     continue
                 if len(arguments) > 1:
                     raise ValueError(f"{verb} expects at most one argument")
@@ -1764,6 +1839,8 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                 emit(f"sol: {error}")
     finally:
         restore()
+        if adapter is not None:
+            adapter.close()
 
 
 def default_pdf() -> Path:
@@ -1884,12 +1961,14 @@ def save_corpus(directory: Path) -> tuple[Path, Path]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sol", description="Read and navigate Hegel's Science of Logic.")
-    parser.add_argument("command", nargs="?", choices=("visual-help",), help="open the ASCII manual")
+    parser.add_argument("command", nargs="?", choices=("guide",), help="open the beginner guide")
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--structure", action="store_true", help="show the outline (prefer the indexed local corpus)")
-    mode.add_argument("--visual-help", action="store_true", help="ASCII manual, roadmap, and book tree")
-    mode.add_argument("--shell", action="store_true", help="open the interactive reader")
+    mode.add_argument("--guide", action="store_true", help="beginner guide, examples, and book tree")
+    mode.add_argument("--shell", action="store_true", help="open the workspace reader (also the default)")
+    mode.add_argument("-n", "--none", action="store_true", help="open the shell without workspace or actor")
+    mode.add_argument("-r", "--random", action="store_true", help="print a random passage and leave")
     mode.add_argument("--read", metavar="PATH", help="read a random paragraph within a virtual path")
     mode.add_argument("--first", metavar="PATH", help="read the first paragraph within a virtual path")
     mode.add_argument("--cat", metavar="FILE", help="display a virtual file completely, in book order")
@@ -1903,10 +1982,12 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--workspace-check", action="store_true", help="report unresolved, retired and versioned workspace references")
     mode.add_argument("--workspace-backup", type=Path, metavar="FILE", help="create a new, verified .sqlite3 backup without overwriting")
     mode.add_argument("--review-queue", action="store_true", help="show canonical pending transcriptions; optionally include workspace testimony")
-    parser.add_argument("--workspace", metavar="NAME", help="opt into a persistent, named reading workspace")
+    parser.add_argument("--workspace", metavar="NAME", help="choose a named reading workspace without prompting")
     parser.add_argument("--workspace-dir", type=Path, metavar="DIRECTORY", help="directory for local workspace databases")
     parser.add_argument("--actor", metavar="NAME", help="explicit author for workspace notes and assertions")
     parser.add_argument("--resume-revision", type=int, metavar="N", help="with --resume, restore a historical checkpoint as a new visit")
+    parser.add_argument("--ui", choices=("auto", "basic", "prompt"), help="shell input: optional enhanced prompt or basic input (default auto)")
+    parser.add_argument("--editing-mode", choices=("emacs", "vi"), help="editing keys for the enhanced shell prompt")
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--corpus", type=Path, metavar="DIRECTORY",
                         help="canonical corpus for this run (otherwise discover a local or saved corpus)")
@@ -1917,7 +1998,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--word", action="store_true", help="whole-word --search rather than substring")
     parser.add_argument("--limit", type=int, metavar="N", help="maximum search results (1–1000; default 20)")
     parser.add_argument("--context", type=int, metavar="N", help="neighbors around --passage (0–10 on each side)")
-    parser.add_argument("--depth", type=int, metavar="N", help="outline depth (0–32; visual-help default 2)")
+    parser.add_argument("--depth", type=int, metavar="N", help="outline depth (0–32; guide default 1)")
     output = parser.add_mutually_exclusive_group()
     output.add_argument("--plain", action="store_true", help="passage text without metadata or ANSI styling")
     output.add_argument("--json", action="store_true", help="structured output for scripts")
@@ -1926,14 +2007,29 @@ def build_parser() -> argparse.ArgumentParser:
 
 def validate_options(args: argparse.Namespace) -> None:
     if args.command:
-        actions = (args.structure, args.visual_help, args.shell, args.read is not None,
+        actions = (args.structure, args.guide, args.shell, args.none, args.random, args.read is not None,
                    args.first is not None, args.cat is not None, args.search is not None,
                    args.passage is not None, args.info is not None, args.set_corpus is not None,
                    args.resume, args.workspace_export, args.workspace_check, args.workspace_backup is not None,
                    args.review_queue)
         if any(actions):
-            raise ValueError("visual-help cannot be combined with another action")
-        args.visual_help = True
+            raise ValueError("guide cannot be combined with another action")
+        args.guide = True
+    actions = (args.structure, args.guide, args.shell, args.none, args.random, args.read is not None,
+               args.first is not None, args.cat is not None, args.search is not None,
+               args.passage is not None, args.info is not None, args.set_corpus is not None,
+               args.resume, args.workspace_export, args.workspace_check, args.workspace_backup is not None,
+               args.review_queue)
+    if not any(actions) or args.none:
+        args.shell = True
+    if args.shell and not args.none and args.pdf is not None:
+        raise ValueError("the persistent shell requires an indexed Markdown corpus, not --pdf. "
+                         "Use sol -n --pdf PATH for a temporary legacy shell or sol -r --pdf PATH "
+                         "for a legacy random passage.")
+    if args.none and (args.workspace is not None or args.actor is not None or args.workspace_dir is not None):
+        raise ValueError("-n/--none does not use a workspace or actor; omit workspace options")
+    if not args.shell and (args.ui is not None or args.editing_mode is not None):
+        raise ValueError("--ui and --editing-mode are available only in the shell")
     if args.word and args.search is None:
         raise ValueError("--word requires --search")
     if args.search is None and not args.review_queue and (args.within is not None or args.limit is not None):
@@ -1948,15 +2044,15 @@ def validate_options(args: argparse.Namespace) -> None:
         if not 0 <= args.context <= 10:
             raise ValueError("--context must be between 0 and 10")
     if args.depth is not None:
-        if not args.structure and not args.visual_help:
-            raise ValueError("--depth requires --structure or visual-help")
+        if not args.structure and not args.guide:
+            raise ValueError("--depth requires --structure or guide")
         if not 0 <= args.depth <= 32:
             raise ValueError("--depth must be between 0 and 32")
-    if args.json and (args.shell or args.visual_help):
-        raise ValueError("--json is available for reading, search, info, and structure")
+    if args.json and (args.shell or args.guide):
+        raise ValueError("--json is not a shell/guide mode; use sol -r --json for a random passage")
     if args.set_corpus is not None and (args.corpus is not None or args.pdf is not None):
         raise ValueError("--set-corpus cannot be combined with --corpus or --pdf")
-    if args.workspace is None and (args.workspace_dir is not None or args.actor is not None or args.resume
+    if args.workspace is None and not args.shell and (args.workspace_dir is not None or args.actor is not None or args.resume
                                    or args.workspace_export or args.workspace_check or args.workspace_backup is not None):
         raise ValueError("workspace options require --workspace NAME")
     if args.resume_revision is not None and (not args.resume or args.resume_revision < 1):
@@ -1968,7 +2064,7 @@ def validate_options(args: argparse.Namespace) -> None:
             raise ValueError("workspace name must contain 1–64 letters, numbers, underscores or hyphens")
         if args.actor is not None and not args.actor.strip():
             raise ValueError("--actor requires a nonempty name")
-        if args.pdf is not None or args.set_corpus is not None or args.visual_help or args.structure:
+        if args.pdf is not None or args.set_corpus is not None or args.guide or args.structure:
             raise ValueError("--workspace requires the indexed corpus and cannot accompany --pdf, --set-corpus, or an outline action")
         if args.search is not None or args.info is not None or args.cat is not None:
             raise ValueError("--workspace is available for reading, --shell, --resume, and --workspace-export")
@@ -1976,6 +2072,49 @@ def validate_options(args: argparse.Namespace) -> None:
             raise ValueError("workspace reading does not yet save a context view; use --passage ID --context N without --workspace")
     if args.workspace_export and args.plain:
         raise ValueError("--workspace-export always emits JSON; omit --plain")
+
+
+def interactive_input_available() -> bool:
+    return bool(sys.stdin.isatty())
+
+
+def shell_identity(book: Book, args) -> None:
+    """Ask only for missing labels; accepting a name explicitly creates it later."""
+    from sol_profiles import actor_name, list_actors
+    from sol_workspace_reader import workspace_path
+
+    if not book.corpus_manifest.get('corpus_id'):
+        raise ValueError("a persistent shell needs an identified Markdown corpus. "
+                         "Run sol-corpus-check DIRECTORY --initialize-identity, or use sol -n.")
+    known = list_actors()
+    if (args.workspace is None or args.actor is None) and not interactive_input_available():
+        raise ValueError("workspace and actor prompts need interactive input. "
+                         "Supply --workspace NAME --actor NAME, use sol -n for a temporary shell, "
+                         "or sol -r for a random passage.")
+    if args.workspace is None:
+        while True:
+            name = input('Workspace [reading]: ').strip() or 'reading'
+            try:
+                workspace_path(name, args.workspace_dir)
+            except ValueError as error:
+                print(f'sol: {error}')
+                continue
+            args.workspace = name
+            break
+    if args.actor is None:
+        if known:
+            print('Known actors: ' + ', '.join(profile['name'] for profile in known[-10:]))
+        default = known[-1]['name'] if known else None
+        while True:
+            value = input(f'Actor [{default}]: ' if default else 'Actor (name for your own notes): ')
+            try:
+                args.actor = actor_name(value or default or '')
+            except ValueError as error:
+                print(f'sol: {error}')
+                continue
+            break
+    else:
+        args.actor = actor_name(args.actor)
 
 
 def tree_data(node: Node, depth: int | None = None) -> dict:
@@ -1999,7 +2138,7 @@ def emit_json(value: object) -> None:
 
 
 def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
-    """Opt-in durable state; ordinary invocations do not open a database."""
+    """Named durable state, kept separate from corpus-only one-shot reading."""
     from sol_workspace import Workspace
     from sol_workspace_reader import WorkspaceReader, workspace_path
 
@@ -2015,6 +2154,9 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
         raise ValueError(f"workspace does not exist: {args.workspace}; start with --workspace NAME --shell")
     provenance = {"edition": book.corpus_manifest["edition"], "source": book.corpus_manifest["source"]}
     with Workspace(location, identity, provenance, actor=args.actor or "Reader") as store:
+        if args.shell:
+            from sol_profiles import register_actor
+            register_actor(args.actor)
         reader = WorkspaceReader(book, store, args.actor, resolve_path, display_path,
                                  render_passage, width, args.plain, color)
         if args.workspace_export:
@@ -2043,7 +2185,8 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
                 print(f"Verified workspace backup: {destination}")
             return 0
         if args.shell:
-            return run_shell(book, width, args.plain, color, reader)
+            return run_shell(book, width, args.plain, color, reader,
+                             ui_mode=args.ui or 'auto', editing_mode=args.editing_mode or 'emacs')
         session = ReadingSession(book)
         cwd, previous = (), None
         if args.resume:
@@ -2087,7 +2230,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         width = sensible_width(args.width)
         color = terminal_color() and not args.plain and not args.json
-        if args.visual_help and args.corpus is None and args.pdf is None:
+        if args.guide and args.corpus is None and args.pdf is None:
             # The guide must still explain setup when an automatic source is broken.
             try:
                 corpus = discover_corpus()
@@ -2095,7 +2238,7 @@ def main(argv: list[str] | None = None) -> int:
             except ValueError as error:
                 print(f"sol: {error}\nShowing the abbreviated visual guide.", file=sys.stderr)
                 book = None
-            print(render_visual_help(book, width, 2 if args.depth is None else args.depth))
+            print(render_guide(book, width, 1 if args.depth is None else args.depth))
             return 0
         corpus = None if args.pdf is not None else discover_corpus(args.corpus)
         if corpus is not None:
@@ -2110,8 +2253,8 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError(f"PDF not found: {pdf}")
             book = load_book(pdf)
         else:
-            if args.visual_help:
-                print(render_visual_help(width=width, depth=2 if args.depth is None else args.depth))
+            if args.guide:
+                print(render_guide(width=width, depth=1 if args.depth is None else args.depth))
                 return 0
             if args.structure:
                 if args.json:
@@ -2127,6 +2270,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"For an initial import: sol-corpus convert --pdf {PDF_FILENAME}\n"
                 "PDF extraction is never automatic; --pdf PATH explicitly selects the slow legacy reader."
             )
+        if args.shell and not args.none:
+            shell_identity(book, args)
         if args.workspace is not None:
             return run_workspace_cli(book, args, width, color)
         if args.review_queue:
@@ -2146,10 +2291,11 @@ def main(argv: list[str] | None = None) -> int:
                 emit_json({"outline": tree_data(book.root, args.depth), "abbreviated": False})
             else:
                 print(render_tree(book.root, depth=args.depth))
-        elif args.visual_help:
-            print(render_visual_help(book, width, 2 if args.depth is None else args.depth))
+        elif args.guide:
+            print(render_guide(book, width, 1 if args.depth is None else args.depth))
         elif args.shell:
-            return run_shell(book, width, args.plain, color)
+            return run_shell(book, width, args.plain, color, ui_mode=args.ui or 'auto',
+                             editing_mode=args.editing_mode or 'emacs')
         elif args.search is not None:
             _, path = resolve_path(args.within, (), book.root)
             passages = book.search(args.search, path, args.word,
@@ -2201,6 +2347,9 @@ def main(argv: list[str] | None = None) -> int:
     except RuntimeError as error:
         print(f"sol: {error}", file=sys.stderr)
         return 1
+    except EOFError:
+        print("\nsol: setup cancelled; no workspace or actor was created", file=sys.stderr)
+        return 0
 
 
 def cli(argv: list[str] | None = None) -> int:

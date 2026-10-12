@@ -109,6 +109,7 @@ bookmark add NAME [ID]             save current passage or explicit record
 bookmark set NAME [ID]             explicitly replace a bookmark
 bookmark list / open NAME / remove NAME
 note add TEXT [--on ID]            attributed personal annotation
+note draft [--on ID]               multiline note (enhanced prompt; Ctrl-S saves)
 note list [--on ID] / show NOTE_ID
 compare save NAME ID ID... --question TEXT
 compare list / show NAME           saved, ordered passage comparison
@@ -119,7 +120,7 @@ review queue [--within PATH] --limit N
                                   canonical pending flags, independent of testimony
 relate add ID KIND ID --reason TEXT
 relate list [--on ID]              attributed directed relations
-Authored writes require --actor NAME when starting SOL.
+Authored writes require an actor chosen at setup or with --actor NAME.
 Review outcomes: inspected, correction_needed, verified. No corpus edits occur."""
 
 

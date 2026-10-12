@@ -1,7 +1,8 @@
 # SOL’s virtual interface: an investigation
 
-Research checked against primary documentation on 11 October 2026. These are
-possibilities, not newly installed dependencies or implemented SOL commands.
+Research checked against primary documentation on 11 October 2026, with the
+implemented input-only stage recorded below on 12 October. The broader tools are
+possibilities, not adopted SOL interfaces.
 The workspace design is separate: see [WORKSPACE_PLAN.md](WORKSPACE_PLAN.md).
 
 ## What we are choosing
@@ -20,7 +21,7 @@ for the current codebase, not performance measurements.
 
 | Tool | Responsibility | Possible role in SOL | Main tradeoff |
 | --- | --- | --- | --- |
-| prompt_toolkit | Command input; optionally full-screen applications | A better command-first book shell | Small initial change; full-screen work needs more assembly |
+| prompt_toolkit | Command input; optionally full-screen applications | Implemented optional command-first prompt | Input stays separate; full-screen work needs more assembly |
 | Rich | Styled terminal output | Emphasis, readable results, trees and comparison summaries | Rendering is not an interactive workspace |
 | Textual | Full-screen application framework | A multi-pane philosophical reading desk | Larger change to event handling, focus and layout |
 | Python curses | Low-level terminal control | An educational route into terminal interfaces | More rendering and interaction infrastructure to build |
@@ -33,8 +34,8 @@ for the current codebase, not performance measurements.
 
 `PromptSession` supports custom completion, validation, multiline input, Vi or
 Emacs editing, and a bottom toolbar. `FileHistory` can persist entered commands.
-SOL could use these for virtual-path completion, recalling searches, entering
-notes, and displaying the current reading scope. Command history is not saved
+SOL now uses the input-only subset for virtual-path completion, recalling searches,
+entering notes, and displaying path and actor. Command history is not saved
 reading position or annotation storage. [Prompt documentation](https://python-prompt-toolkit.readthedocs.io/en/stable/pages/asking_for_input.html)
 
 Its full-screen layouts could also support a reader and input line, but we would
@@ -44,9 +45,9 @@ facilities offer simulated input and dummy output.
 [Full-screen applications](https://python-prompt-toolkit.readthedocs.io/en/stable/pages/full_screen_apps.html),
 [testing](https://python-prompt-toolkit.readthedocs.io/en/stable/pages/advanced_topics/unit_testing.html)
 
-My preferred first experiment would replace only the input/completion boundary.
-Keep the existing command semantics and a simple input fallback. This would let
-SOL become more comfortable without prematurely turning it into a dashboard.
+The implemented first stage replaces only the input/completion boundary.
+It keeps existing command semantics and a simple input fallback, improving input
+without turning SOL into a full-screen dashboard.
 
 ## Rich: improve presentation without changing the book
 
@@ -179,8 +180,9 @@ terminal output. [jq manual](https://jqlang.org/manual/)
 
 ## Recommendation and experiment criteria
 
-First make continuity and scholarly data durable behind an interface-independent
-workspace API. Then try prompt_toolkit for the shell. Consider Rich for a small
+Keep continuity and scholarly data durable behind an interface-independent
+workspace API. The optional prompt_toolkit input stage is now implemented for
+the shell. Consider Rich for a small
 presentation experiment; consider Textual when the reading desk actually needs
 multiple visible panes. Treat external viewers as replaceable tools, not sources
 of passage identity.
@@ -197,23 +199,33 @@ behavior separately: keyboard focus support does not establish accessibility.
 No framework should make SOL’s data unreadable to scripts, agents, or a human
 using the canonical Markdown.
 
-## 12 October 2026: the input-first next step
+## 12 October 2026: the implemented input-first stage
 
 The workspace foundation is now implemented, including structured diagnostics,
 review queues, backups and historical resume. `run_shell` also accepts an injected
 `read_command(prompt)` and a `write_output` function with `print`'s calling
 convention, including `end=`. Supplying a custom reader bypasses standard-library
-readline setup. This seam permits a small input experiment now; no prompt_toolkit,
-Rich or Textual dependency has been installed, and no editor has been added.
+readline setup. `sol_prompt.py` now implements an optional PromptSession adapter
+through this seam. The `shell` extra supplies prompt_toolkit; the base reader still
+has no third-party dependency. Rich and Textual have not been adopted, and
+existing-note editing remains unimplemented.
+
+`sol` and `--shell` now open a persistent reader. Onboarding asks only for missing
+workspace and actor labels; supplying both flags permits noninteractive command
+input. `-n` bypasses workspace and profile storage, and `-r` explicitly retains
+the one-shot random quote. Actor labels are local attribution, not authentication;
+`sol_profiles.py` stores them separately from workspace schema version 1.
 
 ### Start with an optional prompt, not a new application
 
-A `PromptSession` adapter can improve command input and custom completion while
+The `PromptSession` adapter improves command input and custom completion while
 leaving the synchronous command loop, workspace operations and existing string
 renderers intact. Completion should understand command position, virtual paths
 and saved names. It must tolerate unfinished quoting and must not write reading
 state merely because a suggestion is displayed. Keep validation and persistence
-in SOL's existing operations.
+in SOL's existing operations. The implemented completer captures virtual paths,
+record IDs and saved names before prompting; keypress callbacks do not access
+SQLite or create checkpoints. The toolbar exposes the current path and actor.
 [Prompt documentation](https://python-prompt-toolkit.readthedocs.io/en/stable/pages/asking_for_input.html)
 
 Print each result after the command prompt returns, before asking for the next
@@ -235,7 +247,8 @@ system prompt or external editor.
 
 ### Keep drafts and history separate from scholarly records
 
-The first input experiment should use in-memory history. `FileHistory` stores
+The implemented command prompt uses in-memory history, never `FileHistory`.
+`FileHistory` stores
 entered strings in a separate plaintext file, so commands containing annotations,
 review issues or relation rationales can duplicate private work outside SQLite.
 Its implementation uses the supplied filename verbatim and appends to it; SOL
@@ -245,26 +258,35 @@ writing layer, not try to scrub a sensitive command after execution.
 [History API](https://python-prompt-toolkit.readthedocs.io/en/stable/pages/reference.html#prompt_toolkit.history.FileHistory),
 [official implementation](https://github.com/prompt-toolkit/python-prompt-toolkit/blob/main/src/prompt_toolkit/history.py)
 
-Multiline annotation drafting is a possible next vertical slice. The documented
-multiline prompt inserts newlines on Enter and accepts Meta+Enter, or Escape
-followed by Enter. Capture the intended record UUID, actor and inspected version
-before drafting. Pass the accepted body as data to the annotation operation,
-without rebuilding a quoted shell command. Use a no-history draft buffer and
-commit exactly once on explicit save; cancelling must not change the corpus,
-workspace, cursor or reading checkpoint. Existing annotation editing should wait
+Multiline `note draft [--on ID]` is now implemented for new annotations. Enter
+inserts a newline; SOL's explicit Ctrl-S binding accepts the draft and Ctrl-C
+cancels it. This is a SOL binding, not a claim about every toolkit application's
+default keys. The target UUID, actor and inspected text digest are captured before
+drafting. The accepted body is passed as data, without reconstructing a shell
+command. A DummyHistory buffer is reset after use. Save rechecks the target and
+corpus generation before one insert; cancellation changes neither authored
+records nor the reading checkpoint. Basic input retains `note add "TEXT"`.
+Existing annotation editing should wait
 for immutable author/revision audit and conflict-aware saves.
 [Multiline input](https://python-prompt-toolkit.readthedocs.io/en/stable/pages/asking_for_input.html#multiline-input),
 [DummyHistory](https://python-prompt-toolkit.readthedocs.io/en/stable/pages/reference.html#prompt_toolkit.history.DummyHistory)
 
 ### Preserve the linear fallback and test before adoption
 
-Select the existing simple adapter before importing an optional interface when
+The adapter selects basic input before importing prompt_toolkit when
 streams are not interactive, `TERM=dumb`, or an escape-free transcript is wanted.
+`--ui auto` is the default; `--ui basic` selects the fallback. In an eligible
+interactive terminal, `--ui prompt` requests the optional adapter and reports a
+missing shell extra instead of silently ignoring it. `--editing-mode` selects
+Emacs or Vi keys. Even explicit prompt mode respects plain output, redirected
+streams and `TERM=dumb`.
 Do not seek another TTY to evade redirected stdin. The library's input API has
 an explicit TTY-preference option; SOL need not enable it.
 [Input implementation](https://github.com/prompt-toolkit/python-prompt-toolkit/blob/main/src/prompt_toolkit/input/defaults.py)
 
-A PromptSession prototype should pass the same command and workspace tests as the
+The PromptSession adapter is covered by command/workspace and injected-input
+tests for completion, ephemeral history, resource cleanup, drafts and cancellation.
+It must continue to pass the same command and workspace tests as the
 simple adapter, plus injected-input tests for Unicode, quoting, completion,
 interrupts, EOF, draft acceptance and cancellation. Check that sensitive bodies
 never reach persisted history and that a changed corpus generation or competing
@@ -294,7 +316,7 @@ manual accessibility and terminal tests.
 [testing](https://textual.textualize.io/guide/testing/)
 
 Better completion or occasional notes alone do not justify an application rewrite.
-Before a multi-pane interface, prioritize safe drafts, immutable author/revision
+Before a multi-pane interface, retain safe drafts and prioritize immutable author/revision
 audit, explicit backup/import previews and verified selected-span anchors. Neither
 an interface nor a classifier may silently create semantic edges, claim a source
 was verified, or turn version-1 text/PDF fingerprint matches into full-record

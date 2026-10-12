@@ -66,7 +66,8 @@ Use the corpus in the existing terminal reader:
 
 ```sh
 python3 sol.py --structure
-python3 sol.py --corpus local-corpus --shell
+python3 sol.py --corpus local-corpus -r
+python3 sol.py --corpus local-corpus -n
 ```
 
 The installed reader can remember a default corpus independently of the working
@@ -78,7 +79,15 @@ cd ~
 sol
 ```
 
-This validates the corpus before saving its absolute path in
+`sol` and `--shell` now open a persistent reader and ask for any missing workspace
+and actor labels. Initialize the corpus identity explicitly first, as described
+below. `-r` prints one random passage; `-n` opens a temporary shell without reading
+or creating actor profiles or workspace databases. Search and other one-shot
+actions retain their existing behavior. Redirected input requires both shell
+labels as flags, or a nonpersistent/one-shot action; setup does not consume piped
+commands to answer missing identity questions.
+
+`--set-corpus` validates the corpus before saving its absolute path in
 `$XDG_CONFIG_HOME/sol/config.json`, with `~/.config/sol/config.json` as the default
 location. It stores a location, not a copy of the corpus. Run the command again if
 the corpus moves. `python3 sol.py --set-corpus DIRECTORY` supplies the same setting
@@ -95,9 +104,9 @@ installed code with `pipx reinstall sol-organizes-logic` after an update.
 Reading verifies the generated index and does not parse the PDF or require
 `markdown-it-py`. A missing, invalid, or stale selected corpus produces an error
 rather than silently trying another source. Ordinary reading never falls back to
-PDF extraction. Explicit `--pdf PATH` selects the slower legacy PDF reader, whose
+PDF extraction. Explicit `sol --pdf PATH -r` selects the slower legacy PDF reader, whose
 identifiers are separate from corpus UUIDs; `--pdf` and `--corpus` are mutually
-exclusive. Help, version information, and the visual guide remain usable without
+exclusive. Help, version information, and `guide` remain usable without
 a corpus, and the structure command can show an abbreviated outline.
 
 Do not rerun the initial conversion over an existing canonical corpus. That risks
@@ -223,8 +232,8 @@ references, rather than treating its explanatory body as source prose.
 Record UUIDs identify passages within a corpus. A separate manifest `corpus_id`
 identifies that corpus lineage; it is an opaque lower-case UUID, not the PDF hash,
 directory name, or a selected root record. New conversions include this identity.
-Older corpora without it remain readable through the ordinary CLI, but persistent
-workspaces require explicit initialization:
+Older corpora without it remain readable through one-shot actions and `sol -n`,
+but the default persistent reader requires explicit initialization:
 
 ```sh
 sol-corpus-check local-corpus --initialize-identity
@@ -249,11 +258,23 @@ incompatible corpus instead of guessing that equal source filenames imply equal
 records. Missing references remain unresolved, and retired IDs retain their
 original identity while exposing redirect targets.
 
+Default shell onboarding selects a workspace and requires an actor label;
+`--workspace NAME` and `--actor NAME` each skip only their corresponding question.
+Accepted actor labels are kept separately in `$XDG_DATA_HOME/sol/profiles.sqlite3`,
+or `~/.local/share/sol/profiles.sqlite3`. These are local attribution labels, not
+authenticated accounts or operating-system identities. Registering a new label
+does not rewrite older authors or alter workspace schema version 1. Read-only
+one-shot workspace commands do not require or create an actor profile.
+
 Reader annotations, comparison questions, directed relations, and review decisions
 retain their explicit actor attribution. Whole-record annotation bodies are literal
-Markdown, separate from the edition's notes. Review events retain the inspected
-record digest and source fingerprint: the reader distinguishes current and stale
-versions and conservatively marks reviews of retired targets stale. `verified`
+Markdown, separate from the edition's notes. Optional `note draft [--on ID]` captures
+the target UUID and text digest before input, accepts an explicit save, and refuses
+changed targets or corpus generations before inserting one new note. Cancelled
+drafts are discarded; existing-note editing is not implemented. Review events bind
+the inspected Markdown digest and declared PDF fingerprint, not complete attribution
+or source-location metadata. The reader distinguishes matching and stale bindings
+and conservatively marks reviews of retired targets stale. `verified`
 remains a reader's testimony, not a change to canonical
 `transcription_status` or `random_eligible`. Corrections still belong in canonical
 Markdown followed by reindexing.
@@ -322,8 +343,8 @@ titles and headings must be strings; `reader_path` must be an absolute virtual
 path, not a host filesystem path.
 
 The reader retains the full verified canonical record graph, including notes and
-editorial records that it does not quote by default. Corpus-backed `sol --json`
-passages expose their indexed record under `canonical`, retaining Markdown,
+editorial records that it does not quote by default. Corpus-backed JSON passages,
+such as `sol -r --json`, expose their indexed record under `canonical`, retaining Markdown,
 attribution, parent IDs, note links, and all source references. The top-level
 `text` is a reader presentation, not a replacement for canonical Markdown;
 `needs_source_review` exposes the reader's explicit pending-status check.

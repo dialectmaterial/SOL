@@ -4,7 +4,9 @@ The first workspace foundation is implemented through the existing CLI and
 command shell. Reading continuity, attributed annotations, comparison, source
 inspection and review testimony, and relations beyond the tree are available
 without installing an interface framework. Richer interfaces and selected-span
-annotations remain future work. Interface research is kept separately in
+annotations remain future work. An optional input-only prompt and multiline drafts
+are now available without changing workspace schema version 1. Interface research
+is kept separately in
 [INTERFACE_RESEARCH.md](INTERFACE_RESEARCH.md).
 
 The aim is a workspace that remembers an inquiry, not merely a terminal that
@@ -29,7 +31,10 @@ The reader retains the complete verified record graph alongside its convenient
 three-doctrine view. Passage JSON exposes the canonical record, including its
 Markdown and attribution. Verified corpus snapshots, an explicitly initialized
 corpus identity, and separate local SQLite storage now provide durable references.
-The standard shell remains nonpersistent unless `--workspace NAME` is supplied.
+`sol` and `sol --shell` open the persistent reader, asking for any missing
+workspace and actor labels. `sol -n` bypasses both workspace and profile storage;
+`sol -r` prints one random quotation. One-shot searches and inspections remain
+separate from shell onboarding.
 
 ## 1. Reading continuity
 
@@ -54,10 +59,17 @@ display numbers are never used as permanent identity.
 ## 2. Annotations with attribution
 
 An annotation has its own ID, target record, literal Markdown body, author,
-timestamps and personal-note attribution. Notes require an explicit `--actor`
-when starting SOL. They remain visibly distinct from Hegel’s prose and the
-edition’s notes. The current interface displays annotation Markdown literally,
+timestamps and personal-note attribution. Notes require the explicitly selected
+actor from shell onboarding or `--actor NAME`. They remain visibly distinct from
+Hegel’s prose and the edition’s notes. The current interface displays annotation Markdown literally,
 rather than adding a rendered editor.
+
+The enhanced prompt supplies `note draft [--on ID]` for new multiline notes.
+Enter inserts a newline, Ctrl-S saves and Ctrl-C cancels. The target UUID,
+resolved record and text digest are captured before drafting. Acceptance rechecks
+the target and loaded corpus generation before one annotation is inserted;
+cancellation makes no saved-position or authored change. Drafts use no history.
+Basic input retains `note add "TEXT"`. Existing-note editing is not implemented.
 
 The current notes target whole canonical records. Later, a selected quotation can
 carry a text snapshot, offsets and the inspected content digest. If the passage
@@ -195,6 +207,17 @@ enforcement is enabled on each database connection. Import, Markdown/JSONL expor
 previewed restore and explicit format migrations remain future work.
 [SQLite foreign keys](https://www.sqlite.org/foreignkeys.html)
 
+Shell onboarding remembers actor labels separately in
+`$XDG_DATA_HOME/sol/profiles.sqlite3`, or `~/.local/share/sol/profiles.sqlite3`.
+The registry creates or reuses a label only after both workspace and actor choices
+are accepted. It is not authentication, and its IDs are not retroactively inserted
+into version-1 authored records. Older notes keep their original actor names.
+`--workspace NAME` and `--actor NAME` skip only the supplied question. Noninteractive
+shell input requires both flags and otherwise fails without consuming commands.
+One-shot workspace inspection needs no actor; `-n` touches neither registry nor
+workspace storage. Workspace backup/export concerns the workspace database, not
+the separate actor-label registry; exported authored records retain their labels.
+
 Workspace storage and corpus-reference operations live in `sol_workspace.py` and
 `sol_workspace_reader.py`, separate from input and rendering. Pure diagnostics in
 `sol_workspace_diagnostics.py` work from a loaded corpus and one consistent
@@ -211,15 +234,18 @@ philosophically or typographically correct transcription.
 The CLI and shell use the same operations; any future Textual desk should do
 likewise. `run_shell` now accepts injected `read_command` and `write_output`
 functions, so an input experiment can avoid replacing command semantics or
-storage. No interface library, image renderer or Kitty integration has been added.
+storage. `sol_prompt.py` implements the optional PromptSession adapter through this
+seam; basic, plain and redirected input need no optional import. `sol_profiles.py`
+owns actor-label onboarding storage. No full-screen framework, image renderer or
+Kitty integration has been added.
 
 ## Using the implemented workspace
 
-After initialization, opt into persistence and identify the author of notes and
-assertions:
+After initialization, open `sol` and select the workspace and actor, or provide
+both explicitly:
 
 ```sh
-sol --workspace quantity-study --actor "Your name" --shell
+sol --workspace quantity-study --actor "Your name"
 ```
 
 Inside that shell:
@@ -229,6 +255,7 @@ first /being
 workspace
 bookmark add beginning
 note add "*Question:* How does this determination return later?"
+note draft
 review show
 review record inspected --issue "Canonical record inspected; source comparison remains."
 cd /essence
@@ -244,8 +271,8 @@ review queue --limit 10
 
 Replace the illustrative passage IDs with displayed UUIDs or unambiguous prefixes.
 Omitting an annotation or review target uses the current passage. `--on ID`
-selects an explicit target for `note add` or `review record`, and filters
-`note list`, `review list` or `relate list`. Lists without `--on` show the saved
+selects an explicit target for `note add`, enhanced `note draft` or `review record`,
+and filters `note list`, `review list` or `relate list`. Lists without `--on` show the saved
 records across the workspace. `review show ID` inspects a specific canonical
 record; it never changes the reading cursor.
 
@@ -253,7 +280,9 @@ Other operations are `bookmark list`, `bookmark open NAME`,
 `bookmark set NAME [ID]`, `bookmark remove NAME`, `note show NOTE_ID`,
 `compare list`, and `relate list`. Duplicate bookmark names require explicit `set`; duplicate
 comparison names are refused. Notes, comparison questions, reviews and relations
-require an explicit actor; ordinary navigation and bookmark use do not.
+require an explicit actor in the workspace operations. The default shell selects
+an actor at entry, including navigation sessions; read-only one-shot commands do
+not ask for one.
 
 Outside the shell:
 
@@ -276,8 +305,8 @@ original workspace. Existing backup filenames are never reused automatically.
 Export always emits JSON to standard output. `workspace export` offers the same
 snapshot inside the shell. Keep the `.sol-workspace.json` suffix for personal
 exports, which is excluded from Git and source archives. Direct workspace reading
-also supports random quotation, `--read`, `--first` and `--passage`. Context, search and inspection
-remain available through ordinary CLI invocations or inside the workspace shell;
+also supports `-r` for random quotation, `--read`, `--first` and `--passage`.
+Context, search and inspection remain available through ordinary CLI invocations or inside the workspace shell;
 they do not silently replace a saved reading position.
 
 The standalone source queue is available through
@@ -287,29 +316,28 @@ are inspection, not saved-position changes or a way to clear quality flags.
 
 ## Next work, in priority order
 
-1. Add optional multiline annotation drafts with explicit save and cancellation.
-   Capture the intended record and inspected version before editing; do not store
-   a cancelled draft or leak its body into command history. The synchronous input
-   seam is ready for a small experiment, not a claim that an editor exists.
-2. Establish immutable authorship and revision audit before exposing annotation
+Multiline drafts with explicit save and cancellation are implemented as new-note
+input, not existing-note editing. The next work remains deliberately separate:
+
+1. Establish immutable authorship and revision audit before exposing annotation
    editing. Preserve the original author and record who edited what, when, and
    against which version. A replacement body must not erase earlier evidence or
    silently become attributed to the current actor.
-3. Design review binding version 2 around an explicitly defined full-record digest,
+2. Design review binding version 2 around an explicitly defined full-record digest,
    including the relevant attribution and provenance fields. Captured version
    binding for comparison and relation endpoints can also be considered without
    creating a second canonical book. Asset verification needs its own stated
    scope. Require a backup and explicit migration plan; never reinterpret old
    text/PDF-only testimony as proof of metadata it did not record. The installed
    workspace schema remains version 1.
-4. Add explicit backup restore and import previews. Show identity mismatches,
+3. Add explicit backup restore and import previews. Show identity mismatches,
    unresolved references, duplicate IDs and authorship conflicts before any
    accepted change. Do not automatically merge workspaces or overwrite a newer
    checkpoint. Continue to provide export independently of a graphical interface.
-5. Introduce selected-span annotations with verified quote snapshots, a documented
+4. Introduce selected-span annotations with verified quote snapshots, a documented
    offset basis and target-version binding. If the text changes, show an unresolved
    anchor rather than selecting similar words silently.
-6. Consider richer comparison and review layouts only after these workflows expose
+5. Consider richer comparison and review layouts only after these workflows expose
    a measured need for simultaneous views. Computational similarities or classifier
    suggestions must retain their own provenance and must never silently become
    reader-asserted philosophical relations or changes to Hegel's published tree.

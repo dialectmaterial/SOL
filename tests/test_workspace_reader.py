@@ -270,7 +270,7 @@ class WorkspaceReaderTests(unittest.TestCase):
         with patch('sol_workspace.Workspace', side_effect=AssertionError('No database for ordinary shell')), \
                 patch('builtins.input', side_effect=['first /being', 'exit']), \
                 patch('sol.install_completion', return_value=lambda: None):
-            status, _, stderr = self.main(['--shell'])
+            status, _, stderr = self.main(['-n'])
         self.assertEqual(status, 0, stderr)
 
     def test_workspace_names_and_environment_do_not_allow_path_traversal(self):
@@ -503,6 +503,69 @@ class WorkspaceReaderTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertIn('command input must be text', stdout.getvalue())
 
+    def test_annotation_draft_stores_raw_multiline_text_once_without_changing_checkpoint(self):
+        body = '--flaglike text with "quotes"\n\n*An interpretation of α.*'
+        commands = iter(['first /being', 'note draft', 'exit'])
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            status = sol.run_shell(self.book, 80, workspace_reader=self.reader,
+                                   read_command=lambda prompt: next(commands), draft_reader=lambda prompt: body)
+        self.assertEqual(status, 0)
+        records = self.store.list_annotations()
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]['body'], body)
+        self.assertEqual(records[0]['actor'], 'Ada')
+        self.assertEqual(records[0]['target_id'], IDS[0])
+        self.assertEqual(self.store.get_state()['revision'], 1)
+
+    def test_cancelled_or_empty_draft_preserves_annotations_and_checkpoint(self):
+        for result in (KeyboardInterrupt(), EOFError(), ''):
+            with self.subTest(result=result):
+                commands = iter(['first /being', 'note draft', 'exit'])
+                def draft(prompt):
+                    if isinstance(result, BaseException):
+                        raise result
+                    return result
+                stdout = StringIO()
+                with redirect_stdout(stdout):
+                    status = sol.run_shell(self.book, 80, workspace_reader=self.make_reader(),
+                                           read_command=lambda prompt: next(commands), draft_reader=draft)
+                self.assertEqual(status, 0)
+                self.assertEqual(self.store.list_annotations(), [])
+        self.assertEqual(len(self.store.list_history()), 3)
+
+    def test_draft_actor_or_target_changes_refuse_commit(self):
+        for change in ('actor', 'store_actor', 'target'):
+            with self.subTest(change=change):
+                reader = self.make_reader()
+                self.store.actor = 'Ada'
+                commands = iter(['first /being', 'note draft', 'exit'])
+                def draft(prompt):
+                    if change == 'actor':
+                        reader.actor = 'Other'
+                    elif change == 'store_actor':
+                        self.store.actor = 'Other'
+                    else:
+                        self.book.canonical_records[IDS[0]]['content_sha256'] = '1' * 64
+                    return 'A draft that must not be misattributed or moved.'
+                with redirect_stdout(StringIO()):
+                    status = sol.run_shell(self.book, 80, workspace_reader=reader,
+                                           read_command=lambda prompt: next(commands), draft_reader=draft)
+                self.assertEqual(status, 0)
+                self.assertEqual(self.store.list_annotations(), [])
+
+    def test_draft_requires_actor_and_enhanced_input_before_opening_editor(self):
+        commands = iter(['first /being', 'note draft', 'exit'])
+        with redirect_stdout(StringIO()):
+            self.assertEqual(sol.run_shell(self.book, 80, workspace_reader=self.reader,
+                                          read_command=lambda prompt: next(commands)), 0)
+        self.assertEqual(self.store.list_annotations(), [])
+        commands = iter(['note draft', 'exit'])
+        with redirect_stdout(StringIO()):
+            self.assertEqual(sol.run_shell(self.book, 80, workspace_reader=self.make_reader(actor=None),
+                                          read_command=lambda prompt: next(commands),
+                                          draft_reader=lambda prompt: self.fail('No draft without actor')), 0)
+
     def test_changed_canonical_generation_refuses_writes_without_reading_pdf(self):
         import sol_corpus_contract as contract
         from test_packaging import write_runtime_corpus
@@ -529,6 +592,29 @@ class WorkspaceReaderTests(unittest.TestCase):
             report = reader.health()
             self.assertEqual(report['corpus_freshness']['state'], 'changed')
             self.assertEqual(report['status'], 'attention_required')
+
+    def test_source_changed_during_draft_refuses_one_insert_and_preserves_checkpoint(self):
+        import sol_corpus_contract as contract
+        from test_packaging import write_runtime_corpus
+        corpus = self.directory / 'draft-corpus'
+        write_runtime_corpus(corpus)
+        contract.initialize_corpus_identity(corpus)
+        book = sol.load_corpus_book(corpus)
+        with Workspace(self.directory / 'draft-guarded.sqlite3', book.corpus_manifest['corpus_id'],
+                       {'source': book.corpus_manifest['source']}, actor='Ada') as store:
+            reader = WorkspaceReader(book, store, 'Ada', sol.resolve_path, sol.display_path, sol.render_passage)
+            commands = iter(['first /being', 'note draft', 'exit'])
+            def draft(prompt):
+                document = corpus / 'sample.md'
+                document.write_text(document.read_text(encoding='utf-8') + '\n', encoding='utf-8')
+                return 'An annotation based on a now-stale source.'
+            stdout = StringIO()
+            with redirect_stdout(stdout), patch('sol.load_book', side_effect=AssertionError('Never read the PDF')):
+                self.assertEqual(sol.run_shell(book, 80, workspace_reader=reader,
+                                              read_command=lambda prompt: next(commands), draft_reader=draft), 0)
+            self.assertIn('loaded corpus changed', stdout.getvalue())
+            self.assertEqual(store.list_annotations(), [])
+            self.assertEqual(store.get_state()['revision'], 1)
 
 
 if __name__ == '__main__':

@@ -21,6 +21,7 @@ MODULES = {
     "sol", "sol_corpus", "sol_corpus_contract", "sol_corpus_notes",
     "sol_corpus_references", "sol_corpus_structure", "sol_workspace", "sol_workspace_reader",
     "sol_workspace_diagnostics",
+    "sol_prompt", "sol_profiles",
 }
 ENTRY_POINTS = {
     "sol": "sol:cli",
@@ -29,7 +30,7 @@ ENTRY_POINTS = {
 }
 PUBLIC_FILES = {
     "pyproject.toml", "MANIFEST.in", "README.md", "CORPUS.md",
-    "INTERFACE_RESEARCH.md", "WORKSPACE_PLAN.md",
+    "INTERFACE_RESEARCH.md", "WORKSPACE_PLAN.md", "OPENDATALOADER_RESEARCH.md",
     "requirements-corpus.txt",
 } | {module + ".py" for module in MODULES}
 
@@ -114,6 +115,7 @@ class PackagingTests(unittest.TestCase):
                          "local-corpus/index.jsonl", ".sol-corpus-work/layout.xml",
                          "reading.sqlite3", "reading.sqlite3-wal", "reading.sqlite3-shm",
                          "tests/private-workspace/reading.sqlite3-journal",
+                         "profiles.sqlite3", "tests/private-profile/profiles.sqlite3-wal",
                          "personal.sol-workspace.json",
                          "AGENTS.md"):
             sentinel = cls.stage / relative
@@ -159,9 +161,14 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(metadata["Requires-Python"], ">=3.10")
         self.assertEqual(dict(entry_points["console_scripts"]), ENTRY_POINTS)
         requirements = metadata.get_all("Requires-Dist") or []
-        self.assertEqual(len(requirements), 1)
-        self.assertTrue(requirements[0].startswith("markdown-it-py<4,>=3;"))
-        self.assertIn('extra == "corpus"', requirements[0])
+        self.assertEqual(set(metadata.get_all("Provides-Extra") or []), {"corpus", "shell"})
+        self.assertEqual(len(requirements), 2)
+        corpus = [requirement for requirement in requirements if 'extra == "corpus"' in requirement]
+        shell = [requirement for requirement in requirements if 'extra == "shell"' in requirement]
+        self.assertEqual(len(corpus), 1)
+        self.assertEqual(len(shell), 1)
+        self.assertTrue(corpus[0].startswith("markdown-it-py<4,>=3;"))
+        self.assertTrue(shell[0].startswith("prompt-toolkit<4,>=3.0.52;"))
 
     def test_sdist_contains_sources_and_docs_without_local_material(self):
         with tarfile.open(self.sdist) as archive:
@@ -234,7 +241,7 @@ raise SystemExit(sol.cli(sys.argv[2:]))
                 "url": origin.as_uri(),
                 "dir_info": {"editable": True} if editable else {},
             }), encoding="utf-8")
-            for arguments in (["--passage", passage_id, "--json"], ["--json"]):
+            for arguments in (["--passage", passage_id, "--json"], ["-r", "--json"]):
                 with self.subTest(editable=editable, arguments=arguments):
                     result = subprocess.run(
                         [sys.executable, "-I", "-c", program, str(installed), *arguments],
@@ -245,6 +252,136 @@ raise SystemExit(sol.cli(sys.argv[2:]))
                     self.assertEqual(returned["id"], passage_id)
                     self.assertEqual(returned["text"], body)
                     self.assertEqual(returned["path"], "/BEING/synthetic.txt")
+
+    def test_installed_temporary_shell_random_and_sourcefree_guide_create_no_private_storage(self):
+        installed = Path(self.temporary.name) / "installed-launch-modes"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        corpus = Path(self.temporary.name) / "temporary-reader-corpus"
+        passage_id, body = write_runtime_corpus(corpus)
+        elsewhere = Path(self.temporary.name) / "launch-modes-outside-checkout"
+        elsewhere.mkdir()
+        data = Path(self.temporary.name) / "launch-modes-data"
+        environment = os.environ.copy()
+        environment.pop("SOL_CORPUS", None)
+        environment["XDG_CONFIG_HOME"] = str(Path(self.temporary.name) / "launch-modes-config")
+        environment["XDG_DATA_HOME"] = str(data)
+        program = """
+import builtins, importlib, sys
+sys.path.insert(0, sys.argv[1])
+original_import = builtins.__import__
+def block_optional_and_profiles(name, *args, **kwargs):
+    if name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'sol_profiles'}:
+        raise AssertionError('Temporary/one-shot reader imported ' + name)
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = block_optional_and_profiles
+sol = importlib.import_module('sol')
+def block_pdf(*args, **kwargs):
+    raise AssertionError('Installed reader must not extract a PDF')
+sol.load_book = block_pdf
+if sys.argv[2:] == ['guide']:
+    def block_book(*args, **kwargs):
+        raise AssertionError('Source-free guide must not load a corpus')
+    sol.load_corpus_book = block_book
+raise SystemExit(sol.cli(sys.argv[2:]))
+"""
+        cases = [
+            (["--corpus", str(corpus), "-n", "--ui", "prompt"], "first /being\nexit\n"),
+            (["--corpus", str(corpus), "-r", "--json"], ""),
+            (["guide"], ""),
+        ]
+        for arguments, commands in cases:
+            with self.subTest(arguments=arguments):
+                result = subprocess.run(
+                    [sys.executable, "-I", "-c", program, str(installed), *arguments],
+                    cwd=elsewhere, env=environment, input=commands,
+                    capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertNotIn("\x1b", result.stdout)
+                self.assertFalse(data.exists(), "Temporary and one-shot modes must create no private storage")
+                if "-r" in arguments:
+                    returned = json.loads(result.stdout)
+                    self.assertEqual(returned["id"], passage_id)
+                    self.assertEqual(returned["text"], body)
+                elif "-n" in arguments:
+                    self.assertIn(body, " ".join(result.stdout.split()))
+                else:
+                    self.assertIn("START IN YOUR TERMINAL", result.stdout)
+                    self.assertIn("sol -n", result.stdout)
+                    self.assertIn("sol -r", result.stdout)
+
+    def test_installed_default_shell_requires_both_labels_and_resumes_attributed_work(self):
+        installed = Path(self.temporary.name) / "installed-shell-onboarding"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        corpus = Path(self.temporary.name) / "shell-onboarding-corpus"
+        passage_id, body = write_runtime_corpus(corpus)
+        elsewhere = Path(self.temporary.name) / "shell-onboarding-outside-checkout"
+        elsewhere.mkdir()
+        data = Path(self.temporary.name) / "shell-onboarding-data"
+        environment = os.environ.copy()
+        environment.pop("SOL_CORPUS", None)
+        environment["XDG_CONFIG_HOME"] = str(Path(self.temporary.name) / "shell-onboarding-config")
+        environment["XDG_DATA_HOME"] = str(data)
+        program = """
+import builtins, importlib, sys
+sys.path.insert(0, sys.argv[1])
+original_import = builtins.__import__
+def block_optional(name, *args, **kwargs):
+    if name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit'}:
+        raise AssertionError('Installed basic reader imported optional dependency ' + name)
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = block_optional
+module = importlib.import_module(sys.argv[2])
+if sys.argv[2] == 'sol':
+    def block_pdf(*args, **kwargs):
+        raise AssertionError('Installed reader must not extract a PDF')
+    module.load_book = block_pdf
+    entry = module.cli
+else:
+    entry = module.main
+status = entry(sys.argv[3:])
+if status == 2:
+    assert sys.stdin.read() == 'first /being\\nexit\\n', 'Setup consumed noninteractive commands'
+raise SystemExit(status)
+"""
+
+        def run(module, arguments, *, commands="", expected_status=0):
+            result = subprocess.run(
+                [sys.executable, "-I", "-c", program, str(installed), module, *arguments],
+                cwd=elsewhere, env=environment, input=commands,
+                capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, expected_status, result.stdout + result.stderr)
+            self.assertNotIn("\x1b", result.stdout)
+            return result
+
+        run("sol_corpus_contract", [str(corpus), "--initialize-identity"])
+        base = ["--corpus", str(corpus)]
+        for supplied in ([], ["--workspace", "installed-reading"], ["--actor", "Installed author"]):
+            with self.subTest(supplied=supplied):
+                result = run("sol", [*base, *supplied], commands="first /being\nexit\n", expected_status=2)
+                self.assertIn("--workspace NAME --actor NAME", result.stderr)
+                self.assertIn("sol -n", result.stderr)
+                self.assertIn("sol -r", result.stderr)
+                self.assertFalse(data.exists(), "Rejected onboarding must not create private storage")
+        selected = [*base, "--workspace", "installed-reading", "--actor", "Installed author"]
+        opened = run("sol", selected,
+                     commands='first /being\nnote add "A private installed-reader question."\nexit\n')
+        self.assertIn("Actor: Installed author", opened.stdout)
+        self.assertTrue((data / "sol" / "profiles.sqlite3").is_file())
+        self.assertTrue((data / "sol" / "workspaces" / "installed-reading.sqlite3").is_file())
+        # Inspection remains one-shot and needs no actor; it must preserve the saved passage.
+        inspection = [*base, "--workspace", "installed-reading"]
+        resumed = json.loads(run("sol", [*inspection, "--resume", "--json"]).stdout)
+        self.assertEqual(resumed["id"], passage_id)
+        self.assertEqual(resumed["text"], body)
+        exported = json.loads(run("sol", [*inspection, "--workspace-export"]).stdout)
+        self.assertEqual(exported["schema_version"], 1)
+        self.assertEqual(exported["state"]["current_id"], passage_id)
+        self.assertEqual(len(exported["annotations"]), 1)
+        self.assertEqual(exported["annotations"][0]["actor"], "Installed author")
 
     def test_installed_workspace_identity_resume_and_export_need_no_optional_dependencies(self):
         installed = Path(self.temporary.name) / "installed-workspace"

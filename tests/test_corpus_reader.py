@@ -228,18 +228,18 @@ class CorpusReaderTests(unittest.TestCase):
         self.assertIn(str(self.cwd / "missing"), stderr)
         self.assertIn("--set-corpus", stderr)
 
-    def test_visual_help_survives_broken_automatic_configuration(self) -> None:
+    def test_guide_survives_broken_automatic_configuration(self) -> None:
         configuration = sol.config_path()
         configuration.parent.mkdir(parents=True)
         for content in ("{broken", json.dumps({"corpus": str(self.cwd / "missing")})):
             with self.subTest(content=content), \
                     patch("sol.load_book", side_effect=AssertionError("PDF extraction forbidden")):
                 configuration.write_text(content, encoding="utf-8")
-                status, stdout, stderr = self.run_main(["visual-help"], cwd=self.cwd / "elsewhere")
+                status, stdout, stderr = self.run_main(["guide"], cwd=self.cwd / "elsewhere")
                 self.assertEqual(status, 0, stderr)
                 self.assertIn("BEING", stdout)
                 self.assertIn("abbreviated visual guide", stderr)
-        status, _, stderr = self.run_main(["visual-help", "--corpus", str(self.cwd / "missing")])
+        status, _, stderr = self.run_main(["guide", "--corpus", str(self.cwd / "missing")])
         self.assertEqual(status, 2)
         self.assertIn("Cannot use local corpus", stderr)
 
@@ -273,7 +273,7 @@ class CorpusReaderTests(unittest.TestCase):
         configuration.write_text("{broken", encoding="utf-8")
         with patch.dict("os.environ", {"SOL_CORPUS": str(self.cwd / "missing")}), \
                 patch("sol.load_book", return_value=book) as loader:
-            status, _, stderr = self.run_main(["--pdf", str(pdf)])
+            status, _, stderr = self.run_main(["--pdf", str(pdf), "-r"])
         self.assertEqual(status, 0, stderr)
         loader.assert_called_once_with(pdf)
 
@@ -304,7 +304,7 @@ class CorpusReaderTests(unittest.TestCase):
                 status, _, stderr = self.run_main([], cwd=self.cwd / "elsewhere")
                 self.assertEqual(status, 2)
                 self.assertIn("--set-corpus", stderr)
-                status, _, stderr = self.run_main(["--corpus", str(self.corpus)])
+                status, _, stderr = self.run_main(["--corpus", str(self.corpus), "-r"])
                 self.assertEqual(status, 0, stderr)
 
     def test_configuration_write_error_is_actionable(self) -> None:
