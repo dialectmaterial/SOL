@@ -19,7 +19,7 @@ import zipfile
 
 MODULES = {
     "sol", "sol_corpus", "sol_corpus_contract", "sol_corpus_notes",
-    "sol_corpus_references", "sol_corpus_structure",
+    "sol_corpus_references", "sol_corpus_structure", "sol_workspace", "sol_workspace_reader",
 }
 ENTRY_POINTS = {
     "sol": "sol:cli",
@@ -109,10 +109,18 @@ class PackagingTests(unittest.TestCase):
         # Synthetic sentinels exercise archive exclusions without copying the book.
         for relative in ("Hegel-SOL.pdf", "sources/source.pdf", "local-corpus/hegel/chapter.md",
                          "local-corpus/index.jsonl", ".sol-corpus-work/layout.xml",
+                         "reading.sqlite3", "reading.sqlite3-wal", "reading.sqlite3-shm",
+                         "tests/private-workspace/reading.sqlite3-journal",
+                         "personal.sol-workspace.json",
                          "AGENTS.md"):
             sentinel = cls.stage / relative
             sentinel.parent.mkdir(parents=True, exist_ok=True)
             sentinel.write_text("Synthetic private fixture\n", encoding="utf-8")
+        # Deliberately nominate the workspace sentinels before the real exclusions,
+        # so this test exercises MANIFEST.in rather than an incidental omission.
+        manifest = cls.stage / "MANIFEST.in"
+        manifest.write_text("recursive-include . *.sqlite3 *.sqlite3-* *.sol-workspace.json\n"
+                            + manifest.read_text(encoding="utf-8"), encoding="utf-8")
         cls.dist = Path(cls.temporary.name) / "dist"
         cls.dist.mkdir()
         # Direct backend calls require no network, frontend or isolated build download.
@@ -160,7 +168,9 @@ class PackagingTests(unittest.TestCase):
         private_parts = {"sources", "local-corpus", ".sol-corpus-work", "AGENTS.md"}
         for name in names:
             self.assertFalse(private_parts.intersection(Path(name).parts), name)
-            self.assertFalse(name.endswith((".pdf", ".png", ".zip", ".jsonl")), name)
+            self.assertFalse(name.endswith((".pdf", ".png", ".zip", ".jsonl", ".sol-workspace.json")), name)
+            self.assertFalse(Path(name).name.endswith(".sqlite3")
+                             or ".sqlite3-" in Path(name).name, name)
 
     def test_built_wheel_entry_points_import_and_display_help(self):
         unpacked = Path(self.temporary.name) / "wheel"
@@ -232,6 +242,70 @@ raise SystemExit(sol.cli(sys.argv[2:]))
                     self.assertEqual(returned["id"], passage_id)
                     self.assertEqual(returned["text"], body)
                     self.assertEqual(returned["path"], "/BEING/synthetic.txt")
+
+    def test_installed_workspace_identity_resume_and_export_need_no_optional_dependencies(self):
+        installed = Path(self.temporary.name) / "installed-workspace"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        corpus = Path(self.temporary.name) / "workspace-corpus"
+        passage_id, body = write_runtime_corpus(corpus)
+        storage = Path(self.temporary.name) / "workspace-storage"
+        elsewhere = Path(self.temporary.name) / "workspace-outside-checkout"
+        elsewhere.mkdir()
+        environment = os.environ.copy()
+        environment.pop("SOL_CORPUS", None)
+        environment["XDG_CONFIG_HOME"] = str(Path(self.temporary.name) / "workspace-config")
+        environment["XDG_DATA_HOME"] = str(Path(self.temporary.name) / "workspace-data")
+        program = """
+import builtins
+import importlib
+import sys
+sys.path.insert(0, sys.argv[1])
+original_import = builtins.__import__
+def block_optional(name, *args, **kwargs):
+    if name.split(".")[0] in {"markdown_it", "rich", "textual", "prompt_toolkit"}:
+        raise AssertionError("Installed workspace must not import optional dependency " + name)
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = block_optional
+module = importlib.import_module(sys.argv[2])
+if sys.argv[2] == "sol":
+    def block_pdf(*args, **kwargs):
+        raise AssertionError("Installed workspace must not extract a PDF")
+    module.load_book = block_pdf
+    entry = module.cli
+else:
+    entry = module.main
+raise SystemExit(entry(sys.argv[3:]))
+"""
+
+        def run(module, arguments):
+            result = subprocess.run(
+                [sys.executable, "-I", "-c", program, str(installed), module, *arguments],
+                cwd=elsewhere, env=environment, capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("\x1b", result.stdout)
+            return result.stdout
+
+        initialized = run("sol_corpus_contract", [str(corpus), "--initialize-identity"])
+        self.assertIn("Initialized corpus identity", initialized)
+        identity = json.loads((corpus / "corpus.json").read_text(encoding="utf-8"))["corpus_id"]
+        arguments = ["--corpus", str(corpus), "--workspace", "wheel-study",
+                     "--workspace-dir", str(storage), "--actor", "Installed reader"]
+        first = json.loads(run("sol", [*arguments, "--first", "/being", "--json"]))
+        self.assertEqual(first["id"], passage_id)
+        self.assertEqual(first["workspace"]["corpus_id"], identity)
+        resumed = json.loads(run("sol", [*arguments, "--resume", "--json"]))
+        self.assertEqual(resumed["id"], passage_id)
+        self.assertEqual(resumed["workspace"]["revision"], first["workspace"]["revision"])
+        plain = run("sol", [*arguments, "--resume", "--plain"])
+        self.assertEqual(" ".join(plain.split()), body)
+        exported = json.loads(run("sol", [*arguments, "--workspace-export"]))
+        self.assertEqual(exported["format"], "sol-workspace")
+        self.assertEqual(exported["corpus_id"], identity)
+        self.assertEqual(exported["state"]["current_id"], passage_id)
+        self.assertEqual(exported["history"][0]["actor"], "Installed reader")
+        self.assertTrue((storage / "wheel-study.sqlite3").is_file())
 
 
 if __name__ == "__main__":

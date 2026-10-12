@@ -118,7 +118,7 @@ sol --cat /concept/foreword --plain | less
 sol --search "infinity" --within /being --json
 ~~~
 
-With `--json`, a single passage is an object; search, complete file, and context results are arrays in book order. Context includes the selected passage. Each passage carries its identifier, path, text, page references, and review status. Corpus-backed passages also include a `canonical` record containing the Markdown, attribution, note links, and full source references. Scripts can inspect this information without parsing decorated output.
+With `--json`, a single passage is an object; search, complete file, and context results are arrays in book order. Context includes the selected passage. Each passage carries its identifier, path, text, page references, and review status. Corpus-backed passages also include a `canonical` record containing the Markdown, attribution, note links, and full source references. Their `corpus` metadata retains the import identity, edition, and source fingerprint. Scripts can inspect this information without parsing decorated output.
 
 `visual-help` and `--visual-help` open an ASCII guide containing the project roadmap, book outline, and navigation examples. Use `--depth` from 0 to 32 to control how much of an outline appears.
 
@@ -145,7 +145,7 @@ cd -
 
 `ls` lists the current location, `pwd` displays its path, and `tree [PATH] --depth N` shows descendants. `up` moves to the parent; `cd -` returns to the previous directory. Both `/` and `..` work.
 
-`read` and `first` establish a reading selection. `next` and `previous` move within it; changing to another directory resets that selection. Entering `cd .` or the current directory preserves it. Reaching its boundary does not jump elsewhere. `cat FILE` prints a complete file without moving the cursor.
+In the standard shell, `read` and `first` establish a reading selection. `next` and `previous` move within it; changing to another directory resets that selection. Entering `cd .` or the current directory preserves it. Reaching its boundary does not jump elsewhere. `cat FILE` prints a complete file without moving the cursor.
 
 Search the current subtree, then open a result and inspect its surroundings:
 
@@ -162,6 +162,56 @@ next
 Use `info [PATH]` for a location summary, `visual-help [PATH] --depth N` for a scoped guide, `help` for command syntax, and `exit` or `quit` to leave.
 
 A useful comparison workflow is to search a term in one doctrine, inspect the surrounding prose, then repeat the search in another. Permanent identifiers let you record those observations and return to exactly the same passages.
+
+## Keep a reading workspace
+
+The standard shell remains nonpersistent. Add `--workspace NAME` when you want SOL to remember an inquiry. Before its first use, explicitly initialize the corpus identity from the project directory:
+
+~~~sh
+sol-corpus-check local-corpus --initialize-identity
+sol --workspace quantity-study --actor "Your name" --shell
+~~~
+
+Initialization adds a permanent corpus UUID and updates its index metadata without changing Markdown, passage IDs, or the index text. It does not reconvert the PDF. Ordinary reading never performs this change automatically.
+
+New conversions already include a corpus identity; this command retains it when present and initializes an older corpus once.
+
+A workspace restores its saved passage and reading scope when reopened. Browsing with `cd` does not erase that scope or cursor. `workspace history` preserves earlier checkpoints as visits, not claims that a passage was understood.
+
+~~~text
+first /being
+bookmark add starting-point
+note add "*Question:* What does this beginning presuppose?"
+review show
+review record inspected --issue "Inspected the canonical record; PDF comparison remains."
+cd /essence
+where
+bookmark open starting-point
+workspace history
+~~~
+
+Use `bookmark list`, `bookmark set NAME`, or `bookmark remove NAME` to inspect, deliberately replace, or remove a bookmark. Bookmarks target readable passages. `note list` shows personal annotations, not the edition's notes; `note show NOTE_ID` opens one. Annotation Markdown is stored and displayed literally. Notes target whole records, not selected words. `--on ID` can select an explicit record for a note or review instead of the current passage.
+
+Notes, comparisons, review decisions, and relations require an explicit `--actor NAME`. Comparisons preserve an ordered set of record IDs and a question. Relations are directed, attributed assertions alongside the published tree:
+
+~~~text
+compare save inquiry ID_A ID_B --question "How do these determinations differ?"
+compare show inquiry
+relate add ID_A compares-with ID_B --reason "A connection to investigate, not an identity claim."
+relate list
+~~~
+
+Replace `ID_A` and `ID_B` with displayed record UUIDs or unambiguous prefixes. `compare list`, `review list`, and `relate list` inspect saved work without moving the reading cursor. Review outcomes are `inspected`, `correction_needed`, and `verified`. A reader's `verified` testimony never changes canonical transcription status or random eligibility; changed text or a retired target makes the saved review stale. Missing and retired references remain visible rather than being matched by similar wording.
+
+Resume or export outside the shell:
+
+~~~sh
+sol --workspace quantity-study --resume
+sol --workspace quantity-study --resume --json
+sol --workspace quantity-study --workspace-export > quantity-study.sol-workspace.json
+~~~
+
+Export always writes JSON to standard output. Keep the `.sol-workspace.json` suffix so personal exports remain excluded from Git and source archives. Each workspace is a separate local SQLite database under `$XDG_DATA_HOME/sol/workspaces`, or `~/.local/share/sol/workspaces`; `--workspace-dir DIRECTORY` selects another location. It is bound to the corpus UUID and source fingerprint, not merely the PDF filename or directory. A mismatched corpus is refused. The workspace does not edit or automatically synchronize the book. See [the workspace plan](WORKSPACE_PLAN.md) for implemented boundaries and next steps.
 
 ## Maintain and review the corpus
 
@@ -212,9 +262,9 @@ The roadmap follows the three doctrines as a way of organizing development.
 
 The current focus is SOL as a command line application: random quotations, careful formatting, reading, search, and a virtual terminal interface for navigating the book.
 
-Next come saved reading sequences, bookmarks, annotations, and richer links between passages. Permanent identifiers provide their foundation. Exact textual searches should remain distinguishable from any future conceptual search.
+The opt-in workspace now provides reading continuity, bookmarks, attributed annotations, saved comparisons, review testimony, and relations between passages. Permanent identifiers provide their foundation. Exact textual searches should remain distinguishable from any future conceptual search.
 
-[The workspace plan](WORKSPACE_PLAN.md) develops reading continuity, attributed annotations, comparison, a source-review desk, and relations beyond the tree. These remain proposed features. [The separate interface investigation](INTERFACE_RESEARCH.md) compares prompt_toolkit, Rich, Textual, curses, and external readers without adding them as dependencies.
+[The workspace plan](WORKSPACE_PLAN.md) distinguishes this implemented foundation from selected-span annotations, richer exports and imports, and future interface work. [The separate interface investigation](INTERFACE_RESEARCH.md) compares prompt_toolkit, Rich, Textual, curses, and external readers without adding them as dependencies.
 
 This stage should make reading more productive while keeping the corpus inspectable and the interface small enough to understand and modify.
 

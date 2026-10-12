@@ -145,6 +145,7 @@ class Book:
     redirects: dict[str, str] = field(default_factory=dict)
     canonical_records: dict[str, dict] = field(default_factory=dict, repr=False, compare=False)
     corpus_directory: Path | None = field(default=None, repr=False, compare=False)
+    corpus_manifest: dict = field(default_factory=dict, repr=False, compare=False)
 
     def selection(self, path: tuple[str, ...]) -> list[Passage]:
         matches = [p for p in self.passages if p.path[:len(path)] == path]
@@ -908,10 +909,11 @@ def load_corpus_book(corpus: Path) -> Book:
     explicitly supplied reader_path metadata defines this convenient view;
     it is not reconstructed from heading spellings or assigned new IDs.
     """
-    from sol_corpus_contract import CorpusError, load_index
+    from sol_corpus_contract import CorpusError, load_snapshot
 
     try:
-        records = load_index(corpus, verify=True)
+        snapshot = load_snapshot(corpus)
+        records = snapshot.records
     except CorpusError as error:
         if not (corpus / "corpus.json").is_file():
             raise ValueError(
@@ -1032,7 +1034,8 @@ def load_corpus_book(corpus: Path) -> Book:
     # Markdown, attribution, notes, source rectangles and retirement history must
     # not disappear merely because the terminal presents Hegel's prose as text.
     return Book(root, passages, redirects,
-                {record["id"]: record for record in records}, corpus.resolve())
+                {record["id"]: record for record in records}, snapshot.corpus_directory,
+                snapshot.manifest)
 
 
 # 5. Navigation and display: no PDF extraction details belong in the shell.
@@ -1148,6 +1151,12 @@ def passage_data(passage: Passage, book: Book | None = None) -> dict:
     }
     if book is not None and passage.identifier in book.canonical_records:
         result["canonical"] = deepcopy(book.canonical_records[passage.identifier])
+    if book is not None and book.corpus_manifest:
+        result["corpus"] = {
+            "id": book.corpus_manifest.get("corpus_id"),
+            "edition": deepcopy(book.corpus_manifest.get("edition", {})),
+            "source": deepcopy(book.corpus_manifest.get("source", {})),
+        }
     return result
 
 
@@ -1491,7 +1500,7 @@ class ReadingSession:
         return matches[index]
 
 
-def install_completion(root: Node, get_cwd):
+def install_completion(root: Node, get_cwd, workspace: bool = False):
     """Optional standard-library tab completion; safe on systems without readline."""
     try:
         import readline
@@ -1501,6 +1510,8 @@ def install_completion(root: Node, get_cwd):
     old_delimiters = readline.get_completer_delims()
     commands = ("ls", "cd", "up", "pwd", "tree", "read", "first", "next", "previous",
                 "cat", "search", "open", "context", "info", "where", "visual-help", "neofetch", "help", "exit")
+    if workspace:
+        commands += ("workspace", "resume", "bookmark", "note", "compare", "review", "relate")
     def complete(text: str, state: int):
         try:
             buffer = readline.get_line_buffer()
@@ -1567,13 +1578,25 @@ def shell_options(verb: str, arguments: list[str]) -> argparse.Namespace:
     return parser.parse_args(arguments)
 
 
-def run_shell(book: Book, width: int, plain: bool = False, color: bool = False) -> int:
+def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
+              workspace_reader=None) -> int:
     cwd: tuple[str, ...] = ()
     previous_cwd: tuple[str, ...] | None = None
     results: list[Passage] = []
     session = ReadingSession(book)
-    restore = install_completion(book.root, lambda: cwd)
+    restore = install_completion(book.root, lambda: cwd, workspace=workspace_reader is not None)
     print("SOL. Type 'visual-help' for the guide; 'help' for commands.")
+    if workspace_reader is not None:
+        print(f"Workspace: {workspace_reader.store.path.stem}. Authored writes require --actor NAME.")
+        if workspace_reader.store.get_state() is not None:
+            try:
+                cwd, previous_cwd, passage, message = workspace_reader.restore(session)
+                if message:
+                    print(message)
+                print(render_passage(passage, width, plain, color))
+            except ValueError as error:
+                print(f"sol: saved position not restored: {error}\n"
+                      "The reference is retained. Inspect the workspace or deliberately start another reading.")
     try:
         while True:
             try:
@@ -1584,11 +1607,38 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False) 
             except KeyboardInterrupt:
                 print("\nType 'exit' to leave.")
                 continue
+            before_command = (cwd, previous_cwd, session.path, session.cursor,
+                              workspace_reader.resumed_reference if workspace_reader else None)
             try:
                 parts = shlex.split(command)
                 if not parts:
                     continue
                 verb, arguments = parts[0], parts[1:]
+                if verb == "resume":
+                    if arguments:
+                        raise ValueError("resume does not take arguments")
+                    if workspace_reader is None:
+                        raise ValueError("resume requires starting SOL with --workspace NAME")
+                    cwd, previous_cwd, passage, message = workspace_reader.restore(session)
+                    results = []
+                    if message:
+                        print(message)
+                    print(render_passage(passage, width, plain, color))
+                    continue
+                if verb in {"workspace", "bookmark", "note", "compare", "review", "relate"}:
+                    if workspace_reader is None:
+                        raise ValueError(f"{verb} requires starting SOL with --workspace NAME")
+                    from sol_workspace_reader import safe_output
+                    outcome = workspace_reader.execute(verb, arguments, session)
+                    if outcome.open_id:
+                        reference = workspace_reader.current_reference(session, outcome.open_id)
+                        passage = session.open(reference.target_id)
+                        workspace_reader.resumed_reference = reference
+                        workspace_reader.checkpoint(session, cwd, previous_cwd)
+                        print(render_passage(passage, width, plain, color))
+                    if outcome.text:
+                        print(safe_output(outcome.text))
+                    continue
                 if verb in {"search", "tree", "visual-help"}:
                     options = shell_options(verb, arguments)
                     node, path = resolve_path(options.path, cwd, book.root)
@@ -1612,6 +1662,9 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False) 
                     if argument is not None:
                         raise ValueError("help does not take an argument")
                     print(SHELL_HELP)
+                    if workspace_reader is not None:
+                        from sol_workspace_reader import WORKSPACE_HELP
+                        print("\n" + WORKSPACE_HELP)
                 elif verb == "neofetch":
                     if argument is not None:
                         raise ValueError("neofetch does not take an argument")
@@ -1623,7 +1676,10 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False) 
                 elif verb in {"next", "previous", "prev"}:
                     if argument is not None:
                         raise ValueError(f"{verb} does not take a path")
-                    print(render_passage(session.move(1 if verb == "next" else -1), width, plain, color))
+                    passage = session.move(1 if verb == "next" else -1)
+                    if workspace_reader is not None:
+                        workspace_reader.checkpoint(session, cwd, previous_cwd)
+                    print(render_passage(passage, width, plain, color))
                 elif verb in {"cd", "up"}:
                     if verb == "up" and argument is not None:
                         raise ValueError("up does not take an argument")
@@ -1638,7 +1694,11 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False) 
                     if path != cwd:
                         previous_cwd = cwd
                         cwd = path
-                        session.path, session.cursor = cwd, None
+                        if workspace_reader is None:
+                            session.path, session.cursor = cwd, None
+                        else:
+                            # Browsing and reading are independent in a workspace.
+                            workspace_reader.checkpoint(session, cwd, previous_cwd)
                 elif verb == "open":
                     if argument is None:
                         raise ValueError("open requires a passage ID or search result number")
@@ -1649,7 +1709,11 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False) 
                         identifier = results[number - 1].identifier
                     else:
                         identifier = argument
-                    print(render_passage(session.open(identifier), width, plain, color))
+                    passage = session.open(identifier)
+                    if workspace_reader is not None:
+                        workspace_reader.resumed_reference = workspace_reader.current_reference(session, identifier)
+                        workspace_reader.checkpoint(session, cwd, previous_cwd)
+                    print(render_passage(passage, width, plain, color))
                 elif verb == "context":
                     radius = 1 if argument is None else int(argument)
                     print(render_context(book, session.current(), radius, width, plain, color))
@@ -1668,7 +1732,10 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False) 
                     elif verb == "info":
                         print(render_info(book, node, path, width))
                     elif verb in {"read", "first"}:
-                        print(render_passage(session.read(path, verb == "first"), width, plain, color))
+                        passage = session.read(path, verb == "first")
+                        if workspace_reader is not None:
+                            workspace_reader.checkpoint(session, cwd, previous_cwd)
+                        print(render_passage(passage, width, plain, color))
                     else:
                         if node.is_directory:
                             raise ValueError("cat takes a file; use first or read for a directory")
@@ -1677,6 +1744,10 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False) 
                 else:
                     raise ValueError(f"unknown command: {verb}; type help")
             except ValueError as error:
+                if workspace_reader is not None:
+                    from sol_workspace import WorkspaceError
+                    if isinstance(error, WorkspaceError):
+                        cwd, previous_cwd, session.path, session.cursor, workspace_reader.resumed_reference = before_command
                 print(f"sol: {error}")
     finally:
         restore()
@@ -1814,6 +1885,11 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--info", metavar="PATH", help="show location, source range, and passage counts")
     mode.add_argument("--set-corpus", type=Path, metavar="DIRECTORY",
                       help="validate and remember the default corpus for reading from any directory")
+    mode.add_argument("--resume", action="store_true", help="resume the named workspace's saved passage")
+    mode.add_argument("--workspace-export", action="store_true", help="export the named workspace as JSON")
+    parser.add_argument("--workspace", metavar="NAME", help="opt into a persistent, named reading workspace")
+    parser.add_argument("--workspace-dir", type=Path, metavar="DIRECTORY", help="directory for local workspace databases")
+    parser.add_argument("--actor", metavar="NAME", help="explicit author for workspace notes and assertions")
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--corpus", type=Path, metavar="DIRECTORY",
                         help="canonical corpus for this run (otherwise discover a local or saved corpus)")
@@ -1835,7 +1911,8 @@ def validate_options(args: argparse.Namespace) -> None:
     if args.command:
         actions = (args.structure, args.visual_help, args.shell, args.read is not None,
                    args.first is not None, args.cat is not None, args.search is not None,
-                   args.passage is not None, args.info is not None, args.set_corpus is not None)
+                   args.passage is not None, args.info is not None, args.set_corpus is not None,
+                   args.resume, args.workspace_export)
         if any(actions):
             raise ValueError("visual-help cannot be combined with another action")
         args.visual_help = True
@@ -1859,6 +1936,21 @@ def validate_options(args: argparse.Namespace) -> None:
         raise ValueError("--json is available for reading, search, info, and structure")
     if args.set_corpus is not None and (args.corpus is not None or args.pdf is not None):
         raise ValueError("--set-corpus cannot be combined with --corpus or --pdf")
+    if args.workspace is None and (args.workspace_dir is not None or args.actor is not None or args.resume or args.workspace_export):
+        raise ValueError("--workspace-dir, --actor, --resume and --workspace-export require --workspace NAME")
+    if args.workspace is not None:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", args.workspace):
+            raise ValueError("workspace name must contain 1–64 letters, numbers, underscores or hyphens")
+        if args.actor is not None and not args.actor.strip():
+            raise ValueError("--actor requires a nonempty name")
+        if args.pdf is not None or args.set_corpus is not None or args.visual_help or args.structure:
+            raise ValueError("--workspace requires the indexed corpus and cannot accompany --pdf, --set-corpus, or an outline action")
+        if args.search is not None or args.info is not None or args.cat is not None:
+            raise ValueError("--workspace is available for reading, --shell, --resume, and --workspace-export")
+        if args.context is not None:
+            raise ValueError("workspace reading does not yet save a context view; use --passage ID --context N without --workspace")
+    if args.workspace_export and args.plain:
+        raise ValueError("--workspace-export always emits JSON; omit --plain")
 
 
 def tree_data(node: Node, depth: int | None = None) -> dict:
@@ -1879,6 +1971,58 @@ def terminal_color() -> bool:
 
 def emit_json(value: object) -> None:
     print(json.dumps(value, ensure_ascii=False, indent=2))
+
+
+def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
+    """Opt-in durable state; ordinary invocations do not open a database."""
+    from sol_workspace import Workspace
+    from sol_workspace_reader import WorkspaceReader, workspace_path
+
+    identity = book.corpus_manifest.get("corpus_id")
+    if not identity:
+        directory = shlex.quote(str(book.corpus_directory))
+        raise ValueError("this corpus needs an explicit permanent identity before workspace use.\n"
+                         f"Run once: sol-corpus-check {directory} --initialize-identity\n"
+                         "This preserves canonical text and passage IDs; do not reconvert the PDF.")
+    location = workspace_path(args.workspace, args.workspace_dir)
+    if (args.resume or args.workspace_export) and not location.exists():
+        raise ValueError(f"workspace does not exist: {args.workspace}; start with --workspace NAME --shell")
+    provenance = {"edition": book.corpus_manifest["edition"], "source": book.corpus_manifest["source"]}
+    with Workspace(location, identity, provenance, actor=args.actor or "Reader") as store:
+        reader = WorkspaceReader(book, store, args.actor, resolve_path, display_path,
+                                 render_passage, width, args.plain, color)
+        if args.workspace_export:
+            emit_json(store.export())
+            return 0
+        if args.shell:
+            return run_shell(book, width, args.plain, color, reader)
+        session = ReadingSession(book)
+        cwd, previous = (), None
+        if args.resume:
+            cwd, previous, passage, message = reader.restore(session)
+            if message:
+                print(message, file=sys.stderr)
+            # Resume is inspection, not a new saved visit.
+        elif args.passage is not None:
+            reference = reader.current_reference(session, args.passage)
+            passage = session.open(reference.target_id)
+            reader.resumed_reference = reference
+            reader.checkpoint(session, cwd, previous)
+        else:
+            value = args.first if args.first is not None else args.read
+            _, path = resolve_path(value, (), book.root)
+            passage = session.read(path, args.first is not None)
+            reader.checkpoint(session, cwd, previous)
+        if args.json:
+            data = passage_data(passage, book)
+            data["workspace"] = {"name": args.workspace, "corpus_id": identity,
+                                 "revision": reader.revision,
+                                 "requested_id": reader.resumed_reference.requested_id
+                                 if reader.resumed_reference else passage.identifier}
+            emit_json(data)
+        else:
+            print(render_passage(passage, width, args.plain, color))
+        return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1935,6 +2079,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"For an initial import: sol-corpus convert --pdf {PDF_FILENAME}\n"
                 "PDF extraction is never automatic; --pdf PATH explicitly selects the slow legacy reader."
             )
+        if args.workspace is not None:
+            return run_workspace_cli(book, args, width, color)
         if args.structure:
             if args.json:
                 emit_json({"outline": tree_data(book.root, args.depth), "abbreviated": False})

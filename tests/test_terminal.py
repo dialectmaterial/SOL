@@ -7,6 +7,7 @@ import io
 import json
 from pathlib import Path
 import re
+from types import SimpleNamespace
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -360,7 +361,8 @@ class TerminalTests(unittest.TestCase):
             'plain_text': 'Invented reader prose.\n' + caption,
             'markdown': 'Invented reader prose.\n\n![' + caption + '](../assets/source.png)',
         }
-        with patch('sol_corpus_contract.load_index', return_value=[record]):
+        snapshot = SimpleNamespace(records=[record], corpus_directory=Path('/synthetic'), manifest={})
+        with patch('sol_corpus_contract.load_snapshot', return_value=snapshot):
             book = sol.load_corpus_book(Path('/synthetic'))
         passage = book.passages[0]
         self.assertIn(caption, passage.text)
@@ -368,7 +370,7 @@ class TerminalTests(unittest.TestCase):
         self.assertEqual(book.search('facsimile'), [])
         self.assertEqual(book.search('Invented reader prose'), [passage])
         record['markdown'] = record['plain_text']
-        with patch('sol_corpus_contract.load_index', return_value=[record]):
+        with patch('sol_corpus_contract.load_snapshot', return_value=snapshot):
             ordinary = sol.load_corpus_book(Path('/synthetic')).passages[0]
         self.assertIn(caption, sol.render_passage(ordinary, 80))
 

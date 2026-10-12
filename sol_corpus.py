@@ -799,7 +799,7 @@ class Importer:
                       "reason": "No text spans" if not p["spans"] else "All spans explicitly accounted for"}
                      for p in self.pages]
         manifest = {
-            "contract_version": 1, "edition": EDITION,
+            "contract_version": 1, "corpus_id": new_id(), "edition": EDITION,
             "source": {"filename": self.pdf.name, "sha256": fingerprint, "pdf_pages": len(self.pages)},
             "rights": {"redistribution": "not_authorized", "storage": "local_only"},
             "documents": sorted(by_doc), "page_inventory": inventory, "source_gaps": GAPS,

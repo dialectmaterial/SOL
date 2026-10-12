@@ -218,6 +218,54 @@ is editorial history, not a passage: exclude `retired_record` from classifier
 text and ordinary reading. Follow its redirect metadata when reconciling old
 references, rather than treating its explanatory body as source prose.
 
+### Corpus identity for persistent workspaces
+
+Record UUIDs identify passages within a corpus. A separate manifest `corpus_id`
+identifies that corpus lineage; it is an opaque lower-case UUID, not the PDF hash,
+directory name, or a selected root record. New conversions include this identity.
+Older corpora without it remain readable through the ordinary CLI, but persistent
+workspaces require explicit initialization:
+
+```sh
+sol-corpus-check local-corpus --initialize-identity
+```
+
+This verifies the existing corpus before adding the identity to `corpus.json` and
+updating the manifest fingerprint in `index.meta.json`. Canonical Markdown, passage
+IDs, and `index.jsonl` remain unchanged. Running it again retains the existing
+identity. It needs neither PDF extraction nor the optional Markdown parser. Do not
+assign a new identity merely because you move or rename a corpus.
+
+The metadata pair is committed with index metadata last. An interrupted update
+fails verification rather than silently accepting inconsistent provenance; inspect
+the corpus and explicitly reindex if recovery is needed. Workspace reads never
+initialize identity or repair this pair automatically.
+
+Workspaces use separate local SQLite files, not records inserted into canonical
+Markdown. Their default directory is `$XDG_DATA_HOME/sol/workspaces`, falling back
+to `~/.local/share/sol/workspaces`; `--workspace-dir DIRECTORY` overrides it. A
+database is bound to its corpus identity and source fingerprint. It refuses an
+incompatible corpus instead of guessing that equal source filenames imply equal
+records. Missing references remain unresolved, and retired IDs retain their
+original identity while exposing redirect targets.
+
+Reader annotations, comparison questions, directed relations, and review decisions
+retain their explicit actor attribution. Whole-record annotation bodies are literal
+Markdown, separate from the edition's notes. Review events retain the inspected
+record digest and source fingerprint: the reader distinguishes current and stale
+versions and conservatively marks reviews of retired targets stale. `verified`
+remains a reader's testimony, not a change to canonical
+`transcription_status` or `random_eligible`. Corrections still belong in canonical
+Markdown followed by reindexing.
+
+`sol --workspace NAME --workspace-export` writes a consistent JSON snapshot of
+workspace references, authored records, and history to standard output. Use the
+`.sol-workspace.json` suffix for exported files so they remain excluded from Git
+and source archives. Export is available; importing, selected-span anchoring, and
+a full-screen review interface remain future work. See
+[WORKSPACE_PLAN.md](WORKSPACE_PLAN.md) for command syntax
+and the boundary between the canonical book and a reader's inquiry.
+
 ## Notes, bibliography, and index
 
 Paragraphs or notes with callouts list their target note UUIDs in `note_ids`.
@@ -279,12 +327,17 @@ passages expose their indexed record under `canonical`, retaining Markdown,
 attribution, parent IDs, note links, and all source references. The top-level
 `text` is a reader presentation, not a replacement for canonical Markdown;
 `needs_source_review` exposes the reader's explicit pending-status check.
+The separate `corpus` object exposes the verified import identity, edition, and
+source provenance without repeating the entire manifest and page inventory.
+Its `id` is `null` for an older corpus that has not initialized its identity.
 
 ## Manifest and generated JSONL
 
 `corpus.json` records at least:
 
 - `contract_version`: currently `1`.
+- `corpus_id`: optional for older corpora, required for persistent workspaces;
+  explicitly initialized as a permanent lower-case UUID.
 - `edition`: edition and translation metadata, with completeness/review status.
 - `source`: source filename, SHA-256 fingerprint, and PDF page count.
 - `documents`: exact relative Markdown filenames.

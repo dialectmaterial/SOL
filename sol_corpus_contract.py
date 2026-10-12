@@ -5,7 +5,8 @@ Markdown is parsed as CommonMark with markdown-it-py when generating an index,
 not stripped with regular expressions. The original Markdown is always preserved.
 
 Public API: new_id(), render_record(metadata, markdown), parse_document(text),
-reindex(corpus_dir), load_index(corpus_dir), and plain_text(markdown). Editing text,
+reindex(corpus_dir), load_index(corpus_dir), load_snapshot(corpus_dir),
+initialize_corpus_identity(corpus_dir), and plain_text(markdown). Editing text,
 titles, or order never creates IDs: IDs belong to the canonical record markers.
 Loading and verifying an existing index uses only Python's standard library;
 reindexing additionally requires markdown-it-py. Nothing opens the source PDF.
@@ -14,6 +15,8 @@ reindexing additionally requires markdown-it-py. Nothing opens the source PDF.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+from dataclasses import dataclass
 import hashlib
 from html.parser import HTMLParser
 import json
@@ -31,6 +34,7 @@ CONTRACT_VERSION = 1
 MANIFEST_FILENAME = "corpus.json"
 INDEX_FILENAME = "index.jsonl"
 INDEX_META_FILENAME = "index.meta.json"
+_WRITE_LOCK_FILENAME = ".sol-corpus-write.lock"
 _OPEN = re.compile(r"^<!-- sol:(.+) -->$")
 _ANCHOR = re.compile(r'^<a id="([0-9a-f-]+)"></a>$')
 _RESERVED = {"markdown", "plain_text", "document", "context", "content_sha256"}
@@ -39,6 +43,29 @@ _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 
 class CorpusError(ValueError):
     """Canonical content or its generated index fails the corpus contract."""
+
+
+@dataclass(frozen=True)
+class CorpusSnapshot:
+    """One verified manifest/index generation, loaded without opening its PDF.
+
+    The dictionaries are caller-owned snapshots, not live views of corpus files.
+    Missing corpus_id is permitted for older corpora; persistent workspaces must
+    require explicit identity initialization rather than deriving it from a PDF.
+    """
+
+    corpus_directory: Path
+    manifest: dict
+    records: list[dict]
+    manifest_sha256: str
+    index_sha256: str
+    documents: dict[str, str]
+    index_file: Path
+    index_metadata_sha256: str
+
+    @property
+    def corpus_id(self) -> str | None:
+        return self.manifest.get("corpus_id")
 
 
 def new_id() -> str:
@@ -388,14 +415,28 @@ def _read_utf8(path: Path) -> str:
         raise CorpusError(f"Cannot read UTF-8 corpus file {path}: {exc}") from exc
 
 
-def read_manifest(corpus_dir: Path | str) -> dict:
-    """Read and validate the declared edition, document list, and page inventory."""
-    root = Path(corpus_dir)
-    manifest = _decode_json(_read_utf8(root / MANIFEST_FILENAME), MANIFEST_FILENAME)
+def _read_bytes(path: Path) -> bytes:
+    try:
+        return path.read_bytes()
+    except OSError as exc:
+        raise CorpusError(f"Cannot read corpus file {path}: {exc}") from exc
+
+
+def _decode_utf8(data: bytes, label: str) -> str:
+    try:
+        return data.decode("utf-8")
+    except UnicodeError as exc:
+        raise CorpusError(f"Cannot read UTF-8 corpus file {label}: {exc}") from exc
+
+
+def _manifest_from_bytes(root: Path, data: bytes) -> dict:
+    manifest = _decode_json(_decode_utf8(data, MANIFEST_FILENAME), MANIFEST_FILENAME)
     if not isinstance(manifest, dict) or not _is_int(manifest.get("contract_version")) or manifest["contract_version"] != CONTRACT_VERSION:
         raise CorpusError(f"Unsupported corpus contract; expected version {CONTRACT_VERSION}")
     if not isinstance(manifest.get("edition"), dict) or not manifest["edition"]:
         raise CorpusError("Manifest requires nonempty edition metadata")
+    if "corpus_id" in manifest:
+        _valid_id(manifest["corpus_id"], "Manifest corpus_id")
     source = manifest.get("source")
     if not isinstance(source, dict) or not {"filename", "sha256", "pdf_pages"} <= source.keys():
         raise CorpusError("Manifest source requires filename, sha256, and pdf_pages")
@@ -430,6 +471,12 @@ def read_manifest(corpus_dir: Path | str) -> dict:
         if entry["disposition"] != "records" and not isinstance(entry.get("reason"), str):
             raise CorpusError("Blank/excluded inventory pages require a reason")
     return manifest
+
+
+def read_manifest(corpus_dir: Path | str) -> dict:
+    """Read and validate the declared edition, document list, and page inventory."""
+    root = Path(corpus_dir)
+    return _manifest_from_bytes(root, _read_bytes(root / MANIFEST_FILENAME))
 
 
 def validate_records(records: list[dict], manifest: dict) -> None:
@@ -514,8 +561,9 @@ def _canonical_files(root: Path, manifest: dict) -> tuple[dict[str, str], dict[s
     return contents, fingerprints
 
 
-def _read_canonical(root: Path) -> tuple[dict, list[dict], dict[str, str]]:
-    manifest = read_manifest(root)
+def _read_canonical(root: Path) -> tuple[dict, list[dict], dict[str, str], str]:
+    manifest_bytes = _read_bytes(root / MANIFEST_FILENAME)
+    manifest = _manifest_from_bytes(root, manifest_bytes)
     contents, fingerprints = _canonical_files(root, manifest)
     records: list[dict] = []
     for document, content in contents.items():
@@ -538,21 +586,59 @@ def _read_canonical(root: Path) -> tuple[dict, list[dict], dict[str, str]]:
             for ancestor in ancestors
         ]
         record["content_sha256"] = _sha(record["markdown"].encode("utf-8"))
-    return manifest, records, fingerprints
+    return manifest, records, fingerprints, _sha(manifest_bytes)
 
 
 def _atomic_write(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    except OSError as exc:
+        raise CorpusError(f"Cannot prepare corpus write {path}: {exc}") from exc
     try:
         with os.fdopen(descriptor, "wb") as stream:
             stream.write(data)
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
+    except OSError as exc:
+        raise CorpusError(f"Cannot commit corpus write {path}: {exc}") from exc
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
+
+
+@contextmanager
+def _corpus_write_lock(root: Path):
+    """Serialize SOL's corpus writers; manual editors must still be rechecked."""
+    path = root / _WRITE_LOCK_FILENAME
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError as exc:
+        raise CorpusError(
+            f"Corpus write lock exists: {path}. Another SOL writer may be active; "
+            "remove a stale lock only after checking that no writer is running."
+        ) from exc
+    except OSError as exc:
+        raise CorpusError(f"Cannot acquire corpus write lock {path}: {exc}") from exc
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(f"pid={os.getpid()}\n")
+        yield
+    finally:
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _assert_canonical_unchanged(root: Path, manifest: dict, manifest_sha256: str,
+                                fingerprints: dict[str, str]) -> None:
+    if _sha(_read_bytes(root / MANIFEST_FILENAME)) != manifest_sha256:
+        raise CorpusError("Corpus manifest changed while loading or writing; retry after reindexing")
+    _, current = _canonical_files(root, manifest)
+    if current != fingerprints:
+        raise CorpusError("Canonical Markdown changed while loading or writing; reindex required")
 
 
 def reindex(corpus_dir: Path | str, output: Path | str | None = None) -> dict:
@@ -562,65 +648,148 @@ def reindex(corpus_dir: Path | str, output: Path | str | None = None) -> dict:
     pair of writes is detected by load_index's digest check rather than used silently.
     """
     root = Path(corpus_dir)
-    manifest, records, fingerprints = _read_canonical(root)
     target = Path(output) if output is not None else root / INDEX_FILENAME
     if target.suffix != ".jsonl":
         raise CorpusError("Index output must have a .jsonl extension")
-    metadata_target = target.with_suffix(".meta.json")
-    payload = "".join(_json(record) + "\n" for record in records).encode("utf-8")
-    metadata = {
-        "contract_version": CONTRACT_VERSION,
-        "manifest_sha256": _sha((root / MANIFEST_FILENAME).read_bytes()),
-        "source_sha256": manifest["source"]["sha256"],
-        "documents": fingerprints,
-        "index_sha256": _sha(payload),
-        "record_count": len(records),
-    }
-    _atomic_write(target, payload)
-    _atomic_write(metadata_target, (_json(metadata) + "\n").encode("utf-8"))
+    with _corpus_write_lock(root):
+        manifest, records, fingerprints, manifest_sha256 = _read_canonical(root)
+        metadata_target = target.with_suffix(".meta.json")
+        payload = "".join(_json(record) + "\n" for record in records).encode("utf-8")
+        metadata = {
+            "contract_version": CONTRACT_VERSION,
+            "manifest_sha256": manifest_sha256,
+            "source_sha256": manifest["source"]["sha256"],
+            "documents": fingerprints,
+            "index_sha256": _sha(payload),
+            "record_count": len(records),
+        }
+        _assert_canonical_unchanged(root, manifest, manifest_sha256, fingerprints)
+        _atomic_write(target, payload)
+        _assert_canonical_unchanged(root, manifest, manifest_sha256, fingerprints)
+        _atomic_write(metadata_target, (_json(metadata) + "\n").encode("utf-8"))
     return {"records": len(records), "documents": len(fingerprints), "index": str(target), "metadata": str(metadata_target)}
+
+
+def _index_records(content: str, target: Path) -> list[dict]:
+    records = [_decode_json(line, f"{target}:{i+1}") for i, line in enumerate(content.splitlines()) if line.strip()]
+    return records
+
+
+def _assert_snapshot_unchanged(snapshot: CorpusSnapshot,
+                               expected_manifest_sha256: str | None = None) -> None:
+    _assert_canonical_unchanged(
+        snapshot.corpus_directory, snapshot.manifest,
+        expected_manifest_sha256 or snapshot.manifest_sha256, snapshot.documents,
+    )
+    if _sha(_read_bytes(snapshot.index_file)) != snapshot.index_sha256:
+        raise CorpusError("Generated index changed while loading or writing; retry after reindexing")
+    if _sha(_read_bytes(snapshot.index_file.with_suffix(".meta.json"))) != snapshot.index_metadata_sha256:
+        raise CorpusError("Index metadata changed while loading or writing; retry after reindexing")
+
+
+def load_snapshot(corpus_dir: Path | str, index: Path | str | None = None) -> CorpusSnapshot:
+    """Verify and return the manifest and records from one consistent generation.
+
+    Identity and source provenance come from the exact manifest bytes whose digest
+    was verified against index metadata, not a separately reread manifest. A final
+    check refuses files changed during loading. This is integrity verification,
+    not authentication against a malicious actor able to rewrite all fingerprints.
+    """
+    root = Path(corpus_dir).resolve()
+    target = (Path(index) if index is not None else root / INDEX_FILENAME).resolve()
+    index_bytes = _read_bytes(target)
+    records = _index_records(_decode_utf8(index_bytes, str(target)), target)
+    metadata_bytes = _read_bytes(target.with_suffix(".meta.json"))
+    metadata = _decode_json(_decode_utf8(metadata_bytes, "index metadata"), "index metadata")
+    if (not isinstance(metadata, dict) or not _is_int(metadata.get("contract_version"))
+            or metadata["contract_version"] != CONTRACT_VERSION):
+        raise CorpusError("Unsupported generated-index metadata")
+    if metadata.get("index_sha256") != _sha(index_bytes):
+        raise CorpusError("Generated index was changed or incompletely written; reindex required")
+    manifest_bytes = _read_bytes(root / MANIFEST_FILENAME)
+    manifest = _manifest_from_bytes(root, manifest_bytes)
+    manifest_sha256 = _sha(manifest_bytes)
+    if metadata.get("manifest_sha256") != manifest_sha256:
+        raise CorpusError("Corpus manifest changed; reindex required")
+    _, fingerprints = _canonical_files(root, manifest)
+    if metadata.get("source_sha256") != manifest["source"]["sha256"] or metadata.get("documents") != fingerprints:
+        raise CorpusError("Canonical Markdown or source fingerprint changed; reindex required")
+    if not _is_int(metadata.get("record_count")) or metadata["record_count"] != len(records):
+        raise CorpusError("Generated index record count disagrees with canonical content")
+    if not all(isinstance(record, dict) for record in records):
+        raise CorpusError("Generated index records must be JSON objects")
+    validate_records(records, manifest)
+    if [record["order"] for record in records] != sorted(record["order"] for record in records):
+        raise CorpusError("Generated index is not in source order")
+    for record in records:
+        if not isinstance(record.get("markdown"), str) or not isinstance(record.get("plain_text"), str):
+            raise CorpusError("Generated records require Markdown and plain text")
+        if record.get("content_sha256") != _sha(record["markdown"].encode("utf-8")):
+            raise CorpusError("Generated record content digest is invalid")
+    snapshot = CorpusSnapshot(
+        corpus_directory=root, manifest=manifest, records=records,
+        manifest_sha256=manifest_sha256, index_sha256=_sha(index_bytes),
+        documents=fingerprints, index_file=target,
+        index_metadata_sha256=_sha(metadata_bytes),
+    )
+    _assert_snapshot_unchanged(snapshot)
+    return snapshot
 
 
 def load_index(corpus_dir: Path | str, verify: bool = True, index: Path | str | None = None) -> list[dict]:
     """Load derived JSONL, refusing stale/tampered indexes by default (no PDF I/O)."""
-    root = Path(corpus_dir)
-    target = Path(index) if index is not None else root / INDEX_FILENAME
-    content = _read_utf8(target)
-    records = [_decode_json(line, f"{target}:{i+1}") for i, line in enumerate(content.splitlines()) if line.strip()]
     if verify:
-        metadata = _decode_json(_read_utf8(target.with_suffix(".meta.json")), "index metadata")
-        if not isinstance(metadata, dict) or metadata.get("contract_version") != CONTRACT_VERSION:
-            raise CorpusError("Unsupported generated-index metadata")
-        if metadata.get("index_sha256") != _sha(content.encode("utf-8")):
-            raise CorpusError("Generated index was changed or incompletely written; reindex required")
-        manifest = read_manifest(root)
-        _, fingerprints = _canonical_files(root, manifest)
-        if metadata.get("manifest_sha256") != _sha((root / MANIFEST_FILENAME).read_bytes()):
-            raise CorpusError("Corpus manifest changed; reindex required")
-        if metadata.get("source_sha256") != manifest["source"]["sha256"] or metadata.get("documents") != fingerprints:
-            raise CorpusError("Canonical Markdown or source fingerprint changed; reindex required")
-        if metadata.get("record_count") != len(records):
-            raise CorpusError("Generated index record count disagrees with canonical content")
-        if not all(isinstance(record, dict) for record in records):
-            raise CorpusError("Generated index records must be JSON objects")
-        validate_records(records, manifest)
-        if [record["order"] for record in records] != sorted(record["order"] for record in records):
-            raise CorpusError("Generated index is not in source order")
-        for record in records:
-            if not isinstance(record.get("markdown"), str) or not isinstance(record.get("plain_text"), str):
-                raise CorpusError("Generated records require Markdown and plain text")
-            if record.get("content_sha256") != _sha(record["markdown"].encode("utf-8")):
-                raise CorpusError("Generated record content digest is invalid")
-    return records
+        return load_snapshot(corpus_dir, index=index).records
+    target = Path(index) if index is not None else Path(corpus_dir) / INDEX_FILENAME
+    return _index_records(_read_utf8(target), target)
+
+
+def initialize_corpus_identity(corpus_dir: Path | str) -> dict:
+    """Explicitly add a permanent lineage UUID to an already verified corpus.
+
+    Existing identities are retained. Documents and index JSONL are never rewritten,
+    and stale indexes are rejected rather than silently regenerated. Only the
+    manifest and its index-metadata digest change; metadata is committed last so
+    an interrupted pair fails closed and can be recovered by explicit reindexing.
+    No PDF or Markdown-parser dependency is needed.
+    """
+    root = Path(corpus_dir).resolve()
+    with _corpus_write_lock(root):
+        if any((root / name).is_symlink() for name in (MANIFEST_FILENAME, INDEX_META_FILENAME)):
+            raise CorpusError("Identity initialization may not replace symlinked corpus metadata")
+        snapshot = load_snapshot(root)
+        if snapshot.corpus_id is not None:
+            return {"corpus_id": snapshot.corpus_id, "initialized": False, "records": len(snapshot.records)}
+        manifest = {**snapshot.manifest, "corpus_id": new_id()}
+        manifest_payload = (json.dumps(manifest, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8")
+        metadata_target = snapshot.index_file.with_suffix(".meta.json")
+        metadata = _decode_json(_read_utf8(metadata_target), "index metadata")
+        metadata["manifest_sha256"] = _sha(manifest_payload)
+        _assert_snapshot_unchanged(snapshot)
+        _atomic_write(root / MANIFEST_FILENAME, manifest_payload)
+        _assert_snapshot_unchanged(snapshot, expected_manifest_sha256=_sha(manifest_payload))
+        _atomic_write(metadata_target, (_json(metadata) + "\n").encode("utf-8"))
+        # Validate the committed pair as a whole before reporting success.
+        committed = load_snapshot(root)
+        if committed.corpus_id != manifest["corpus_id"]:
+            raise CorpusError("Corpus identity changed during initialization; inspect the corpus before retrying")
+        return {"corpus_id": committed.corpus_id, "initialized": True, "records": len(committed.records)}
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate SOL canonical Markdown and rebuild its PDF-independent JSONL index.")
     parser.add_argument("corpus", type=Path, help="directory containing corpus.json and canonical Markdown")
-    parser.add_argument("--check", action="store_true", help="validate the existing index without modifying it")
+    operation = parser.add_mutually_exclusive_group()
+    operation.add_argument("--check", action="store_true", help="validate the existing index without modifying it")
+    operation.add_argument("--initialize-identity", action="store_true",
+                           help="explicitly add or retain a stable corpus UUID without changing book text")
     args = parser.parse_args(argv)
     try:
-        if args.check:
+        if args.initialize_identity:
+            summary = initialize_corpus_identity(args.corpus)
+            action = "Initialized" if summary["initialized"] else "Retained"
+            print(f"{action} corpus identity {summary['corpus_id']} ({summary['records']} indexed records).")
+        elif args.check:
             records = load_index(args.corpus)
             print(f"Validated {len(records)} indexed records.")
         else:

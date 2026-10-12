@@ -352,9 +352,10 @@ class CorpusReaderTests(unittest.TestCase):
         self.assertIn(self.ids[5], stdout)
 
     def test_reader_rejects_non_boolean_random_eligibility(self) -> None:
-        records = contract.load_index(self.corpus)
+        snapshot = contract.load_snapshot(self.corpus)
+        records = snapshot.records
         next(record for record in records if record["id"] == self.ids[4])["random_eligible"] = "false"
-        with patch("sol_corpus_contract.load_index", return_value=records):
+        with patch("sol_corpus_contract.load_snapshot", return_value=snapshot):
             with self.assertRaisesRegex(ValueError, "random_eligible.*bool|boolean.*random_eligible"):
                 sol.load_corpus_book(self.corpus)
 
