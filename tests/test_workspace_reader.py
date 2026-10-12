@@ -174,7 +174,9 @@ class WorkspaceReaderTests(unittest.TestCase):
         self.assertIn('PDF transcription', output)
         self.reader.execute('review', ['record', 'verified', '--issue', 'Reader testimony only'], self.session)
         self.assertEqual(json.dumps(self.book.canonical_records, sort_keys=True), original)
-        self.assertIn('current inspected version', self.reader.execute('review', ['list'], self.session).text)
+        output = self.reader.execute('review', ['list'], self.session).text
+        self.assertIn('same text/PDF fingerprints; PDF hash is manifest-declared', output)
+        self.assertIn('record metadata is not bound', output)
         self.book.canonical_records[IDS[0]]['content_sha256'] = '2' * 64
         self.assertIn('STALE', self.reader.execute('review', ['list'], self.session).text)
 
@@ -346,6 +348,187 @@ class WorkspaceReaderTests(unittest.TestCase):
                                 ('relate', ['list', '--on', ''])]:
             with self.subTest(verb=verb, arguments=arguments), self.assertRaises(ValueError):
                 self.reader.execute(verb, arguments, self.session)
+
+    def test_historical_resume_creates_a_new_checkpoint_without_erasing_history(self):
+        self.session.read((), first=True)
+        self.reader.checkpoint(self.session, (), None)
+        self.session.move(1)
+        self.reader.checkpoint(self.session, ('ESSENCE',), ())
+        _, _, passage, message = self.reader.restore(self.session, 1)
+        self.assertEqual(passage.identifier, IDS[0])
+        self.assertEqual(self.store.get_state()['revision'], 3)
+        self.assertEqual(self.store.get_history(2)['current_id'], IDS[1])
+        self.assertIn('new revision 3', message)
+        self.assertEqual(len(self.store.list_history()), 3)
+
+    def test_bad_historical_resume_preserves_live_session_and_database(self):
+        self.session.read((), first=True)
+        self.reader.checkpoint(self.session, (), None)
+        before = (self.session.path, self.session.cursor, self.reader.revision)
+        for value in (0, -1, 99, True):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.reader.restore(self.session, value)
+            self.assertEqual((self.session.path, self.session.cursor, self.reader.revision), before)
+            self.assertEqual(self.store.get_state()['revision'], 1)
+
+    def test_historical_resume_conflict_does_not_mutate_live_cursor(self):
+        self.session.read((), first=True)
+        self.reader.checkpoint(self.session, (), None)
+        self.session.move(1)
+        self.reader.checkpoint(self.session, (), None)
+        with Workspace(self.path, CORPUS_ID, self.provenance) as other:
+            original = self.store.save_state
+            def contested(state, expected_revision):
+                newer = other.get_state()
+                newer['current_id'] = IDS[2]
+                other.save_state(newer, newer['revision'])
+                return original(state, expected_revision)
+            with patch.object(self.store, 'save_state', side_effect=contested), self.assertRaises(WorkspaceConflict):
+                self.reader.restore(self.session, 1)
+        self.assertEqual(self.session.current().identifier, IDS[1])
+        self.assertEqual(self.reader.revision, 2)
+        self.assertEqual(self.store.get_state()['current_id'], IDS[2])
+
+    def test_nullable_history_is_displayed_without_a_crash(self):
+        self.store.save_state({'cwd': '/', 'scope': '/', 'current_id': None, 'previous_cwd': None})
+        output = self.reader.execute('workspace', ['history', '--limit', '1'], self.session).text
+        self.assertIn('[no saved passage]', output)
+
+    def test_health_report_is_readonly_and_separates_pending_flags_from_testimony(self):
+        self.session.read((), first=True)
+        self.reader.checkpoint(self.session, (), None)
+        self.book.canonical_records[IDS[0]]['transcription_status'] = 'needs_visual_review'
+        self.reader.execute('review', ['record', 'verified', '--issue', 'Reader testimony only'], self.session)
+        before = self.store.get_state()
+        report = self.reader.health()
+        self.assertEqual(report['counts']['pending_source_review'], 1)
+        self.assertEqual(report['review_provenance_binding'], 'text_and_pdf_fingerprint_only')
+        self.assertEqual(self.store.get_state(), before)
+        self.book.canonical_records.pop(IDS[0])
+        report = self.reader.health()
+        self.assertGreater(report['counts']['unresolved_references'], 0)
+        self.assertEqual(report['status'], 'attention_required')
+
+    def test_review_queue_can_include_editorial_material_and_filter_by_virtual_path(self):
+        self.book.canonical_records[IDS[0]]['transcription_status'] = 'needs_visual_review'
+        self.book.canonical_records[IDS[3]]['transcription_status'] = 'needs_review'
+        rows = self.reader.queue()
+        self.assertEqual({row['id'] for row in rows}, {IDS[0], IDS[3]})
+        self.assertEqual(self.reader.queue(('ESSENCE',)), [])
+        output = self.reader.execute('review', ['queue', '--within', '/being', '--limit', '1'], self.session).text
+        self.assertIn(IDS[0], output)
+        self.assertNotIn(IDS[3], output)
+
+    def test_cli_health_queue_backup_and_historical_resume_are_machine_readable(self):
+        args = ['--workspace', 'reading', '--workspace-dir', str(self.directory)]
+        for identifier in (IDS[0], IDS[1]):
+            status, _, error = self.main(args + ['--passage', identifier])
+            self.assertEqual(status, 0, error)
+        status, output, error = self.main(args + ['--resume', '--resume-revision', '1', '--json'])
+        self.assertEqual(status, 0, error)
+        self.assertEqual(json.loads(output)['id'], IDS[0])
+        self.assertEqual(json.loads(output)['workspace']['revision'], 3)
+        status, output, error = self.main(args + ['--workspace-check', '--json'])
+        self.assertEqual(status, 0, error)
+        self.assertEqual(json.loads(output)['format'], 'sol-workspace-health')
+        self.book.canonical_records[IDS[0]]['transcription_status'] = 'needs_review'
+        status, output, error = self.main(args + ['--review-queue', '--within', '/being', '--limit', '1', '--json'])
+        self.assertEqual(status, 0, error)
+        self.assertEqual(json.loads(output)[0]['id'], IDS[0])
+        destination = self.directory / 'backup.sqlite3'
+        status, output, error = self.main(args + ['--workspace-backup', str(destination), '--json'])
+        self.assertEqual(status, 0, error)
+        self.assertEqual(json.loads(output)['backup'], str(destination))
+        with Workspace(destination, CORPUS_ID, self.provenance) as backup:
+            self.assertEqual(backup.get_state()['revision'], 3)
+
+    def test_queue_without_workspace_uses_no_database_and_backup_never_overwrites(self):
+        self.book.canonical_records[IDS[0]]['transcription_status'] = 'needs_review'
+        with patch('sol_workspace.Workspace', side_effect=AssertionError('No workspace database')):
+            status, output, error = self.main(['--review-queue', '--json'])
+        self.assertEqual(status, 0, error)
+        self.assertEqual(json.loads(output)[0]['id'], IDS[0])
+        destination = self.directory / 'existing.sqlite3'
+        destination.write_bytes(b'A file to preserve')
+        before = self.store.get_state()
+        with self.assertRaises(ValueError):
+            self.reader.execute('workspace', ['backup', str(destination)], self.session)
+        self.assertEqual(destination.read_bytes(), b'A file to preserve')
+        self.assertEqual(self.store.get_state(), before)
+
+    def test_workspace_commands_reject_options_in_the_wrong_context(self):
+        for arguments in [['check', '--limit', '1'], ['backup'], ['history', '/tmp/extra'], ['export', '--limit', '1']]:
+            with self.subTest(arguments=arguments), self.assertRaises(ValueError):
+                self.reader.execute('workspace', arguments, self.session)
+        for args in [['--resume-revision', '1'], ['--workspace-backup', str(self.directory / 'b.sqlite3')],
+                     ['--workspace-check'], ['--word', '--review-queue']]:
+            with self.subTest(args=args):
+                status, _, _ = self.main(args)
+                self.assertEqual(status, 2)
+
+    def test_injected_input_output_uses_same_commands_and_no_readline_or_ui_import(self):
+        commands = iter(['first /being', 'note add "An adapter note."', 'where', 'exit'])
+        stdout = StringIO()
+        prompts = []
+        def read_command(prompt):
+            prompts.append(prompt)
+            return next(commands)
+        def emit(*values, **options):
+            print(*values, file=stdout, **options)
+        with patch('sol.install_completion', side_effect=AssertionError('Custom adapter owns completion')):
+            status = sol.run_shell(self.book, 80, workspace_reader=self.reader,
+                                   read_command=read_command, write_output=emit)
+        self.assertEqual(status, 0)
+        self.assertEqual(len(prompts), 4)
+        self.assertIn('Position 1 of 2', stdout.getvalue())
+        self.assertEqual(self.store.list_annotations()[0]['body'], 'An adapter note.')
+        self.assertEqual(self.store.get_state()['current_id'], IDS[0])
+
+    def test_injected_input_interrupt_and_eof_preserve_workspace(self):
+        commands = iter([KeyboardInterrupt(), EOFError()])
+        def read_command(prompt):
+            raise next(commands)
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            status = sol.run_shell(self.book, 80, workspace_reader=self.reader, read_command=read_command)
+        self.assertEqual(status, 0)
+        self.assertIn("Type 'exit' to leave", stdout.getvalue())
+        self.assertIsNone(self.store.get_state())
+
+    def test_invalid_adapter_result_does_not_fall_back_to_host_input(self):
+        commands = iter([None, 'exit'])
+        stdout = StringIO()
+        with redirect_stdout(stdout), patch('builtins.input', side_effect=AssertionError('No host-input fallback')):
+            status = sol.run_shell(self.book, 80, read_command=lambda prompt: next(commands))
+        self.assertEqual(status, 0)
+        self.assertIn('command input must be text', stdout.getvalue())
+
+    def test_changed_canonical_generation_refuses_writes_without_reading_pdf(self):
+        import sol_corpus_contract as contract
+        from test_packaging import write_runtime_corpus
+        corpus = self.directory / 'actual-corpus'
+        write_runtime_corpus(corpus)
+        contract.initialize_corpus_identity(corpus)
+        book = sol.load_corpus_book(corpus)
+        with Workspace(self.directory / 'guarded.sqlite3', book.corpus_manifest['corpus_id'],
+                       {'source': book.corpus_manifest['source']}, actor='Ada') as store:
+            reader = WorkspaceReader(book, store, 'Ada', sol.resolve_path, sol.display_path, sol.render_passage)
+            session = sol.ReadingSession(book)
+            session.read((), first=True)
+            reader.checkpoint(session, (), None)
+            self.assertEqual(reader.corpus_freshness()['state'], 'current')
+            document = corpus / 'sample.md'
+            document.write_text(document.read_text(encoding='utf-8') + '\n', encoding='utf-8')
+            with patch('sol.load_book', side_effect=AssertionError('Never read the PDF')):
+                with self.assertRaisesRegex(ValueError, 'loaded corpus changed'):
+                    reader.execute('note', ['add', 'Preserve against stale generation'], session)
+                with self.assertRaisesRegex(ValueError, 'loaded corpus changed'):
+                    reader.checkpoint(session, (), None)
+            self.assertEqual(store.list_annotations(), [])
+            self.assertEqual(store.get_state()['revision'], 1)
+            report = reader.health()
+            self.assertEqual(report['corpus_freshness']['state'], 'changed')
+            self.assertEqual(report['status'], 'attention_required')
 
 
 if __name__ == '__main__':

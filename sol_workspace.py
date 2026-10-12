@@ -13,6 +13,8 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import tempfile
+import time
 from typing import Any, Iterator
 import unicodedata
 from uuid import UUID, uuid4
@@ -372,6 +374,8 @@ class Workspace:
         if state is not None and connection.execute(
                 "SELECT COUNT(*) FROM state_history").fetchone()[0] != state["revision"]:
             raise WorkspaceError("reading checkpoint history has missing revisions")
+        for row in connection.execute("SELECT * FROM state_history ORDER BY revision"):
+            self._history(row)
         self.list_bookmarks()
         self.list_annotations()
         self.list_comparisons()
@@ -494,6 +498,14 @@ class Workspace:
         return [self._history(row) for row in self._all(
             "SELECT * FROM state_history ORDER BY revision DESC LIMIT ?", (limit,))]
 
+    def get_history(self, revision: int) -> dict | None:
+        if type(revision) is not int or revision < 1:
+            raise WorkspaceError("history revision must be a positive integer")
+        if revision > 2 ** 63 - 1:
+            return None
+        row = self._one("SELECT * FROM state_history WHERE revision = ?", (revision,))
+        return None if row is None else self._history(row)
+
     def set_bookmark(self, name: str, target_id: str, replace: bool = False) -> dict:
         name, target_id = _string(name, "bookmark name"), _uuid(target_id)
         if type(replace) is not bool:
@@ -615,11 +627,22 @@ class Workspace:
         return record
 
     def get_comparison(self, name: str) -> dict | None:
-        return self._comparison(self._one("SELECT * FROM comparisons WHERE name = ?",
-                                         (_string(name, "comparison name"),)))
+        name = _string(name, "comparison name")
+        with self._snapshot():
+            return self._comparison(self._one("SELECT * FROM comparisons WHERE name = ?", (name,)))
 
     def list_comparisons(self) -> list[dict]:
-        return [self._comparison(row) for row in self._all("SELECT * FROM comparisons ORDER BY name")]
+        with self._snapshot():
+            return [self._comparison(row) for row in self._all("SELECT * FROM comparisons ORDER BY name")]
+
+    @contextmanager
+    def _snapshot(self) -> Iterator[None]:
+        """Join an existing transaction, otherwise hold one coherent read view."""
+        if self._db().in_transaction:
+            yield
+        else:
+            with self._transaction(write=False):
+                yield
 
     def delete_comparison(self, name: str) -> bool:
         return self._delete("comparisons", "name", _string(name, "comparison name"))
@@ -680,6 +703,89 @@ class Workspace:
 
     def delete_relation(self, identifier: str) -> bool:
         return self._delete("relations", "id", _uuid(identifier, "relation identifier"))
+
+    def backup(self, destination: str | Path) -> Path:
+        """Publish a verified SQLite snapshot without overwriting any path.
+
+        The destination directory must already exist. The same-directory staged
+        file is published by an exclusive hard link; unsupported filesystems fail
+        closed rather than falling back to an overwrite-capable rename.
+        """
+        source = self._db()
+        if source.in_transaction:
+            raise WorkspaceError("finish the active workspace transaction before creating a backup")
+        if not isinstance(destination, (str, Path)):
+            raise WorkspaceError("backup destination must be a filesystem path")
+        target = Path(destination).expanduser().absolute()
+        _string(str(target), "backup destination")
+        if target.suffix.lower() != ".sqlite3":
+            raise WorkspaceError("backup destination must end in .sqlite3")
+        staged: Path | None = None
+        published = False
+        completed = False
+        try:
+            if target.is_symlink():
+                raise WorkspaceError("backup destination must not be a symbolic link")
+            if target.resolve() == self.path.resolve() or (
+                    target.exists() and os.path.samefile(target, self.path)):
+                raise WorkspaceError("backup destination must not refer to the source workspace")
+            if target.exists():
+                raise WorkspaceError("backup destination already exists; choose a new filename")
+            if not target.parent.is_dir():
+                raise WorkspaceError("backup destination directory must already exist")
+            descriptor, temporary = tempfile.mkstemp(
+                prefix=".sol-backup-", suffix=".sqlite3", dir=target.parent)
+            staged = Path(temporary)
+            try:
+                if hasattr(os, "fchmod"):
+                    os.fchmod(descriptor, 0o600)
+            finally:
+                os.close(descriptor)
+            deadline = time.monotonic() + 30
+
+            def progress(status: int, remaining: int, total: int) -> None:
+                if time.monotonic() > deadline:
+                    raise WorkspaceError("workspace backup timed out; no backup was published")
+
+            snapshot = sqlite3.connect(staged.as_uri() + "?mode=rw", uri=True, isolation_level=None)
+            try:
+                source.backup(snapshot, pages=128, progress=progress, sleep=0.05)
+            finally:
+                snapshot.close()
+            # Opening an already initialized workspace performs only read checks.
+            with Workspace(staged, self.corpus_id, self.provenance, self.actor):
+                pass
+            with staged.open("rb") as handle:
+                os.fsync(handle.fileno())
+            try:
+                os.link(staged, target)
+            except FileExistsError as error:
+                raise WorkspaceError("backup destination already exists; choose a new filename") from error
+            published = True
+            if hasattr(os, "O_DIRECTORY"):
+                directory_fd = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
+            completed = True
+            return target
+        except (sqlite3.Error, OSError) as error:
+            raise WorkspaceError(f"cannot create workspace backup: {error}") from error
+        finally:
+            # Delete only the private files created for this operation. If an
+            # exception followed publication, remove our link only while its inode
+            # still matches the staging file; never remove a replacement file.
+            if staged is not None:
+                if not completed and published:
+                    try:
+                        if os.path.samefile(staged, target):
+                            target.unlink()
+                    except FileNotFoundError:
+                        pass
+                for path in (staged, Path(str(staged) + "-journal"),
+                             Path(str(staged) + "-wal"), Path(str(staged) + "-shm")):
+                    path.unlink(missing_ok=True)
 
     def export(self) -> dict:
         """A consistent portable snapshot containing references, not corpus text."""

@@ -20,6 +20,7 @@ import zipfile
 MODULES = {
     "sol", "sol_corpus", "sol_corpus_contract", "sol_corpus_notes",
     "sol_corpus_references", "sol_corpus_structure", "sol_workspace", "sol_workspace_reader",
+    "sol_workspace_diagnostics",
 }
 ENTRY_POINTS = {
     "sol": "sol:cli",
@@ -33,7 +34,7 @@ PUBLIC_FILES = {
 } | {module + ".py" for module in MODULES}
 
 
-def write_runtime_corpus(directory):
+def write_runtime_corpus(directory, *, pending_review=False):
     """Create a valid tiny index using stdlib only, without a source PDF."""
     import sol_corpus_contract as contract
 
@@ -50,6 +51,8 @@ def write_runtime_corpus(directory):
                "order": 0, "title": "Synthetic section", "path": "/synthetic"}
     paragraph = {**common, "id": passage_id, "type": "paragraph",
                  "parent_id": section_id, "order": 1}
+    if pending_review:
+        paragraph["transcription_status"] = "needs_review"
     markdown = "\n".join((
         contract.render_record(section, "# Synthetic section"),
         contract.render_record(paragraph, body),
@@ -248,7 +251,7 @@ raise SystemExit(sol.cli(sys.argv[2:]))
         with zipfile.ZipFile(self.wheel) as archive:
             archive.extractall(installed)
         corpus = Path(self.temporary.name) / "workspace-corpus"
-        passage_id, body = write_runtime_corpus(corpus)
+        passage_id, body = write_runtime_corpus(corpus, pending_review=True)
         storage = Path(self.temporary.name) / "workspace-storage"
         elsewhere = Path(self.temporary.name) / "workspace-outside-checkout"
         elsewhere.mkdir()
@@ -278,12 +281,12 @@ else:
 raise SystemExit(entry(sys.argv[3:]))
 """
 
-        def run(module, arguments):
+        def run(module, arguments, *, expected_status=0):
             result = subprocess.run(
                 [sys.executable, "-I", "-c", program, str(installed), module, *arguments],
                 cwd=elsewhere, env=environment, capture_output=True, text=True,
             )
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(result.returncode, expected_status, result.stdout + result.stderr)
             self.assertNotIn("\x1b", result.stdout)
             return result.stdout
 
@@ -300,11 +303,43 @@ raise SystemExit(entry(sys.argv[3:]))
         self.assertEqual(resumed["workspace"]["revision"], first["workspace"]["revision"])
         plain = run("sol", [*arguments, "--resume", "--plain"])
         self.assertEqual(" ".join(plain.split()), body)
+        second = json.loads(run("sol", [*arguments, "--first", "/being", "--json"]))
+        historical = json.loads(run("sol", [*arguments, "--resume", "--resume-revision",
+                                             str(first["workspace"]["revision"]), "--json"]))
+        self.assertEqual(historical["id"], passage_id)
+        self.assertEqual(historical["workspace"]["revision"], second["workspace"]["revision"] + 1)
+        health = json.loads(run("sol", [*arguments, "--workspace-check", "--json"]))
+        self.assertEqual(health["format"], "sol-workspace-health")
+        self.assertEqual(health["status"], "no_workspace_issues_detected")
+        self.assertEqual(health["corpus_freshness"]["state"], "current")
+        self.assertEqual(health["counts"]["pending_source_review"], 1)
+        self.assertEqual(health["review_provenance_binding"], "text_and_pdf_fingerprint_only")
+        for scope in (["--corpus", str(corpus)], arguments):
+            queue = json.loads(run("sol", [*scope, "--review-queue", "--within", "/being",
+                                          "--limit", "1", "--json"]))
+            self.assertEqual([record["id"] for record in queue], [passage_id])
+            self.assertEqual(queue[0]["transcription_status"], "needs_review")
+        backup = storage / "wheel-study-backup.sqlite3"
+        backed_up = json.loads(run("sol", [*arguments, "--workspace-backup", str(backup), "--json"]))
+        self.assertEqual(backed_up["backup"], str(backup))
+        self.assertEqual(backed_up["corpus_id"], identity)
+        if os.name == "posix":
+            self.assertEqual(backup.stat().st_mode & 0o777, 0o600)
+        backup_digest = hashlib.sha256(backup.read_bytes()).hexdigest()
+        run("sol", [*arguments, "--workspace-backup", str(backup)], expected_status=2)
+        self.assertEqual(hashlib.sha256(backup.read_bytes()).hexdigest(), backup_digest)
+        backup_arguments = ["--corpus", str(corpus), "--workspace", "wheel-study-backup",
+                            "--workspace-dir", str(storage)]
+        restored_backup = json.loads(run("sol", [*backup_arguments, "--resume", "--json"]))
+        self.assertEqual(restored_backup["workspace"]["revision"], historical["workspace"]["revision"])
+        backup_export = json.loads(run("sol", [*backup_arguments, "--workspace-export"]))
+        self.assertEqual(len(backup_export["history"]), 3)
         exported = json.loads(run("sol", [*arguments, "--workspace-export"]))
         self.assertEqual(exported["format"], "sol-workspace")
         self.assertEqual(exported["corpus_id"], identity)
         self.assertEqual(exported["state"]["current_id"], passage_id)
         self.assertEqual(exported["history"][0]["actor"], "Installed reader")
+        self.assertEqual(exported["history"], backup_export["history"])
         self.assertTrue((storage / "wheel-study.sqlite3").is_file())
 
 

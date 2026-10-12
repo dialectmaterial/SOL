@@ -13,7 +13,7 @@ from unittest.mock import patch
 from uuid import UUID
 
 from sol_workspace import (
-    APPLICATION_ID, SCHEMA_VERSION, Workspace, WorkspaceConflict, WorkspaceError,
+    APPLICATION_ID, SCHEMA_VERSION, Workspace, WorkspaceConflict, WorkspaceError, _SCHEMA,
 )
 
 
@@ -33,6 +33,24 @@ PROVENANCE = {
 def state(current_id=A, cwd="/BEING", scope="/BEING", previous_cwd="/"):
     return {"cwd": cwd, "scope": scope, "current_id": current_id,
             "previous_cwd": previous_cwd}
+
+
+class BackupProxy:
+    """Inject a backup event without changing SQLite's actual connections."""
+    def __init__(self, connection, backup):
+        self.connection, self.run_backup = connection, backup
+
+    def __getattr__(self, name):
+        return getattr(self.connection, name)
+
+    def backup(self, *arguments, **options):
+        return self.run_backup(*arguments, **options)
+
+
+def stable_export(workspace):
+    exported = workspace.export()
+    exported.pop("exported_at")
+    return exported
 
 
 class WorkspaceTests(unittest.TestCase):
@@ -133,6 +151,19 @@ class WorkspaceTests(unittest.TestCase):
             with self.subTest(limit=limit), self.assertRaises(WorkspaceError):
                 self.workspace.list_history(limit)
 
+    def test_get_history_returns_exact_revision_without_changing_state(self):
+        self.workspace.save_state(state(A), None)
+        self.workspace.save_state(state(B), 1)
+        before = stable_export(self.workspace)
+        self.assertEqual(self.workspace.get_history(1)["current_id"], A)
+        self.assertEqual(self.workspace.get_history(2)["current_id"], B)
+        self.assertIsNone(self.workspace.get_history(3))
+        self.assertIsNone(self.workspace.get_history(2 ** 100))
+        for value in (0, -1, True, False, "1", 1.0, None):
+            with self.subTest(value=value), self.assertRaises(WorkspaceError):
+                self.workspace.get_history(value)
+        self.assertEqual(stable_export(self.workspace), before)
+
     def test_bookmark_creation_replacement_and_deletion(self):
         first = self.workspace.set_bookmark("beginning", A)
         self.assertEqual(first["corpus_id"], CORPUS_ID)
@@ -206,6 +237,37 @@ class WorkspaceTests(unittest.TestCase):
         finally:
             connection.execute("DROP TRIGGER fail_comparison")
         self.assertEqual(self.reopen().get_comparison("contrast"), original)
+
+    def test_comparison_reads_are_consistent_during_concurrent_wal_replacement(self):
+        self.workspace._connection.execute("PRAGMA journal_mode = WAL")
+        other = self.reopen()
+        for operation in ("get", "list"):
+            name = "snapshot-" + operation
+            original = self.workspace.save_comparison(name, [A], "Original question")
+            read_all = self.workspace._all
+            replaced = False
+
+            def interleave(sql, parameters=()):
+                nonlocal replaced
+                if "FROM comparison_items" in sql and not replaced:
+                    replaced = True
+                    other.save_comparison(name, [B, C], "Different question", replace=True)
+                return read_all(sql, parameters)
+
+            with self.subTest(operation=operation), patch.object(
+                    self.workspace, "_all", side_effect=interleave):
+                if operation == "get":
+                    observed = self.workspace.get_comparison(name)
+                else:
+                    observed = next(item for item in self.workspace.list_comparisons()
+                                    if item["name"] == name)
+                self.assertEqual(observed, original)
+            self.assertTrue(replaced)
+            current = self.workspace.get_comparison(name)
+            self.assertEqual(current["question"], "Different question")
+            self.assertEqual(current["target_ids"], [B, C])
+        self.assertFalse(self.workspace._connection.in_transaction)
+        self.assertEqual(len(self.workspace.export()["comparisons"]), 2)
 
     def test_checkpoint_and_history_roll_back_together(self):
         self.workspace.save_state(state(), None)
@@ -399,6 +461,179 @@ class WorkspaceTests(unittest.TestCase):
             "VALUES('bad','not-a-uuid','Reader','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')")
         with self.assertRaisesRegex(WorkspaceError, "UUID"):
             self.reopen()
+
+    def corrupt_old_history(self):
+        connection = self.workspace._connection
+        self.workspace.save_state(state(A), None)
+        self.workspace.save_state(state(B), 1)
+        connection.execute("DROP TRIGGER history_no_update")
+        connection.execute("UPDATE state_history SET current_id='not-a-uuid' WHERE revision=1")
+        connection.execute(next(sql for sql in _SCHEMA if sql.startswith(
+            "CREATE TRIGGER history_no_update")))
+
+    def test_older_history_values_are_validated_without_changing_rejected_database(self):
+        self.corrupt_old_history()
+        before = self.path.read_bytes()
+        with self.assertRaisesRegex(WorkspaceError, "UUID"):
+            self.reopen()
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_backup_is_complete_private_v1_snapshot_and_preserves_source(self):
+        self.workspace.save_state(state(A), None)
+        self.workspace.save_state(state(B), 1)
+        self.workspace.set_bookmark("start", A)
+        self.workspace.add_annotation(A, "A personal thought.", CONTENT_SHA)
+        self.workspace.save_comparison("pair", [B, A], "How do these compare?")
+        self.workspace.add_review(A, "inspected", "A testimony.", CONTENT_SHA, SOURCE_SHA)
+        self.workspace.add_relation(A, B, "contrasts", "My interpretation.")
+        expected = stable_export(self.workspace)
+        original = self.path.read_bytes()
+        destination = self.root / "snapshot.sqlite3"
+        self.assertEqual(self.workspace.backup(destination), destination)
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(stable_export(self.workspace), expected)
+        if os.name == "posix":
+            self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
+        with Workspace(destination, CORPUS_ID, PROVENANCE) as copied:
+            self.assertEqual(stable_export(copied), expected)
+            source_definitions = self.workspace._all(
+                "SELECT name,sql FROM sqlite_master ORDER BY name")
+            copy_definitions = copied._all("SELECT name,sql FROM sqlite_master ORDER BY name")
+            self.assertEqual([tuple(row) for row in source_definitions],
+                             [tuple(row) for row in copy_definitions])
+        self.assertEqual(list(self.root.glob(".sol-backup-*")), [])
+
+    def test_backup_keeps_uncheckpointed_wal_data(self):
+        self.workspace._connection.execute("PRAGMA journal_mode = WAL")
+        self.workspace.save_state(state(A), None)
+        self.workspace.set_bookmark("in-wal", A)
+        self.assertGreater(Path(str(self.path) + "-wal").stat().st_size, 0)
+        expected = stable_export(self.workspace)
+        destination = self.root / "wal-snapshot.sqlite3"
+        self.workspace.backup(destination)
+        with Workspace(destination, CORPUS_ID, PROVENANCE) as copied:
+            self.assertEqual(stable_export(copied), expected)
+        self.assertEqual(stable_export(self.workspace), expected)
+        self.assertEqual(list(self.root.glob(".sol-backup-*")), [])
+
+    def test_backup_snapshot_stays_coherent_during_wal_writer(self):
+        self.workspace._connection.execute("PRAGMA journal_mode = WAL")
+        self.workspace.save_state(state(A), None)
+        self.workspace.save_comparison("pair", [A], "First question")
+        other = self.reopen()
+        connection = self.workspace._connection
+        wrote = False
+
+        def interleaved_backup(target, **options):
+            def progress(status, remaining, total):
+                nonlocal wrote
+                if remaining and not wrote:
+                    wrote = True
+                    other.save_state(state(B), 1)
+                    other.save_comparison("pair", [B, C], "Later question", replace=True)
+                options["progress"](status, remaining, total)
+            return connection.backup(target, pages=1, progress=progress, sleep=0.001)
+
+        destination = self.root / "concurrent.sqlite3"
+        with patch.object(self.workspace, "_connection", BackupProxy(connection, interleaved_backup)):
+            self.workspace.backup(destination)
+        self.assertTrue(wrote)
+        with Workspace(destination, CORPUS_ID, PROVENANCE) as copied:
+            self.assertEqual(stable_export(copied), stable_export(other))
+            self.assertEqual(copied.get_state()["current_id"], B)
+            self.assertEqual(copied.get_comparison("pair")["target_ids"], [B, C])
+
+    def test_backup_refuses_existing_targets_source_aliases_and_invalid_paths(self):
+        existing = self.root / "existing.sqlite3"
+        existing.write_bytes(b"Preserve this unrelated file.")
+        link = self.root / "alias.sqlite3"
+        os.link(self.path, link)
+        symbolic = self.root / "symbolic.sqlite3"
+        symbolic.symlink_to(self.path)
+        dangling = self.root / "dangling.sqlite3"
+        dangling.symlink_to(self.root / "absent.sqlite3")
+        destination_dir = self.root / "directory.sqlite3"
+        destination_dir.mkdir()
+        targets = [existing, self.path, link, symbolic, dangling, destination_dir,
+                   self.root / "wrong.txt", self.root / "missing-dir" / "new.sqlite3", None]
+        original = self.path.read_bytes()
+        for destination in targets:
+            with self.subTest(destination=destination), self.assertRaises(WorkspaceError):
+                self.workspace.backup(destination)
+        self.assertEqual(existing.read_bytes(), b"Preserve this unrelated file.")
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertTrue(symbolic.is_symlink())
+        self.assertTrue(dangling.is_symlink())
+        self.assertFalse((self.root / "missing-dir").exists())
+        self.assertEqual(list(self.root.glob(".sol-backup-*")), [])
+
+    def test_backup_publication_race_preserves_the_competing_file(self):
+        destination = self.root / "raced.sqlite3"
+        link = os.link
+
+        def competitor(staged, target):
+            destination.write_bytes(b"Another process owns this file.")
+            return link(staged, target)
+
+        with patch("sol_workspace.os.link", side_effect=competitor), \
+                self.assertRaisesRegex(WorkspaceError, "already exists"):
+            self.workspace.backup(destination)
+        self.assertEqual(destination.read_bytes(), b"Another process owns this file.")
+        self.assertEqual(list(self.root.glob(".sol-backup-*")), [])
+
+    def test_backup_sqlite_failure_and_timeout_publish_nothing_and_clean_staging(self):
+        connection = self.workspace._connection
+        original = self.path.read_bytes()
+
+        def failed_backup(*arguments, **options):
+            raise sqlite3.OperationalError("synthetic backup failure")
+
+        destination = self.root / "failed.sqlite3"
+        with patch.object(self.workspace, "_connection", BackupProxy(connection, failed_backup)), \
+                self.assertRaisesRegex(WorkspaceError, "synthetic backup failure"):
+            self.workspace.backup(destination)
+        self.assertFalse(destination.exists())
+        self.assertEqual(list(self.root.glob(".sol-backup-*")), [])
+        with patch("sol_workspace.time.monotonic", side_effect=[0, 31]), \
+                self.assertRaisesRegex(WorkspaceError, "timed out"):
+            self.workspace.backup(destination)
+        self.assertFalse(destination.exists())
+        self.assertEqual(list(self.root.glob(".sol-backup-*")), [])
+        self.assertEqual(self.path.read_bytes(), original)
+
+    def test_backup_fsync_failures_before_and_after_publication_remove_own_artifacts(self):
+        original = self.path.read_bytes()
+        for label, failures in (("file", [OSError("synthetic fsync failure")]),
+                                ("directory", [None, OSError("synthetic fsync failure")])):
+            if label == "directory" and not hasattr(os, "O_DIRECTORY"):
+                continue
+            destination = self.root / (label + ".sqlite3")
+            with self.subTest(label=label), patch("sol_workspace.os.fsync", side_effect=failures), \
+                    self.assertRaisesRegex(WorkspaceError, "synthetic fsync failure"):
+                self.workspace.backup(destination)
+            self.assertFalse(destination.exists())
+            self.assertEqual(list(self.root.glob(".sol-backup-*")), [])
+            self.assertEqual(self.path.read_bytes(), original)
+
+    def test_backup_rejects_damaged_old_history_without_final_publication(self):
+        self.corrupt_old_history()
+        original = self.path.read_bytes()
+        destination = self.root / "damaged.sqlite3"
+        with self.assertRaisesRegex(WorkspaceError, "UUID"):
+            self.workspace.backup(destination)
+        self.assertFalse(destination.exists())
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(list(self.root.glob(".sol-backup-*")), [])
+
+    def test_backup_rejects_active_transaction_and_closed_workspace(self):
+        destination = self.root / "inactive.sqlite3"
+        with self.workspace._transaction(write=False):
+            with self.assertRaisesRegex(WorkspaceError, "active"):
+                self.workspace.backup(destination)
+        self.workspace.close()
+        with self.assertRaisesRegex(WorkspaceError, "closed"):
+            self.workspace.backup(destination)
+        self.assertFalse(destination.exists())
 
     def test_export_is_portable_independent_and_contains_no_canonical_text(self):
         self.workspace.save_state(state(), None)

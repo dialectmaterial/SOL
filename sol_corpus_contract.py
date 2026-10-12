@@ -736,6 +736,15 @@ def load_snapshot(corpus_dir: Path | str, index: Path | str | None = None) -> Co
     return snapshot
 
 
+def verify_snapshot_current(snapshot: CorpusSnapshot) -> None:
+    """Refuse changes to the loaded canonical generation, without reading its PDF.
+
+    Long-lived readers call this before recording version-sensitive work. It does
+    not reload, reindex, repair, or silently replace a reader's active snapshot.
+    """
+    _assert_snapshot_unchanged(snapshot)
+
+
 def load_index(corpus_dir: Path | str, verify: bool = True, index: Path | str | None = None) -> list[dict]:
     """Load derived JSONL, refusing stale/tampered indexes by default (no PDF I/O)."""
     if verify:

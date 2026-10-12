@@ -2,7 +2,7 @@ include README.md CORPUS.md INTERFACE_RESEARCH.md WORKSPACE_PLAN.md
 include requirements-corpus.txt pyproject.toml MANIFEST.in
 include sol.py sol_corpus.py sol_corpus_contract.py
 include sol_corpus_notes.py sol_corpus_references.py sol_corpus_structure.py
-include sol_workspace.py sol_workspace_reader.py
+include sol_workspace.py sol_workspace_reader.py sol_workspace_diagnostics.py
 recursive-include tests *.py
 exclude AGENTS.md
 prune sources

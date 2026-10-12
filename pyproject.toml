@@ -41,4 +41,5 @@ py-modules = [
     "sol_corpus_structure",
     "sol_workspace",
     "sol_workspace_reader",
+    "sol_workspace_diagnostics",
 ]

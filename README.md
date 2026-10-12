@@ -176,7 +176,7 @@ Initialization adds a permanent corpus UUID and updates its index metadata witho
 
 New conversions already include a corpus identity; this command retains it when present and initializes an older corpus once.
 
-A workspace restores its saved passage and reading scope when reopened. Browsing with `cd` does not erase that scope or cursor. `workspace history` preserves earlier checkpoints as visits, not claims that a passage was understood.
+A workspace restores its saved passage and reading scope when reopened. Browsing with `cd` does not erase that scope or cursor. `workspace history --limit 10` preserves earlier checkpoints as visits, not claims that a passage was understood. `resume REVISION` revisits a historical checkpoint as a new saved revision; it does not erase later history.
 
 ~~~text
 first /being
@@ -187,12 +187,13 @@ review record inspected --issue "Inspected the canonical record; PDF comparison 
 cd /essence
 where
 bookmark open starting-point
-workspace history
+workspace history --limit 10
+workspace check
 ~~~
 
 Use `bookmark list`, `bookmark set NAME`, or `bookmark remove NAME` to inspect, deliberately replace, or remove a bookmark. Bookmarks target readable passages. `note list` shows personal annotations, not the edition's notes; `note show NOTE_ID` opens one. Annotation Markdown is stored and displayed literally. Notes target whole records, not selected words. `--on ID` can select an explicit record for a note or review instead of the current passage.
 
-Notes, comparisons, review decisions, and relations require an explicit `--actor NAME`. Comparisons preserve an ordered set of record IDs and a question. Relations are directed, attributed assertions alongside the published tree:
+Notes, comparisons, review decisions, and relations require an explicit `--actor NAME`. Comparisons preserve an ordered set of record IDs and a question. Relations are directed, attributed assertions alongside the published tree. Their references point to live canonical records, not frozen quotations or captured endpoint versions:
 
 ~~~text
 compare save inquiry ID_A ID_B --question "How do these determinations differ?"
@@ -201,17 +202,36 @@ relate add ID_A compares-with ID_B --reason "A connection to investigate, not an
 relate list
 ~~~
 
-Replace `ID_A` and `ID_B` with displayed record UUIDs or unambiguous prefixes. `compare list`, `review list`, and `relate list` inspect saved work without moving the reading cursor. Review outcomes are `inspected`, `correction_needed`, and `verified`. A reader's `verified` testimony never changes canonical transcription status or random eligibility; changed text or a retired target makes the saved review stale. Missing and retired references remain visible rather than being matched by similar wording.
+Replace `ID_A` and `ID_B` with displayed record UUIDs or unambiguous prefixes. `compare list`, `review list`, and `relate list` inspect saved work without moving the reading cursor. Review outcomes are `inspected`, `correction_needed`, and `verified`. A reader's `verified` testimony never changes canonical transcription status or random eligibility. Version 1 compares the inspected Markdown digest and declared PDF fingerprint, not every attribution or page-location field. Matching fingerprints are not proof of a correct transcription. Missing and retired references remain visible rather than being matched by similar wording.
 
 Resume or export outside the shell:
 
 ~~~sh
 sol --workspace quantity-study --resume
 sol --workspace quantity-study --resume --json
+sol --workspace quantity-study --resume --resume-revision 1
+sol --workspace quantity-study --workspace-check --json
+sol --workspace quantity-study --workspace-backup quantity-study-backup.sqlite3
 sol --workspace quantity-study --workspace-export > quantity-study.sol-workspace.json
 ~~~
 
+Choose the historical revision from `workspace history`. Health checks report saved-reference issues without repairing them or verifying the source text. If canonical files change while SOL is open, saved-position and authored writes are refused until you reopen it, reindexing explicitly if needed. The generation guard checks the manifest, index and canonical Markdown, not PDF or facsimile image bytes.
+
+Backup uses SQLite's online snapshot mechanism, verifies the result, and never overwrites an existing file. Its destination parent must already exist; new backups use mode `0600` on POSIX systems. To inspect the example backup with the same corpus selected, use `sol --workspace quantity-study-backup --workspace-dir . --resume`. This opens a separate workspace and leaves the original untouched. CLI backup and inspection still require a valid selected corpus. Automatic restore, import, and recovery without that corpus are not implemented.
+
 Export always writes JSON to standard output. Keep the `.sol-workspace.json` suffix so personal exports remain excluded from Git and source archives. Each workspace is a separate local SQLite database under `$XDG_DATA_HOME/sol/workspaces`, or `~/.local/share/sol/workspaces`; `--workspace-dir DIRECTORY` selects another location. It is bound to the corpus UUID and source fingerprint, not merely the PDF filename or directory. A mismatched corpus is refused. The workspace does not edit or automatically synchronize the book. See [the workspace plan](WORKSPACE_PLAN.md) for implemented boundaries and next steps.
+
+## Work through a source-review queue
+
+Inspect pending canonical records without opening a workspace:
+
+~~~sh
+sol --review-queue --limit 10
+sol --review-queue --within /being --limit 8 --json
+sol --workspace quantity-study --review-queue --json
+~~~
+
+The unscoped queue includes flagged canonical records across all attribution roles, including edition notes and editorial material. `--within PATH` selects records with matching virtual reader paths; omit it to include records without one. `--limit` accepts 1 to 1000 and defaults to 20. A selected workspace adds reader testimony, but even a reader's `verified` outcome never hides a canonical pending flag. Inside the workspace shell, use `review queue --limit 10` or `review queue --within /being --limit 8`.
 
 ## Maintain and review the corpus
 
