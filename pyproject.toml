@@ -43,6 +43,7 @@ py-modules = [
     "sol_workspace",
     "sol_workspace_reader",
     "sol_workspace_diagnostics",
+    "sol_workspace_catalog",
     "sol_prompt",
     "sol_profiles",
 ]

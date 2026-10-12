@@ -258,12 +258,16 @@ incompatible corpus instead of guessing that equal source filenames imply equal
 records. Missing references remain unresolved, and retired IDs retain their
 original identity while exposing redirect targets.
 
-Default shell onboarding selects a workspace and requires an actor label;
+Default shell onboarding offers up to ten recognized workspaces for the selected
+corpus identity and source fingerprint, inspecting candidates read-only and sorting
+by their latest recorded activity. A displayed number selects a workspace; an
+entered name receives normal workspace validation. `-n` and `-r` do not consult
+this catalog. Onboarding also requires an actor label;
 `--workspace NAME` and `--actor NAME` each skip only their corresponding question.
 Accepted actor labels are kept separately in `$XDG_DATA_HOME/sol/profiles.sqlite3`,
 or `~/.local/share/sol/profiles.sqlite3`. These are local attribution labels, not
 authenticated accounts or operating-system identities. Registering a new label
-does not rewrite older authors or alter workspace schema version 1. Read-only
+does not rewrite older authors or migrate a workspace. Read-only
 one-shot workspace commands do not require or create an actor profile.
 
 Reader annotations, comparison questions, directed relations, and review decisions
@@ -271,7 +275,18 @@ retain their explicit actor attribution. Whole-record annotation bodies are lite
 Markdown, separate from the edition's notes. Optional `note draft [--on ID]` captures
 the target UUID and text digest before input, accepts an explicit save, and refuses
 changed targets or corpus generations before inserting one new note. Cancelled
-drafts are discarded; existing-note editing is not implemented. Review events bind
+drafts are discarded. New workspaces use schema version 2, retaining append-only
+annotation snapshots. `note edit NOTE_ID` uses the enhanced multiline editor;
+basic input requires `note edit NOTE_ID "TEXT" --expect-revision N`. Saving requires
+the original actor and an unchanged note revision and corpus generation. The
+original target and inspected-text digest are retained. `note history NOTE_ID`
+shows saved bodies; a no-op save adds none. Existing version-1 workspaces remain
+unchanged on open and still support reading and new notes. Explicit
+`workspace upgrade FILE.sqlite3` or `sol --workspace NAME --workspace-upgrade FILE.sqlite3`
+creates a verified version-2 copy without replacing the original or switching an
+open session. Legacy notes receive their current body as a baseline, with no
+invented editor or preceding edit history. None of this modifies canonical Markdown.
+Review events bind
 the inspected Markdown digest and declared PDF fingerprint, not complete attribution
 or source-location metadata. The reader distinguishes matching and stale bindings
 and conservatively marks reviews of retired targets stale. `verified`
@@ -280,7 +295,9 @@ remains a reader's testimony, not a change to canonical
 Markdown followed by reindexing.
 
 `sol --workspace NAME --workspace-export` writes a consistent JSON snapshot of
-workspace references, authored records, and history to standard output. Use the
+workspace references, authored records, and history to standard output. Version-2
+exports include `annotation_history`; version-1 exports retain their schema version
+without synthetic history. Use the
 `.sol-workspace.json` suffix for exported files so they remain excluded from Git
 and source archives. Export is available; importing, selected-span anchoring, and
 a full-screen review interface remain future work. See

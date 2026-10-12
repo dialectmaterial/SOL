@@ -20,7 +20,7 @@ import unicodedata
 from uuid import UUID, uuid4
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 APPLICATION_ID = 0x534F4C57  # SOLW
 REVIEW_OUTCOMES = ("inspected", "correction_needed", "verified")
 
@@ -228,44 +228,99 @@ _DEFINITIONS = {
     for statement in _SCHEMA
 }
 
+# Version 1 remains an exact, recognized format. Version 2 only adds an audit
+# ledger and protections; permanent annotation provenance is not a revision.
+_ANNOTATION_SCHEMA = (
+    """CREATE TABLE annotation_history (
+        annotation_id TEXT NOT NULL REFERENCES annotations(id),
+        revision INTEGER NOT NULL CHECK (revision > 0),
+        target_id TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL, body TEXT NOT NULL, content_sha256 TEXT,
+        editor TEXT, recorded_at TEXT NOT NULL, kind TEXT NOT NULL,
+        PRIMARY KEY (annotation_id, revision)
+    )""",
+    """CREATE TRIGGER annotation_history_no_update BEFORE UPDATE ON annotation_history
+        BEGIN SELECT RAISE(ABORT, 'annotation history is append-only'); END""",
+    """CREATE TRIGGER annotation_history_no_delete BEFORE DELETE ON annotation_history
+        BEGIN SELECT RAISE(ABORT, 'annotation history is append-only'); END""",
+    """CREATE TRIGGER annotations_no_delete BEFORE DELETE ON annotations
+        BEGIN SELECT RAISE(ABORT, 'audited annotations cannot be deleted'); END""",
+    """CREATE TRIGGER annotations_provenance BEFORE UPDATE ON annotations
+        WHEN NEW.id IS NOT OLD.id OR NEW.target_id IS NOT OLD.target_id
+          OR NEW.actor IS NOT OLD.actor OR NEW.created_at IS NOT OLD.created_at
+          OR NEW.content_sha256 IS NOT OLD.content_sha256
+          OR NEW.workspace_id IS NOT OLD.workspace_id
+        BEGIN SELECT RAISE(ABORT, 'annotation provenance is immutable'); END""",
+    """CREATE TRIGGER annotations_audited_update BEFORE UPDATE ON annotations
+        WHEN NOT EXISTS (
+          SELECT 1 FROM annotation_history WHERE annotation_id = OLD.id
+            AND revision = (SELECT MAX(revision) FROM annotation_history WHERE annotation_id = OLD.id)
+            AND body IS NEW.body AND updated_at IS NEW.updated_at)
+        BEGIN SELECT RAISE(ABORT, 'annotation update needs an audited snapshot'); END""",
+)
+_V2_COLUMNS = {**_COLUMNS, "annotation_history": (
+    "annotation_id", "revision", "target_id", "actor", "created_at", "updated_at",
+    "body", "content_sha256", "editor", "recorded_at", "kind")}
+_V2_DEFINITIONS = {**_DEFINITIONS, **{
+    re.match(r"CREATE (?:TABLE|TRIGGER) (\w+)", statement).group(1):
+    " ".join(statement.strip().rstrip(";").split()) for statement in _ANNOTATION_SCHEMA}}
+
 
 class Workspace:
     """Durable local records. Methods return JSON-compatible dictionaries."""
 
     def __init__(self, path: str | Path, corpus_id: str, provenance: dict,
-                 actor: str = "Reader") -> None:
+                 actor: str = "Reader", *, read_only: bool = False) -> None:
         self.path = Path(path).expanduser().absolute()
         self.corpus_id = _uuid(corpus_id, "corpus identity")
         self.actor = _string(actor, "actor")
+        if type(read_only) is not bool:
+            raise WorkspaceError("read_only must be a boolean")
+        self.read_only = read_only
         if type(provenance) is not dict:
             raise WorkspaceError("provenance must be a JSON object")
         encoded_provenance = _encode(provenance)
         self._requested_source_sha256 = _source_fingerprint(provenance)
         self._connection: sqlite3.Connection | None = None
         try:
-            self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            if not read_only:
+                self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             if self.path.is_symlink():
                 raise WorkspaceError("workspace database must not be a symbolic link")
-            try:
-                descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
-            except FileExistsError:
+            if read_only:
+                if not self.path.is_file():
+                    raise WorkspaceError("read-only workspace database must already exist")
+                # SQLite's ordinary read-only WAL opening can create a -shm
+                # sidecar. Never inspect WAL with immutable=1, which could hide
+                # committed changes. A verified backup is the safe read desk.
+                with self.path.open("rb") as handle:
+                    header = handle.read(20)
+                if header[:16] == b"SQLite format 3\x00" and 2 in header[18:20]:
+                    raise WorkspaceError("read-only inspection does not open WAL workspaces; "
+                                         "use a verified backup")
                 new = False
             else:
-                new = True
                 try:
-                    if hasattr(os, "fchmod"):
-                        os.fchmod(descriptor, 0o600)
-                finally:
-                    os.close(descriptor)
+                    descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+                except FileExistsError:
+                    new = False
+                else:
+                    new = True
+                    try:
+                        if hasattr(os, "fchmod"):
+                            os.fchmod(descriptor, 0o600)
+                    finally:
+                        os.close(descriptor)
             connection = sqlite3.connect(
-                self.path.as_uri() + "?mode=rw", uri=True, timeout=5, isolation_level=None)
+                self.path.as_uri() + ("?mode=ro" if read_only else "?mode=rw"),
+                uri=True, timeout=5, isolation_level=None)
             connection.row_factory = sqlite3.Row
             self._connection = connection
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("PRAGMA trusted_schema = OFF")
             if new:
                 with self._transaction():
-                    for statement in _SCHEMA:
+                    for statement in _SCHEMA + _ANNOTATION_SCHEMA:
                         connection.execute(statement)
                     connection.execute(f"PRAGMA application_id = {APPLICATION_ID}")
                     connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
@@ -299,6 +354,8 @@ class Workspace:
     @contextmanager
     def _transaction(self, *, write: bool = True) -> Iterator[sqlite3.Connection]:
         connection = self._db()
+        if write and self.read_only:
+            raise WorkspaceError("workspace is read-only")
         try:
             connection.execute("BEGIN IMMEDIATE" if write else "BEGIN")
             yield connection
@@ -318,26 +375,30 @@ class Workspace:
         if connection.execute("PRAGMA application_id").fetchone()[0] != APPLICATION_ID:
             raise WorkspaceError("not a recognized SOL workspace; existing database was not changed")
         version = connection.execute("PRAGMA user_version").fetchone()[0]
-        if version != SCHEMA_VERSION:
+        if version not in (1, SCHEMA_VERSION):
             raise WorkspaceError(f"unsupported workspace schema version {version}; "
-                                 f"expected {SCHEMA_VERSION}; no migration was attempted")
+                                 f"expected 1 or {SCHEMA_VERSION}; no migration was attempted")
+        self.schema_version = version
+        columns_map = _COLUMNS if version == 1 else _V2_COLUMNS
+        definitions = _DEFINITIONS if version == 1 else _V2_DEFINITIONS
         tables = {row[0] for row in connection.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table'")}
-        if tables != set(_COLUMNS):
+        if tables != set(columns_map):
             raise WorkspaceError("workspace schema is damaged or unrecognized")
-        for table, columns in _COLUMNS.items():
+        for table, columns in columns_map.items():
             actual = tuple(row["name"] for row in connection.execute(f"PRAGMA table_info({table})"))
             if actual != columns:
                 raise WorkspaceError(f"workspace table {table} is damaged or unrecognized")
         triggers = {row[0] for row in connection.execute(
             "SELECT name FROM sqlite_master WHERE type = 'trigger'")}
-        if triggers != {"reviews_no_update", "reviews_no_delete",
-                        "history_no_update", "history_no_delete"}:
+        expected_triggers = {name for name, definition in definitions.items()
+                             if definition.startswith("CREATE TRIGGER")}
+        if triggers != expected_triggers:
             raise WorkspaceError("workspace append-only protections are missing")
         for row in connection.execute("SELECT type,name,sql FROM sqlite_master"):
             if row["type"] in {"table", "trigger"}:
                 actual = " ".join(row["sql"].strip().rstrip(";").split()) if row["sql"] else ""
-                if actual != _DEFINITIONS.get(row["name"]):
+                if actual != definitions.get(row["name"]):
                     raise WorkspaceError("workspace schema definitions or append-only protections "
                                          "are damaged or unrecognized")
             elif row["type"] != "index" or row["sql"] is not None:
@@ -350,7 +411,7 @@ class Workspace:
         if len(metadata) != 1 or metadata[0]["singleton"] != 1:
             raise WorkspaceError("workspace identity metadata is damaged")
         metadata = metadata[0]
-        if metadata["schema_version"] != SCHEMA_VERSION:
+        if metadata["schema_version"] != version:
             raise WorkspaceError("workspace schema metadata disagrees with the database version")
         if metadata["corpus_id"] != self.corpus_id:
             raise WorkspaceError("workspace belongs to a different corpus; choose another workspace")
@@ -378,6 +439,8 @@ class Workspace:
             self._history(row)
         self.list_bookmarks()
         self.list_annotations()
+        if version == 2:
+            self._validate_annotation_history()
         self.list_comparisons()
         self.list_reviews()
         self.list_relations()
@@ -547,6 +610,9 @@ class Workspace:
                 "INSERT INTO annotations(id,target_id,body,actor,created_at,updated_at,content_sha256) "
                 "VALUES(?,?,?,?,?,?,?)",
                 (identifier, target_id, body, self.actor, timestamp, timestamp, digest))
+            if self.schema_version == 2:
+                self._append_annotation_snapshot(connection, identifier, 1, self.actor,
+                                                 timestamp, "created")
             result = self._annotation(connection.execute(
                 "SELECT * FROM annotations WHERE id = ?", (identifier,)).fetchone())
         return result
@@ -555,40 +621,157 @@ class Workspace:
         record = self._record(row)
         if record is not None:
             record["attribution"] = {"role": "personal_note", "author": record["actor"]}
+            record["revision"] = None if self.schema_version == 1 else self._one(
+                "SELECT MAX(revision) AS revision FROM annotation_history WHERE annotation_id = ?",
+                (record["id"],))["revision"]
+            if self.schema_version == 2 and (
+                    type(record["revision"]) is not int or record["revision"] < 1):
+                raise WorkspaceError("annotation is missing its audited revision")
         return record
 
     def get_annotation(self, identifier: str) -> dict | None:
-        return self._annotation(self._one("SELECT * FROM annotations WHERE id = ?",
-                                         (_uuid(identifier, "annotation identifier"),)))
+        with self._snapshot():
+            return self._annotation(self._one("SELECT * FROM annotations WHERE id = ?",
+                                             (_uuid(identifier, "annotation identifier"),)))
 
     def list_annotations(self, target_id: str | None = None) -> list[dict]:
         clause, arguments = ("", ()) if target_id is None else (" WHERE target_id = ?", (_uuid(target_id),))
-        return [self._annotation(row) for row in self._all(
-            "SELECT * FROM annotations" + clause + " ORDER BY created_at,id", arguments)]
+        with self._snapshot():
+            return [self._annotation(row) for row in self._all(
+                "SELECT * FROM annotations" + clause + " ORDER BY created_at,id", arguments)]
+
+    def _append_annotation_snapshot(self, connection: sqlite3.Connection, identifier: str,
+                                    revision: int, editor: str | None, recorded_at: str,
+                                    kind: str) -> None:
+        connection.execute(
+            "INSERT INTO annotation_history(annotation_id,revision,target_id,actor,created_at,"
+            "updated_at,body,content_sha256,editor,recorded_at,kind) "
+            "SELECT id,?,target_id,actor,created_at,updated_at,body,content_sha256,?,?,? "
+            "FROM annotations WHERE id = ?", (revision, editor, recorded_at, kind, identifier))
+
+    def _annotation_snapshot(self, row: sqlite3.Row) -> dict:
+        record = self._record(row)
+        record["annotation_id"] = _uuid(record["annotation_id"], "stored annotation identifier")
+        if type(record["revision"]) is not int or record["revision"] < 1:
+            raise WorkspaceError("stored annotation revision is invalid")
+        _timestamp(record["recorded_at"], "stored annotation audit time")
+        if record["kind"] not in {"created", "edited", "legacy_baseline"}:
+            raise WorkspaceError("stored annotation audit kind is invalid")
+        if record["editor"] is not None:
+            _string(record["editor"], "stored annotation editor")
+        return record
+
+    def list_annotation_history(self, identifier: str) -> list[dict]:
+        identifier = _uuid(identifier, "annotation identifier")
+        if self.schema_version == 1:
+            return []
+        return [self._annotation_snapshot(row) for row in self._all(
+            "SELECT * FROM annotation_history WHERE annotation_id = ? ORDER BY revision",
+            (identifier,))]
+
+    def _validate_annotation_history(self, identifier: str | None = None) -> None:
+        clause = "" if identifier is None else " WHERE id = ?"
+        arguments = () if identifier is None else (identifier,)
+        annotations = {row["id"]: self._record(row) for row in self._all(
+            "SELECT * FROM annotations" + clause, arguments)}
+        histories: dict[str, list[dict]] = {}
+        clause = "" if identifier is None else " WHERE annotation_id = ?"
+        for row in self._all("SELECT * FROM annotation_history" + clause +
+                             " ORDER BY annotation_id,revision", arguments):
+            snapshot = self._annotation_snapshot(row)
+            histories.setdefault(snapshot["annotation_id"], []).append(snapshot)
+        if set(histories) != set(annotations):
+            raise WorkspaceError("annotation history is missing or has unknown annotations")
+        for identifier, snapshots in histories.items():
+            annotation = annotations[identifier]
+            if [row["revision"] for row in snapshots] != list(range(1, len(snapshots) + 1)):
+                raise WorkspaceError("annotation history has missing revisions")
+            previous_time = None
+            for position, snapshot in enumerate(snapshots):
+                if any(snapshot[field] != annotation[field] for field in (
+                        "target_id", "actor", "created_at", "content_sha256")):
+                    raise WorkspaceError("annotation history provenance disagrees with its annotation")
+                if position == 0:
+                    if snapshot["kind"] not in {"created", "legacy_baseline"}:
+                        raise WorkspaceError("annotation history needs a creation or legacy baseline")
+                elif snapshot["kind"] != "edited":
+                    raise WorkspaceError("annotation history contains an invalid later baseline")
+                baseline = snapshot["kind"] == "legacy_baseline"
+                if (baseline and snapshot["editor"] is not None) or (
+                        not baseline and snapshot["editor"] != annotation["actor"]):
+                    raise WorkspaceError("annotation history editor attribution is invalid")
+                if not baseline and snapshot["updated_at"] != snapshot["recorded_at"]:
+                    raise WorkspaceError("annotation history update and audit timestamps disagree")
+                if snapshot["kind"] == "created" and snapshot["created_at"] != snapshot["recorded_at"]:
+                    raise WorkspaceError("annotation creation timestamp disagrees with its audit")
+                moment = datetime.fromisoformat(snapshot["recorded_at"].replace("Z", "+00:00"))
+                if previous_time is not None and moment < previous_time:
+                    raise WorkspaceError("annotation history audit timestamps go backwards")
+                previous_time = moment
+                if position and snapshot["body"] == snapshots[position - 1]["body"]:
+                    raise WorkspaceError("annotation history contains an unchanged-body revision")
+            latest = snapshots[-1]
+            if any(latest[field] != annotation[field] for field in (
+                    "body", "updated_at", "content_sha256")):
+                raise WorkspaceError("annotation projection and latest history disagree")
 
     def update_annotation(self, identifier: str, body: str,
-                          content_sha256: str | None = None) -> dict:
+                          content_sha256: str | None = None, *,
+                          expected_revision: int | None = None) -> dict:
+        if self.schema_version == 1:
+            raise WorkspaceError("editing needs workspace schema 2; explicitly copy-upgrade this "
+                                 "workspace with 'workspace upgrade NEW.sqlite3' first")
+        if type(expected_revision) is not int or expected_revision < 1:
+            raise WorkspaceError("an explicit positive expected annotation revision is required")
         identifier = _uuid(identifier, "annotation identifier")
         body, digest = _string(body, "annotation body", multiline=True), _hash(content_sha256, "content digest")
         with self._transaction() as connection:
-            existing = connection.execute("SELECT actor FROM annotations WHERE id = ?",
+            existing = connection.execute("SELECT * FROM annotations WHERE id = ?",
                                           (identifier,)).fetchone()
             if existing is None:
                 raise WorkspaceError("no such annotation")
             if existing["actor"] != self.actor:
                 raise WorkspaceError("annotation belongs to another actor; its authorship "
                                      "cannot be reassigned by editing")
-            changed = connection.execute(
-                "UPDATE annotations SET body=?, updated_at=?, "
-                "content_sha256=COALESCE(?, content_sha256) WHERE id=?",
-                (body, _now(), digest, identifier)).rowcount
-            if not changed:
-                raise WorkspaceError("no such annotation")
+            if digest is not None and digest != existing["content_sha256"]:
+                raise WorkspaceError("annotation content digest is immutable; body editing "
+                                     "cannot rebind its source")
+            # Validate the target inside the same write transaction as CAS. A
+            # long-lived session must not append to a malformed concurrent head.
+            self._validate_annotation_history(identifier)
+            head = connection.execute(
+                "SELECT revision,recorded_at FROM annotation_history WHERE annotation_id = ? "
+                "ORDER BY revision DESC LIMIT 1", (identifier,)).fetchone()
+            revision = head["revision"]
+            if revision != expected_revision:
+                raise WorkspaceConflict("annotation changed in another session; reload its "
+                                        "revision before editing")
+            if body == existing["body"]:
+                return self._annotation(existing)
+            if revision == 2 ** 63 - 1:
+                raise WorkspaceError("annotation revision counter is exhausted")
+            timestamp = _now()
+            _timestamp(timestamp, "annotation edit time")
+            if (datetime.fromisoformat(timestamp.replace("Z", "+00:00")) <
+                    datetime.fromisoformat(head["recorded_at"].replace("Z", "+00:00"))):
+                raise WorkspaceError("system clock precedes the latest annotation audit; "
+                                     "correct the clock before editing")
+            connection.execute(
+                "INSERT INTO annotation_history(annotation_id,revision,target_id,actor,created_at,"
+                "updated_at,body,content_sha256,editor,recorded_at,kind) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (identifier, revision + 1, existing["target_id"], existing["actor"],
+                 existing["created_at"], timestamp, body, existing["content_sha256"],
+                 self.actor, timestamp, "edited"))
+            connection.execute("UPDATE annotations SET body=?, updated_at=? WHERE id=?",
+                               (body, timestamp, identifier))
             result = self._annotation(connection.execute(
                 "SELECT * FROM annotations WHERE id = ?", (identifier,)).fetchone())
         return result
 
     def delete_annotation(self, identifier: str) -> bool:
+        if self.schema_version == 2:
+            raise WorkspaceError("audited annotations cannot be deleted; their revision history "
+                                 "is permanent")
         return self._delete("annotations", "id", _uuid(identifier, "annotation identifier"))
 
     def save_comparison(self, name: str, target_ids: list[str], question: str = "",
@@ -711,6 +894,33 @@ class Workspace:
         file is published by an exclusive hard link; unsupported filesystems fail
         closed rather than falling back to an overwrite-capable rename.
         """
+        return self._publish_copy(destination, upgrade=False)
+
+    def upgrade_copy(self, destination: str | Path) -> Path:
+        """Explicitly create an audited v2 copy of v1; never migrate the source."""
+        self._db()
+        if self.schema_version != 1:
+            raise WorkspaceError("workspace is already schema 2; use backup for a same-version copy")
+        return self._publish_copy(destination, upgrade=True)
+
+    def _migrate_staged_v1(self) -> None:
+        if self.schema_version != 1:
+            raise WorkspaceError("copy upgrade requires a verified version 1 workspace")
+        timestamp = _now()
+        with self._transaction() as connection:
+            for statement in _ANNOTATION_SCHEMA:
+                connection.execute(statement)
+            # A legacy snapshot is evidence of the body at upgrade time only.
+            # Preserve its original updated_at; no past editor is invented.
+            for row in connection.execute("SELECT id FROM annotations ORDER BY id").fetchall():
+                self._append_annotation_snapshot(connection, row["id"], 1, None,
+                                                 timestamp, "legacy_baseline")
+            connection.execute("UPDATE workspace_metadata SET schema_version = ? WHERE singleton = 1",
+                               (SCHEMA_VERSION,))
+            connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+            self._check_schema_contents()
+
+    def _publish_copy(self, destination: str | Path, *, upgrade: bool) -> Path:
         source = self._db()
         if source.in_transaction:
             raise WorkspaceError("finish the active workspace transaction before creating a backup")
@@ -753,8 +963,9 @@ class Workspace:
             finally:
                 snapshot.close()
             # Opening an already initialized workspace performs only read checks.
-            with Workspace(staged, self.corpus_id, self.provenance, self.actor):
-                pass
+            with Workspace(staged, self.corpus_id, self.provenance, self.actor) as snapshot_workspace:
+                if upgrade:
+                    snapshot_workspace._migrate_staged_v1()
             with staged.open("rb") as handle:
                 os.fsync(handle.fileno())
             try:
@@ -791,7 +1002,7 @@ class Workspace:
         """A consistent portable snapshot containing references, not corpus text."""
         with self._transaction(write=False):
             exported = {
-                "format": "sol-workspace", "schema_version": SCHEMA_VERSION,
+                "format": "sol-workspace", "schema_version": self.schema_version,
                 "corpus_id": self.corpus_id, "provenance": self.provenance,
                 "created_at": self.created_at, "exported_at": _now(),
                 "state": self.get_state(), "bookmarks": self.list_bookmarks(),
@@ -800,6 +1011,9 @@ class Workspace:
                 "annotations": self.list_annotations(), "comparisons": self.list_comparisons(),
                 "reviews": self.list_reviews(), "relations": self.list_relations(),
             }
+            if self.schema_version == 2:
+                exported["annotation_history"] = [self._annotation_snapshot(row) for row in self._all(
+                    "SELECT * FROM annotation_history ORDER BY annotation_id,revision")]
             _json_value(exported)
         # Return an independent JSON value, including an independent provenance.
         return _decode(_encode(exported))

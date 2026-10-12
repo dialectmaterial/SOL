@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import textwrap
 import unicodedata
 
@@ -35,6 +36,18 @@ class Reference:
     target_id: str
     record: dict
     chain: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class AnnotationEdit:
+    """A captured note and source version; not an authority to edit the book."""
+    identifier: str
+    revision: int
+    actor: str
+    requested_target: str
+    resolved_target: str
+    inspected_digest: str
+    body: str
 
 
 def resolve_reference(book, identifier: str) -> Reference:
@@ -103,6 +116,7 @@ WORKSPACE_COMMANDS = {"workspace", "bookmark", "note", "compare", "review", "rel
 WORKSPACE_HELP = """workspace                         workspace identity and storage location
 workspace export / check          portable JSON / reference health report
 workspace backup FILE.sqlite3     create a verified, non-overwriting backup
+workspace upgrade FILE.sqlite3    upgrade an older workspace into a separate copy
 workspace history --limit N       recent reading checkpoints (default 20)
 resume [REVISION]                 latest position / historical position as new visit
 bookmark add NAME [ID]             save current passage or explicit record
@@ -111,6 +125,9 @@ bookmark list / open NAME / remove NAME
 note add TEXT [--on ID]            attributed personal annotation
 note draft [--on ID]               multiline note (enhanced prompt; Ctrl-S saves)
 note list [--on ID] / show NOTE_ID
+note edit NOTE_ID [TEXT --expect-revision N]
+                                  edit own note; omit TEXT for enhanced editor
+note history NOTE_ID              inspect preserved note revisions
 compare save NAME ID ID... --question TEXT
 compare list / show NAME           saved, ordered passage comparison
 review show [ID]                   canonical Markdown and source provenance
@@ -286,6 +303,40 @@ class WorkspaceReader:
     def authored(self, record):
         return f"By {record['actor']} | {record['created_at']}"
 
+    def prepare_annotation_edit(self, identifier):
+        self.require_author()
+        if self.store.schema_version < 2:
+            raise ValueError("annotation editing needs workspace version 2. "
+                             "Use workspace upgrade FILE.sqlite3 to create an upgraded copy; "
+                             "the original is retained.")
+        record = self.store.get_annotation(identifier)
+        if record is None:
+            raise ValueError("no annotation with that ID")
+        if record['actor'] != self.actor or self.store.actor != self.actor:
+            raise ValueError("annotation belongs to another actor; choose its original author to edit it")
+        reference = resolve_reference(self.book, record['target_id'])
+        return AnnotationEdit(record['id'], record['revision'], self.actor, record['target_id'],
+                              reference.target_id, reference.record['content_sha256'], record['body'])
+
+    def save_annotation_edit(self, captured, body, *, expected_revision=None):
+        self.require_author()
+        if self.actor != captured.actor or self.store.actor != captured.actor:
+            raise ValueError("annotation actor changed while editing; nothing was saved")
+        reference = resolve_reference(self.book, captured.requested_target)
+        if reference.target_id != captured.resolved_target or \
+                reference.record['content_sha256'] != captured.inspected_digest:
+            raise ValueError("annotation source target changed while editing; nothing was saved")
+        # Do not rebind the note's original source digest just because its wording
+        # changes. A newly inspected canonical version is not old-note provenance.
+        return self.store.update_annotation(captured.identifier, body,
+                                            expected_revision=captured.revision if expected_revision is None
+                                            else expected_revision)
+
+    def annotation_edit_result(self, before_revision, record):
+        label = "Annotation unchanged" if before_revision == record['revision'] else "Personal annotation revised"
+        return (f"{label}: {record['id']} | revision {record['revision']}\n"
+                f"{self.authored(record)}\nOriginal target and source binding retained.")
+
     def _list(self, title, lines):
         return title + "\n" + ("\n\n".join(lines) if lines else "(none)")
 
@@ -317,16 +368,27 @@ class WorkspaceReader:
     def execute(self, verb, arguments, session):
         parser = CommandParser(prog=verb, add_help=False)
         if verb == "workspace":
-            parser.add_argument("action", choices=["export", "history", "check", "backup"], nargs="?")
+            parser.add_argument("action", choices=["export", "history", "check", "backup", "upgrade"], nargs="?")
             parser.add_argument("destination", nargs="?", type=Path)
             parser.add_argument("--limit", type=int)
             options = parser.parse_args(arguments)
-            if options.action == "backup":
+            if options.action in {"backup", "upgrade"}:
                 if options.destination is None or options.limit is not None:
-                    raise ValueError("workspace backup requires FILE.sqlite3 and does not accept --limit")
+                    raise ValueError(f"workspace {options.action} requires FILE.sqlite3 and does not accept --limit")
+                if options.action == "upgrade":
+                    self.ensure_corpus_current()
+                    requested = options.destination.expanduser().absolute()
+                    if requested.name != workspace_path(requested.stem, requested.parent).name:
+                        raise ValueError("an upgraded workspace filename must end in lowercase .sqlite3 "
+                                         "so reopening its workspace name selects the same file")
+                    destination = self.store.upgrade_copy(requested)
+                    return CommandResult(f"Verified upgraded copy: {destination}\n"
+                                         "Original workspace retained; this session still uses the original.\n"
+                                         f"Reopen with --workspace {shlex.quote(destination.stem)} "
+                                         f"--workspace-dir {shlex.quote(str(destination.parent))}.")
                 return CommandResult(f"Verified workspace backup: {self.store.backup(options.destination)}")
             if options.destination is not None or (options.limit is not None and options.action != "history"):
-                raise ValueError("only backup accepts a destination; only history accepts --limit")
+                raise ValueError("only backup/upgrade accept a destination; only history accepts --limit")
             if options.action == "export":
                 return CommandResult(json.dumps(self.store.export(), ensure_ascii=False, indent=2))
             if options.action == "check":
@@ -337,6 +399,7 @@ class WorkspaceReader:
                     f"Scope: {r['scope']} | browsing: {r['cwd']}"
                     for r in self.store.list_history(20 if options.limit is None else options.limit)]))
             return CommandResult(f"Workspace: {self.store.path}\nCorpus ID: {self.store.corpus_id}\n"
+                                 f"Storage version: {self.store.schema_version}\n"
                                  f"Actor: {self.actor or '[not set; authored writes disabled]'}\n"
                                  f"Checkpoint revision: {self.revision}")
         actions = parser.add_subparsers(dest="action", required=True)
@@ -373,12 +436,44 @@ class WorkspaceReader:
             sub.add_argument("--on", dest="identifier")
             actions.add_parser("list", add_help=False).add_argument("--on", dest="identifier")
             actions.add_parser("show", add_help=False).add_argument("identifier")
+            actions.add_parser("history", add_help=False).add_argument("identifier")
+            sub = actions.add_parser("edit", add_help=False)
+            sub.add_argument("identifier")
+            sub.add_argument("body", nargs="?")
+            sub.add_argument("--expect-revision", type=int)
             options = parser.parse_args(arguments)
             if options.action == "add":
                 self.require_author()
                 ref = self.current_reference(session, options.identifier)
                 record = self.store.add_annotation(ref.requested_id, options.body, ref.record["content_sha256"])
                 return CommandResult(f"Personal annotation saved: {record['id']}\n{self.authored(record)}")
+            if options.action == "edit":
+                if options.body is None:
+                    raise ValueError("note edit NOTE_ID needs the enhanced prompt for multiline editing; "
+                                     "otherwise use note edit NOTE_ID \"TEXT\" --expect-revision N")
+                if options.expect_revision is None or options.expect_revision < 1:
+                    raise ValueError("note edit with TEXT requires --expect-revision N from note show NOTE_ID")
+                captured = self.prepare_annotation_edit(options.identifier)
+                record = self.save_annotation_edit(captured, options.body,
+                                                   expected_revision=options.expect_revision)
+                return CommandResult(self.annotation_edit_result(captured.revision, record))
+            if options.action == "history":
+                record = self.store.get_annotation(options.identifier)
+                if record is None:
+                    raise ValueError("no annotation with that ID")
+                rows = self.store.list_annotation_history(options.identifier)
+                if self.store.schema_version < 2:
+                    return CommandResult("This version-1 workspace has no annotation revision audit.\n"
+                                         "Use workspace upgrade FILE.sqlite3 to preserve a baseline in a separate copy.")
+                lines = [self.authored(record), self.describe(record['target_id']),
+                         "Original source binding: " + str(record['content_sha256'])]
+                for row in rows:
+                    label = "Baseline from version 1; earlier edits and editor are unknown" \
+                        if row['kind'] == 'legacy_baseline' else row['kind']
+                    lines.extend(["", f"Revision {row['revision']} | {label}",
+                                  f"Recorded: {row['recorded_at']} | Editor: {row['editor'] or '[unknown]'}",
+                                  self.wrap(row['body'])])
+                return CommandResult("ANNOTATION HISTORY — preserved personal prose\n" + "\n".join(lines))
             if options.action == "show":
                 record = self.store.get_annotation(options.identifier)
                 if record is None:
@@ -394,7 +489,8 @@ class WorkspaceReader:
                     status = "[target text changed since annotation]" if changed else ""
                 except ValueError:
                     status = "[unresolved target]"
-                lines.append(f"{record['id']} | personal_note {status}\n{self.authored(record)}\n"
+                revision = f"revision {record['revision']}" if record['revision'] is not None else "legacy; no revision audit"
+                lines.append(f"{record['id']} | personal_note | {revision} {status}\n{self.authored(record)}\n"
                              f"{self.describe(record['target_id'])}\n\n{self.wrap(record['body'])}")
             return CommandResult(self._list("READER ANNOTATIONS — not edition notes", lines))
         if verb == "compare":

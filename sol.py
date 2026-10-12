@@ -1362,6 +1362,8 @@ WITH A WORKSPACE
 Personal notes require an actor. Passage IDs preserve references across sessions.
 Actor means the name recorded on your personal notes, not the book's author.
 note draft uses the enhanced prompt: Ctrl-S saves, Ctrl-C cancels.
+Use note show NOTE_ID for its revision; note edit NOTE_ID edits your own note.
+note history NOTE_ID shows earlier versions (replace NOTE_ID with a printed ID).
 
 KEEP EXPLORING
   guide --depth 2   reveal more of the tree (or guide PATH --depth N)
@@ -1672,6 +1674,23 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                 if not parts:
                     continue
                 verb, arguments = parts[0], parts[1:]
+                if verb == "note" and arguments and arguments[0] == "edit" and len(arguments) == 2:
+                    if workspace_reader is None:
+                        raise ValueError("note edit requires a workspace and actor")
+                    if draft_reader is None:
+                        raise ValueError("multiline note editing requires the enhanced prompt; "
+                                         "use note edit NOTE_ID \"TEXT\" --expect-revision N for basic input")
+                    captured = workspace_reader.prepare_annotation_edit(arguments[1])
+                    emit(f"Editing your annotation {captured.identifier} at revision {captured.revision}.\n"
+                         "Ctrl-S saves; Ctrl-C cancels. Earlier revisions and original source binding are retained.")
+                    try:
+                        body = draft_reader("Edit personal note: ", default=captured.body)
+                    except (KeyboardInterrupt, EOFError):
+                        emit("Edit cancelled; nothing was saved.")
+                        continue
+                    record = workspace_reader.save_annotation_edit(captured, body)
+                    emit(workspace_reader.annotation_edit_result(captured.revision, record))
+                    continue
                 if verb == "note" and arguments and arguments[0] == "draft":
                     if workspace_reader is None:
                         raise ValueError("note draft requires a workspace and actor")
@@ -1981,6 +2000,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--workspace-export", action="store_true", help="export the named workspace as JSON")
     mode.add_argument("--workspace-check", action="store_true", help="report unresolved, retired and versioned workspace references")
     mode.add_argument("--workspace-backup", type=Path, metavar="FILE", help="create a new, verified .sqlite3 backup without overwriting")
+    mode.add_argument("--workspace-upgrade", type=Path, metavar="FILE", help="upgrade a version-1 workspace into a separate verified copy")
     mode.add_argument("--review-queue", action="store_true", help="show canonical pending transcriptions; optionally include workspace testimony")
     parser.add_argument("--workspace", metavar="NAME", help="choose a named reading workspace without prompting")
     parser.add_argument("--workspace-dir", type=Path, metavar="DIRECTORY", help="directory for local workspace databases")
@@ -2011,6 +2031,7 @@ def validate_options(args: argparse.Namespace) -> None:
                    args.first is not None, args.cat is not None, args.search is not None,
                    args.passage is not None, args.info is not None, args.set_corpus is not None,
                    args.resume, args.workspace_export, args.workspace_check, args.workspace_backup is not None,
+                   args.workspace_upgrade is not None,
                    args.review_queue)
         if any(actions):
             raise ValueError("guide cannot be combined with another action")
@@ -2019,6 +2040,7 @@ def validate_options(args: argparse.Namespace) -> None:
                args.first is not None, args.cat is not None, args.search is not None,
                args.passage is not None, args.info is not None, args.set_corpus is not None,
                args.resume, args.workspace_export, args.workspace_check, args.workspace_backup is not None,
+               args.workspace_upgrade is not None,
                args.review_queue)
     if not any(actions) or args.none:
         args.shell = True
@@ -2053,7 +2075,8 @@ def validate_options(args: argparse.Namespace) -> None:
     if args.set_corpus is not None and (args.corpus is not None or args.pdf is not None):
         raise ValueError("--set-corpus cannot be combined with --corpus or --pdf")
     if args.workspace is None and not args.shell and (args.workspace_dir is not None or args.actor is not None or args.resume
-                                   or args.workspace_export or args.workspace_check or args.workspace_backup is not None):
+                                   or args.workspace_export or args.workspace_check or args.workspace_backup is not None
+                                   or args.workspace_upgrade is not None):
         raise ValueError("workspace options require --workspace NAME")
     if args.resume_revision is not None and (not args.resume or args.resume_revision < 1):
         raise ValueError("--resume-revision requires --resume and a positive checkpoint revision")
@@ -2092,8 +2115,24 @@ def shell_identity(book: Book, args) -> None:
                          "Supply --workspace NAME --actor NAME, use sol -n for a temporary shell, "
                          "or sol -r for a random passage.")
     if args.workspace is None:
+        from sol_workspace_catalog import discover_workspaces
+        source_digest = book.corpus_manifest.get('source', {}).get('sha256')
+        recent = discover_workspaces(book.corpus_manifest['corpus_id'], source_digest, args.workspace_dir)
+        default_workspace = recent[0]['name'] if recent else 'reading'
+        if recent:
+            print('Recent workspaces for this corpus:')
+            for number, entry in enumerate(recent, 1):
+                print(f"  {number}. {entry['name']} | {entry['last_activity'][:10]} | {entry['scope'] or '[no reading yet]'}")
+            print('Choose a displayed number, type a workspace name, or enter a new name.')
         while True:
-            name = input('Workspace [reading]: ').strip() or 'reading'
+            response = input(f'Workspace [{default_workspace}]: ').strip()
+            name = response or default_workspace
+            if recent and response.isdecimal():
+                number = int(response) if len(response) <= 2 else 0
+                if not 1 <= number <= len(recent):
+                    print('sol: choose a displayed workspace number or a name (use --workspace for a numeric name)')
+                    continue
+                name = recent[number - 1]['name']
             try:
                 workspace_path(name, args.workspace_dir)
             except ValueError as error:
@@ -2150,6 +2189,7 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
                          "This preserves canonical text and passage IDs; do not reconvert the PDF.")
     location = workspace_path(args.workspace, args.workspace_dir)
     if (args.resume or args.workspace_export or args.workspace_check or args.workspace_backup is not None
+            or args.workspace_upgrade is not None
             or args.review_queue) and not location.exists():
         raise ValueError(f"workspace does not exist: {args.workspace}; start with --workspace NAME --shell")
     provenance = {"edition": book.corpus_manifest["edition"], "source": book.corpus_manifest["source"]}
@@ -2183,6 +2223,22 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
                 emit_json({"backup": str(destination), "corpus_id": identity})
             else:
                 print(f"Verified workspace backup: {destination}")
+            return 0
+        if args.workspace_upgrade is not None:
+            reader.ensure_corpus_current()
+            requested = args.workspace_upgrade.expanduser().absolute()
+            if requested.name != workspace_path(requested.stem, requested.parent).name:
+                raise ValueError("an upgraded workspace filename must end in lowercase .sqlite3 "
+                                 "so reopening its workspace name selects the same file")
+            destination = store.upgrade_copy(requested)
+            result = {"upgraded_copy": str(destination), "source_workspace": str(store.path),
+                      "schema_version": 2, "corpus_id": identity}
+            if args.json:
+                emit_json(result)
+            else:
+                print(f"Verified upgraded copy: {destination}\nOriginal workspace retained.\n"
+                      f"Open with: sol --workspace {shlex.quote(destination.stem)} "
+                      f"--workspace-dir {shlex.quote(str(destination.parent))}")
             return 0
         if args.shell:
             return run_shell(book, width, args.plain, color, reader,

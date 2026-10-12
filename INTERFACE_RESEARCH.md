@@ -207,14 +207,18 @@ review queues, backups and historical resume. `run_shell` also accepts an inject
 convention, including `end=`. Supplying a custom reader bypasses standard-library
 readline setup. `sol_prompt.py` now implements an optional PromptSession adapter
 through this seam. The `shell` extra supplies prompt_toolkit; the base reader still
-has no third-party dependency. Rich and Textual have not been adopted, and
-existing-note editing remains unimplemented.
+has no third-party dependency. Rich and Textual have not been adopted. Existing-note
+editing is now available through the same input seam, backed by versioned snapshots
+and conflict-aware saves rather than editor-only state.
 
 `sol` and `--shell` now open a persistent reader. Onboarding asks only for missing
 workspace and actor labels; supplying both flags permits noninteractive command
 input. `-n` bypasses workspace and profile storage, and `-r` explicitly retains
 the one-shot random quote. Actor labels are local attribution, not authentication;
-`sol_profiles.py` stores them separately from workspace schema version 1.
+`sol_profiles.py` stores them separately from workspace databases. Missing workspace
+labels now offer a read-only catalog of up to ten matching workspaces, ordered by
+latest recorded activity. Typing a displayed number selects it, while a name creates
+or opens a workspace. `-n` and `-r` consult neither the catalog nor actor registry.
 
 ### Start with an optional prompt, not a new application
 
@@ -266,8 +270,19 @@ drafting. The accepted body is passed as data, without reconstructing a shell
 command. A DummyHistory buffer is reset after use. Save rechecks the target and
 corpus generation before one insert; cancellation changes neither authored
 records nor the reading checkpoint. Basic input retains `note add "TEXT"`.
-Existing annotation editing should wait
-for immutable author/revision audit and conflict-aware saves.
+`note edit NOTE_ID` reuses this isolated draft input with the existing body as its
+initial value. The workspace captures the original actor, target, source binding
+and note revision first. Ctrl-S commits only if these remain valid; Ctrl-C discards
+the draft. Basic input requires an explicit `--expect-revision N` alongside the
+replacement text. Editing does not silently retarget the note or move a checkpoint,
+and an identical body produces no new revision. `note history NOTE_ID` exposes the
+stored snapshots independently of the editor.
+
+New workspaces use schema version 2 for annotation audit. Older version-1 workspaces
+still open unchanged for ordinary work; editing requires an explicit upgrade into
+a separately named copy. `workspace upgrade FILE.sqlite3` does not switch an open
+session. Legacy notes gain a baseline of their current body at upgrade, not an
+invented sequence of earlier edits or an inferred editor.
 [Multiline input](https://python-prompt-toolkit.readthedocs.io/en/stable/pages/asking_for_input.html#multiline-input),
 [DummyHistory](https://python-prompt-toolkit.readthedocs.io/en/stable/pages/reference.html#prompt_toolkit.history.DummyHistory)
 
@@ -316,8 +331,8 @@ manual accessibility and terminal tests.
 [testing](https://textual.textualize.io/guide/testing/)
 
 Better completion or occasional notes alone do not justify an application rewrite.
-Before a multi-pane interface, retain safe drafts and prioritize immutable author/revision
-audit, explicit backup/import previews and verified selected-span anchors. Neither
+Before a multi-pane interface, retain safe drafts and audited annotation revisions,
+then prioritize explicit import/restore previews and verified selected-span anchors. Neither
 an interface nor a classifier may silently create semantic edges, claim a source
 was verified, or turn version-1 text/PDF fingerprint matches into full-record
 provenance proof. Those decisions remain in the corpus and workspace contracts.

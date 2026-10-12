@@ -199,14 +199,17 @@ class WorkspaceTests(unittest.TestCase):
         second = self.workspace.add_annotation(B, "Another thought.")
         self.assertEqual(self.workspace.list_annotations(A), [first])
         self.assertEqual(self.workspace.get_annotation(second["id"]), second)
-        updated = self.workspace.update_annotation(first["id"], "A corrected personal thought.")
+        updated = self.workspace.update_annotation(first["id"], "A corrected personal thought.",
+                                                   expected_revision=first["revision"])
         self.assertEqual(updated["created_at"], first["created_at"])
         self.assertEqual(updated["actor"], first["actor"])
         self.assertEqual(updated["content_sha256"], CONTENT_SHA)
-        self.assertTrue(self.workspace.delete_annotation(first["id"]))
-        self.assertIsNone(self.workspace.get_annotation(first["id"]))
+        self.assertEqual(updated["revision"], 2)
+        with self.assertRaisesRegex(WorkspaceError, "cannot be deleted"):
+            self.workspace.delete_annotation(first["id"])
+        self.assertEqual(self.workspace.get_annotation(first["id"]), updated)
         with self.assertRaisesRegex(WorkspaceError, "no such annotation"):
-            self.workspace.update_annotation(first["id"], "Missing.")
+            self.workspace.update_annotation(C, "Missing.", expected_revision=1)
 
     def test_comparison_retains_order_duplicates_question_and_attribution(self):
         first = self.workspace.save_comparison("contrast", [B, A, B], "Why this order?\nWhat changes?")
@@ -371,7 +374,8 @@ class WorkspaceTests(unittest.TestCase):
         original = self.workspace.add_annotation(A, "A personal thought.", CONTENT_SHA)
         other = self.reopen(actor="Another reader")
         with self.assertRaisesRegex(WorkspaceError, "another actor"):
-            other.update_annotation(original["id"], "Another person's prose.")
+            other.update_annotation(original["id"], "Another person's prose.",
+                                    expected_revision=original["revision"])
         self.assertEqual(other.get_annotation(original["id"]), original)
 
     def test_wrong_corpus_and_changed_source_are_refused_without_writes(self):

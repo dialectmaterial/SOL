@@ -16,7 +16,7 @@ The reader uses readable Markdown and a generated JSONL index. Each passage reta
 
 The shell presents the book through `/BEING`, `/ESSENCE`, and `/CONCEPT`. Sections and subdivisions become directories; their own introductory prose appears as `00-introduction.txt`. Divisions without children become virtual text files. The canonical corpus preserves the fuller volume hierarchy, editorial material, notes, bibliography, and index.
 
-Run `sol` to open a persistent reading workspace. It asks which workspace and actor to use, offering known actor names when available. An actor is the name recorded on your own notes and assertions, not Hegel's name or a login account. Use `sol -r` for one random quotation and `sol -n` for a temporary shell without a workspace or actor.
+Run `sol` to open a persistent reading workspace. It offers recent workspaces for the selected corpus and asks which workspace and actor to use. An actor is the name recorded on your own notes and assertions, not Hegel's name or a login account. Use `sol -r` for one random quotation and `sol -n` for a temporary shell without a workspace or actor.
 
 SOL’s book shell is an application running inside a terminal, not a replacement for Bash or Zsh and not yet a terminal emulator. Its virtual paths refer to the book, not the host filesystem.
 
@@ -144,7 +144,9 @@ Help, version information, and the guide remain available without a corpus. `--s
 
 ## Work inside the virtual shell
 
-Start with `sol`; `sol --shell` means the same persistent reader. Supplying `--workspace NAME` or `--actor NAME` skips only the corresponding question. `sol --workspace reading --actor "Your name"` skips both. Paths accept lowercase names and omit numbering prefixes when the result is unambiguous. The basic input path can use Python's optional `readline` module for Tab completion.
+Start with `sol`; `sol --shell` means the same persistent reader. The workspace picker shows up to ten recognized workspaces bound to the current corpus and source fingerprint, ordered by their latest recorded activity. Enter a displayed number to reopen one, or a name to create or select a workspace. Press Enter to choose the first displayed workspace; if none is available, the default is `reading`. The picker inspects candidates without modifying them and skips unrelated, incompatible, symlink, or WAL/sidecar-bearing files. A name entered explicitly still receives normal validation and can open a workspace omitted from suggestions rather than silently choosing another one.
+
+Supplying `--workspace NAME` or `--actor NAME` skips only the corresponding question. `sol --workspace reading --actor "Your name"` skips both. `sol -n` and `sol -r` do not consult the workspace picker or actor registry. Paths accept lowercase names and omit numbering prefixes when the result is unambiguous. The basic input path can use Python's optional `readline` module for Tab completion.
 
 With the shell extra installed, `--ui auto` uses the enhanced prompt in an interactive terminal. `--ui basic` selects basic input; `--ui prompt` requests the enhanced prompt when eligible and explains a missing extra. `--editing-mode vi` selects Vi editing instead of the Emacs default. Plain output, redirected streams and `TERM=dumb` retain basic input without importing prompt_toolkit. Enhanced command history stays in memory, not a separate history file.
 
@@ -196,7 +198,7 @@ Initialization adds a permanent corpus UUID and updates its index metadata witho
 
 New conversions already include a corpus identity; this command retains it when present and initializes an older corpus once.
 
-A workspace restores its saved passage and reading scope when reopened. Actor labels are remembered separately in `$XDG_DATA_HOME/sol/profiles.sqlite3`, or `~/.local/share/sol/profiles.sqlite3`. Accepting a new name during shell setup records that label locally. This is not authentication; existing notes retain their original author names, and workspace schema version 1 is unchanged. Browsing with `cd` does not erase the saved scope or cursor. `workspace history --limit 10` preserves earlier checkpoints as visits, not claims that a passage was understood. `resume REVISION` revisits a historical checkpoint as a new saved revision; it does not erase later history.
+A workspace restores its saved passage and reading scope when reopened. Actor labels are remembered separately in `$XDG_DATA_HOME/sol/profiles.sqlite3`, or `~/.local/share/sol/profiles.sqlite3`. Accepting a new name during shell setup records that label locally. This is not authentication; existing notes retain their original author names. Browsing with `cd` does not erase the saved scope or cursor. `workspace history --limit 10` preserves earlier checkpoints as visits, not claims that a passage was understood. `resume REVISION` revisits a historical checkpoint as a new saved revision; it does not erase later history.
 
 ~~~text
 first /being
@@ -213,7 +215,26 @@ workspace check
 
 Use `bookmark list`, `bookmark set NAME`, or `bookmark remove NAME` to inspect, deliberately replace, or remove a bookmark. Bookmarks target readable passages. `note list` shows personal annotations, not the edition's notes; `note show NOTE_ID` opens one. Annotation Markdown is stored and displayed literally. Notes target whole records, not selected words. `--on ID` can select an explicit record for a note or review instead of the current passage.
 
-With the enhanced prompt, `note draft` opens a multiline personal note for the current record; `note draft --on ID` chooses another target. Enter inserts a line break, Ctrl-S saves, and Ctrl-C cancels. The target UUID and inspected text digest are captured before drafting, then checked again before one annotation is inserted. Cancelled drafts are discarded and draft bodies never enter command history. This adds new notes, not an editor for existing annotations. Basic input retains `note add "TEXT"`.
+With the enhanced prompt, `note draft` opens a multiline personal note for the current record; `note draft --on ID` chooses another target. Enter inserts a line break, Ctrl-S saves, and Ctrl-C cancels. The target UUID and inspected text digest are captured before drafting, then checked again before one annotation is inserted. Cancelled drafts are discarded and draft bodies never enter command history. Basic input retains `note add "TEXT"`.
+
+New workspaces use schema version 2, which retains a sequence of annotation snapshots. Use `note history NOTE_ID` to inspect them. `note edit NOTE_ID` opens the existing body in the enhanced multiline editor. In basic input, first inspect the note's current revision, then give an explicit expectation:
+
+~~~text
+note show NOTE_ID
+note edit NOTE_ID "A revised question, retaining its original source binding." --expect-revision 1
+note history NOTE_ID
+~~~
+
+Replace `NOTE_ID` with the identifier from `note list`. Only the note's original actor can edit it. Saving checks its revision and corpus generation again; a competing edit is refused, and saving an identical body adds no revision. Earlier bodies remain inspectable, while the original author, target, and inspected-source digest remain unchanged. Cancelling the editor changes neither notes nor reading position. This is local application-controlled revision history, not cryptographically tamper-proof evidence or authenticated identity.
+
+Existing version-1 workspaces still open without migration and support reading and new annotations. To enable audited editing, explicitly create a separately named upgraded copy:
+
+~~~sh
+sol --workspace quantity-study --workspace-upgrade quantity-study-v2.sqlite3
+sol --workspace quantity-study-v2 --workspace-dir . --actor "Your name"
+~~~
+
+Inside a shell, `workspace upgrade FILE.sqlite3` creates the same kind of copy but does not switch the running session. The destination parent must exist and the destination must not already exist. The original is left untouched. Legacy notes receive a baseline of their current body; SOL does not invent earlier edits or an editor attribution. New edits in the upgraded copy are audited from there onward.
 
 Notes, comparisons, review decisions, and relations require the actor selected during setup or supplied with `--actor NAME`. Read-only one-shot workspace inspection needs no actor. Comparisons preserve an ordered set of record IDs and a question. Relations are directed, attributed assertions alongside the published tree. Their references point to live canonical records, not frozen quotations or captured endpoint versions:
 
@@ -224,7 +245,7 @@ relate add ID_A compares-with ID_B --reason "A connection to investigate, not an
 relate list
 ~~~
 
-Replace `ID_A` and `ID_B` with displayed record UUIDs or unambiguous prefixes. `compare list`, `review list`, and `relate list` inspect saved work without moving the reading cursor. Review outcomes are `inspected`, `correction_needed`, and `verified`. A reader's `verified` testimony never changes canonical transcription status or random eligibility. Version 1 compares the inspected Markdown digest and declared PDF fingerprint, not every attribution or page-location field. Matching fingerprints are not proof of a correct transcription. Missing and retired references remain visible rather than being matched by similar wording.
+Replace `ID_A` and `ID_B` with displayed record UUIDs or unambiguous prefixes. `compare list`, `review list`, and `relate list` inspect saved work without moving the reading cursor. Review outcomes are `inspected`, `correction_needed`, and `verified`. A reader's `verified` testimony never changes canonical transcription status or random eligibility. The current review binding compares the inspected Markdown digest and declared PDF fingerprint, not every attribution or page-location field; workspace version 2 does not expand that binding. Matching fingerprints are not proof of a correct transcription. Missing and retired references remain visible rather than being matched by similar wording.
 
 Resume or export outside the shell:
 
@@ -306,7 +327,7 @@ The roadmap follows the three doctrines as a way of organizing development.
 
 The current focus is SOL as a command line application: random quotations, careful formatting, reading, search, and a virtual terminal interface for navigating the book.
 
-The default workspace reader now provides reading continuity, bookmarks, attributed annotations, saved comparisons, review testimony, and relations between passages. The temporary shell and one-shot CLI remain available. Permanent identifiers provide their foundation. Exact textual searches should remain distinguishable from any future conceptual search.
+The default workspace reader now provides reading continuity, a recent-workspace picker, bookmarks, attributed annotations with revision-aware editing, saved comparisons, review testimony, and relations between passages. The temporary shell and one-shot CLI remain available. Permanent identifiers provide their foundation. Exact textual searches should remain distinguishable from any future conceptual search.
 
 [The workspace plan](WORKSPACE_PLAN.md) distinguishes this implemented foundation from selected-span annotations, richer exports and imports, and future interface work. [The separate interface investigation](INTERFACE_RESEARCH.md) explains the optional prompt_toolkit adapter and compares Rich, Textual, curses, and external readers that have not been adopted.
 

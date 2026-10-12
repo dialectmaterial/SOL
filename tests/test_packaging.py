@@ -20,7 +20,7 @@ import zipfile
 MODULES = {
     "sol", "sol_corpus", "sol_corpus_contract", "sol_corpus_notes",
     "sol_corpus_references", "sol_corpus_structure", "sol_workspace", "sol_workspace_reader",
-    "sol_workspace_diagnostics",
+    "sol_workspace_diagnostics", "sol_workspace_catalog",
     "sol_prompt", "sol_profiles",
 }
 ENTRY_POINTS = {
@@ -271,7 +271,7 @@ import builtins, importlib, sys
 sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def block_optional_and_profiles(name, *args, **kwargs):
-    if name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'sol_profiles'}:
+    if name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'sol_profiles', 'sol_workspace_catalog'}:
         raise AssertionError('Temporary/one-shot reader imported ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional_and_profiles
@@ -378,10 +378,141 @@ raise SystemExit(status)
         self.assertEqual(resumed["id"], passage_id)
         self.assertEqual(resumed["text"], body)
         exported = json.loads(run("sol", [*inspection, "--workspace-export"]).stdout)
-        self.assertEqual(exported["schema_version"], 1)
+        self.assertEqual(exported["schema_version"], 2)
         self.assertEqual(exported["state"]["current_id"], passage_id)
         self.assertEqual(len(exported["annotations"]), 1)
         self.assertEqual(exported["annotations"][0]["actor"], "Installed author")
+        note = exported["annotations"][0]
+        self.assertEqual(note["revision"], 1)
+        self.assertEqual([row["kind"] for row in exported["annotation_history"]], ["created"])
+        edited = run("sol", selected, commands=(
+            f'note edit {note["id"]} "A revised installed-reader question." --expect-revision 1\n'
+            f'note history {note["id"]}\nexit\n'))
+        self.assertIn("A revised installed-reader question.", edited.stdout)
+        final = json.loads(run("sol", [*inspection, "--workspace-export"]).stdout)
+        self.assertEqual(final["annotations"][0]["revision"], 2)
+        self.assertEqual(final["annotations"][0]["actor"], note["actor"])
+        self.assertEqual(final["annotations"][0]["target_id"], note["target_id"])
+        self.assertEqual(final["annotations"][0]["content_sha256"], note["content_sha256"])
+        self.assertEqual(final["state"], exported["state"], "Editing must not create a reading checkpoint")
+        self.assertEqual([row["kind"] for row in final["annotation_history"]], ["created", "edited"])
+
+    def test_installed_explicit_upgrade_preserves_legacy_workspace_and_baseline(self):
+        installed = Path(self.temporary.name) / "installed-upgrade"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        corpus = Path(self.temporary.name) / "upgrade-corpus"
+        passage_id, body = write_runtime_corpus(corpus)
+        storage = Path(self.temporary.name) / "upgrade-storage"
+        storage.mkdir()
+        elsewhere = Path(self.temporary.name) / "upgrade-outside-checkout"
+        elsewhere.mkdir()
+        environment = os.environ.copy()
+        environment.pop("SOL_CORPUS", None)
+        environment["XDG_CONFIG_HOME"] = str(Path(self.temporary.name) / "upgrade-config")
+        environment["XDG_DATA_HOME"] = str(Path(self.temporary.name) / "upgrade-data")
+        program = """
+import builtins, importlib, sys
+sys.path.insert(0, sys.argv[1])
+original_import = builtins.__import__
+def block_optional(name, *args, **kwargs):
+    if name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit'}:
+        raise AssertionError('Installed upgrade imported optional dependency ' + name)
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = block_optional
+module = importlib.import_module(sys.argv[2])
+if sys.argv[2] == 'sol':
+    def block_pdf(*args, **kwargs):
+        raise AssertionError('Installed upgrade must not extract a PDF')
+    module.load_book = block_pdf
+    entry = module.cli
+else:
+    entry = module.main
+raise SystemExit(entry(sys.argv[3:]))
+"""
+
+        def run(module, arguments, *, commands="", expected_status=0):
+            result = subprocess.run(
+                [sys.executable, "-I", "-c", program, str(installed), module, *arguments],
+                cwd=elsewhere, env=environment, input=commands,
+                capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, expected_status, result.stdout + result.stderr)
+            self.assertNotIn("\x1b", result.stdout)
+            return result
+
+        run("sol_corpus_contract", [str(corpus), "--initialize-identity"])
+        manifest = json.loads((corpus / "corpus.json").read_text(encoding="utf-8"))
+        legacy = storage / "legacy.sqlite3"
+        note_id = "cccccccc-0000-4000-8000-000000000003"
+        timestamp = "2026-01-01T00:00:00Z"
+        digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+        # Frozen version-1 DDL is deliberately used rather than creating a new
+        # current workspace and mutating it into an unrepresentative old database.
+        fixture = """
+from contextlib import closing
+import json, sqlite3, sys
+sys.path.insert(0, sys.argv[1])
+from sol_workspace import APPLICATION_ID, _SCHEMA
+with closing(sqlite3.connect(sys.argv[2])) as connection, connection:
+    for statement in _SCHEMA:
+        connection.execute(statement)
+    connection.execute('PRAGMA application_id = ' + str(APPLICATION_ID))
+    connection.execute('PRAGMA user_version = 1')
+    manifest = json.loads(sys.argv[3])
+    provenance = {'edition': manifest['edition'], 'source': manifest['source']}
+    connection.execute('INSERT INTO workspace_metadata VALUES(1,1,?,?,?)',
+                       (manifest['corpus_id'], json.dumps(provenance), sys.argv[6]))
+    connection.execute('INSERT INTO annotations(id,target_id,body,actor,created_at,updated_at,content_sha256) '
+                       'VALUES(?,?,?,?,?,?,?)',
+                       (sys.argv[4], sys.argv[5], 'Legacy question without an invented history.',
+                        'Installed legacy author', sys.argv[6], sys.argv[6], sys.argv[7]))
+"""
+        created = subprocess.run(
+            [sys.executable, "-I", "-c", fixture, str(installed), str(legacy),
+             json.dumps(manifest), note_id, passage_id, timestamp, digest],
+            cwd=elsewhere, env=environment, capture_output=True, text=True,
+        )
+        self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
+        before_digest = hashlib.sha256(legacy.read_bytes()).hexdigest()
+        arguments = ["--corpus", str(corpus), "--workspace", "legacy", "--workspace-dir", str(storage)]
+        original = json.loads(run("sol", [*arguments, "--workspace-export"]).stdout)
+        self.assertEqual(original["schema_version"], 1)
+        self.assertNotIn("annotation_history", original)
+        self.assertIsNone(original["annotations"][0]["revision"])
+        upgraded = storage / "legacy-v2.sqlite3"
+        result = json.loads(run("sol", [*arguments, "--workspace-upgrade", str(upgraded), "--json"]).stdout)
+        self.assertEqual(result["upgraded_copy"], str(upgraded))
+        self.assertEqual(result["source_workspace"], str(legacy))
+        self.assertEqual(result["schema_version"], 2)
+        self.assertEqual(hashlib.sha256(legacy.read_bytes()).hexdigest(), before_digest)
+        if os.name == "posix":
+            self.assertEqual(upgraded.stat().st_mode & 0o777, 0o600)
+        copy_arguments = ["--corpus", str(corpus), "--workspace", "legacy-v2", "--workspace-dir", str(storage)]
+        baseline = json.loads(run("sol", [*copy_arguments, "--workspace-export"]).stdout)
+        self.assertEqual(baseline["schema_version"], 2)
+        self.assertEqual(len(baseline["annotation_history"]), 1)
+        snapshot = baseline["annotation_history"][0]
+        self.assertEqual(snapshot["kind"], "legacy_baseline")
+        self.assertIsNone(snapshot["editor"])
+        self.assertEqual(snapshot["created_at"], timestamp)
+        self.assertEqual(snapshot["updated_at"], timestamp)
+        self.assertNotEqual(snapshot["recorded_at"], timestamp)
+        self.assertEqual(snapshot["actor"], "Installed legacy author")
+        for key in ("id", "target_id", "body", "actor", "created_at", "updated_at", "content_sha256"):
+            self.assertEqual(baseline["annotations"][0][key], original["annotations"][0][key])
+        published_digest = hashlib.sha256(upgraded.read_bytes()).hexdigest()
+        run("sol", [*arguments, "--workspace-upgrade", str(upgraded)], expected_status=2)
+        self.assertEqual(hashlib.sha256(upgraded.read_bytes()).hexdigest(), published_digest)
+        edited = run("sol", [*copy_arguments, "--actor", "Installed legacy author"], commands=(
+            f'note edit {note_id} "An explicitly audited revision." --expect-revision 1\nexit\n'))
+        self.assertIn("revision 2", edited.stdout)
+        after = json.loads(run("sol", [*copy_arguments, "--workspace-export"]).stdout)
+        self.assertEqual(after["annotations"][0]["body"], "An explicitly audited revision.")
+        self.assertEqual(after["annotations"][0]["revision"], 2)
+        self.assertEqual(after["annotations"][0]["content_sha256"], digest)
+        self.assertEqual([row["kind"] for row in after["annotation_history"]], ["legacy_baseline", "edited"])
+        self.assertEqual(hashlib.sha256(legacy.read_bytes()).hexdigest(), before_digest)
 
     def test_installed_workspace_identity_resume_and_export_need_no_optional_dependencies(self):
         installed = Path(self.temporary.name) / "installed-workspace"
