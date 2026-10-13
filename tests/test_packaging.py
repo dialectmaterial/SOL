@@ -25,10 +25,12 @@ PACKAGE_FILES = {
     "sol/reader/options.py",
     "sol/corpus/__init__.py", "sol/corpus/convert.py", "sol/corpus/contract.py", "sol/corpus/notes.py",
     "sol/corpus/references.py", "sol/corpus/structure.py", "sol/corpus/layout.py", "sol/corpus/edition.py",
+    "sol/corpus/extraction.py", "sol/corpus/ingest.py",
+    "sol/corpus/backends/__init__.py", "sol/corpus/backends/opendataloader.py",
     "sol/workspace/__init__.py", "sol/workspace/store.py", "sol/workspace/reader.py",
     "sol/workspace/diagnostics.py", "sol/workspace/catalog.py", "sol/workspace/export.py",
     "sol/workspace/profiles.py", "sol/workspace/comparison.py", "sol/terminal/__init__.py", "sol/terminal/prompt.py",
-    "sol/terminal/source.py", "sol/terminal/kitty.py", "sol/terminal/comparison.py",
+    "sol/terminal/source.py", "sol/terminal/kitty.py", "sol/terminal/comparison.py", "sol/terminal/commands.py",
 }
 ENTRY_POINTS = {
     "sol": "sol:cli",
@@ -38,7 +40,7 @@ ENTRY_POINTS = {
 }
 PUBLIC_FILES = {
     "pyproject.toml", "MANIFEST.in", "README.md", "docs/CORPUS.md", "docs/USAGE.md",
-    "docs/WORKSPACE_PLAN.md", "docs/WORKSPACE_EXPORT.md", "docs/MODULARITY.md",
+    "docs/WORKSPACE_PLAN.md", "docs/WORKSPACE_EXPORT.md", "docs/MODULARITY.md", "docs/EXTRACTION.md",
     "docs/research/INTERFACE_RESEARCH.md", "docs/research/OPENDATALOADER_RESEARCH.md",
 } | PACKAGE_FILES
 
@@ -122,6 +124,8 @@ class PackagingTests(unittest.TestCase):
         # Synthetic sentinels exercise archive exclusions without copying the book.
         for relative in ("Hegel-SOL.pdf", "sources/source.pdf", "local-corpus/hegel/chapter.md",
                          "local-corpus/index.jsonl", ".sol-corpus-work/layout.xml",
+                         ".sol-extractions/candidate.json", ".sol-extractions/review.json",
+                         ".sol-ingest-work/audit/ingestion.json", ".sol-ingest-work/doc.md",
                          "reading.sqlite3", "reading.sqlite3-wal", "reading.sqlite3-shm",
                          "tests/private-workspace/reading.sqlite3-journal",
                          "profiles.sqlite3", "tests/private-profile/profiles.sqlite3-wal",
@@ -135,6 +139,7 @@ class PackagingTests(unittest.TestCase):
         # so this test exercises MANIFEST.in rather than an incidental omission.
         manifest = cls.stage / "MANIFEST.in"
         manifest.write_text("recursive-include . *.sqlite3 *.sqlite3-* *.sol-workspace.json *.sol-workspace.md\n"
+                            "recursive-include .sol-extractions *\nrecursive-include .sol-ingest-work *\n"
                             + manifest.read_text(encoding="utf-8"), encoding="utf-8")
         cls.dist = Path(cls.temporary.name) / "dist"
         cls.dist.mkdir()
@@ -171,21 +176,25 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(metadata["Requires-Python"], ">=3.10")
         self.assertEqual(dict(entry_points["console_scripts"]), ENTRY_POINTS)
         requirements = metadata.get_all("Requires-Dist") or []
-        self.assertEqual(set(metadata.get_all("Provides-Extra") or []), {"corpus", "shell"})
-        self.assertEqual(len(requirements), 2)
+        self.assertEqual(set(metadata.get_all("Provides-Extra") or []), {"corpus", "shell", "extraction"})
+        self.assertEqual(len(requirements), 3)
         corpus = [requirement for requirement in requirements if 'extra == "corpus"' in requirement]
         shell = [requirement for requirement in requirements if 'extra == "shell"' in requirement]
+        extraction = [requirement for requirement in requirements if 'extra == "extraction"' in requirement]
         self.assertEqual(len(corpus), 1)
         self.assertEqual(len(shell), 1)
+        self.assertEqual(len(extraction), 1)
         self.assertTrue(corpus[0].startswith("markdown-it-py<4,>=3;"))
         self.assertTrue(shell[0].startswith("prompt-toolkit<4,>=3.0.52;"))
+        self.assertTrue(extraction[0].startswith("opendataloader-pdf==2.5.13;"))
 
     def test_sdist_contains_sources_and_docs_without_local_material(self):
         with tarfile.open(self.sdist) as archive:
             names = {"/".join(Path(name).parts[1:]) for name in archive.getnames()}
         self.assertTrue(PUBLIC_FILES <= names)
         self.assertIn("tests/test_packaging.py", names)
-        private_parts = {"sources", "local-corpus", ".sol-corpus-work", "AGENTS.md"}
+        private_parts = {"sources", "local-corpus", ".sol-corpus-work", ".sol-extractions",
+                         ".sol-ingest-work", "AGENTS.md"}
         for name in names:
             self.assertFalse(private_parts.intersection(Path(name).parts), name)
             self.assertFalse(name.endswith((".pdf", ".png", ".zip", ".jsonl", ".sol-workspace.json", ".sol-workspace.md")), name)
@@ -210,6 +219,39 @@ class PackagingTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("usage:", result.stdout)
+
+    def test_installed_extraction_help_does_not_require_extraction_or_corpus_extras(self):
+        installed = Path(self.temporary.name) / "extraction-help-wheel"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        program = """
+import builtins, sys
+sys.path.insert(0, sys.argv[1])
+original_import = builtins.__import__
+def guard(name, *args, **kwargs):
+    if name.split('.')[0] in {'markdown_it', 'opendataloader_pdf'} or name in {
+        'sol.corpus.extraction', 'sol.corpus.ingest', 'sol.corpus.backends.opendataloader'}:
+        raise AssertionError('Installed help imported optional operation ' + name)
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = guard
+from sol.corpus.convert import main
+try:
+    main(sys.argv[2:])
+except SystemExit as error:
+    assert error.code == 0
+else:
+    raise AssertionError('Help should exit without running an operation')
+assert 'opendataloader_pdf' not in sys.modules
+assert 'markdown_it' not in sys.modules
+"""
+        for action in ("extract", "normalize", "ingest"):
+            with self.subTest(action=action):
+                result = subprocess.run(
+                    [sys.executable, "-I", "-B", "-c", program, str(installed), action, "--help"],
+                    cwd=self.temporary.name, capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("usage:", result.stdout)
 
     def test_core_only_wheel_proves_interface_dependency_boundary(self):
         """Release-gate fixture only: this is not another installable SOL product."""
@@ -267,6 +309,7 @@ import builtins, json, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 forbidden = ('sol.reader', 'sol.workspace', 'sol.terminal', 'markdown_it',
+             'sol.corpus.extraction', 'sol.corpus.ingest', 'sol.corpus.backends', 'opendataloader_pdf',
              'prompt_toolkit', 'rich', 'textual', 'pypdf', 'pdfplumber')
 original_import = builtins.__import__
 def guard(name, *args, **kwargs):
@@ -336,8 +379,8 @@ import sys
 sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def block_parser(name, *args, **kwargs):
-    if name.startswith("markdown_it"):
-        raise AssertionError("Installed reader must not import the Markdown parser")
+    if name.split('.')[0] in {'markdown_it', 'opendataloader_pdf'}:
+        raise AssertionError("Installed reader must not import an extraction or Markdown backend")
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_parser
 sol = importlib.import_module("sol.reader.app")
@@ -387,7 +430,7 @@ import builtins, importlib, sys
 sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def block_optional_and_profiles(name, *args, **kwargs):
-    if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit'}
+    if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'opendataloader_pdf'}
             or name in {'sol.workspace.profiles', 'sol.workspace.catalog'}):
         raise AssertionError('Temporary/one-shot reader imported ' + name)
     return original_import(name, *args, **kwargs)
@@ -446,7 +489,7 @@ import builtins, importlib, sys
 sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def block_optional(name, *args, **kwargs):
-    if name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit'}:
+    if name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'opendataloader_pdf'}:
         raise AssertionError('Installed basic reader imported optional dependency ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional
@@ -533,7 +576,7 @@ import builtins, importlib, sys
 sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def block_optional(name, *args, **kwargs):
-    if name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit'}:
+    if name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'opendataloader_pdf'}:
         raise AssertionError('Installed upgrade imported optional dependency ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional
@@ -651,7 +694,7 @@ import sys
 sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def block_optional(name, *args, **kwargs):
-    if name.split(".")[0] in {"markdown_it", "rich", "textual", "prompt_toolkit"}:
+    if name.split(".")[0] in {"markdown_it", "rich", "textual", "prompt_toolkit", "opendataloader_pdf"}:
         raise AssertionError("Installed workspace must not import optional dependency " + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional
@@ -754,7 +797,7 @@ urllib.request.urlopen = block_network
 urllib.request.OpenerDirector.open = block_network
 original_import = builtins.__import__
 def block_optional(name, *args, **kwargs):
-    if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'requests', 'httpx'}
+    if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'opendataloader_pdf', 'requests', 'httpx'}
             or name in {'sol.workspace.profiles', 'sol.workspace.catalog', 'sol.terminal.source', 'sol.terminal.kitty'}):
         raise AssertionError('Inquiry export imported unrelated dependency ' + name)
     return original_import(name, *args, **kwargs)

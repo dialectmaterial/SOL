@@ -421,7 +421,8 @@ class ComparisonView:
             header += _wrap("Refresh failed: " + error, width)[:2]
         refresh_command = self.snapshot.get("refresh_command") or "compare open " + shlex.quote(name)
         footer = _wrap("a/b select | arrows scroll | PgUp/PgDn | n/p pair | Tab view | q close", width)
-        footer += _wrap("Refresh in reader: " + refresh_command, width)
+        footer += _wrap("q returns to your shell; rerun sol compare to refresh" if self.snapshot.get("terminal_mode") == "foreground"
+                        else "Refresh in reader: " + refresh_command, width)
         positions = list(range(self.pair * 2, min(len(self.snapshot["records"]), self.pair * 2 + 2)))
         available = rows - len(header) - len(footer)
         wide = len(positions) == 2 and columns >= 72

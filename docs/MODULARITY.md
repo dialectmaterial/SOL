@@ -9,7 +9,7 @@ Independent selection is the architectural destination. The first implemented st
 | Component | Responsibility | Boundary |
 | --- | --- | --- |
 | CORE | Shared book and passage models, verified corpus loading, canonical reference resolution, virtual paths, and corpus configuration | Does not import reader command loops, workspace storage, terminal adapters, or machine-learning frameworks |
-| BEING | Reading, virtual-shell navigation, continuity, attributed notes, comparison, review testimony, and relations | Consumes shared corpus APIs; owns reader actions and personal workspace operations |
+| BEING | Scholarly reading, continuity, attributed notes, comparison, review testimony, and relations | Consumes shared corpus APIs; owns reader actions and personal workspace operations; the virtual shell is one optional interface |
 | ESSENCE | Optional applications, terminal-host integrations, linguistic experiments, classifiers, and other research tools | Consumes shared APIs or an explicit data protocol; does not redefine passage identity or require the BEING shell to start |
 | CONCEPT | Future reproducible environment and operating-system composition | Selects applications and configuration deliberately; installing the reader must not require a SOL operating system |
 
@@ -17,11 +17,24 @@ Dependency direction is toward shared contracts, not toward another application'
 
 Current folders are implementation units, not a claim that each already forms an independently installable product. In particular, `sol.terminal` contains optional adapters in the aggregate distribution; its placement does not make CORE dependent on kitty or prompt_toolkit.
 
+The architecture handoff sets the reader and scholarly workspace, not a simulated
+POSIX environment, as BEING's governing purpose. ESSENCE computation belongs in
+a real Unix shell and replaceable applications, with deliberate movement back to
+BEING. Existing virtual navigation remains compatible; it is not a second shell
+language or the canonical meaning of a passage.
+
 ### The shared corpus contract
 
 `sol.corpus.contract` remains the implementation of canonical validation and verified snapshots. It is a shared-domain dependency, not reader application code: it does not import the reader, workspace, or terminal layers. `sol.core` exposes its snapshot and error types through the public boundary rather than duplicating the contract.
 
 Corpus maintenance and initial PDF conversion remain explicit tooling in `sol.corpus.convert` and related extraction modules. Ordinary loading of an existing index does not perform conversion, require the optional Markdown parser, or download a source. A future package split must include the shared contract wherever CORE requires it while keeping conversion-only dependencies optional.
+
+The first handoff implementation adds a replaceable OpenDataLoader extraction
+adapter. Physical extraction yields unreviewed, source-bound candidate artifacts;
+only explicit mappings and reviewed Markdown can enter a separate canonical copy.
+SOL preserves existing identities and semantic metadata rather than deriving them
+from an engine's headings, element IDs, or rectangles. This is not a from-scratch
+generic book importer. [Extraction workflow](EXTRACTION.md).
 
 ## Public CORE API, version 1
 
@@ -75,7 +88,15 @@ pipx installs applications into isolated environments. Installing two SOL applic
 
 Later NixOS modules or profiles can compose a reader, selected ESSENCE applications, and their configuration. Each service or integration should be enabled deliberately rather than treating CONCEPT as a mandatory runtime dependency for BEING. NixOS provides typed options and enable switches for such composition; the particular SOL options have not been designed or implemented here. No operating-system configuration is changed by this step. [NixOS: writing modules](https://nixos.org/manual/nixos/stable/#sec-writing-modules).
 
-## Staged next steps and acceptance gates
+## Handoff priorities and acceptance gates
+
+The immediate order is: an extraction adapter with a reviewed-copy proof,
+semantic/interface separation, a minimal CORE reference protocol, one reversible
+BEING–ESSENCE handoff, then one substantial experiment. These refine the longer
+packaging roadmap below rather than requiring a broad rewrite. Dependencies remain
+replaceable, and existing corpus/workspace contracts remain binding. The current
+extraction step does not claim that a cross-process protocol or reversible shell
+bridge has already shipped.
 
 1. **Establish the internal CORE boundary.** Move shared models, reference/path operations, configuration, and indexed corpus loading behind `sol.core`. Keep compatibility imports and the current aggregate installation. Test that importing CORE and CLI options does not import the shell, workspace, terminal, extraction tooling, or optional frameworks.
 2. **Exercise it with real consumers.** The reader and launcher should use this boundary; future ESSENCE applications can do likewise. Preserve existing reader behavior, corpus verification, workspace reopenability, and installed command tests. Add new APIs only for demonstrated cross-component needs.

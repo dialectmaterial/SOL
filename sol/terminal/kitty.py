@@ -154,6 +154,71 @@ def launch_reader(arguments: list[str]) -> int:
         return completed.returncode
 
 
+def launch_zsh(arguments: list[str]) -> int:
+    """Open a normal interactive shell with a verified corpus as its directory."""
+    import argparse
+    from sol.core.config import discover_corpus
+    from sol.core.corpus import load_corpus_book
+
+    class NativeParser(argparse.ArgumentParser):
+        def error(self, message):
+            raise KittyError(message)
+
+    parser = NativeParser(prog="sol-kitty --zsh", add_help=False,
+                          description="Open normal zsh in SOL's private kitty profile.")
+    parser.add_argument("-h", "--help", action="store_true")
+    parser.add_argument("--corpus", type=Path, metavar="DIRECTORY")
+    parser.add_argument("--directory", type=Path, metavar="DIRECTORY",
+                        help="initial shell directory (default: selected corpus)")
+    if any(not isinstance(value, str) or any(c in value for c in "\r\n\0") for value in arguments):
+        raise KittyError("SOL launcher arguments cannot contain line breaks or NUL characters.")
+    options = parser.parse_args(arguments)
+    if options.help:
+        print(parser.format_help())
+        return 0
+    executable, shell = shutil.which("kitty"), shutil.which("zsh")
+    if executable is None or shell is None:
+        raise KittyError("kitty and zsh are required for sol-kitty --zsh.")
+    corpus = discover_corpus(options.corpus)
+    if corpus is None:
+        raise KittyError("No local Markdown corpus found; choose --corpus DIRECTORY or sol --set-corpus DIRECTORY.")
+    corpus = corpus.expanduser().resolve()
+    load_corpus_book(corpus)
+    directory = options.directory.expanduser().resolve() if options.directory else corpus
+    if not directory.is_dir():
+        raise KittyError(f"Shell directory not found: {directory}")
+    sol_command = shutil.which("sol")
+    if sol_command is None:
+        sibling = Path(sys.executable).parent / "sol"
+        sol_command = str(sibling) if sibling.is_file() and os.access(sibling, os.X_OK) else None
+    if sol_command is None:
+        raise KittyError("The sol command must be installed or on PATH before opening native zsh.")
+    environment = _child_environment()
+    environment["SOL_CORPUS"] = str(corpus)
+    command_directory = str(Path(sol_command).absolute().parent)
+    environment["PATH"] = os.pathsep.join([command_directory, *[
+        value for value in environment.get("PATH", "").split(os.pathsep) if value != command_directory
+    ]])
+    launch = ["launch", "--title=SOL zsh", "--env=SOL_CORPUS=" + str(corpus), shell, "-i"]
+    if any(any(c in value for c in "\r\n\0") for value in launch):
+        raise KittyError("SOL launch paths cannot contain line breaks or NUL characters.")
+    with tempfile.TemporaryDirectory(prefix="sol-zsh-") as temporary:
+        root = Path(temporary)
+        profile, session = root / "kitty.conf", root / "shell.session"
+        profile.write_text(KITTY_PROFILE, encoding="utf-8")
+        session.write_text("layout splits\n" + shlex.join(launch) + "\n", encoding="utf-8")
+        profile.chmod(0o600)
+        session.chmod(0o600)
+        try:
+            completed = subprocess.run(
+                [executable, "--config", str(profile), "--session", str(session)],
+                cwd=str(directory), env=environment, check=False,
+            )
+        except OSError as error:
+            raise KittyError(f"Could not start kitty: {error}") from error
+        return completed.returncode
+
+
 class SourcePane:
     """The reader owns one specific kitty window and one private mailbox."""
 
@@ -612,6 +677,8 @@ def render_child(page_index: int) -> int:
 def main(argv=None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     try:
+        if arguments and arguments[0] == "--zsh":
+            return launch_zsh(arguments[1:])
         if arguments and arguments[0] == "--comparison-viewer":
             if len(arguments) != 2:
                 raise KittyError("Internal comparison usage: --comparison-viewer SELECTION_MAILBOX")
@@ -627,7 +694,10 @@ def main(argv=None) -> int:
             return viewer_main(Path(arguments[1]))
         if arguments in (["-h"], ["--help"]):
             from sol.reader.options import build_parser
-            print("Usage: sol-kitty [SOL options]\n\nOpen SOL in its private kitty profile. "
+            print("Usage: sol-kitty [SOL options]\n"
+                  "       sol-kitty --zsh [--corpus DIRECTORY] [--directory DIRECTORY]\n\n"
+                  "Use --zsh for normal shell commands and pipelines.\n"
+                  "Open SOL in its private kitty profile. "
                   "Use source show in the reader to open the verified source pane.\n"
                   "Ctrl+Alt+Left/Right switches panes; add Shift to resize.\n"
                   "The profile leaves SOL's Ctrl+S and Ctrl+C editing keys unchanged.\n")

@@ -118,6 +118,48 @@ With `--json`, a single passage is an object; search, complete file, and context
 
 Help, version information, and the guide remain available without a corpus. `--structure` can show an abbreviated outline until the text is configured. One-shot actions such as search, passage opening and inspection do not ask for a workspace or actor. With redirected input, a persistent shell needs both `--workspace NAME` and `--actor NAME`; missing labels cause an actionable error without consuming input. Use `-n`, `-r`, or a one-shot action for scripts that need no saved workspace.
 
+## Use normal zsh commands
+
+Open the native shell mode:
+
+~~~sh
+sol-kitty --zsh
+~~~
+
+This starts your installed interactive zsh in the verified corpus directory, using
+your usual shell startup files. `ls`, `cd`, `rg`, `less`, pipes, redirection,
+wildcards and other shell commands use their normal meanings. The SOL profile is
+private to this kitty launch. To choose another initial folder, add
+`--directory DIRECTORY`; `--corpus DIRECTORY` selects the corpus explicitly.
+
+For example, inside that zsh window:
+
+~~~sh
+cd hegel/being/i-determinateness-quality
+sol read 1-being.md --plain | less
+sol read 1-being.md --markdown > /tmp/being-excerpt.md
+sol compare 1-being.md 2-existence.md
+~~~
+
+`sol read FILE` selects the complete canonical file in order. Relative filenames
+follow the shell's current directory; corpus-relative and absolute canonical
+paths also work. Default output identifies the text and its contributors, and
+keeps source-review warnings visible. `--plain` emits unwrapped text only;
+`--markdown` preserves the indexed Markdown. `--json` emits an object containing
+`selection`, `corpus`, and full canonical `records` with IDs, attribution and
+source references. Generated virtual `.txt` reader paths remain accepted.
+
+`sol compare FILE_A FILE_B` opens a foreground comparison. Press `a` or `b` to
+select a text, arrows to scroll, Tab to change views, and `q` to return to zsh.
+Use `--question TEXT` to keep an inquiry alongside the texts; `--json` prints the
+comparison snapshot for a pipeline. Repeat the command to capture current text
+again. These first native commands inspect the corpus without opening or changing
+a personal workspace. Notes and verified PDF source viewing remain available
+through the existing reader while their native command adapters are developed.
+
+Existing one-shot commands continue to compose with normal tools, for example
+`sol --search "contradiction" --within /ESSENCE --json | jq 'length'`.
+
 ## Work inside the virtual shell
 
 Start with `sol`; `sol --shell` means the same persistent reader. The workspace picker shows up to ten recognized workspaces bound to the current corpus and source fingerprint, ordered by their latest recorded activity. Enter a displayed number to reopen one, or a name to create or select a workspace. Press Enter to choose the first displayed workspace; if none is available, the default is `reading`. The picker inspects candidates without modifying them and skips unrelated, incompatible, symlink, or WAL/sidecar-bearing files. A name entered explicitly still receives normal validation and can open a workspace omitted from suggestions rather than silently choosing another one.

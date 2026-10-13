@@ -9,6 +9,8 @@ prune local-corpus
 prune local-corpus.building
 prune local-corpus.building-*
 prune .sol-corpus-work
+prune .sol-extractions
+prune .sol-ingest-work
 prune .venv
 prune build
 prune dist

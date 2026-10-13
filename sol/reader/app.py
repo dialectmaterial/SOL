@@ -1216,6 +1216,10 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] in {"read", "compare"}:
+        from sol.terminal.commands import main as command_main
+        return command_main(arguments)
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

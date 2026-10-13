@@ -8,6 +8,8 @@ local-corpus/
 local-corpus.building/
 local-corpus.building-*/
 .sol-corpus-work/
+.sol-extractions/
+.sol-ingest-work/
 
 # Python-generated files
 __pycache__/

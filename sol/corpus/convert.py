@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""One-time, edition-specific PDF importer; canonical Markdown is edited thereafter.
+"""Explicit corpus maintenance and reviewed extraction candidates.
 
-Conversion uses font-aware Poppler coordinates. Reindexing and ordinary reading
-never open the PDF. Generated manuscript text must stay local and Git-ignored.
+The historical Cambridge importer uses audited, font-aware Poppler coordinates.
+Alternative extraction produces private candidates, not canonical identities.
+Reindexing and ordinary reading never open the PDF.
 """
 from __future__ import annotations
 
@@ -876,11 +877,40 @@ def main(argv=None):
     create.add_argument("--work", type=Path, default=Path(".sol-corpus-work"))
     index = commands.add_parser("index", help="regenerate JSONL after canonical Markdown corrections")
     index.add_argument("corpus", type=Path, nargs="?", default=Path("local-corpus"))
+    extract = commands.add_parser("extract", help="create a private local OpenDataLoader review candidate")
+    extract.add_argument("--pdf", type=Path, required=True, metavar="FILE")
+    extract.add_argument("--output", type=Path, required=True, metavar="FILE.json",
+                         help="new candidate artifact; existing outputs are never overwritten")
+    extract.add_argument("--pages", metavar="RANGES", help="one-based PDF pages, e.g. 80,282-283")
+    normalize = commands.add_parser("normalize", help="normalize external OpenDataLoader JSON for review")
+    normalize.add_argument("--json", dest="raw_json", type=Path, required=True, metavar="FILE")
+    normalize.add_argument("--pdf", type=Path, required=True, metavar="FILE")
+    normalize.add_argument("--output", type=Path, required=True, metavar="FILE.json")
+    normalize.add_argument("--backend-version", required=True, metavar="VERSION",
+                           help="declared external extraction version; execution is not verified")
+    ingest = commands.add_parser("ingest", help="apply explicit reviewed corrections to a new corpus copy")
+    ingest.add_argument("--candidate", type=Path, required=True, metavar="FILE")
+    ingest.add_argument("--review", type=Path, required=True, metavar="FILE")
+    ingest.add_argument("--baseline", type=Path, required=True, metavar="CORPUS")
+    ingest.add_argument("--output", type=Path, required=True, metavar="NEW_CORPUS",
+                        help="new reviewed corpus directory; baseline and existing targets stay unchanged")
     args = parser.parse_args(argv)
     try:
-        summary = (convert(args.pdf, args.output, args.work) if args.command == "convert"
-                   else reindex(args.corpus))
-    except (CorpusError, OSError, subprocess.SubprocessError, ET.ParseError) as error:
+        if args.command == "convert":
+            summary = convert(args.pdf, args.output, args.work)
+        elif args.command == "index":
+            summary = reindex(args.corpus)
+        elif args.command == "extract":
+            from sol.corpus.extraction import extract_candidate
+            summary = extract_candidate(args.pdf, args.output, pages=args.pages)
+        elif args.command == "normalize":
+            from sol.corpus.extraction import normalize_candidate
+            summary = normalize_candidate(args.raw_json, args.pdf, args.output,
+                                          backend_version=args.backend_version)
+        else:
+            from sol.corpus.ingest import ingest_reviewed
+            summary = ingest_reviewed(args.candidate, args.review, args.baseline, args.output)
+    except (CorpusError, ValueError, OSError, subprocess.SubprocessError, ET.ParseError) as error:
         parser.exit(1, f"sol corpus: {error}\n")
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 

@@ -1,8 +1,16 @@
 # OpenDataLoader as a second opinion for SOL
 
-Research checked on 2026-10-12. This evaluates documented capabilities, not a
+Historical research checked on 2026-10-12. This evaluates documented capabilities, not a
 runtime trial: no packages, Java archives or models were installed; no book pages
 were converted, uploaded or changed.
+
+Implementation follow-up, 2026-10-13: SOL now has an optional, local-only adapter
+pinned to OpenDataLoader 2.5.13, tested with the actual SDK on invented PDF input
+and with synthetic boundary fixtures. It emits review candidates, not a new
+canonical edition. Explicitly reviewed corrections can be published into a new,
+ID-preserving corpus copy. The existing book corpus was not reconverted. See the
+[extraction workflow and limits](../EXTRACTION.md); the investigation below remains
+the record of its earlier documentation-only assessment.
 
 ## Recommendation
 
@@ -113,4 +121,6 @@ claims do not prove textual accuracy or SOL's accessibility.
    followed by reindexing. Consider a separately authorized, loopback-only formula
    trial only if local extraction cannot answer the specific problem.
 
-No experiment or integration was performed by this research.
+No experiment or integration was performed by the historical research above;
+the separately documented adapter follow-up does not validate this entire book's
+transcription, typography, notes, formulas, or source rectangles.

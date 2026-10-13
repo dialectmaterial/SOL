@@ -121,3 +121,8 @@ The [usage manual](docs/USAGE.md) covers navigation, configuration, workspace hi
 [Interface research](docs/research/INTERFACE_RESEARCH.md) and the [OpenDataLoader investigation](docs/research/OPENDATALOADER_RESEARCH.md) record options without making them reader dependencies.
 
 From the checkout, run `python -m sol` to use the current source. See the [development checks](docs/USAGE.md#development-checks) for an isolated environment and the test suite.
+
+For normal shell commands and pipes, use `sol-kitty --zsh`. It opens zsh in the
+corpus directory. `sol read FILE --plain | less` reads canonical text;
+`sol compare FILE_A FILE_B` opens a comparison and returns to zsh with `q`.
+See [native shell usage](docs/USAGE.md#use-normal-zsh-commands).
