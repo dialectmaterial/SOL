@@ -2,19 +2,13 @@
 
 ## Hegel’s *Science of Logic* in the terminal
 
-SOL is a reader and philosophical workspace for Hegel’s *Science of Logic*. Its name is a recursive acronym: **SOL Organizes Logic**.
+SOL is a recursive acronym that stands for SOL Organizes Logic. It is a reader and workspace for Hegel’s *Science of Logic*. Its larger ambition is to become an encyclopedic system for studying how texts, concepts, and the Idea are organized, bringing philosophical science into conversation with computational linguistics, machine learning, deep learning and operating systems.
 
-The organizing concern is the Idea in Hegel’s technical sense: the articulation and development of logical determinations through Being, Essence, and Concept. SOL makes this movement accessible for reading and investigation. Its interfaces and classifications are instruments of inquiry, not substitutes for the argument.
-
-> “The concept is concrete and the richest in determination”
-
-> “It is essentially only spirit that can grasp the concept as concept”
-
-Hegel, *Science of Logic*, “The particular concept,” Remark.
+The organizing concern is the Idea in Hegel’s technical sense: the articulation and derivation of logical determinations through Being, Essence, and Concept. SOL makes this movement accessible for reading and investigation. The interfaces and classifications are the instruments as well as the objects of its inquiry.
 
 The book appears as a virtual filesystem rooted in `/BEING`, `/ESSENCE`, and `/CONCEPT`. Sections become directories; their introductory prose and terminal subdivisions become text files. These paths belong to the book, not your computer’s filesystem. SOL runs inside a terminal; its book shell is not Bash or Zsh.
 
-Readable Markdown is the canonical text, with a generated JSONL index for the reader and other tools. Passages retain permanent identifiers, attribution, structural context, and printed and PDF page references. Ordinary reading does not extract the PDF again.
+Readable Markdown is the canonical text, with a generated JSONL index for the reader and other tools. Passages retain permanent identifiers, attribution, structural context, and printed and PDF page references.
 
 ## Install
 
@@ -101,7 +95,7 @@ The present foundation is careful reading: a dependable corpus, clear navigation
 
 ### ESSENCE: applications and experiments
 
-Concordances, computational linguistics, classification, topic modeling, machine learning, and deep learning can investigate explicit and discovered organizations of the text. Every method should answer a research question and retain its connection to the passages that produced it. Terminal-host integration belongs here; the optional `sol-kitty` launcher and verified source-page viewer are documented in the [manual](docs/USAGE.md#read-in-kitty-and-inspect-the-source).
+Computational linguistics, classification, concordances, topic modeling, machine learning, and deep learning can investigate explicit and discovered organizations of the text. Every method should answer a research question and retain its connection to the passages that produced it. Terminal-host integration belongs here; the optional `sol-kitty` launcher and verified source-page viewer are documented in the [manual](docs/USAGE.md#read-in-kitty-and-inspect-the-source).
 
 ### CONCEPT: an operating system
 
