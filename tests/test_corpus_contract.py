@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import sol_corpus_contract as contract
+import sol.corpus.contract as contract
 
 
 class CorpusContractTests(unittest.TestCase):

@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import patch
 from uuid import UUID
 
-from sol_workspace import (
+from sol.workspace.store import (
     APPLICATION_ID, SCHEMA_VERSION, Workspace, WorkspaceConflict, WorkspaceError, _SCHEMA,
 )
 
@@ -311,8 +311,8 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(self.workspace.list_history()[0]["current_id"], A)
 
     def test_review_append_order_survives_equal_timestamps_and_uuid_sorting(self):
-        with patch("sol_workspace._now", return_value="2026-01-01T00:00:00Z"), \
-                patch("sol_workspace.uuid4", side_effect=[UUID(C), UUID(A)]):
+        with patch("sol.workspace.store._now", return_value="2026-01-01T00:00:00Z"), \
+                patch("sol.workspace.store.uuid4", side_effect=[UUID(C), UUID(A)]):
             first = self.workspace.add_review(A, "inspected")
             second = self.workspace.add_review(A, "correction_needed")
         self.assertEqual(self.workspace.list_reviews(), [first, second])
@@ -579,7 +579,7 @@ class WorkspaceTests(unittest.TestCase):
             destination.write_bytes(b"Another process owns this file.")
             return link(staged, target)
 
-        with patch("sol_workspace.os.link", side_effect=competitor), \
+        with patch("sol.workspace.store.os.link", side_effect=competitor), \
                 self.assertRaisesRegex(WorkspaceError, "already exists"):
             self.workspace.backup(destination)
         self.assertEqual(destination.read_bytes(), b"Another process owns this file.")
@@ -598,7 +598,7 @@ class WorkspaceTests(unittest.TestCase):
             self.workspace.backup(destination)
         self.assertFalse(destination.exists())
         self.assertEqual(list(self.root.glob(".sol-backup-*")), [])
-        with patch("sol_workspace.time.monotonic", side_effect=[0, 31]), \
+        with patch("sol.workspace.store.time.monotonic", side_effect=[0, 31]), \
                 self.assertRaisesRegex(WorkspaceError, "timed out"):
             self.workspace.backup(destination)
         self.assertFalse(destination.exists())
@@ -612,7 +612,7 @@ class WorkspaceTests(unittest.TestCase):
             if label == "directory" and not hasattr(os, "O_DIRECTORY"):
                 continue
             destination = self.root / (label + ".sqlite3")
-            with self.subTest(label=label), patch("sol_workspace.os.fsync", side_effect=failures), \
+            with self.subTest(label=label), patch("sol.workspace.store.os.fsync", side_effect=failures), \
                     self.assertRaisesRegex(WorkspaceError, "synthetic fsync failure"):
                 self.workspace.backup(destination)
             self.assertFalse(destination.exists())
@@ -662,8 +662,8 @@ class WorkspaceTests(unittest.TestCase):
             self.assertEqual(reopened[key], exported[key])
 
     def test_workspace_does_not_read_or_change_corpus_files(self):
-        with patch("sol_workspace.Path.read_text", side_effect=AssertionError("No corpus reads")), \
-                patch("sol_workspace.Path.read_bytes", side_effect=AssertionError("No corpus reads")):
+        with patch("sol.workspace.store.Path.read_text", side_effect=AssertionError("No corpus reads")), \
+                patch("sol.workspace.store.Path.read_bytes", side_effect=AssertionError("No corpus reads")):
             self.workspace.set_bookmark("start", A)
             self.workspace.add_annotation(A, "An independent personal note.")
             self.workspace.save_state(state(), None)

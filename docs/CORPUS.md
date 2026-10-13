@@ -21,19 +21,20 @@ material.
 ## Create, inspect, and index
 
 Python 3.10 or newer is required. The converter needs Poppler's PDF tools and the
-CommonMark parser listed in `requirements-corpus.txt`. On Debian/Ubuntu:
+CommonMark parser supplied by the `corpus` extra. Dependency requirements are
+defined once in `pyproject.toml`. On Debian/Ubuntu:
 
 ```sh
 sudo apt install poppler-utils
 python3 -m venv .venv
 . .venv/bin/activate
-python3 -m pip install -r requirements-corpus.txt
+python3 -m pip install '.[corpus]'
 ```
 
 From the project directory, create the local candidate conversion:
 
 ```sh
-python3 sol_corpus.py convert --pdf Hegel-SOL.pdf
+python3 -m sol.corpus.convert convert --pdf Hegel-SOL.pdf
 ```
 
 The default destination is `local-corpus/`. Read its manifest and audit information
@@ -52,22 +53,22 @@ reconvert an existing corpus merely because its source PDF has been renamed.
 After making canonical Markdown corrections, rebuild the index:
 
 ```sh
-python3 sol_corpus.py index local-corpus
+python3 -m sol.corpus.convert index local-corpus
 ```
 
 The lower-level contract tool can also rebuild or check the generated index:
 
 ```sh
-python3 sol_corpus_contract.py local-corpus
-python3 sol_corpus_contract.py local-corpus --check
+python3 -m sol.corpus.contract local-corpus
+python3 -m sol.corpus.contract local-corpus --check
 ```
 
 Use the corpus in the existing terminal reader:
 
 ```sh
-python3 sol.py --structure
-python3 sol.py --corpus local-corpus -r
-python3 sol.py --corpus local-corpus -n
+python3 -m sol --structure
+python3 -m sol --corpus local-corpus -r
+python3 -m sol --corpus local-corpus -n
 ```
 
 The installed reader can remember a default corpus independently of the working
@@ -90,13 +91,14 @@ commands to answer missing identity questions.
 `--set-corpus` validates the corpus before saving its absolute path in
 `$XDG_CONFIG_HOME/sol/config.json`, with `~/.config/sol/config.json` as the default
 location. It stores a location, not a copy of the corpus. Run the command again if
-the corpus moves. `python3 sol.py --set-corpus DIRECTORY` supplies the same setting
+the corpus moves. `python3 -m sol --set-corpus DIRECTORY` supplies the same setting
 when running directly from the checkout.
 
 Reader discovery proceeds through an explicit `--corpus`, the `SOL_CORPUS`
 environment variable, `./local-corpus`, the saved default, a local pipx
-installation's remembered source checkout, and a corpus alongside a directly run
-`sol.py`. A local `pipx install .` can therefore find the checkout's corpus from
+installation's remembered source checkout, and `local-corpus` in a recognized SOL
+checkout, whose project identity is checked in `pyproject.toml`.
+A local `pipx install .` can therefore find the checkout's corpus from
 another directory without packaging its private contents. An installation from
 GitHub should use `--set-corpus` to locate separately supplied local text. Refresh
 installed code with `pipx reinstall sol-organizes-logic` after an update.

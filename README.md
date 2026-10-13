@@ -2,392 +2,115 @@
 
 ## Hegel’s *Science of Logic* in the terminal
 
-SOL is a recursive acronym that stands for SOL Organizes Logic. It is a reader and virtual shell for Hegel’s *Science of Logic*. Its larger ambition is to become an environment for studying how texts, concepts, and the idea are organized, bringing philosophy into conversation with computational linguistics, machine learning, deep learning and operating systems.
+SOL is a reader and philosophical workspace for Hegel’s *Science of Logic*. Its name is a recursive acronym: **SOL Organizes Logic**.
 
-Its organizing concern is the idea itself, in Hegel’s technical sense:
+The organizing concern is the Idea in Hegel’s technical sense: the articulation and development of logical determinations through Being, Essence, and Concept. SOL makes this movement accessible for reading and investigation. Its interfaces and classifications are instruments of inquiry, not substitutes for the argument.
 
-> "But the adequate concept is something higher; it properly denotes the agreement of the concept with reality, and this is not the concept as such but the idea."
+> “The concept is concrete and the richest in determination”
 
-Hegel@SOL:/CONCEPT/i-subjectivity/1-the-concept/b-the-particular-concept/remark.txt$
+> “It is essentially only spirit that can grasp the concept as concept”
 
-Organization here means the articulation and development of logical determinations through Being, Essence, and Concept. The software provides ways to read and investigate this movement; its classifications and interfaces are instruments of inquiry, not substitutes for the argument.
+Hegel, *Science of Logic*, “The particular concept,” Remark.
 
-The reader uses readable Markdown and a generated JSONL index. Each passage retains its permanent identifier, location, attribution, printed pages, and PDF pages.
+The book appears as a virtual filesystem rooted in `/BEING`, `/ESSENCE`, and `/CONCEPT`. Sections become directories; their introductory prose and terminal subdivisions become text files. These paths belong to the book, not your computer’s filesystem. SOL runs inside a terminal; its book shell is not Bash or Zsh.
 
-The shell presents the book through `/BEING`, `/ESSENCE`, and `/CONCEPT`. Sections and subdivisions become directories; their own introductory prose appears as `00-introduction.txt`. Divisions without children become virtual text files. The canonical corpus preserves the fuller volume hierarchy, editorial material, notes, bibliography, and index.
+Readable Markdown is the canonical text, with a generated JSONL index for the reader and other tools. Passages retain permanent identifiers, attribution, structural context, and printed and PDF page references. Ordinary reading does not extract the PDF again.
 
-Run `sol` to open a persistent reading workspace. It offers recent workspaces for the selected corpus and asks which workspace and actor to use. An actor is the name recorded on your own notes and assertions, not Hegel's name or a login account. Use `sol -r` for one random quotation and `sol -n` for a temporary shell without a workspace or actor.
+## Install
 
-SOL’s book shell is an application running inside a terminal, not a replacement for Bash or Zsh and not yet a terminal emulator. Its virtual paths refer to the book, not the host filesystem.
-
-## Install with pipx
-
-Python 3.10 or newer is required. For a new checkout, clone the repository and install SOL into its own environment:
+Python 3.10 or newer and [pipx](https://pipx.pypa.io/) are required.
 
 ~~~sh
 git clone https://github.com/dialectmaterial/SOL.git
 cd SOL
-pipx install .
+pipx install '.[shell]'
 pipx ensurepath
-sol --version
 ~~~
 
-If pipx is not installed, Debian and Ubuntu users can install it with `sudo apt install pipx`. After `ensurepath`, open a new terminal if necessary.
+Open a new terminal if `sol` is not yet on your path. The `shell` extra adds the optional enhanced prompt: completion, Emacs or Vi editing, and multiline annotation drafts. Use `pipx install .` for the standard-library reader and basic shell instead. Corpus conversion and index rebuilding use the separate `corpus` extra; see the [usage manual](docs/USAGE.md#install-with-pipx).
 
-The reader and basic shell use Python’s standard library. For the optional enhanced command prompt and multiline note drafts, install the shell extra from the project directory. For an existing installation, this replaces its package environment; it is not a way to overwrite an unrelated command occupying the `sol` name:
+After updating a local checkout, refresh an existing installation with:
 
 ~~~sh
-pipx install --force '.[shell]'
+pipx reinstall sol-organizes-logic
 ~~~
 
-To include the Markdown parser for conversion and index rebuilding, choose the corpus extra, or both extras together:
+## Choose a local corpus
 
-~~~sh
-pipx install '.[corpus]'
-pipx install --force '.[corpus,shell]'
-~~~
-
-An existing installation can be refreshed with `pipx reinstall sol-organizes-logic`. The package supplies three commands: `sol`, `sol-corpus`, and `sol-corpus-check`.
-
-If you previously created a `~/.local/bin/sol` symlink, inspect it before installing:
-
-~~~sh
-readlink ~/.local/bin/sol
-~~~
-
-If its target is your previous SOL script, preserve that link under another name, then install:
-
-~~~sh
-mv -n ~/.local/bin/sol ~/.local/bin/sol-before-pipx
-pipx install '.[corpus]'
-~~~
-
-The rename preserves the old link and does not overwrite an existing backup. If the name is still occupied, inspect it before proceeding.
-
-Alternatively, install directly from the GitHub repository:
-
-~~~sh
-pipx install git+https://github.com/dialectmaterial/SOL.git
-~~~
-
-## Choose the text
-
-The book is supplied locally; installing SOL does not download it or copy the private corpus into the package. A local pipx installation remembers the source checkout through installer metadata, so its `local-corpus` can be found from another directory. From a project containing the corpus, open the reader:
-
-~~~sh
-sol
-~~~
-
-If an older corpus lacks its permanent identity, initialize it explicitly before opening a persistent shell:
-
-~~~sh
-sol-corpus-check local-corpus --initialize-identity
-~~~
-
-This preserves the text and passage IDs. To read without initializing a workspace identity, use `sol -n` or `sol -r`. Select a different corpus for one invocation:
-
-~~~sh
-sol --corpus /absolute/path/to/SOL/local-corpus -r
-~~~
-
-For an installation from GitHub, or to choose a lasting default, save the corpus location once. SOL validates it and stores an absolute path:
+Installing SOL does not supply or download the book. Point it at an existing SOL corpus once:
 
 ~~~sh
 sol --set-corpus /absolute/path/to/SOL/local-corpus
-cd ~
-sol -r
-sol --info /being
-sol --workspace reading --actor "Your name"
 ~~~
 
-The setting lives in `$XDG_CONFIG_HOME/sol/config.json`, or `~/.config/sol/config.json` when that environment variable is unset. If you move the corpus, run `--set-corpus` again. After updating the installed code, use `pipx reinstall sol-organizes-logic` before checking it from home.
+A local pipx installation can also discover `local-corpus` in its source checkout. The saved setting makes your chosen text explicit and works from any directory. If you only have the PDF, follow the [conversion instructions](docs/USAGE.md#maintain-and-review-the-corpus) before ordinary reading.
 
-Discovery prefers `--corpus`, then the `SOL_CORPUS` environment variable, the working directory's `local-corpus`, the saved default, the source checkout remembered by a local pipx installation, and finally a corpus alongside a directly run `sol.py`. A missing or stale selected corpus produces an actionable error rather than switching sources silently.
-
-Ordinary reading never extracts a PDF. Renaming the PDF does not require reconverting an existing corpus. Its source fingerprint and permanent passage identifiers do not depend on the filename; the manifest retains the name used at import as historical provenance.
-
-## Read, search, and inspect
+## Start reading
 
 ~~~sh
-sol
-sol -r
-sol -r --width 72
-sol -n
-sol --structure --depth 2
-sol --read /being/i-determinateness-quality/existence
-sol --first /being/i-determinateness-quality/being
-sol --cat /concept/foreword
-sol --search "ground" --within /essence --word --limit 8
-sol --info /concept/iii-the-idea
-sol guide
-sol --shell
+sol           # Open or create a workspace and choose an actor
+sol -n        # Open a temporary shell without workspace or actor
+sol -r        # Print one random passage
+sol guide     # Show the beginner guide
 ~~~
 
-`--read` selects a random paragraph within a location. `--first` starts in book order, and `--cat` prints a complete virtual file. `--width` controls wrapping between 20 and 240 columns. Default output keeps the heading, path, source pages, and full identifier visible. Meaningful list and schema lines remain separate.
+An actor is your local attribution label, not a login account. A workspace remembers your reading position, bookmarks, notes, comparisons, review testimony, and relations between passages. Existing annotation bodies remain inspectable after an edit.
 
-Search is literal and case insensitive. `--word` matches whole words rather than fragments; `--within` restricts the search to a subtree, and `--limit` bounds the displayed results.
-
-Use `--passage ID` to return to a passage by its identifier or an unambiguous prefix. IDs remain permanent within their corpus; an independent initial conversion allocates its own IDs. Add `--context 2` to read neighboring paragraphs in book order, including across subdivision boundaries. Context accepts 0 to 10 passages on each side. `--info PATH` summarizes a location.
-
-For other terminal tools, `--plain` prints passage text without decorative formatting or ANSI codes. `--json` supplies structured output:
-
-~~~sh
-sol --cat /concept/foreword --plain | less
-sol --search "infinity" --within /being --json
-~~~
-
-With `--json`, a single passage is an object; search, complete file, and context results are arrays in book order. Context includes the selected passage. Each passage carries its identifier, path, text, page references, and review status. Corpus-backed passages also include a `canonical` record containing the Markdown, attribution, note links, and full source references. Their `corpus` metadata retains the import identity, edition, and source fingerprint. Scripts can inspect this information without parsing decorated output.
-
-`guide` and `--guide` open a compact ASCII starting guide containing the project roadmap, the three doctrines, and commands to try. Its default depth is 1; `sol guide --depth 2` reveals more detail. Use `--depth` from 0 to 32 to control how much of an outline appears. For random JSON or plain text, name the action explicitly: `sol -r --json` or `sol -r --plain`.
-
-Help, version information, and the guide remain available without a corpus. `--structure` can show an abbreviated outline until the text is configured. One-shot actions such as search, passage opening and inspection do not ask for a workspace or actor. With redirected input, a persistent shell needs both `--workspace NAME` and `--actor NAME`; missing labels cause an actionable error without consuming input. Use `-n`, `-r`, or a one-shot action for scripts that need no saved workspace.
-
-## Work inside the virtual shell
-
-Start with `sol`; `sol --shell` means the same persistent reader. The workspace picker shows up to ten recognized workspaces bound to the current corpus and source fingerprint, ordered by their latest recorded activity. Enter a displayed number to reopen one, or a name to create or select a workspace. Press Enter to choose the first displayed workspace; if none is available, the default is `reading`. The picker inspects candidates without modifying them and skips unrelated, incompatible, symlink, or WAL/sidecar-bearing files. A name entered explicitly still receives normal validation and can open a workspace omitted from suggestions rather than silently choosing another one.
-
-Supplying `--workspace NAME` or `--actor NAME` skips only the corresponding question. `sol --workspace reading --actor "Your name"` skips both. `sol -n` and `sol -r` do not consult the workspace picker or actor registry. Paths accept lowercase names and omit numbering prefixes when the result is unambiguous. The basic input path can use Python's optional `readline` module for Tab completion.
-
-With the shell extra installed, `--ui auto` uses the enhanced prompt in an interactive terminal. `--ui basic` selects basic input; `--ui prompt` requests the enhanced prompt when eligible and explains a missing extra. `--editing-mode vi` selects Vi editing instead of the Emacs default. Plain output, redirected streams and `TERM=dumb` retain basic input without importing prompt_toolkit. Enhanced command history stays in memory, not a separate history file.
+Try this inside the shell:
 
 ~~~text
-cd being
-cd i-determinateness-quality
-cd existence
+cd /being
 ls
-info
 first
+bookmark add beginning
+note add "What does this beginning presuppose?"
 next
-previous
-context 1
 where
-up
-cd -
-~~~
-
-`ls` lists the current location, `pwd` displays its path, and `tree [PATH] --depth N` shows descendants. `up` moves to the parent; `cd -` returns to the previous directory. Both `/` and `..` work.
-
-`read` and `first` establish a reading selection. `next` and `previous` move within it. In a persistent workspace, browsing with `cd` preserves the selection and cursor. In the temporary `sol -n` shell, changing directories resets that selection; entering `cd .` or the current directory preserves it. Reaching its boundary does not jump elsewhere. `cat FILE` prints a complete file without moving the cursor.
-
-Search the current subtree, then open a result and inspect its surroundings:
-
-~~~text
-cd /essence
-search "ground" --word --limit 6
+search "infinity" --word --limit 5
 open 1
-context 2
-next
+context 1
+help
 ~~~
 
-`search QUERY [PATH]` also accepts an explicit subtree. `open` accepts a full identifier, a unique prefix, or a result number from the latest search. `context [N]` defaults to one neighboring paragraph on each side, accepts 0 to 10, and leaves the cursor unchanged. `where` displays the current passage and its position within the reading selection.
+Bookmark and note commands require a workspace. Use `guide` for examples, `tree --depth 2` for the book’s structure, and `exit` to leave. With the enhanced prompt, `note draft` opens a multiline note: Ctrl-S saves and Ctrl-C cancels. Use `sol --ui basic` if you prefer basic input.
 
-Use `info [PATH]` for a location summary, `guide [PATH] --depth N` for a scoped guide, `help` for command syntax, and `exit` or `quit` to leave.
-
-A useful comparison workflow is to search a term in one doctrine, inspect the surrounding prose, then repeat the search in another. Permanent identifiers let you record those observations and return to exactly the same passages.
-
-## Keep a reading workspace
-
-The default shell remembers an inquiry. Before its first use with an older corpus, explicitly initialize the corpus identity from the project directory, then select the workspace and actor:
+One-shot commands work without opening a workspace:
 
 ~~~sh
-sol-corpus-check local-corpus --initialize-identity
-sol --workspace quantity-study --actor "Your name"
+sol --structure --depth 2
+sol --search "ground" --within /essence --word --limit 8
+sol --passage ID --context 1
+sol -r --plain
+sol -r --json
 ~~~
 
-Initialization adds a permanent corpus UUID and updates its index metadata without changing Markdown, passage IDs, or the index text. It does not reconvert the PDF. Ordinary reading never performs this change automatically.
+Replace `ID` with an identifier displayed by your own corpus. Passage output shows its location and source pages; `--plain` and `--json` support pipelines and scripts.
 
-New conversions already include a corpus identity; this command retains it when present and initializes an older corpus once.
+## The three stages
 
-A workspace restores its saved passage and reading scope when reopened. Actor labels are remembered separately in `$XDG_DATA_HOME/sol/profiles.sqlite3`, or `~/.local/share/sol/profiles.sqlite3`. Accepting a new name during shell setup records that label locally. This is not authentication; existing notes retain their original author names. Browsing with `cd` does not erase the saved scope or cursor. `workspace history --limit 10` preserves earlier checkpoints as visits, not claims that a passage was understood. `resume REVISION` revisits a historical checkpoint as a new saved revision; it does not erase later history.
+### BEING: reader and virtual shell
 
-~~~text
-first /being
-bookmark add starting-point
-note add "*Question:* What does this beginning presuppose?"
-review show
-review record inspected --issue "Inspected the canonical record; PDF comparison remains."
-cd /essence
-where
-bookmark open starting-point
-workspace history --limit 10
-workspace check
-~~~
-
-Use `bookmark list`, `bookmark set NAME`, or `bookmark remove NAME` to inspect, deliberately replace, or remove a bookmark. Bookmarks target readable passages. `note list` shows personal annotations, not the edition's notes; `note show NOTE_ID` opens one. Annotation Markdown is stored and displayed literally. Notes target whole records, not selected words. `--on ID` can select an explicit record for a note or review instead of the current passage.
-
-With the enhanced prompt, `note draft` opens a multiline personal note for the current record; `note draft --on ID` chooses another target. Enter inserts a line break, Ctrl-S saves, and Ctrl-C cancels. The target UUID and inspected text digest are captured before drafting, then checked again before one annotation is inserted. Cancelled drafts are discarded and draft bodies never enter command history. Basic input retains `note add "TEXT"`.
-
-New workspaces use schema version 2, which retains a sequence of annotation snapshots. Use `note history NOTE_ID` to inspect them. `note edit NOTE_ID` opens the existing body in the enhanced multiline editor. In basic input, first inspect the note's current revision, then give an explicit expectation:
-
-~~~text
-note show NOTE_ID
-note edit NOTE_ID "A revised question, retaining its original source binding." --expect-revision 1
-note history NOTE_ID
-~~~
-
-Replace `NOTE_ID` with the identifier from `note list`. Only the note's original actor can edit it. Saving checks its revision and corpus generation again; a competing edit is refused, and saving an identical body adds no revision. Earlier bodies remain inspectable, while the original author, target, and inspected-source digest remain unchanged. Cancelling the editor changes neither notes nor reading position. This is local application-controlled revision history, not cryptographically tamper-proof evidence or authenticated identity.
-
-Existing version-1 workspaces still open without migration and support reading and new annotations. To enable audited editing, explicitly create a separately named upgraded copy:
-
-~~~sh
-sol --workspace quantity-study --workspace-upgrade quantity-study-v2.sqlite3
-sol --workspace quantity-study-v2 --workspace-dir . --actor "Your name"
-~~~
-
-Inside a shell, `workspace upgrade FILE.sqlite3` creates the same kind of copy but does not switch the running session. The destination parent must exist and the destination must not already exist. The original is left untouched. Legacy notes receive a baseline of their current body; SOL does not invent earlier edits or an editor attribution. New edits in the upgraded copy are audited from there onward.
-
-Notes, comparisons, review decisions, and relations require the actor selected during setup or supplied with `--actor NAME`. Read-only one-shot workspace inspection needs no actor. Comparisons preserve an ordered set of record IDs and a question. Relations are directed, attributed assertions alongside the published tree. Their references point to live canonical records, not frozen quotations or captured endpoint versions:
-
-~~~text
-compare save inquiry ID_A ID_B --question "How do these determinations differ?"
-compare show inquiry
-relate add ID_A compares-with ID_B --reason "A connection to investigate, not an identity claim."
-relate list
-~~~
-
-Replace `ID_A` and `ID_B` with displayed record UUIDs or unambiguous prefixes. `compare list`, `review list`, and `relate list` inspect saved work without moving the reading cursor. Review outcomes are `inspected`, `correction_needed`, and `verified`. A reader's `verified` testimony never changes canonical transcription status or random eligibility. The current review binding compares the inspected Markdown digest and declared PDF fingerprint, not every attribution or page-location field; workspace version 2 does not expand that binding. Matching fingerprints are not proof of a correct transcription. Missing and retired references remain visible rather than being matched by similar wording.
-
-Resume or export outside the shell:
-
-~~~sh
-sol --workspace quantity-study --resume
-sol --workspace quantity-study --resume --json
-sol --workspace quantity-study --resume --resume-revision 1
-sol --workspace quantity-study --workspace-check --json
-sol --workspace quantity-study --workspace-backup quantity-study-backup.sqlite3
-sol --workspace quantity-study --workspace-export > quantity-study.sol-workspace.json
-~~~
-
-Choose the historical revision from `workspace history`. Health checks report saved-reference issues without repairing them or verifying the source text. If canonical files change while SOL is open, saved-position and authored writes are refused until you reopen it, reindexing explicitly if needed. The generation guard checks the manifest, index and canonical Markdown, not PDF or facsimile image bytes.
-
-Backup uses SQLite's online snapshot mechanism, verifies the result, and never overwrites an existing file. Its destination parent must already exist; new backups use mode `0600` on POSIX systems. To inspect the example backup with the same corpus selected, use `sol --workspace quantity-study-backup --workspace-dir . --resume`. This opens a separate workspace and leaves the original untouched. CLI backup and inspection still require a valid selected corpus. Automatic restore, import, and recovery without that corpus are not implemented.
-
-Export always writes JSON to standard output. Keep the `.sol-workspace.json` suffix so personal exports remain excluded from Git and source archives. Each workspace is a separate local SQLite database under `$XDG_DATA_HOME/sol/workspaces`, or `~/.local/share/sol/workspaces`; `--workspace-dir DIRECTORY` selects another location. It is bound to the corpus UUID and source fingerprint, not merely the PDF filename or directory. A mismatched corpus is refused. The workspace does not edit or automatically synchronize the book. See [the workspace plan](WORKSPACE_PLAN.md) for implemented boundaries and next steps.
-
-## Work through a source-review queue
-
-Inspect pending canonical records without opening a workspace:
-
-~~~sh
-sol --review-queue --limit 10
-sol --review-queue --within /being --limit 8 --json
-sol --workspace quantity-study --review-queue --json
-~~~
-
-The unscoped queue includes flagged canonical records across all attribution roles, including edition notes and editorial material. `--within PATH` selects records with matching virtual reader paths; omit it to include records without one. `--limit` accepts 1 to 1000 and defaults to 20. A selected workspace adds reader testimony, but even a reader's `verified` outcome never hides a canonical pending flag. Inside the workspace shell, use `review queue --limit 10` or `review queue --within /being --limit 8`.
-
-## Maintain and review the corpus
-
-Canonical Markdown is the correction surface. The JSONL index is generated from it; see [the corpus contract](CORPUS.md) for the representation and validation rules.
-
-With the corpus dependencies installed, rebuild after a correction:
-
-~~~sh
-sol-corpus index local-corpus
-sol-corpus-check local-corpus --check
-~~~
-
-For an initial conversion, install Poppler and use the audited source PDF:
-
-~~~sh
-sudo apt install poppler-utils
-sol-corpus convert --pdf Hegel-SOL.pdf
-~~~
-
-Conversion refuses to overwrite an existing corpus. Other editions require deliberate adaptation. The source is missing printed front matter pages l and lxix; these gaps are recorded explicitly.
-
-Mathematical passages awaiting review remain available through ordered reading and direct opening, with a warning that also appears in search results. They are excluded from random quotations. Their Markdown records include source images. Source-review status is separate from random eligibility: a reviewed formula is not labelled unreviewed merely because it is excluded from random quotations.
-
-Four useful places to begin checking are printed pages 209 to 210, PDF pages 282 to 283, on fractions and infinite series; printed pages 224 to 225, PDF pages 297 to 298, on Newton’s differential product; printed page 252, PDF page 325, on Lagrange, Kepler, and powers; and printed page 374, PDF page 447, on signs in Opposition.
-
-Find the Newton passage by its text and location, rather than an identifier belonging to someone else's conversion:
-
-~~~sh
-sol --search "remarkable procedure of Newton" --within /BEING/ii-magnitude-quantity/2-quantum --limit 5
-~~~
-
-Copy the displayed identifier into `sol --passage ID --context 1`, replacing `ID` with that value. The target begins on printed page 224; its continuation reaches page 225. Compare the prose with its Markdown facsimile before correcting a symbol or exponent. Preserve the identifier, then rebuild the index. Mathematical display improvements should follow checked transcriptions.
-
-[The OpenDataLoader investigation](OPENDATALOADER_RESEARCH.md) considers an isolated second extractor for difficult source passages. It is research only: the existing corpus was not reconverted, and no book content was uploaded. Candidate text or formula output would need human review before any canonical correction.
-
-For development checks, use a separate environment in the project directory:
-
-~~~sh
-python3 -m venv .venv
-. .venv/bin/activate
-python3 -m pip install -r requirements-corpus.txt
-python3 -m unittest discover -s tests -v
-~~~
-
-## Where SOL is going
-
-The roadmap follows the three doctrines as a way of organizing development.
-
-### BEING: the reader and virtual shell
-
-The current focus is SOL as a command line application: random quotations, careful formatting, reading, search, and a virtual terminal interface for navigating the book.
-
-The default workspace reader now provides reading continuity, a recent-workspace picker, bookmarks, attributed annotations with revision-aware editing, saved comparisons, review testimony, and relations between passages. The temporary shell and one-shot CLI remain available. Permanent identifiers provide their foundation. Exact textual searches should remain distinguishable from any future conceptual search.
-
-[The workspace plan](WORKSPACE_PLAN.md) distinguishes this implemented foundation from selected-span annotations, richer exports and imports, and future interface work. [The separate interface investigation](INTERFACE_RESEARCH.md) explains the optional prompt_toolkit adapter and compares Rich, Textual, curses, and external readers that have not been adopted.
-
-This stage should make reading more productive while keeping the corpus inspectable and the interface small enough to understand and modify.
+The present foundation is careful reading: a dependable corpus, clear navigation, continuity, attributed annotations, comparison, source review, and relations beyond the published tree. The reader should remain small enough to inspect and understand.
 
 ### ESSENCE: applications and experiments
 
-SOL can become a text laboratory through concordances, word frequencies, vocabulary comparisons, and recurring expressions. Classification, topic modeling, machine learning, and deep learning can follow clear research questions.
-
-Can a model recover Being, Essence, or Concept from a paragraph? What organization emerges when chapter labels are withheld? Where do statistical similarities cross Hegel’s explicit divisions?
-
-Each experiment should record its corpus version, preprocessing, settings, and evaluation. The results support interpretation and comparison. They should remain connected to the passages and questions that produced them.
-
-An actual terminal emulator, or a modification of an existing one, belongs here once the reading and research workflows clarify what it needs to provide.
+Concordances, computational linguistics, classification, topic modeling, machine learning, and deep learning can investigate explicit and discovered organizations of the text. Every method should answer a research question and retain its connection to the passages that produced it. Terminal-host integration belongs here; the optional `sol-kitty` launcher and verified source-page viewer are documented in the [manual](docs/USAGE.md#read-in-kitty-and-inspect-the-source).
 
 ### CONCEPT: an operating system
 
-The longer ambition is a NixOS distribution, with Hyprland as a possible desktop foundation, bringing the reader and selected applications into a coherent environment.
+The long-term ambition is a NixOS distribution with a distinctive philosophical and computational purpose. A useful reader and reproducible applications come first; a curated environment is the bridge toward the operating system.
 
-A reproducible development environment is the bridge: first a useful application, then a curated collection of tools, and eventually an operating system with a distinctive purpose.
+## Documentation and development
 
-For now, development stays with BEING. Each improvement should provide a usable result and an opportunity to learn the systems beneath it.
+~~~text
+sol/            Application code
+docs/           Manuals, contracts, and research
+tests/          Regression tests
+local-corpus/   Your local edition, excluded from Git
+~~~
 
-### Appendix: Hegel on the question of computational externality for the concept
+The [usage manual](docs/USAGE.md) covers navigation, configuration, workspace history, annotation editing, backup, export, and source viewing. The [corpus contract](docs/CORPUS.md) defines text, identifiers, provenance, and validation. The [workspace plan](docs/WORKSPACE_PLAN.md) separates implemented behavior from future work; [workspace export](docs/WORKSPACE_EXPORT.md) explains readable inquiry reports.
 
-> "What first led to this wayward attempt is above all the quantitative relation in
-which universality, particularity, and singularity are supposed to stand to one
-another: universal means, more extensive than particular and singular; and
-particular, more extensive than singular. The concept is concrete and the richest
-in determination, because it is the ground and the totality of the previous
-determinations, of the categories of being and the determinations of reflection;
-these, therefore, are certain also to come up in it. But its nature is totally
-misunderstood if such determinations are retained in it in their former abstraction
-– if the wider extent of the universal is understood to mean that the universal is
-a more, or a greater quantum, than the particular and the singular. As absolute
-ground, it is the possibility of quantity, but no less so of quality, that is, its
-determinations are no less qualitatively distinct; therefore they are already
-viewed in contravention to their truth when they are posited in the form of
-quantity alone. So, too, a reflective determination is a relative, something in
-which the opposite shines reflectively; unlike a quantum, its relation is not
-external. But the concept is more than all this; its determinations are determinate
-concepts, themselves essentially the totality of all determinations. It is,
-therefore, entirely inappropriate, in order to grasp such an inner totality, to
-want to apply numerical and spatial relations in which the terms fall apart; such
-relations are rather the last and the worst medium that could be used. Natural
-relations, as for instance “magnetism” or “color tonality” would make infinitely
-higher and truer symbols for the purpose. Since the human being has in language a
-means of designation that is appropriate to reason, it is otiose to look for a less
-perfect means of representation to bother oneself with. It is essentially only
-spirit that can grasp the concept as concept, for the latter is not just the
-property of spirit but its pure self. It is futile to want to fix it by means of
-spatial figures and algebraic signs for the sake of the outer eye and a
-non-conceptual, mechanical manipulation, such as a calculus. Also anything else
-that might be supposed to serve as symbol, like the symbols for the nature of God,
-can at best elicit only intimations and echoes of the concept; if, however, one
-insists on employing such symbols for expressing and cognizing the concept, then it
-is not their external nature which is fit for the task; the reverse relation
-applies, namely that what in the symbols is the echo of a higher determination is
-recognized to be such only by virtue of the concept, and it is only by shedding the
-sensuous standbys that were supposed to express it that one comes closer to the
-concept."
+[Interface research](docs/research/INTERFACE_RESEARCH.md) and the [OpenDataLoader investigation](docs/research/OPENDATALOADER_RESEARCH.md) record options without making them reader dependencies.
 
-Hegel@SOL:/CONCEPT/i-subjectivity/1-the-concept/b-the-particular-concept/remark.txt$
+From the checkout, run `python -m sol` to use the current source. See the [development checks](docs/USAGE.md#development-checks) for an isolated environment and the test suite.

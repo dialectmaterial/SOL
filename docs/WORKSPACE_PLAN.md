@@ -8,7 +8,7 @@ annotations remain future work. An optional input-only prompt supports multiline
 drafts and revision-aware editing. New workspaces use schema version 2; older
 version-1 workspaces remain readable and are upgraded only through an explicit copy.
 Interface research is kept separately in
-[INTERFACE_RESEARCH.md](INTERFACE_RESEARCH.md).
+[INTERFACE_RESEARCH.md](research/INTERFACE_RESEARCH.md).
 
 The aim is a workspace that remembers an inquiry, not merely a terminal that
 remembers its commands. The five developments are reading continuity, attributed
@@ -106,8 +106,11 @@ changes, old offsets must not silently attach the note to different words.
 If machine-generated suggestions are introduced later, retain their tool/model
 provenance and whether a reader adopted them. Never silently turn a suggestion
 into an annotation attributed to the reader, or an interpretation attributed to
-Hegel. Structured JSON export is available; a readable Markdown export is a
-possible next step.
+Hegel. Structured JSON export and a readable Markdown inquiry report are
+available. The report retains stored annotation history and reference provenance
+without becoming another canonical correction surface. Optional included text is
+the current canonical Markdown, never invented historical wording. See
+[WORKSPACE_EXPORT.md](WORKSPACE_EXPORT.md).
 
 ## 3. Comparison
 
@@ -243,8 +246,11 @@ Storage defaults to `$XDG_DATA_HOME/sol/workspaces`, or
 location. Keep it outside the canonical book; it is not synchronized to Git or
 a remote service. JSON export provides a consistent snapshot of workspace
 references, authored records and history, not another canonical book. Foreign-key
-enforcement is enabled on each database connection. Import, Markdown/JSONL export
-and previewed restore remain future work. Version-2 JSON exports include
+enforcement is enabled on each database connection. Markdown inquiry reports are
+implemented alongside the unchanged default JSON export. Both go to standard
+output and neither adds reading activity nor changes authored records. Import,
+JSONL workspace export and previewed restore remain future work. Version-2 JSON
+exports include
 `annotation_history`; version-1 exports do not fabricate that history.
 [SQLite foreign keys](https://www.sqlite.org/foreignkeys.html)
 
@@ -259,9 +265,9 @@ One-shot workspace inspection needs no actor; `-n` touches neither registry nor
 workspace storage. Workspace backup/export concerns the workspace database, not
 the separate actor-label registry; exported authored records retain their labels.
 
-Workspace storage and corpus-reference operations live in `sol_workspace.py` and
-`sol_workspace_reader.py`, separate from input and rendering. Pure diagnostics in
-`sol_workspace_diagnostics.py` work from a loaded corpus and one consistent
+Workspace storage and corpus-reference operations live in `sol/workspace/store.py` and
+`sol/workspace/reader.py`, separate from input and rendering. Pure diagnostics in
+`sol/workspace/diagnostics.py` work from a loaded corpus and one consistent
 workspace export. `workspace check` reports unresolved, retired and versioned
 references; it performs no repairs and is not source verification.
 
@@ -275,11 +281,12 @@ philosophically or typographically correct transcription.
 The CLI and shell use the same operations; any future Textual desk should do
 likewise. `run_shell` now accepts injected `read_command` and `write_output`
 functions, so an input experiment can avoid replacing command semantics or
-storage. `sol_prompt.py` implements the optional PromptSession adapter through this
-seam; basic, plain and redirected input need no optional import. `sol_profiles.py`
+storage. `sol/terminal/prompt.py` implements the optional PromptSession adapter through this
+seam; basic, plain and redirected input need no optional import. `sol/workspace/profiles.py`
 owns actor-label onboarding storage. Read-only discovery is isolated in
-`sol_workspace_catalog.py`. No full-screen framework, image renderer or
-Kitty integration has been added.
+`sol/workspace/catalog.py`. No full-screen framework is required. The optional
+source renderer and kitty launcher live in `sol/terminal/source.py` and
+`sol/terminal/kitty.py`, separate from the base reader and workspace storage.
 
 ## Using the implemented workspace
 
@@ -348,9 +355,12 @@ new visit. To inspect the example backup from its directory, run
 corpus selected. This opens the snapshot separately, without replacing the
 original workspace. Existing backup filenames are never reused automatically.
 
-Export always emits JSON to standard output. `workspace export` offers the same
-snapshot inside the shell. Keep the `.sol-workspace.json` suffix for personal
-exports, which is excluded from Git and source archives. Direct workspace reading
+Export defaults to JSON on standard output. `--export-format markdown` produces
+the readable inquiry report; `workspace export --format markdown` offers it inside
+the shell. Optional `--include-passages` includes current canonical Markdown for
+referenced records, not invented historical text. Keep the `.sol-workspace.json`
+or `.sol-workspace.md` suffix for personal exports, both excluded from Git and
+source archives. See [the export guide](WORKSPACE_EXPORT.md). Direct workspace reading
 also supports `-r` for random quotation, `--read`, `--first` and `--passage`.
 Context, search and inspection remain available through ordinary CLI invocations or inside the workspace shell;
 they do not silently replace a saved reading position.

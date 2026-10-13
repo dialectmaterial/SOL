@@ -1,0 +1,101 @@
+"""Package responsibilities and safe source-checkout corpus discovery."""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+from sol.reader import app
+
+
+class PackageBoundaryTests(unittest.TestCase):
+    def imported_modules(self, statement: str) -> set[str]:
+        root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            [sys.executable, "-B", "-c",
+             "import json, sys; " + statement + "; print(json.dumps(sorted(sys.modules)))"],
+            cwd=root, text=True, capture_output=True, check=True,
+        )
+        return set(json.loads(result.stdout))
+
+    def test_public_package_import_does_not_load_the_application(self):
+        modules = self.imported_modules("import sol")
+        self.assertNotIn("sol.reader.app", modules)
+        self.assertFalse(any(name.startswith("sol.terminal.") for name in modules))
+
+    def test_reader_import_does_not_load_pdf_conversion_or_optional_ui(self):
+        modules = self.imported_modules("from sol.reader import app; app.build_parser()")
+        for name in ("sol.reader.legacy_pdf", "sol.corpus.layout", "sol.corpus.convert",
+                     "sol.terminal.prompt", "sol.terminal.source", "sol.terminal.kitty",
+                     "markdown_it", "prompt_toolkit"):
+            with self.subTest(module=name):
+                self.assertNotIn(name, modules)
+
+    def test_converter_does_not_import_the_reader_application(self):
+        modules = self.imported_modules("import sol.corpus.convert")
+        self.assertNotIn("sol.reader.app", modules)
+        self.assertNotIn("sol.reader.legacy_pdf", modules)
+        self.assertFalse(any(name.startswith("sol.terminal.") for name in modules))
+
+
+class SourceCheckoutDiscoveryTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="sol-source-discovery-")
+        self.addCleanup(self.temporary.cleanup)
+        self.directory = Path(self.temporary.name)
+        self.checkout = self.directory / "checkout"
+        self.reader = self.checkout / "sol" / "reader" / "app.py"
+        self.reader.parent.mkdir(parents=True)
+        self.reader.write_text("# Synthetic package source\n", encoding="utf-8")
+        self.metadata = self.checkout / "pyproject.toml"
+        self.metadata.write_text('[project]\nname = "sol-organizes-logic"\n', encoding="utf-8")
+        self.corpus = self.checkout / "local-corpus"
+        self.corpus.mkdir()
+        (self.corpus / "corpus.json").write_text("{}\n", encoding="utf-8")
+
+    def discover(self):
+        with patch.object(app, "__file__", str(self.reader)), \
+                patch.object(app.Path, "cwd", return_value=self.directory), \
+                patch.object(app, "installed_project_directory", return_value=None), \
+                patch.dict(os.environ, {"XDG_CONFIG_HOME": str(self.directory / "config")}, clear=True):
+            return app.discover_corpus()
+
+    def test_recognized_checkout_finds_root_corpus_from_elsewhere(self):
+        self.assertEqual(self.discover(), self.corpus)
+
+    def test_missing_project_metadata_does_not_guess_from_package_location(self):
+        self.metadata.unlink()
+        self.assertIsNone(self.discover())
+
+    def test_checkout_marker_tolerates_indentation_comments_and_crlf(self):
+        self.metadata.write_bytes(
+            b"  [project] # Project identity\r\n  name = 'sol-organizes-logic' # SOL\r\n"
+        )
+        self.assertEqual(self.discover(), self.corpus)
+
+    def test_different_project_name_does_not_select_its_corpus(self):
+        self.metadata.write_text('[project]\nname = "another-project"\n', encoding="utf-8")
+        self.assertIsNone(self.discover())
+
+    def test_matching_name_outside_project_table_is_not_identity(self):
+        self.metadata.write_text('[tool.example]\nname = "sol-organizes-logic"\n', encoding="utf-8")
+        self.assertIsNone(self.discover())
+
+    def test_unreadable_project_metadata_is_not_an_automatic_source(self):
+        self.metadata.write_bytes(b"\xff\xfe")
+        self.assertIsNone(self.discover())
+
+    def test_saved_choice_has_precedence_over_checkout_fallback(self):
+        selected = self.directory / "selected-corpus"
+        with patch.object(app, "configured_corpus", return_value=selected):
+            self.assertEqual(self.discover(), selected)
+
+
+if __name__ == "__main__":
+    unittest.main()

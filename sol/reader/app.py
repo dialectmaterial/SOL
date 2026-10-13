@@ -9,10 +9,8 @@ legacy PDF reading. Corpus/PDF loading and the terminal interface stay separate.
 from __future__ import annotations
 
 import argparse
-from collections import Counter
 from copy import deepcopy
-from dataclasses import dataclass, field
-from functools import cached_property
+from dataclasses import dataclass
 from importlib import metadata as package_metadata
 import json
 import os
@@ -20,887 +18,24 @@ import random
 import re
 import shlex
 import shutil
-import statistics
-import subprocess
 import sys
 import tempfile
 import textwrap
 import unicodedata
 from urllib.parse import unquote, urlsplit
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
-# This index is specific to the Cambridge di Giovanni edition supplied with the
-# project. Its printed page 7 is PDF page 80; page 827 begins the editor's
-# appendix, so it is deliberately outside the readable corpus.
-PDF_FILENAME = "Hegel-SOL.pdf"
-FIRST_TEXT_PAGE = 80
-LAST_TEXT_PAGE = 826
-PRINTED_PAGE_OFFSET = 73
-XML_NS = {"p": "http://www.w3.org/1999/xhtml"}
-VERSION = "0.1.0"
-
-
-@dataclass
-class Node:
-    """One item in the virtual filesystem; children make a directory."""
-
-    name: str
-    title: str
-    start_page: int
-    children: tuple["Node", ...] = field(default_factory=tuple)
-    label: str = ""
-    anchor: tuple[int, float] | None = None
-    parent: "Node | None" = field(default=None, repr=False, compare=False)
-
-    @property
-    def is_directory(self) -> bool:
-        return bool(self.children)
-
-
-@dataclass(frozen=True)
-class Passage:
-    text: str
-    pdf_page: int
-    printed_page: int
-    node: Node
-    path: tuple[str, ...]
-    end_pdf_page: int
-    end_printed_page: int
-    identifier: str
-    heading: str = ""
-    kind: str = "paragraph"
-    random_eligible: bool = True
-    transcription_status: str = ""
-    facsimile_labels: tuple[str, ...] = ()
-
-    @property
-    def needs_source_review(self) -> bool:
-        """Transcription quality is independent of quotation eligibility/type."""
-        return self.transcription_status in {"needs_review", "needs_visual_review"}
-
-
-@dataclass(frozen=True)
-class Word:
-    text: str
-    x0: float
-    y0: float
-    x1: float
-    y1: float
-
-    @property
-    def height(self) -> float:
-        return self.y1 - self.y0
-
-
-@dataclass(frozen=True)
-class Line:
-    words: tuple[Word, ...]
-    pdf_page: int
-
-    @cached_property
-    def text(self) -> str:
-        return unicodedata.normalize("NFC", " ".join(word.text for word in self.words))
-
-    @cached_property
-    def typographic_words(self) -> tuple[Word, ...]:
-        # A short final line can contain one body word and several raised note
-        # markers. Estimate its type from words, not those letters/numerals.
-        words = tuple(word for word in self.words
-                      if sum(character.isalpha() for character in word.text) >= 2)
-        return words or self.words
-
-    @cached_property
-    def y(self) -> float:
-        # Raised footnote numbers must not move the prose line's baseline.
-        return statistics.median(word.y0 for word in self.typographic_words)
-
-    @cached_property
-    def x(self) -> float:
-        return min(word.x0 for word in self.words)
-
-    @cached_property
-    def height(self) -> float:
-        return statistics.median(word.height for word in self.typographic_words)
-
-    @property
-    def position(self) -> tuple[int, float]:
-        return self.pdf_page, self.y
-
-
-@dataclass(frozen=True)
-class Page:
-    number: int
-    lines: tuple[Line, ...]
-    body_height: float
-    left: float
-    right: float
-
-
-@dataclass
-class Book:
-    root: Node
-    passages: list[Passage]
-    redirects: dict[str, str] = field(default_factory=dict)
-    canonical_records: dict[str, dict] = field(default_factory=dict, repr=False, compare=False)
-    corpus_directory: Path | None = field(default=None, repr=False, compare=False)
-    corpus_manifest: dict = field(default_factory=dict, repr=False, compare=False)
-    corpus_snapshot: object | None = field(default=None, repr=False, compare=False)
-
-    def selection(self, path: tuple[str, ...]) -> list[Passage]:
-        matches = [p for p in self.passages if p.path[:len(path)] == path]
-        if not matches:
-            raise ValueError("this location has no prose")
-        return matches
-
-    def find_passage(self, identifier: str) -> Passage:
-        """Resolve an exact ID, retired ID, or unambiguous prefix."""
-        identifier = identifier.strip().casefold()
-        if not identifier:
-            raise ValueError("a passage identifier is required")
-        by_id = {passage.identifier.casefold(): passage for passage in self.passages}
-        redirects = {key.casefold(): value.casefold() for key, value in self.redirects.items()}
-        candidates = [key for key in (*by_id, *redirects) if key.startswith(identifier)]
-        if identifier in by_id or identifier in redirects:
-            target = identifier
-        elif len(candidates) == 1:
-            target = candidates[0]
-        elif len(candidates) > 1:
-            raise ValueError("ambiguous identifier; use more of the passage ID")
-        else:
-            raise ValueError(f"no passage with identifier: {identifier}")
-        seen: set[str] = set()
-        while target in redirects:
-            if target in seen:
-                raise ValueError("invalid passage redirect cycle")
-            seen.add(target)
-            target = redirects[target]
-        if target not in by_id:
-            raise ValueError("this identifier does not refer to a readable Hegel passage")
-        return by_id[target]
-
-    def search(self, query: str, path: tuple[str, ...] = (),
-               whole_word: bool = False, limit: int = 20) -> list[Passage]:
-        """Literal Unicode search in a subtree, preserving book order."""
-        if not query.strip():
-            raise ValueError("search requires a nonempty query")
-        if not 1 <= limit <= 1000:
-            raise ValueError("search limit must be between 1 and 1000")
-        pattern = re.escape(unicodedata.normalize("NFC", query.strip()).casefold())
-        if whole_word:
-            pattern = rf"(?<!\w){pattern}(?!\w)"
-        expression = re.compile(pattern)
-        return [passage for passage in self.selection(path)
-                if expression.search(unicodedata.normalize("NFC", presentation_text(
-                    passage.text, passage.facsimile_labels)).casefold())][:limit]
-
-
-# Directories are divisions that contain further divisions. Files are passages
-# attached to the heading that begins them. Numeric prefixes are display names,
-# not claims about Hegel's own numbering; they keep `ls` in reading order.
-# 1. Book index: the published TOC, followed by verified internal headings.
-BEING = Node(
-    "BEING",
-    "Doctrine of Being (Book One)",
-    7,
-    (
-        Node("00-preface-to-the-first-edition.txt", "Preface to the first edition", 7),
-        Node("01-preface-to-the-second-edition.txt", "Preface to the second edition", 11),
-        Node("02-introduction.txt", "Introduction", 23),
-        Node("03-with-what-must-the-beginning-of-science-be-made.txt", "With what must the beginning of science be made?", 45),
-        Node("04-general-division-of-being.txt", "General division of being", 56),
-        Node(
-            "05-determinateness-quality",
-            "Section I: Determinateness (Quality)",
-            58,
-            (
-                Node("01-being.txt", "Chapter 1: Being", 59),
-                Node("02-existence.txt", "Chapter 2: Existence", 83),
-                Node("03-being-for-itself.txt", "Chapter 3: Being-for-itself", 126),
-            ),
-        ),
-        Node(
-            "06-magnitude-quantity",
-            "Section II: Magnitude (Quantity)",
-            152,
-            (
-                Node("01-quantity.txt", "Chapter 1: Quantity", 154),
-                Node("02-quantum.txt", "Chapter 2: Quantum", 168),
-                Node("03-ratio-or-the-quantitative-relation.txt", "Chapter 3: Ratio or the quantitative relation", 271),
-            ),
-        ),
-        Node(
-            "07-measure",
-            "Section III: Measure",
-            282,
-            (
-                Node("01-specific-quantity.txt", "Chapter 1: Specific quantity", 288),
-                Node("02-real-measure.txt", "Chapter 2: Real measure", 302),
-                Node("03-the-becoming-of-essence.txt", "Chapter 3: The becoming of essence", 326),
-            ),
-        ),
-    ),
-)
-
-ESSENCE = Node(
-    "ESSENCE",
-    "Doctrine of Essence (Book Two)",
-    337,
-    (
-        Node(
-            "01-essence-as-reflection-within",
-            "Section I: Essence as reflection within",
-            340,
-            (
-                Node("01-shine.txt", "Chapter 1: Shine", 341),
-                Node("02-the-essentialities-or-the-determinations-of-reflection.txt", "Chapter 2: The essentialities or the determinations of reflection", 354),
-                Node("03-ground.txt", "Chapter 3: Ground", 386),
-            ),
-        ),
-        Node(
-            "02-appearance",
-            "Section II: Appearance",
-            418,
-            (
-                Node("01-concrete-existence.txt", "Chapter 1: Concrete existence", 420),
-                Node("02-appearance.txt", "Chapter 2: Appearance", 437),
-                Node("03-the-essential-relation.txt", "Chapter 3: The essential relation", 449),
-            ),
-        ),
-        Node(
-            "03-actuality",
-            "Section III: Actuality",
-            465,
-            (
-                Node("01-the-absolute.txt", "Chapter 1: The absolute", 466),
-                Node("02-actuality.txt", "Chapter 2: Actuality", 477),
-                Node("03-the-absolute-relation.txt", "Chapter 3: The absolute relation", 489),
-            ),
-        ),
-    ),
-)
-
-CONCEPT = Node(
-    "CONCEPT",
-    "Doctrine of the Concept (Volume Two / Subjective Logic)",
-    507,
-    (
-        Node("00-foreword.txt", "Foreword", 507),
-        Node("01-of-the-concept-in-general.txt", "Of the concept in general", 508),
-        Node("02-division.txt", "Division", 526),
-        Node(
-            "03-subjectivity",
-            "Section I: Subjectivity",
-            528,
-            (
-                Node("01-the-concept.txt", "Chapter 1: The concept", 529),
-                Node("02-judgment.txt", "Chapter 2: Judgment", 550),
-                Node("03-the-syllogism.txt", "Chapter 3: The syllogism", 588),
-            ),
-        ),
-        Node(
-            "04-objectivity",
-            "Section II: Objectivity",
-            625,
-            (
-                Node("01-mechanism.txt", "Chapter 1: Mechanism", 631),
-                Node("02-chemism.txt", "Chapter 2: Chemism", 645),
-                Node("03-teleology.txt", "Chapter 3: Teleology", 651),
-            ),
-        ),
-        Node(
-            "05-the-idea",
-            "Section III: The idea",
-            670,
-            (
-                Node("01-life.txt", "Chapter 1: Life", 676),
-                Node("02-the-idea-of-cognition.txt", "Chapter 2: The idea of cognition", 689),
-                Node("03-the-absolute-idea.txt", "Chapter 3: The absolute idea", 735),
-            ),
-        ),
-    ),
-)
-
-# Verified against this edition's headings, including their positions within
-# the printed page. No classifier or inferred philosophical hierarchy is used.
-SUBDIVISIONS = {
-    59: (
-        ("A", "Being", 59, 169.0),
-        ("B", "Nothing", 59, 333.9),
-        ("C", "Becoming", 59, 486.4),
-    ),
-    83: (
-        ("A", "Existence as such", 83, 324.5),
-        ("B", "Finitude", 90, 212.4),
-        ("C", "Infinity", 108, 412.8),
-    ),
-    126: (
-        ("A", "Being-for-itself as such", 126, 474.0),
-        ("B", "The one and the many", 132, 411.7),
-        ("C", "Repulsion and attraction", 138, 62.9),
-    ),
-    154: (
-        ("A", "Pure quantity", 154, 181.5),
-        ("B", "Continuous and discrete magnitude", 165, 438.6),
-        ("C", "The limiting of quantity", 167, 249.8),
-    ),
-    168: (
-        ("A", "Number", 168, 324.5),
-        ("B", "Extensive and intensive quantum", 182, 125.2),
-        ("C", "Quantitative infinity", 190, 100.3),
-    ),
-    271: (
-        ("A", "The direct ratio", 272, 262.2),
-        ("B", "The inverse ratio", 274, 62.9),
-        ("C", "The ratio of powers", 278, 62.9),
-    ),
-    288: (
-        ("A", "The specific quantum", 288, 336.9),
-        ("B", "Specifying measure", 291, 355.6),
-        ("C", "The being-for-itself in measure", 298, 275.7),
-    ),
-    302: (
-        ("A", "The relation of independent measures", 303, 212.4),
-        ("B", "Nodal lines of measure-relations", 318, 474.4),
-        ("C", "The measureless", 323, 187.5),
-    ),
-    326: (
-        ("A", "Absolute indifference", 326, 181.5),
-        ("B", "Indifference as inverse ratio of its factors", 327, 63.1),
-        ("C", "Transition into essence", 333, 486.4),
-    ),
-    341: (
-        ("A", "The essential and the unessential", 341, 287.1),
-        ("B", "Shine", 342, 312.0),
-        ("C", "Reflection", 345, 411.7),
-    ),
-    354: (
-        ("A", "Identity", 356, 274.7),
-        ("B", "Difference", 361, 175.0),
-        ("C", "Contradiction", 374, 224.8),
-    ),
-    386: (
-        ("A", "Absolute ground", 389, 64.3),
-        ("B", "Determinate ground", 397, 361.9),
-        ("C", "Condition", 410, 62.9),
-    ),
-    420: (
-        ("A", "The thing and its properties", 423, 137.6),
-        ("B", "The constitution of the thing out of matters", 430, 361.9),
-        ("C", "Dissolution of the thing", 432, 449.1),
-    ),
-    437: (
-        ("A", "The law of appearance", 438, 449.1),
-        ("B", "The world of appearance and the world-in-itself", 443, 150.1),
-        ("C", "The dissolution of appearance", 447, 63.1),
-    ),
-    449: (
-        ("A", "The relation of whole and parts", 450, 424.2),
-        ("B", "The relation of force and its expression", 455, 187.5),
-        ("C", "Relation of outer and inner", 460, 62.9),
-    ),
-    466: (
-        ("A", "The exposition of the absolute", 466, 436.6),
-        ("B", "The absolute attribute", 469, 199.9),
-        ("C", "The mode of the absolute", 470, 312.0),
-    ),
-    477: (
-        ("A", "Contingency or formal actuality, possibility, and necessity", 478, 371.6),
-        ("B", "Relative necessity or real actuality, possibility, and necessity", 482, 62.9),
-        ("C", "Absolute necessity", 485, 462.0),
-    ),
-    489: (
-        ("A", "The relation of substantiality", 490, 125.2),
-        ("B", "The relation of causality", 492, 436.7),
-        ("C", "Reciprocity of action", 503, 150.1),
-    ),
-    529: (
-        ("A", "The universal concept", 530, 175.0),
-        ("B", "The particular concept", 534, 162.6),
-        ("C", "The singular", 546, 187.5),
-    ),
-    550: (
-        ("A", "The judgment of existence", 557, 187.5),
-        ("B", "The judgment of reflection", 568, 411.7),
-        ("C", "The judgment of necessity", 575, 175.0),
-        ("D", "The judgment of the concept", 581, 462.2),
-    ),
-    588: (
-        ("A", "The syllogism of existence", 590, 195.9),
-        ("B", "The syllogism of reflection", 609, 62.7),
-        ("C", "The syllogism of necessity", 617, 249.8),
-    ),
-    631: (
-        ("A", "The mechanical object", 631, 499.1),
-        ("B", "The mechanical process", 634, 177.5),
-        ("C", "Absolute mechanism", 640, 499.4),
-    ),
-    645: (
-        ("A", "The chemical object", 645, 260.1),
-        ("B", "The process", 646, 361.9),
-        ("C", "Transition of chemism", 649, 150.1),
-    ),
-    651: (
-        ("A", "The subjective purpose", 657, 150.1),
-        ("B", "The means", 659, 274.7),
-        ("C", "The realized purpose", 662, 99.1),
-    ),
-    676: (
-        ("A", "The living individual", 679, 224.9),
-        ("B", "The life-process", 684, 62.9),
-        ("C", "The genus", 686, 414.2),
-    ),
-    689: (
-        ("A", "The idea of the true", 697, 175.0),
-        ("B", "The idea of the good", 729, 187.5),
-    ),
-    735: (),  # No A/B/C subdivision in this final chapter.
-}
-
-# Requested verified next-level headings. Keys identify (chapter, major letter).
-# Unlike small-cap A/B/C headings, the source displays these lower-case letters
-# or Arabic numerals. Existence/B/c has a deeper Greek alpha/beta/gamma level;
-# that further level is intentionally not included here.
-SECOND_LEVEL = {
-    (59, "C"): (
-        ("1", "Unity of being and nothing", 59, 508.2),
-        ("2", "The moments of becoming", 80, 259.1),
-        ("3", "Sublation of becoming", 81, 147.0),
-    ),
-    (83, "A"): (
-        ("a", "Existence in general", 83, 421.0),
-        ("b", "Quality", 84, 495.8),
-        ("c", "Something", 88, 297.0),
-    ),
-    (83, "B"): (
-        ("a", "Something and an other", 90, 470.9),
-        ("b", "Determination, constitution, and limit", 95, 256.4),
-        ("c", "Finitude", 101, 105.7),
-    ),
-    (83, "C"): (
-        ("a", "The infinite in general", 109, 259.1),
-        ("b", "Alternating determination of finite and infinite", 110, 134.5),
-        ("c", "Affirmative infinity", 114, 59.8),
-    ),
-    (126, "A"): (
-        ("a", "Existence and being-for-itself", 127, 359.3),
-        ("b", "Being-for-one", 128, 59.7),
-        ("c", "The one", 132, 134.5),
-    ),
-    (126, "B"): (
-        ("a", "The one within", 133, 171.9),
-        ("b", "The one and the void", 133, 458.4),
-        ("c", "Many ones", 135, 321.4),
-    ),
-    (126, "C"): (
-        ("a", "Exclusion of the one", 138, 84.7),
-        ("b", "The one one of attraction", 141, 59.8),
-        ("c", "The connection of repulsion and attraction", 142, 97.2),
-    ),
-    (354, "B"): (
-        ("1", "Absolute difference", 361, 196.8),
-        ("2", "Diversity", 362, 321.4),
-        ("3", "Opposition", 367, 433.5),
-    ),
-    (550, "A"): (
-        ("a", "The positive judgment", 557, 446.0),
-        ("b", "The negative judgment", 562, 59.9),
-        ("c", "The infinite judgment", 567, 209.3),
-    ),
-    (550, "B"): (
-        ("a", "The singular judgment", 570, 217.6),
-        ("b", "The particular judgment", 570, 425.2),
-        ("c", "The universal judgment", 572, 171.9),
-    ),
-    (550, "C"): (
-        ("a", "The categorical judgment", 575, 358.8),
-        ("b", "The hypothetical judgment", 576, 458.4),
-        ("c", "The disjunctive judgment", 578, 122.1),
-    ),
-    (550, "D"): (
-        ("a", "The assertoric judgment", 583, 159.4),
-        ("b", "The problematic judgment", 584, 209.3),
-        ("c", "The apodictic judgment", 585, 433.5),
-    ),
-    (689, "A"): (
-        ("a", "Analytic cognition", 700, 134.5),
-        ("b", "Synthetic cognition", 706, 411.3),
-    ),
-}
-
-THIRD_LEVEL = {
-    (689, "A", "b"): (
-        ("1", "Definition", 708, 53.8),
-        ("2", "Division", 713, 190.9),
-        ("3", "The theorem", 718, 190.8),
-    ),
-}
-
-ROOT = Node("", "The Science of Logic", 7, (BEING, ESSENCE, CONCEPT))
-
-
-# 2. PDF layout: preserve positions until paragraphs and headings are resolved.
-def extract_pages(pdf: Path) -> list[Page]:
-    """Read word geometry with Poppler; no extra Python packages are required."""
-    program = shutil.which("pdftotext")
-    if not program:
-        raise RuntimeError("Install Poppler first (on Ubuntu: sudo apt install poppler-utils).")
-    try:
-        result = subprocess.run(
-            [program, "-f", str(FIRST_TEXT_PAGE), "-l", str(LAST_TEXT_PAGE),
-             "-bbox-layout", str(pdf.resolve()), "-"],
-            check=True, capture_output=True,
-        )
-    except (OSError, subprocess.CalledProcessError) as error:
-        detail = getattr(error, "stderr", b"").decode("utf-8", errors="replace").strip()
-        raise RuntimeError(detail or "Could not extract the PDF.") from error
-    # Poppler emits a handful of control characters from this PDF's fonts.
-    xml = re.sub(rb"[\x00-\x08\x0b\x0c\x0e-\x1f]", b"", result.stdout)
-    try:
-        document = ET.fromstring(xml)
-    except ET.ParseError as error:
-        raise RuntimeError("Poppler returned unreadable PDF layout data.") from error
-    raw_pages = document.findall(".//p:page", XML_NS)
-    if len(raw_pages) != LAST_TEXT_PAGE - FIRST_TEXT_PAGE + 1:
-        raise RuntimeError("This reader requires the supplied 863-page Cambridge edition.")
-    # A few pages contain more notes than prose. Learn the body font from the
-    # whole document so those pages cannot mistake note type for main text.
-    font_counts = Counter(
-        round(float(word.attrib["yMax"]) - float(word.attrib["yMin"]), 1)
-        for element in raw_pages for word in element.findall(".//p:word", XML_NS)
-        if len(word.text or "") > 1
-    )
-    if not font_counts:
-        raise RuntimeError("No searchable text found. Use the original text-based Cambridge PDF, not a scan.")
-    body_height = font_counts.most_common(1)[0][0]
-    pages = []
-    for number, element in enumerate(raw_pages, FIRST_TEXT_PAGE):
-        raw_lines = []
-        for row in element.findall(".//p:line", XML_NS):
-            words = tuple(
-                Word(word.text or "", *(
-                    float(word.attrib[key]) for key in ("xMin", "yMin", "xMax", "yMax")
-                ))
-                for word in row.findall("p:word", XML_NS)
-            )
-            if words:
-                raw_lines.append(Line(words, number))
-        height = float(element.attrib["height"])
-        # Long prose lines identify the font and the margins independently of
-        # the alternating left/right page layout.
-        prose = [line for line in raw_lines if
-                 len(line.words) >= 7 and height * .075 < line.y < height * .85]
-        prose = [line for line in prose if abs(line.height - body_height) < body_height * .08]
-        if not prose:
-            prose = [line for line in raw_lines if
-                     abs(line.height - body_height) < body_height * .08
-                     and height * .075 < line.y < height * .85 and len(line.words) >= 3]
-        if not prose:
-            pages.append(Page(number, (), body_height, 0.0, 0.0))
-            continue
-        left = Counter(round(line.x, 1) for line in prose).most_common(1)[0][0]
-        right = max(statistics.quantiles(
-            [max(word.x1 for word in line.words) for line in prose], n=10
-        )[7], left + 200) if len(prose) > 1 else max(word.x1 for word in prose[0].words)
-        note_start = min((line.y for line in raw_lines if
-                          body_height * .65 < line.height < body_height * .82
-                          and left - 3 <= line.x <= left + body_height * 1.5
-                          and line.y > height * .25
-                          and (re.match(r"^\d{1,3}\b", line.text)
-                               or len(re.findall(r"[A-Za-z]{2,}", line.text)) >= 3)),
-                         default=height)
-        lines = []
-        for line in raw_lines:
-            if not height * .075 < line.y < height * .855:
-                continue  # Running title/page number or footer.
-            if line.y >= note_start:
-                continue  # All continuation lines of the footnote apparatus.
-            # Small-caps headings are smaller than notes, but have recognizable
-            # labels and are centered. Keep them for the verified heading index.
-            small_heading = (
-                line.height < body_height * .65
-                and (line.x > left + body_height * 2
-                     or re.match(r"^[a-d][.] ", line.text))
-            )
-            if line.height < body_height * .86 and not small_heading:
-                continue  # Smaller type is the footnote apparatus.
-            words = tuple(
-                word for word in line.words
-                if left - 3 <= word.x0 <= right + 3
-                or line.height > body_height * 1.3
-            )
-            if not words:
-                continue
-            full_size = [word for word in words if word.height >= body_height * .86]
-            baseline = statistics.median(word.y1 for word in (full_size or words))
-            cleaned = []
-            for word in words:
-                # A raised number after prose is a note callout. Keep powers
-                # following single-letter mathematical variables.
-                is_callout = (
-                    re.fullmatch(r"(?:[a-z]|\d{1,3})(?:[,–-](?:[a-z]|\d{1,3}))*", word.text) is not None
-                    and word.y1 < baseline - body_height * .16
-                    and (not cleaned or not re.fullmatch(r"[A-Za-z]", cleaned[-1].text))
-                )
-                if not is_callout:
-                    cleaned.append(word)
-            if cleaned:
-                lines.append(Line(tuple(cleaned), number))
-        lines.sort(key=lambda line: (round(line.y, 1), line.x))
-        pages.append(Page(number, tuple(lines), body_height, left, right))
-    return pages
-
-
-# 3. Verified hierarchy: heading positions delimit logical divisions.
-def heading_key(text: str) -> str:
-    """Compare heading spelling despite small caps, ligatures, and spacing."""
-    text = unicodedata.normalize("NFKC", text).casefold()
-    text = re.sub(r"^(?:chapter \d+|section [ivx]+):\s*", "", text)
-    text = re.sub(r"^[a-zα-ω0-9]+[.)]\s*", "", text)
-    text = re.sub(r"\s*\((?:book|volume).*", "", text)
-    text = re.sub(r"^the\s+", "", text)
-    return re.sub(r"[^a-z0-9]", "", text)
-
-
-def find_anchor(pages: dict[int, Page], node: Node, expected_y: float | None = None) -> tuple[int, float]:
-    """Verify a printed heading, including titles split over several lines."""
-    page = pages[node.start_page + PRINTED_PAGE_OFFSET]
-    target = heading_key(node.title)
-    candidates = []
-    for index, line in enumerate(page.lines):
-        # A prose sentence containing the title is not the heading.
-        if expected_y is not None and abs(line.y - expected_y) > 5:
-            continue
-        text = ""
-        for following in page.lines[index:index + 3]:
-            if following.y - line.y > page.body_height * 4:
-                break
-            text += " " + following.text
-            if heading_key(text.strip()) == target:
-                if expected_y is not None or (
-                    line.x > page.left + page.body_height * 2
-                    or line.height > page.body_height * 1.2
-                ):
-                    candidates.append(line.position)
-    if not candidates:
-        raise RuntimeError(
-            f"Could not verify '{node.title}' on printed page {node.start_page}. "
-            "Use the original Cambridge PDF; other editions are not supported."
-        )
-    return min(candidates)
-
-
-def slug(title: str) -> str:
-    title = unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode().lower()
-    return re.sub(r"[^a-z0-9]+", "-", title).strip("-")
-
-
-def indexed_tree(pages: list[Page]) -> tuple[Node, dict[tuple[int, float], Node]]:
-    """Build a fresh tree and verify every indexed heading against the PDF."""
-    root = deepcopy(ROOT)
-    page_map = {page.number: page for page in pages}
-    events = {}
-    chapters = {}
-
-    def attach(node: Node, parent: Node | None = None) -> None:
-        node.parent = parent
-        if node is not root and node is not root.children[0]:
-            node.anchor = find_anchor(page_map, node)
-            events[node.anchor] = node
-        for child in node.children:
-            if child.title.startswith("Chapter "):
-                chapters[child.start_page] = child
-            attach(child, node)
-
-    attach(root)
-    # Doctrine root headings have different wording from the descriptive TOC.
-    # The leaf Foreword/Preface anchors already delimit text on their first page.
-    for node in root.children:
-        if node.anchor is None:
-            node.anchor = (node.start_page + PRINTED_PAGE_OFFSET, 0.0)
-    indexed = {}
-    for chapter_page, headings in SUBDIVISIONS.items():
-        chapter = chapters[chapter_page]
-        for label, title, page, y in headings:
-            node = Node(f"{label}-{slug(title)}.txt", title, page, label=label, parent=chapter)
-            node.anchor = find_anchor(page_map, node, y)
-            chapter.children += (node,)
-            indexed[(chapter_page, label)] = node
-            events[node.anchor] = node
-    for table in (SECOND_LEVEL, THIRD_LEVEL):
-        for key, headings in table.items():
-            parent = indexed[key]
-            for label, title, page, y in headings:
-                node = Node(f"{label}-{slug(title)}.txt", title, page, label=label, parent=parent)
-                node.anchor = find_anchor(page_map, node, y)
-                parent.children += (node,)
-                indexed[key + (label,)] = node
-                events[node.anchor] = node
-    return root, events
-
-
-def is_heading(line: Line, page: Page) -> bool:
-    """Recognize unindexed headings as prose boundaries, without guessing depth."""
-    text = line.text
-    if re.fullmatch(r"Remark(?: \d+)?", text):
-        return True
-    if line.height < page.body_height * .65:
-        return True
-    # Centered italic subsection titles have extra vertical spacing and labels.
-    centered = abs((line.x + max(word.x1 for word in line.words)) / 2
-                   - (page.left + page.right) / 2) < page.body_height * 1.5
-    if line.height > page.body_height * 1.25:
-        return centered and line.x > page.left + page.body_height * 2 and len(text) < 120
-    return centered and line.x > page.left + page.body_height * 2 and bool(
-        re.match(r"^(?:[a-zα-ω]|\d+)[.)]\s", text)
-    )
-
-
-# 4. Prose reconstruction: paragraphs, their source spans, and readable text.
-def join_lines(lines: list[Line], vocabulary: set[str]) -> str:
-    """Undo line wraps conservatively, retaining genuine compound-word hyphens."""
-    text = ""
-    for line in lines:
-        fragment = unicodedata.normalize("NFC", line.text)
-        # Some callouts are fused to punctuation rather than separate PDF words.
-        fragment = re.sub(r"(?<=[A-Za-z])([,.;:])\d{1,3}(?=\s|$)", r"\1", fragment)
-        if text.endswith("-") and re.match(r"^[A-Za-z]", fragment):
-            left = re.search(r"([A-Za-z]+(?:-[A-Za-z]+)*)-$", text)
-            right = re.match(r"[A-Za-z]+", fragment)
-            if left and right:
-                a, b = left.group(1), right.group(0)
-                compound, joined = (a + "-" + b).casefold(), (a + b).casefold()
-                retain = compound in vocabulary or (
-                    joined not in vocabulary and (
-                        "-" in a or a.casefold() in {
-                            "self", "non", "being", "for", "in", "form", "sense", "co"
-                        }
-                    )
-                )
-                text = text + fragment if retain else text[:-1] + fragment
-                continue
-        text += (" " if text else "") + fragment
-    text = re.sub(r"\s+([,.;:?!])", r"\1", text)
-    return re.sub(r"[ \t]+", " ", text).strip()
+from sol import __version__ as VERSION
+from sol.corpus.edition import PDF_FILENAME, ROOT, default_pdf
+from sol.reader.models import Book, Node, Passage, node_path, presentation_text
 
 
 def load_book(pdf: Path) -> Book:
-    """Recover paragraph indents and page continuations, then attach source paths."""
-    pages = extract_pages(pdf)
-    root, events = indexed_tree(pages)
-    vocabulary = {
-        word.casefold()
-        for page in pages for line in page.lines
-        for word in re.findall(r"[A-Za-z]+(?:-[A-Za-z]+)*", line.text)
-    }
-    records = []
-    current: list[Line] = []
-    active = root.children[0].children[0]
-    detail = ""
-    previous: Line | None = None
-    body_started = False
-    skip_title_until = -1.0
+    """Load historical PDF prose only when --pdf was explicitly requested."""
+    from sol.reader.legacy_pdf import load_book as load_legacy_book
 
-    def finish() -> None:
-        nonlocal current
-        if current:
-            text = join_lines(current, vocabulary)
-            if text:
-                records.append((text, current[0].pdf_page, current[-1].pdf_page, active, detail))
-        current = []
-
-    for page in pages:
-        previous = None
-        skip_title_until = -1.0
-        for line in page.lines:
-            event = events.get(line.position)
-            if event is not None:
-                finish()
-                active, detail = event, ""
-                body_started = True
-                # Ignore remaining lines of a verified wrapped title.
-                skip_title_until = line.y
-                target = heading_key(event.title)
-                accumulated = line.text
-                index = page.lines.index(line)
-                for following in page.lines[index + 1:index + 3]:
-                    if heading_key(accumulated) == target:
-                        break
-                    accumulated += " " + following.text
-                    skip_title_until = following.y
-                previous = None
-                continue
-            if line.y <= skip_title_until:
-                continue
-            if is_heading(line, page):
-                finish()
-                # Display otherwise unindexed lower-level headings as context,
-                # but do not invent their hierarchy from typography alone.
-                detail = line.text
-                previous = None
-                continue
-            if not body_started:
-                continue
-            # Paragraphs in this edition are indented by one em, not separated
-            # by blank lines. Ignore page changes themselves: unindented prose
-            # at the top of the next page continues the preceding paragraph.
-            indentation = line.x - page.left
-            indented = page.body_height * .6 < indentation < page.body_height * 1.8
-            # Italic end-of-line fragments can have the same inset as a new
-            # paragraph. A lowercase continuation of an unfinished sentence
-            # (or a divided word) is still part of the preceding paragraph.
-            if current and re.match(r"^[a-z]", line.text) and not re.search(
-                r"[.!?:][\"’”)]?$", current[-1].text
-            ):
-                indented = False
-            gap = (previous is not None
-                   and line.y - previous.y > page.body_height * 1.8
-                   and re.search(r"[.!?][\"’”)]?$", previous.text) is not None)
-            # Body enumerations belong to the preceding introductory paragraph.
-            enumerated_list = re.match(r"^[A-Z][.)]\s", line.text) is not None
-            if current and (indented or gap) and not enumerated_list:
-                finish()
-            current.append(line)
-            previous = line
-    finish()
-
-    # A directory's own introductory prose becomes a real virtual text file.
-    by_node = {}
-    for _, start, _, node, _ in records:
-        by_node.setdefault(id(node), start - PRINTED_PAGE_OFFSET)
-
-    def finish_tree(node: Node) -> None:
-        if node.children:
-            if node.name.endswith(".txt"):
-                node.name = node.name[:-4]
-            if id(node) in by_node:
-                intro = Node("00-introduction.txt", "Introduction — " + node.title,
-                             by_node[id(node)], parent=node)
-                node.children = (intro,) + node.children
-            for child in node.children:
-                finish_tree(child)
-
-    finish_tree(root)
-    page_counts = Counter()
-    passages = []
-    for text, start, end, node, heading in records:
-        if node.children:
-            node = node.children[0]
-        path = node_path(node)
-        printed = start - PRINTED_PAGE_OFFSET
-        page_counts[printed] += 1
-        identifier = f"p{printed:04d}-{page_counts[printed]:02d}"
-        passages.append(Passage(text, start, printed, node, path, end,
-                                end - PRINTED_PAGE_OFFSET, identifier, heading))
-    if not passages:
-        raise RuntimeError("No paragraphs found in the PDF.")
-    return Book(root, passages)
-
-
-def extract_passages(pdf: Path) -> list[Passage]:
-    """Compatibility helper for experiments that previously imported this function."""
-    return load_book(pdf).passages
+    return load_legacy_book(pdf)
 
 
 def load_corpus_book(corpus: Path) -> Book:
@@ -910,7 +45,7 @@ def load_corpus_book(corpus: Path) -> Book:
     explicitly supplied reader_path metadata defines this convenient view;
     it is not reconstructed from heading spellings or assigned new IDs.
     """
-    from sol_corpus_contract import CorpusError, load_snapshot
+    from sol.corpus.contract import CorpusError, load_snapshot
 
     try:
         snapshot = load_snapshot(corpus)
@@ -922,7 +57,7 @@ def load_corpus_book(corpus: Path) -> Book:
                 "Select its actual location with sol --set-corpus DIRECTORY or --corpus DIRECTORY.\n"
                 "If SOL_CORPUS is set, update or unset that environment override."
             ) from error
-        instruction = f"{shlex.quote(sys.executable)} -m sol_corpus_contract {shlex.quote(str(corpus))}"
+        instruction = f"{shlex.quote(sys.executable)} -m sol.corpus.contract {shlex.quote(str(corpus))}"
         raise ValueError(
             f"Cannot use local corpus {corpus}: {error}\n"
             f"After correcting canonical Markdown if necessary, rebuild the index with:\n{instruction}"
@@ -932,6 +67,7 @@ def load_corpus_book(corpus: Path) -> Book:
     nodes: dict[tuple[str, ...], Node] = {(): root}
     children: dict[tuple[str, ...], list[Node]] = {(): []}
     node_orders: dict[tuple[str, ...], int] = {}
+    # Reader-facing names are intentionally shorter than the edition outline.
     for name, title, start in (
         ("BEING", "Doctrine of Being (Book One)", 7),
         ("ESSENCE", "Doctrine of Essence (Book Two)", 337),
@@ -1040,12 +176,6 @@ def load_corpus_book(corpus: Path) -> Book:
 
 
 # 5. Navigation and display: no PDF extraction details belong in the shell.
-def node_path(node: Node) -> tuple[str, ...]:
-    parts = []
-    while node.parent is not None:
-        parts.append(node.name)
-        node = node.parent
-    return tuple(reversed(parts))
 
 
 def display_path(path: tuple[str, ...]) -> str:
@@ -1093,11 +223,6 @@ def fold_path(path: tuple[str, ...], width: int) -> str:
     return "\n".join(lines)
 
 
-def presentation_text(text: str, facsimile_labels: tuple[str, ...] = ()) -> str:
-    """Exclude generated facsimile captions from the terminal prose only."""
-    for label in facsimile_labels:
-        text = re.sub(r"(?m)^[ \t]*" + re.escape(label) + r"[ \t]*$", "", text)
-    return text.strip()
 
 
 def fold_body(text: str, width: int) -> str:
@@ -1513,14 +638,17 @@ class ReadingSession:
 
     def read(self, path: tuple[str, ...], first: bool = False) -> Passage:
         matches = self.book.selection(path)
+        if first:
+            self.path, self.cursor = path, 0
+            return matches[0]
         candidates = [index for index, p in enumerate(matches)
                       if p.kind != "formula" and p.random_eligible and len(re.findall(r"[A-Za-z]{2,}", p.text)) >= 8]
-        if not first and not candidates:
+        if not candidates:
             candidates = [index for index, p in enumerate(matches)
                           if p.kind != "formula" and p.random_eligible and len(re.findall(r"[A-Za-z]{2,}", p.text)) >= 3]
-        if not first and not candidates:
+        if not candidates:
             raise ValueError("this file has no suitable random prose paragraph; use cat")
-        index = 0 if first else random.choice(candidates)
+        index = random.choice(candidates)
         self.path, self.cursor = path, index
         return matches[index]
 
@@ -1546,7 +674,7 @@ def install_completion(root: Node, get_cwd, workspace: bool = False):
     old_completer = readline.get_completer()
     old_delimiters = readline.get_completer_delims()
     commands = ("ls", "cd", "up", "pwd", "tree", "read", "first", "next", "previous",
-                "cat", "search", "open", "context", "info", "where", "guide", "neofetch", "help", "exit")
+                "cat", "search", "open", "context", "info", "where", "guide", "neofetch", "source", "help", "exit")
     if workspace:
         commands += ("workspace", "resume", "bookmark", "note", "compare", "review", "relate")
     def complete(text: str, state: int):
@@ -1554,6 +682,9 @@ def install_completion(root: Node, get_cwd, workspace: bool = False):
             buffer = readline.get_line_buffer()
             if " " not in buffer:
                 choices = [command for command in commands if command.startswith(text)]
+            elif buffer.startswith("source "):
+                choices = [action for action in ("show", "close", "set-pdf", "info")
+                           if action.startswith(text)] if buffer.count(" ") == 1 else []
             else:
                 parent, _, fragment = text.rpartition("/")
                 node, _ = resolve_path(parent + "/" if "/" in text else None, get_cwd(), root)
@@ -1617,7 +748,8 @@ def shell_options(verb: str, arguments: list[str]) -> argparse.Namespace:
 
 def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
               workspace_reader=None, read_command=None, write_output=None,
-              ui_mode="basic", editing_mode="emacs", draft_reader=None) -> int:
+              ui_mode="basic", editing_mode="emacs", draft_reader=None,
+              source_pdf=None, source_pane=None, auto_width=False) -> int:
     """Run the linear shell through replaceable, synchronous input/output seams.
 
     The optional adapter owns completion and accepts one command at a time;
@@ -1631,10 +763,28 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
     emit = write_output if write_output is not None else print
     restore = lambda: None
     adapter = None
+    source_service = None
+
+    def reflow_current():
+        nonlocal width
+        if not auto_width:
+            return
+        current_width = sensible_width(None)
+        if current_width == width:
+            return
+        width = current_width
+        if workspace_reader is not None:
+            workspace_reader.width = width
+        try:
+            current = session.current()
+        except ValueError:
+            return
+        emit(render_passage(current, width, plain, color))
+
     try:
         emit("SOL. Type 'guide' to get started; 'help' for commands.")
         if workspace_reader is not None:
-            from sol_workspace_reader import safe_output
+            from sol.workspace.reader import safe_output
             emit(f"Workspace: {workspace_reader.store.path.stem}")
             emit("Actor: " + safe_output(workspace_reader.actor) if workspace_reader.actor else
                  "No actor selected; authored writes require --actor NAME.")
@@ -1648,7 +798,7 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                     emit(f"sol: saved position not restored: {error}\n"
                          "The reference is retained. Inspect the workspace or deliberately start another reading.")
         if read_command is None and ui_mode != "basic":
-            from sol_prompt import create_adapter
+            from sol.terminal.prompt import create_adapter
             adapter = create_adapter(book, lambda: cwd, workspace_reader, mode=ui_mode,
                                      plain=plain, editing_mode=editing_mode)
             if adapter is not None:
@@ -1674,6 +824,46 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                 if not parts:
                     continue
                 verb, arguments = parts[0], parts[1:]
+                if auto_width:
+                    width = sensible_width(None)
+                    if workspace_reader is not None:
+                        workspace_reader.width = width
+                if verb == "source":
+                    from sol.terminal.source import SourceService
+                    from sol.workspace.reader import safe_output
+                    action = arguments[0] if arguments else "show"
+                    targets = arguments[1:]
+                    if action not in {"show", "close", "set-pdf", "info"}:
+                        raise ValueError("use source show [UUID], source close, source set-pdf PATH, or source info")
+                    if len(targets) > 1 or (action in {"close", "info"} and targets):
+                        raise ValueError(f"source {action}: unexpected arguments")
+                    if action == "close":
+                        if source_pane is not None:
+                            source_pane.close()
+                        reflow_current()
+                        emit("Source pane closed.")
+                        continue
+                    if source_service is None:
+                        source_service = SourceService(book, source_pdf=source_pdf)
+                    if action == "set-pdf":
+                        if not targets:
+                            raise ValueError("source set-pdf requires a local PDF path")
+                        location = source_service.set_pdf(Path(targets[0]))
+                        emit(safe_output(f"Verified source PDF remembered: {location}"))
+                    elif action == "info":
+                        emit(safe_output(json.dumps(source_service.inspect_info(), ensure_ascii=False, indent=2)))
+                    else:
+                        if source_pane is None:
+                            from sol.terminal.kitty import SourcePane
+                            source_pane = SourcePane()
+                        identifier = targets[0] if targets else session.current().identifier
+                        request = source_service.capture(identifier)
+                        source_pane.show(request)
+                        reflow_current()
+                        emit(f"Source PDF verified; {len(request['sources'])} source page(s).\n"
+                             f"Pinned source: {request['target_id']}\n"
+                             "Use source show to refresh.")
+                    continue
                 if verb == "note" and arguments and arguments[0] == "edit" and len(arguments) == 2:
                     if workspace_reader is None:
                         raise ValueError("note edit requires a workspace and actor")
@@ -1735,7 +925,7 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                 if verb in {"workspace", "bookmark", "note", "compare", "review", "relate"}:
                     if workspace_reader is None:
                         raise ValueError(f"{verb} requires starting SOL with --workspace NAME")
-                    from sol_workspace_reader import safe_output
+                    from sol.workspace.reader import safe_output
                     outcome = workspace_reader.execute(verb, arguments, session)
                     if outcome.open_id:
                         reference = workspace_reader.current_reference(session, outcome.open_id)
@@ -1769,8 +959,12 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                     if argument is not None:
                         raise ValueError("help does not take an argument")
                     emit(SHELL_HELP)
+                    emit("\nsource show [UUID]   view verified source pages in the SOL kitty desk\n"
+                         "source close         close the source pane\n"
+                         "source set-pdf PATH  verify and remember this edition's local PDF\n"
+                         "source info          inspect the source-file association")
                     if workspace_reader is not None:
-                        from sol_workspace_reader import WORKSPACE_HELP
+                        from sol.workspace.reader import WORKSPACE_HELP
                         emit("\n" + WORKSPACE_HELP)
                 elif verb == "neofetch":
                     if argument is not None:
@@ -1850,9 +1044,11 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                             emit(render_passage(passage, width, plain, color), end="\n\n")
                 else:
                     raise ValueError(f"unknown command: {verb}; type help")
-            except ValueError as error:
+            except KeyboardInterrupt:
+                emit("Command cancelled.")
+            except (ValueError, RuntimeError) as error:
                 if workspace_reader is not None:
-                    from sol_workspace import WorkspaceError
+                    from sol.workspace.store import WorkspaceError
                     if isinstance(error, WorkspaceError):
                         cwd, previous_cwd, session.path, session.cursor, workspace_reader.resumed_reference = before_command
                 emit(f"sol: {error}")
@@ -1860,13 +1056,10 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
         restore()
         if adapter is not None:
             adapter.close()
+        if source_pane is not None:
+            source_pane.cleanup()
 
 
-def default_pdf() -> Path:
-    """Look in the working directory first, then preserve the user's sources layout."""
-    direct = Path.cwd() / PDF_FILENAME
-    local_source = Path.cwd() / "sources" / PDF_FILENAME
-    return direct if direct.is_file() or not local_source.is_file() else local_source
 
 
 def config_path() -> Path:
@@ -1933,6 +1126,32 @@ def installed_project_directory() -> Path | None:
         return None
 
 
+def source_project_directory() -> Path | None:
+    """Recognize this source checkout, never guess a corpus beside a module.
+
+    The fallback is for running ``python -m sol`` directly. Installed wheels
+    normally have no project metadata; local pipx installs use PEP 610 instead.
+    Match the known project's identity within its project table, without adding
+    a TOML parser dependency to the Python 3.10 standard-library reader.
+    """
+    module = Path(__file__).resolve()
+    try:
+        directory = module.parents[2]
+        if module != directory / "sol" / "reader" / "app.py":
+            return None
+        metadata = (directory / "pyproject.toml").read_text(encoding="utf-8")
+    except (IndexError, OSError, UnicodeError):
+        return None
+    project = re.search(r"(?ms)^[ \t]*\[project\][ \t]*(?:#[^\n]*)?\r?\n(.*?)(?=^[ \t]*\[|\Z)", metadata)
+    if project is None:
+        return None
+    identity = re.search(
+        r"(?m)^[ \t]*name[ \t]*=[ \t]*(['\"])sol-organizes-logic\1[ \t]*(?:#[^\n]*)?\r?$",
+        project.group(1),
+    )
+    return directory if identity is not None else None
+
+
 def discover_corpus(explicit: Path | None = None) -> Path | None:
     """Select a canonical corpus independently of the shell's working directory.
 
@@ -1952,7 +1171,9 @@ def discover_corpus(explicit: Path | None = None) -> Path | None:
         return saved
     project = installed_project_directory()
     candidates = ([project / "local-corpus"] if project is not None else [])
-    candidates.append(Path(__file__).resolve().parent / "local-corpus")
+    source = source_project_directory()
+    if source is not None:
+        candidates.append(source / "local-corpus")
     return next((candidate for candidate in candidates if (candidate / "corpus.json").is_file()), None)
 
 
@@ -1997,7 +1218,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--set-corpus", type=Path, metavar="DIRECTORY",
                       help="validate and remember the default corpus for reading from any directory")
     mode.add_argument("--resume", action="store_true", help="resume the named workspace's saved passage")
-    mode.add_argument("--workspace-export", action="store_true", help="export the named workspace as JSON")
+    mode.add_argument("--workspace-export", action="store_true", help="export a workspace snapshot (JSON by default)")
     mode.add_argument("--workspace-check", action="store_true", help="report unresolved, retired and versioned workspace references")
     mode.add_argument("--workspace-backup", type=Path, metavar="FILE", help="create a new, verified .sqlite3 backup without overwriting")
     mode.add_argument("--workspace-upgrade", type=Path, metavar="FILE", help="upgrade a version-1 workspace into a separate verified copy")
@@ -2005,6 +1226,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--workspace", metavar="NAME", help="choose a named reading workspace without prompting")
     parser.add_argument("--workspace-dir", type=Path, metavar="DIRECTORY", help="directory for local workspace databases")
     parser.add_argument("--actor", metavar="NAME", help="explicit author for workspace notes and assertions")
+    parser.add_argument("--export-format", choices=("json", "markdown"),
+                        help="format for --workspace-export (default JSON)")
+    parser.add_argument("--include-passages", action="store_true",
+                        help="include current referenced canonical Markdown in a Markdown workspace export")
     parser.add_argument("--resume-revision", type=int, metavar="N", help="with --resume, restore a historical checkpoint as a new visit")
     parser.add_argument("--ui", choices=("auto", "basic", "prompt"), help="shell input: optional enhanced prompt or basic input (default auto)")
     parser.add_argument("--editing-mode", choices=("emacs", "vi"), help="editing keys for the enhanced shell prompt")
@@ -2013,6 +1238,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="canonical corpus for this run (otherwise discover a local or saved corpus)")
     source.add_argument("--pdf", type=Path, metavar="PATH",
                         help="explicit legacy PDF reading (slow; not used for ordinary reading)")
+    parser.add_argument("--source-pdf", type=Path, metavar="PATH",
+                        help="local evidence PDF for source viewing in the canonical shell")
     parser.add_argument("--width", type=int, metavar="COLUMNS", help="line width (20–240; default fits the terminal, up to 88)")
     parser.add_argument("--within", metavar="PATH", help="restrict --search to this subtree")
     parser.add_argument("--word", action="store_true", help="whole-word --search rather than substring")
@@ -2052,6 +1279,8 @@ def validate_options(args: argparse.Namespace) -> None:
         raise ValueError("-n/--none does not use a workspace or actor; omit workspace options")
     if not args.shell and (args.ui is not None or args.editing_mode is not None):
         raise ValueError("--ui and --editing-mode are available only in the shell")
+    if args.source_pdf is not None and (not args.shell or args.pdf is not None):
+        raise ValueError("--source-pdf is for source viewing in the canonical shell; omit --pdf and one-shot actions")
     if args.word and args.search is None:
         raise ValueError("--word requires --search")
     if args.search is None and not args.review_queue and (args.within is not None or args.limit is not None):
@@ -2094,7 +1323,13 @@ def validate_options(args: argparse.Namespace) -> None:
         if args.context is not None:
             raise ValueError("workspace reading does not yet save a context view; use --passage ID --context N without --workspace")
     if args.workspace_export and args.plain:
-        raise ValueError("--workspace-export always emits JSON; omit --plain")
+        raise ValueError("--workspace-export emits an artifact, not plain passage output; omit --plain")
+    if args.export_format is not None and not args.workspace_export:
+        raise ValueError("--export-format requires --workspace-export")
+    if args.workspace_export and args.export_format == "markdown" and args.json:
+        raise ValueError("--json cannot accompany a Markdown export; omit --json or choose --export-format json")
+    if args.include_passages and not (args.workspace_export and args.export_format == "markdown"):
+        raise ValueError("--include-passages requires --workspace-export --export-format markdown")
 
 
 def interactive_input_available() -> bool:
@@ -2103,8 +1338,8 @@ def interactive_input_available() -> bool:
 
 def shell_identity(book: Book, args) -> None:
     """Ask only for missing labels; accepting a name explicitly creates it later."""
-    from sol_profiles import actor_name, list_actors
-    from sol_workspace_reader import workspace_path
+    from sol.workspace.profiles import actor_name, list_actors
+    from sol.workspace.reader import workspace_path
 
     if not book.corpus_manifest.get('corpus_id'):
         raise ValueError("a persistent shell needs an identified Markdown corpus. "
@@ -2115,7 +1350,7 @@ def shell_identity(book: Book, args) -> None:
                          "Supply --workspace NAME --actor NAME, use sol -n for a temporary shell, "
                          "or sol -r for a random passage.")
     if args.workspace is None:
-        from sol_workspace_catalog import discover_workspaces
+        from sol.workspace.catalog import discover_workspaces
         source_digest = book.corpus_manifest.get('source', {}).get('sha256')
         recent = discover_workspaces(book.corpus_manifest['corpus_id'], source_digest, args.workspace_dir)
         default_workspace = recent[0]['name'] if recent else 'reading'
@@ -2178,8 +1413,8 @@ def emit_json(value: object) -> None:
 
 def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
     """Named durable state, kept separate from corpus-only one-shot reading."""
-    from sol_workspace import Workspace
-    from sol_workspace_reader import WorkspaceReader, workspace_path
+    from sol.workspace.store import Workspace
+    from sol.workspace.reader import WorkspaceReader, workspace_path
 
     identity = book.corpus_manifest.get("corpus_id")
     if not identity:
@@ -2195,12 +1430,12 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
     provenance = {"edition": book.corpus_manifest["edition"], "source": book.corpus_manifest["source"]}
     with Workspace(location, identity, provenance, actor=args.actor or "Reader") as store:
         if args.shell:
-            from sol_profiles import register_actor
+            from sol.workspace.profiles import register_actor
             register_actor(args.actor)
         reader = WorkspaceReader(book, store, args.actor, resolve_path, display_path,
                                  render_passage, width, args.plain, color)
         if args.workspace_export:
-            emit_json(store.export())
+            print(reader.export_text(args.export_format or 'json', include_passages=args.include_passages))
             return 0
         if args.workspace_check:
             report = reader.health()
@@ -2242,7 +1477,8 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
             return 0
         if args.shell:
             return run_shell(book, width, args.plain, color, reader,
-                             ui_mode=args.ui or 'auto', editing_mode=args.editing_mode or 'emacs')
+                             ui_mode=args.ui or 'auto', editing_mode=args.editing_mode or 'emacs',
+                             source_pdf=args.source_pdf, auto_width=args.width is None)
         session = ReadingSession(book)
         cwd, previous = (), None
         if args.resume:
@@ -2333,8 +1569,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.review_queue:
             if not book.canonical_records:
                 raise ValueError("--review-queue requires the canonical Markdown corpus, not the legacy PDF reader")
-            from sol_workspace_diagnostics import review_queue
-            from sol_workspace_reader import render_review_queue
+            from sol.workspace.diagnostics import review_queue
+            from sol.workspace.reader import render_review_queue
             within = None if args.within is None else resolve_path(args.within, (), book.root)[1]
             rows = review_queue(book, {"reviews": []}, within, 20 if args.limit is None else args.limit)
             if args.json:
@@ -2351,7 +1587,8 @@ def main(argv: list[str] | None = None) -> int:
             print(render_guide(book, width, 1 if args.depth is None else args.depth))
         elif args.shell:
             return run_shell(book, width, args.plain, color, ui_mode=args.ui or 'auto',
-                             editing_mode=args.editing_mode or 'emacs')
+                             editing_mode=args.editing_mode or 'emacs', source_pdf=args.source_pdf,
+                             auto_width=args.width is None)
         elif args.search is not None:
             _, path = resolve_path(args.within, (), book.root)
             passages = book.search(args.search, path, args.word,

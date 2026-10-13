@@ -17,27 +17,32 @@ import unittest
 import zipfile
 
 
-MODULES = {
-    "sol", "sol_corpus", "sol_corpus_contract", "sol_corpus_notes",
-    "sol_corpus_references", "sol_corpus_structure", "sol_workspace", "sol_workspace_reader",
-    "sol_workspace_diagnostics", "sol_workspace_catalog",
-    "sol_prompt", "sol_profiles",
+PACKAGE_FILES = {
+    "sol/__init__.py", "sol/__main__.py",
+    "sol/reader/__init__.py", "sol/reader/app.py", "sol/reader/models.py", "sol/reader/legacy_pdf.py",
+    "sol/corpus/__init__.py", "sol/corpus/convert.py", "sol/corpus/contract.py", "sol/corpus/notes.py",
+    "sol/corpus/references.py", "sol/corpus/structure.py", "sol/corpus/layout.py", "sol/corpus/edition.py",
+    "sol/workspace/__init__.py", "sol/workspace/store.py", "sol/workspace/reader.py",
+    "sol/workspace/diagnostics.py", "sol/workspace/catalog.py", "sol/workspace/export.py",
+    "sol/workspace/profiles.py", "sol/terminal/__init__.py", "sol/terminal/prompt.py",
+    "sol/terminal/source.py", "sol/terminal/kitty.py",
 }
 ENTRY_POINTS = {
     "sol": "sol:cli",
-    "sol-corpus": "sol_corpus:main",
-    "sol-corpus-check": "sol_corpus_contract:main",
+    "sol-kitty": "sol.terminal.kitty:main",
+    "sol-corpus": "sol.corpus.convert:main",
+    "sol-corpus-check": "sol.corpus.contract:main",
 }
 PUBLIC_FILES = {
-    "pyproject.toml", "MANIFEST.in", "README.md", "CORPUS.md",
-    "INTERFACE_RESEARCH.md", "WORKSPACE_PLAN.md", "OPENDATALOADER_RESEARCH.md",
-    "requirements-corpus.txt",
-} | {module + ".py" for module in MODULES}
+    "pyproject.toml", "MANIFEST.in", "README.md", "docs/CORPUS.md", "docs/USAGE.md",
+    "docs/WORKSPACE_PLAN.md", "docs/WORKSPACE_EXPORT.md",
+    "docs/research/INTERFACE_RESEARCH.md", "docs/research/OPENDATALOADER_RESEARCH.md",
+} | PACKAGE_FILES
 
 
 def write_runtime_corpus(directory, *, pending_review=False):
     """Create a valid tiny index using stdlib only, without a source PDF."""
-    import sol_corpus_contract as contract
+    import sol.corpus.contract as contract
 
     directory.mkdir(parents=True)
     section_id = "aaaaaaaa-0000-4000-8000-000000000001"
@@ -105,6 +110,7 @@ class PackagingTests(unittest.TestCase):
         cls.stage.mkdir()
         root = Path(__file__).resolve().parents[1]
         for filename in PUBLIC_FILES:
+            (cls.stage / filename).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(root / filename, cls.stage / filename)
         tests = cls.stage / "tests"
         tests.mkdir()
@@ -117,6 +123,7 @@ class PackagingTests(unittest.TestCase):
                          "tests/private-workspace/reading.sqlite3-journal",
                          "profiles.sqlite3", "tests/private-profile/profiles.sqlite3-wal",
                          "personal.sol-workspace.json",
+                         "personal.sol-workspace.md", "tests/private-workspace/personal.sol-workspace.md",
                          "AGENTS.md"):
             sentinel = cls.stage / relative
             sentinel.parent.mkdir(parents=True, exist_ok=True)
@@ -124,7 +131,7 @@ class PackagingTests(unittest.TestCase):
         # Deliberately nominate the workspace sentinels before the real exclusions,
         # so this test exercises MANIFEST.in rather than an incidental omission.
         manifest = cls.stage / "MANIFEST.in"
-        manifest.write_text("recursive-include . *.sqlite3 *.sqlite3-* *.sol-workspace.json\n"
+        manifest.write_text("recursive-include . *.sqlite3 *.sqlite3-* *.sol-workspace.json *.sol-workspace.md\n"
                             + manifest.read_text(encoding="utf-8"), encoding="utf-8")
         cls.dist = Path(cls.temporary.name) / "dist"
         cls.dist.mkdir()
@@ -144,9 +151,9 @@ class PackagingTests(unittest.TestCase):
     def test_wheel_contains_only_public_modules_and_metadata(self):
         with zipfile.ZipFile(self.wheel) as archive:
             names = archive.namelist()
-        actual_modules = {name[:-3] for name in names if "/" not in name and name.endswith(".py")}
-        self.assertEqual(actual_modules, MODULES)
-        self.assertTrue(all(name in {module + ".py" for module in MODULES}
+        actual_modules = {name for name in names if name.endswith(".py")}
+        self.assertEqual(actual_modules, PACKAGE_FILES)
+        self.assertTrue(all(name in PACKAGE_FILES
                             or ".dist-info/" in name for name in names))
 
     def test_metadata_and_console_entry_points(self):
@@ -178,7 +185,7 @@ class PackagingTests(unittest.TestCase):
         private_parts = {"sources", "local-corpus", ".sol-corpus-work", "AGENTS.md"}
         for name in names:
             self.assertFalse(private_parts.intersection(Path(name).parts), name)
-            self.assertFalse(name.endswith((".pdf", ".png", ".zip", ".jsonl", ".sol-workspace.json")), name)
+            self.assertFalse(name.endswith((".pdf", ".png", ".zip", ".jsonl", ".sol-workspace.json", ".sol-workspace.md")), name)
             self.assertFalse(Path(name).name.endswith(".sqlite3")
                              or ".sqlite3-" in Path(name).name, name)
 
@@ -224,9 +231,9 @@ def block_parser(name, *args, **kwargs):
         raise AssertionError("Installed reader must not import the Markdown parser")
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_parser
-sol = importlib.import_module("sol")
-assert Path(sol.__file__).parent == Path(sys.argv[1])
-assert not (Path(sol.__file__).parent / "local-corpus").exists()
+sol = importlib.import_module("sol.reader.app")
+assert Path(sol.__file__).parents[2] == Path(sys.argv[1])
+assert not (Path(sys.argv[1]) / "local-corpus").exists()
 def block_pdf(*args, **kwargs):
     raise AssertionError("Installed reader must not extract the PDF")
 sol.load_book = block_pdf
@@ -271,11 +278,12 @@ import builtins, importlib, sys
 sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def block_optional_and_profiles(name, *args, **kwargs):
-    if name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'sol_profiles', 'sol_workspace_catalog'}:
+    if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit'}
+            or name in {'sol.workspace.profiles', 'sol.workspace.catalog'}):
         raise AssertionError('Temporary/one-shot reader imported ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional_and_profiles
-sol = importlib.import_module('sol')
+sol = importlib.import_module('sol.reader.app')
 def block_pdf(*args, **kwargs):
     raise AssertionError('Installed reader must not extract a PDF')
 sol.load_book = block_pdf
@@ -334,7 +342,7 @@ def block_optional(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional
 module = importlib.import_module(sys.argv[2])
-if sys.argv[2] == 'sol':
+if sys.argv[2] == 'sol.reader.app':
     def block_pdf(*args, **kwargs):
         raise AssertionError('Installed reader must not extract a PDF')
     module.load_book = block_pdf
@@ -357,27 +365,27 @@ raise SystemExit(status)
             self.assertNotIn("\x1b", result.stdout)
             return result
 
-        run("sol_corpus_contract", [str(corpus), "--initialize-identity"])
+        run("sol.corpus.contract", [str(corpus), "--initialize-identity"])
         base = ["--corpus", str(corpus)]
         for supplied in ([], ["--workspace", "installed-reading"], ["--actor", "Installed author"]):
             with self.subTest(supplied=supplied):
-                result = run("sol", [*base, *supplied], commands="first /being\nexit\n", expected_status=2)
+                result = run("sol.reader.app", [*base, *supplied], commands="first /being\nexit\n", expected_status=2)
                 self.assertIn("--workspace NAME --actor NAME", result.stderr)
                 self.assertIn("sol -n", result.stderr)
                 self.assertIn("sol -r", result.stderr)
                 self.assertFalse(data.exists(), "Rejected onboarding must not create private storage")
         selected = [*base, "--workspace", "installed-reading", "--actor", "Installed author"]
-        opened = run("sol", selected,
+        opened = run("sol.reader.app", selected,
                      commands='first /being\nnote add "A private installed-reader question."\nexit\n')
         self.assertIn("Actor: Installed author", opened.stdout)
         self.assertTrue((data / "sol" / "profiles.sqlite3").is_file())
         self.assertTrue((data / "sol" / "workspaces" / "installed-reading.sqlite3").is_file())
         # Inspection remains one-shot and needs no actor; it must preserve the saved passage.
         inspection = [*base, "--workspace", "installed-reading"]
-        resumed = json.loads(run("sol", [*inspection, "--resume", "--json"]).stdout)
+        resumed = json.loads(run("sol.reader.app", [*inspection, "--resume", "--json"]).stdout)
         self.assertEqual(resumed["id"], passage_id)
         self.assertEqual(resumed["text"], body)
-        exported = json.loads(run("sol", [*inspection, "--workspace-export"]).stdout)
+        exported = json.loads(run("sol.reader.app", [*inspection, "--workspace-export"]).stdout)
         self.assertEqual(exported["schema_version"], 2)
         self.assertEqual(exported["state"]["current_id"], passage_id)
         self.assertEqual(len(exported["annotations"]), 1)
@@ -385,11 +393,11 @@ raise SystemExit(status)
         note = exported["annotations"][0]
         self.assertEqual(note["revision"], 1)
         self.assertEqual([row["kind"] for row in exported["annotation_history"]], ["created"])
-        edited = run("sol", selected, commands=(
+        edited = run("sol.reader.app", selected, commands=(
             f'note edit {note["id"]} "A revised installed-reader question." --expect-revision 1\n'
             f'note history {note["id"]}\nexit\n'))
         self.assertIn("A revised installed-reader question.", edited.stdout)
-        final = json.loads(run("sol", [*inspection, "--workspace-export"]).stdout)
+        final = json.loads(run("sol.reader.app", [*inspection, "--workspace-export"]).stdout)
         self.assertEqual(final["annotations"][0]["revision"], 2)
         self.assertEqual(final["annotations"][0]["actor"], note["actor"])
         self.assertEqual(final["annotations"][0]["target_id"], note["target_id"])
@@ -421,7 +429,7 @@ def block_optional(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional
 module = importlib.import_module(sys.argv[2])
-if sys.argv[2] == 'sol':
+if sys.argv[2] == 'sol.reader.app':
     def block_pdf(*args, **kwargs):
         raise AssertionError('Installed upgrade must not extract a PDF')
     module.load_book = block_pdf
@@ -441,7 +449,7 @@ raise SystemExit(entry(sys.argv[3:]))
             self.assertNotIn("\x1b", result.stdout)
             return result
 
-        run("sol_corpus_contract", [str(corpus), "--initialize-identity"])
+        run("sol.corpus.contract", [str(corpus), "--initialize-identity"])
         manifest = json.loads((corpus / "corpus.json").read_text(encoding="utf-8"))
         legacy = storage / "legacy.sqlite3"
         note_id = "cccccccc-0000-4000-8000-000000000003"
@@ -453,7 +461,7 @@ raise SystemExit(entry(sys.argv[3:]))
 from contextlib import closing
 import json, sqlite3, sys
 sys.path.insert(0, sys.argv[1])
-from sol_workspace import APPLICATION_ID, _SCHEMA
+from sol.workspace.store import APPLICATION_ID, _SCHEMA
 with closing(sqlite3.connect(sys.argv[2])) as connection, connection:
     for statement in _SCHEMA:
         connection.execute(statement)
@@ -476,12 +484,12 @@ with closing(sqlite3.connect(sys.argv[2])) as connection, connection:
         self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
         before_digest = hashlib.sha256(legacy.read_bytes()).hexdigest()
         arguments = ["--corpus", str(corpus), "--workspace", "legacy", "--workspace-dir", str(storage)]
-        original = json.loads(run("sol", [*arguments, "--workspace-export"]).stdout)
+        original = json.loads(run("sol.reader.app", [*arguments, "--workspace-export"]).stdout)
         self.assertEqual(original["schema_version"], 1)
         self.assertNotIn("annotation_history", original)
         self.assertIsNone(original["annotations"][0]["revision"])
         upgraded = storage / "legacy-v2.sqlite3"
-        result = json.loads(run("sol", [*arguments, "--workspace-upgrade", str(upgraded), "--json"]).stdout)
+        result = json.loads(run("sol.reader.app", [*arguments, "--workspace-upgrade", str(upgraded), "--json"]).stdout)
         self.assertEqual(result["upgraded_copy"], str(upgraded))
         self.assertEqual(result["source_workspace"], str(legacy))
         self.assertEqual(result["schema_version"], 2)
@@ -489,7 +497,7 @@ with closing(sqlite3.connect(sys.argv[2])) as connection, connection:
         if os.name == "posix":
             self.assertEqual(upgraded.stat().st_mode & 0o777, 0o600)
         copy_arguments = ["--corpus", str(corpus), "--workspace", "legacy-v2", "--workspace-dir", str(storage)]
-        baseline = json.loads(run("sol", [*copy_arguments, "--workspace-export"]).stdout)
+        baseline = json.loads(run("sol.reader.app", [*copy_arguments, "--workspace-export"]).stdout)
         self.assertEqual(baseline["schema_version"], 2)
         self.assertEqual(len(baseline["annotation_history"]), 1)
         snapshot = baseline["annotation_history"][0]
@@ -502,12 +510,12 @@ with closing(sqlite3.connect(sys.argv[2])) as connection, connection:
         for key in ("id", "target_id", "body", "actor", "created_at", "updated_at", "content_sha256"):
             self.assertEqual(baseline["annotations"][0][key], original["annotations"][0][key])
         published_digest = hashlib.sha256(upgraded.read_bytes()).hexdigest()
-        run("sol", [*arguments, "--workspace-upgrade", str(upgraded)], expected_status=2)
+        run("sol.reader.app", [*arguments, "--workspace-upgrade", str(upgraded)], expected_status=2)
         self.assertEqual(hashlib.sha256(upgraded.read_bytes()).hexdigest(), published_digest)
-        edited = run("sol", [*copy_arguments, "--actor", "Installed legacy author"], commands=(
+        edited = run("sol.reader.app", [*copy_arguments, "--actor", "Installed legacy author"], commands=(
             f'note edit {note_id} "An explicitly audited revision." --expect-revision 1\nexit\n'))
         self.assertIn("revision 2", edited.stdout)
-        after = json.loads(run("sol", [*copy_arguments, "--workspace-export"]).stdout)
+        after = json.loads(run("sol.reader.app", [*copy_arguments, "--workspace-export"]).stdout)
         self.assertEqual(after["annotations"][0]["body"], "An explicitly audited revision.")
         self.assertEqual(after["annotations"][0]["revision"], 2)
         self.assertEqual(after["annotations"][0]["content_sha256"], digest)
@@ -539,7 +547,7 @@ def block_optional(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional
 module = importlib.import_module(sys.argv[2])
-if sys.argv[2] == "sol":
+if sys.argv[2] == "sol.reader.app":
     def block_pdf(*args, **kwargs):
         raise AssertionError("Installed workspace must not extract a PDF")
     module.load_book = block_pdf
@@ -558,57 +566,166 @@ raise SystemExit(entry(sys.argv[3:]))
             self.assertNotIn("\x1b", result.stdout)
             return result.stdout
 
-        initialized = run("sol_corpus_contract", [str(corpus), "--initialize-identity"])
+        initialized = run("sol.corpus.contract", [str(corpus), "--initialize-identity"])
         self.assertIn("Initialized corpus identity", initialized)
         identity = json.loads((corpus / "corpus.json").read_text(encoding="utf-8"))["corpus_id"]
         arguments = ["--corpus", str(corpus), "--workspace", "wheel-study",
                      "--workspace-dir", str(storage), "--actor", "Installed reader"]
-        first = json.loads(run("sol", [*arguments, "--first", "/being", "--json"]))
+        first = json.loads(run("sol.reader.app", [*arguments, "--first", "/being", "--json"]))
         self.assertEqual(first["id"], passage_id)
         self.assertEqual(first["workspace"]["corpus_id"], identity)
-        resumed = json.loads(run("sol", [*arguments, "--resume", "--json"]))
+        resumed = json.loads(run("sol.reader.app", [*arguments, "--resume", "--json"]))
         self.assertEqual(resumed["id"], passage_id)
         self.assertEqual(resumed["workspace"]["revision"], first["workspace"]["revision"])
-        plain = run("sol", [*arguments, "--resume", "--plain"])
+        plain = run("sol.reader.app", [*arguments, "--resume", "--plain"])
         self.assertEqual(" ".join(plain.split()), body)
-        second = json.loads(run("sol", [*arguments, "--first", "/being", "--json"]))
-        historical = json.loads(run("sol", [*arguments, "--resume", "--resume-revision",
+        second = json.loads(run("sol.reader.app", [*arguments, "--first", "/being", "--json"]))
+        historical = json.loads(run("sol.reader.app", [*arguments, "--resume", "--resume-revision",
                                              str(first["workspace"]["revision"]), "--json"]))
         self.assertEqual(historical["id"], passage_id)
         self.assertEqual(historical["workspace"]["revision"], second["workspace"]["revision"] + 1)
-        health = json.loads(run("sol", [*arguments, "--workspace-check", "--json"]))
+        health = json.loads(run("sol.reader.app", [*arguments, "--workspace-check", "--json"]))
         self.assertEqual(health["format"], "sol-workspace-health")
         self.assertEqual(health["status"], "no_workspace_issues_detected")
         self.assertEqual(health["corpus_freshness"]["state"], "current")
         self.assertEqual(health["counts"]["pending_source_review"], 1)
         self.assertEqual(health["review_provenance_binding"], "text_and_pdf_fingerprint_only")
         for scope in (["--corpus", str(corpus)], arguments):
-            queue = json.loads(run("sol", [*scope, "--review-queue", "--within", "/being",
+            queue = json.loads(run("sol.reader.app", [*scope, "--review-queue", "--within", "/being",
                                           "--limit", "1", "--json"]))
             self.assertEqual([record["id"] for record in queue], [passage_id])
             self.assertEqual(queue[0]["transcription_status"], "needs_review")
         backup = storage / "wheel-study-backup.sqlite3"
-        backed_up = json.loads(run("sol", [*arguments, "--workspace-backup", str(backup), "--json"]))
+        backed_up = json.loads(run("sol.reader.app", [*arguments, "--workspace-backup", str(backup), "--json"]))
         self.assertEqual(backed_up["backup"], str(backup))
         self.assertEqual(backed_up["corpus_id"], identity)
         if os.name == "posix":
             self.assertEqual(backup.stat().st_mode & 0o777, 0o600)
         backup_digest = hashlib.sha256(backup.read_bytes()).hexdigest()
-        run("sol", [*arguments, "--workspace-backup", str(backup)], expected_status=2)
+        run("sol.reader.app", [*arguments, "--workspace-backup", str(backup)], expected_status=2)
         self.assertEqual(hashlib.sha256(backup.read_bytes()).hexdigest(), backup_digest)
         backup_arguments = ["--corpus", str(corpus), "--workspace", "wheel-study-backup",
                             "--workspace-dir", str(storage)]
-        restored_backup = json.loads(run("sol", [*backup_arguments, "--resume", "--json"]))
+        restored_backup = json.loads(run("sol.reader.app", [*backup_arguments, "--resume", "--json"]))
         self.assertEqual(restored_backup["workspace"]["revision"], historical["workspace"]["revision"])
-        backup_export = json.loads(run("sol", [*backup_arguments, "--workspace-export"]))
+        backup_export = json.loads(run("sol.reader.app", [*backup_arguments, "--workspace-export"]))
         self.assertEqual(len(backup_export["history"]), 3)
-        exported = json.loads(run("sol", [*arguments, "--workspace-export"]))
+        exported = json.loads(run("sol.reader.app", [*arguments, "--workspace-export"]))
         self.assertEqual(exported["format"], "sol-workspace")
         self.assertEqual(exported["corpus_id"], identity)
         self.assertEqual(exported["state"]["current_id"], passage_id)
         self.assertEqual(exported["history"][0]["actor"], "Installed reader")
         self.assertEqual(exported["history"], backup_export["history"])
         self.assertTrue((storage / "wheel-study.sqlite3").is_file())
+
+    def test_installed_markdown_inquiry_export_preserves_json_and_private_state(self):
+        installed = Path(self.temporary.name) / "installed-inquiry-export"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        corpus = Path(self.temporary.name) / "inquiry-export-corpus"
+        passage_id, body = write_runtime_corpus(corpus)
+        storage = Path(self.temporary.name) / "inquiry-export-storage"
+        storage.mkdir()
+        elsewhere = Path(self.temporary.name) / "inquiry-export-outside-checkout"
+        elsewhere.mkdir()
+        data = Path(self.temporary.name) / "inquiry-export-data"
+        environment = os.environ.copy()
+        environment.pop("SOL_CORPUS", None)
+        environment["XDG_CONFIG_HOME"] = str(Path(self.temporary.name) / "inquiry-export-config")
+        environment["XDG_DATA_HOME"] = str(data)
+        program = """
+import builtins, importlib, socket, sys, urllib.request
+sys.path.insert(0, sys.argv[1])
+def block_network(*args, **kwargs):
+    raise AssertionError('Inquiry export must not access the network')
+socket.socket.connect = block_network
+socket.socket.connect_ex = block_network
+socket.create_connection = block_network
+urllib.request.urlopen = block_network
+urllib.request.OpenerDirector.open = block_network
+original_import = builtins.__import__
+def block_optional(name, *args, **kwargs):
+    if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'requests', 'httpx'}
+            or name in {'sol.workspace.profiles', 'sol.workspace.catalog', 'sol.terminal.source', 'sol.terminal.kitty'}):
+        raise AssertionError('Inquiry export imported unrelated dependency ' + name)
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = block_optional
+module = importlib.import_module(sys.argv[2])
+if sys.argv[2] == 'sol.reader.app':
+    def block_pdf(*args, **kwargs):
+        raise AssertionError('Inquiry export must not extract a PDF')
+    module.load_book = block_pdf
+    entry = module.cli
+else:
+    entry = module.main
+raise SystemExit(entry(sys.argv[3:]))
+"""
+
+        def run(module, arguments, expected_status=0):
+            result = subprocess.run(
+                [sys.executable, "-I", "-c", program, str(installed), module, *arguments],
+                cwd=elsewhere, env=environment, capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, expected_status, result.stdout + result.stderr)
+            self.assertNotIn("\x1b", result.stdout)
+            return result
+
+        run("sol.corpus.contract", [str(corpus), "--initialize-identity"])
+        original_note = '*Private question:* Does this determination presuppose another?\n```\nLiteral fence.\n```'
+        revised_note = original_note + '\n![unfetched](https://example.invalid/private.png)'
+        database = storage / "inquiry.sqlite3"
+        fixture = """
+import json, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from sol.workspace.store import Workspace
+manifest = json.loads(Path(sys.argv[2]).read_text(encoding='utf-8'))
+provenance = {key: manifest[key] for key in ('edition', 'source')}
+with Workspace(Path(sys.argv[3]), manifest['corpus_id'], provenance, actor='Invented reader') as store:
+    store.save_state({'cwd': '/BEING', 'scope': '/BEING', 'current_id': sys.argv[4], 'previous_cwd': None})
+    store.set_bookmark('beginning', sys.argv[4])
+    note = store.add_annotation(sys.argv[4], sys.argv[5], sys.argv[7])
+    store.update_annotation(note['id'], sys.argv[6], expected_revision=1)
+    store.save_comparison('determinations', [sys.argv[4], 'aaaaaaaa-0000-4000-8000-000000000001'], 'How do they differ?')
+    store.add_review(sys.argv[4], 'inspected', 'No PDF was opened.', sys.argv[7], '0' * 64)
+    store.add_relation(sys.argv[4], 'aaaaaaaa-0000-4000-8000-000000000001', 'compares-with', 'A reader assertion.')
+"""
+        seeded = subprocess.run(
+            [sys.executable, "-I", "-c", fixture, str(installed), str(corpus / "corpus.json"),
+             str(database), passage_id, original_note, revised_note,
+             hashlib.sha256(body.encode("utf-8")).hexdigest()],
+            cwd=elsewhere, env=environment, capture_output=True, text=True,
+        )
+        self.assertEqual(seeded.returncode, 0, seeded.stdout + seeded.stderr)
+        before_database = hashlib.sha256(database.read_bytes()).hexdigest()
+        before_corpus = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                         for path in corpus.iterdir() if path.is_file()}
+        arguments = ["--corpus", str(corpus), "--workspace", "inquiry",
+                     "--workspace-dir", str(storage), "--workspace-export"]
+        before_json = json.loads(run("sol.reader.app", arguments).stdout)
+        report = run("sol.reader.app", [*arguments, "--export-format", "markdown"]).stdout
+        self.assertTrue(report.startswith("# "))
+        self.assertIn(passage_id, report)
+        self.assertIn(original_note, report)
+        self.assertIn(revised_note, report)
+        self.assertNotIn(body, report, "Canonical text must be opt-in")
+        included = run("sol.reader.app", [*arguments, "--export-format", "markdown", "--include-passages"]).stdout
+        self.assertIn(body, included)
+        self.assertIn("Invented reader", included)
+        self.assertIn("How do they differ?", included)
+        self.assertIn("No PDF was opened.", included)
+        self.assertIn("A reader assertion.", included)
+        after_json = json.loads(run("sol.reader.app", [*arguments, "--export-format", "json"]).stdout)
+        before_json.pop("exported_at")
+        after_json.pop("exported_at")
+        self.assertEqual(before_json, after_json, "Markdown inspection must preserve JSON export data")
+        self.assertEqual(hashlib.sha256(database.read_bytes()).hexdigest(), before_database)
+        self.assertEqual({path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                          for path in corpus.iterdir() if path.is_file()}, before_corpus)
+        self.assertFalse(data.exists(), "Read-only export must create no actor registry or default workspace")
+        self.assertFalse(list(elsewhere.glob("*.sol-workspace.*")), "No automatic report file may be created")
+        run("sol.reader.app", [*arguments, "--include-passages"], expected_status=2)
+        run("sol.reader.app", ["--corpus", str(corpus), "-r", "--export-format", "markdown"], expected_status=2)
 
 
 if __name__ == "__main__":

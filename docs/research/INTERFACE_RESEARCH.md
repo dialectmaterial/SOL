@@ -3,7 +3,7 @@
 Research checked against primary documentation on 11 October 2026, with the
 implemented input-only stage recorded below on 12 October. The broader tools are
 possibilities, not adopted SOL interfaces.
-The workspace design is separate: see [WORKSPACE_PLAN.md](WORKSPACE_PLAN.md).
+The workspace design is separate: see [WORKSPACE_PLAN.md](../WORKSPACE_PLAN.md).
 
 ## What we are choosing
 
@@ -205,7 +205,7 @@ The workspace foundation is now implemented, including structured diagnostics,
 review queues, backups and historical resume. `run_shell` also accepts an injected
 `read_command(prompt)` and a `write_output` function with `print`'s calling
 convention, including `end=`. Supplying a custom reader bypasses standard-library
-readline setup. `sol_prompt.py` now implements an optional PromptSession adapter
+readline setup. `sol/terminal/prompt.py` now implements an optional PromptSession adapter
 through this seam. The `shell` extra supplies prompt_toolkit; the base reader still
 has no third-party dependency. Rich and Textual have not been adopted. Existing-note
 editing is now available through the same input seam, backed by versioned snapshots
@@ -215,7 +215,7 @@ and conflict-aware saves rather than editor-only state.
 workspace and actor labels; supplying both flags permits noninteractive command
 input. `-n` bypasses workspace and profile storage, and `-r` explicitly retains
 the one-shot random quote. Actor labels are local attribution, not authentication;
-`sol_profiles.py` stores them separately from workspace databases. Missing workspace
+`sol/workspace/profiles.py` stores them separately from workspace databases. Missing workspace
 labels now offer a read-only catalog of up to ten matching workspaces, ordered by
 latest recorded activity. Typing a displayed number selects it, while a name creates
 or opens a workspace. `-n` and `-r` consult neither the catalog nor actor registry.
@@ -336,3 +336,28 @@ then prioritize explicit import/restore previews and verified selected-span anch
 an interface nor a classifier may silently create semantic edges, claim a source
 was verified, or turn version-1 text/PDF fingerprint matches into full-record
 provenance proof. Those decisions remain in the corpus and workspace contracts.
+
+## Kitty launcher and verified source desk
+
+The first kitty integration keeps the existing shell and prompt_toolkit adapter.
+`sol-kitty` supplies a separate launch profile, using a split only when the reader
+explicitly requests source evidence. Window commands target the captured reader
+and viewer IDs. The per-window reader permission is limited to the window-control
+commands needed for this desk; no general kitty configuration is rewritten.
+
+`source show [UUID]` captures a canonical record, its complete ordered page
+references, metadata digest and corpus generation. `sol/terminal/source.py` verifies the
+actual PDF bytes, retains a verified local snapshot and renders complete physical
+pages through Poppler. Printed labels remain separate from PDF page numbers.
+Cached renders include the source fingerprint, renderer version and settings.
+
+The source process owns its terminal and graphics. It never reads or writes a
+workspace database. Reader navigation leaves its captured source pinned until an
+explicit refresh. Rendering, resizing and closing a pane do not create reading
+checkpoints or review events. The existing review testimony binding is unchanged;
+source-file verification does not establish transcription correctness.
+
+The ordinary shell remains usable independently of kitty. A coordinated comparison
+desk and automatic selection synchronization remain later work. Multi-pane readers
+should retain one owner for the persistent reading checkpoint and exchange explicit
+captured selections rather than launch competing persistent shells.

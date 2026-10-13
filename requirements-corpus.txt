@@ -1,3 +1,0 @@
-# Needed only to create or rebuild the local corpus index.
-# The reader uses the standard library; install Poppler tools separately.
-markdown-it-py>=3,<4

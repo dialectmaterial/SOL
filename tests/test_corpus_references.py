@@ -2,7 +2,7 @@
 
 import unittest
 
-from sol_corpus_references import segment_references
+from sol.corpus.references import segment_references
 
 
 def span(source_id, text, x, y, width=80, size=10, height=10, family="Serif"):

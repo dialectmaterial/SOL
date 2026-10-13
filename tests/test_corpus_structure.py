@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from sol_corpus_structure import EXPECTED_COUNTS, _assign_parents, _attach_source_span, build_hierarchy
+from sol.corpus.structure import EXPECTED_COUNTS, _assign_parents, _attach_source_span, build_hierarchy
 
 
 @dataclass

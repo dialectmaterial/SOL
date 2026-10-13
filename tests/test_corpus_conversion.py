@@ -11,9 +11,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import sol_corpus as converter
-from sol_corpus_contract import CorpusError, plain_text
-from sol_corpus_notes import extract_notes
+import sol.corpus.convert as converter
+from sol.corpus.contract import CorpusError, plain_text
+from sol.corpus.notes import extract_notes
 
 
 def span(identifier, text, x=53.5, y=100, width=100, size=11,
@@ -45,7 +45,7 @@ class PDFNamingTests(unittest.TestCase):
                 if selected.parent == root:
                     selected.write_bytes(b"Synthetic working fixture")
                 with self.subTest(selected=selected), \
-                        patch("sol.Path.cwd", return_value=root), \
+                        patch("sol.reader.app.Path.cwd", return_value=root), \
                         patch.object(converter, "convert", return_value={}) as convert, \
                         contextlib.redirect_stdout(io.StringIO()):
                     converter.main(["convert"])
@@ -261,7 +261,7 @@ class ImporterGraphTests(unittest.TestCase):
                 {"type": "bibliography_entry", "title": "Reference B", "spans": [spans[4]], "lines": [reference_line(spans[4])], "section": "WORKS CITED BY B"},
             ]}
 
-        with patch("sol_corpus_references.segment_references", side_effect=entries):
+        with patch("sol.corpus.references.segment_references", side_effect=entries):
             importer.references([{"number": 830, "body_spans": spans}])
         sections = [record for record in importer.records if record["type"] == "section" and record is not root]
         self.assertEqual([record["parent_id"] for record in sections], [root["id"], root["id"]])
@@ -284,7 +284,7 @@ class ImporterGraphTests(unittest.TestCase):
                 "lines": [reference_line(first), reference_line(continued, 1)],
             }]}
 
-        with patch("sol_corpus_references.segment_references", side_effect=entries):
+        with patch("sol.corpus.references.segment_references", side_effect=entries):
             importer.references([{"number": 850, "body_spans": [first, continued]}])
         record = next(record for record in importer.records if record["type"] == "index_entry")
         self.assertEqual(plain_text(record["_md"]), "Synthetic subject, 1–3; continued.")

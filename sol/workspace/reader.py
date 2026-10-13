@@ -16,7 +16,7 @@ import shlex
 import textwrap
 import unicodedata
 
-from sol_workspace import Workspace, WorkspaceError
+from sol.workspace.store import Workspace, WorkspaceError
 
 
 def workspace_path(name: str, directory: Path | None = None) -> Path:
@@ -115,6 +115,8 @@ class CommandResult:
 WORKSPACE_COMMANDS = {"workspace", "bookmark", "note", "compare", "review", "relate"}
 WORKSPACE_HELP = """workspace                         workspace identity and storage location
 workspace export / check          portable JSON / reference health report
+workspace export --format markdown [--include-passages]
+                                  readable inquiry; current excerpts are optional
 workspace backup FILE.sqlite3     create a verified, non-overwriting backup
 workspace upgrade FILE.sqlite3    upgrade an older workspace into a separate copy
 workspace history --limit N       recent reading checkpoints (default 20)
@@ -161,7 +163,7 @@ class WorkspaceReader:
         snapshot = self.book.corpus_snapshot
         if snapshot is None:
             return {"state": "unknown", "reason": "no filesystem generation was retained"}
-        from sol_corpus_contract import CorpusError, verify_snapshot_current
+        from sol.corpus.contract import CorpusError, verify_snapshot_current
         try:
             verify_snapshot_current(snapshot)
         except CorpusError as error:
@@ -175,12 +177,27 @@ class WorkspaceReader:
                                  "Reindex if necessary, then reopen SOL before continuing. " + freshness["reason"])
 
     def health(self):
-        from sol_workspace_diagnostics import workspace_health
+        from sol.workspace.diagnostics import workspace_health
         report = workspace_health(self.book, self.store.export())
         report["corpus_freshness"] = self.corpus_freshness()
         if report["corpus_freshness"]["state"] == "changed":
             report["status"] = "attention_required"
         return report
+
+    def export_text(self, format='json', *, include_passages=False):
+        """One read snapshot, with no checkpoint, source-file or authored writes."""
+        if format not in {'json', 'markdown'}:
+            raise ValueError('workspace export format must be json or markdown')
+        if type(include_passages) is not bool:
+            raise ValueError('include-passages must be a boolean')
+        if include_passages and format != 'markdown':
+            raise ValueError('--include-passages requires a Markdown export')
+        snapshot = self.store.export()
+        if format == 'json':
+            return json.dumps(snapshot, ensure_ascii=False, indent=2)
+        from sol.workspace.export import render_workspace_markdown
+        return render_workspace_markdown(self.book, snapshot, workspace_name=self.store.path.stem,
+                                         include_passages=include_passages, freshness=self.corpus_freshness())
 
     def render_health(self, report):
         counts = report["counts"]
@@ -206,7 +223,7 @@ class WorkspaceReader:
         return resolve_reference(self.book, session.current().identifier if identifier is None else identifier)
 
     def queue(self, within=None, limit=20):
-        from sol_workspace_diagnostics import review_queue
+        from sol.workspace.diagnostics import review_queue
         return review_queue(self.book, self.store.export(), within, limit)
 
     def render_queue(self, rows):
@@ -371,7 +388,13 @@ class WorkspaceReader:
             parser.add_argument("action", choices=["export", "history", "check", "backup", "upgrade"], nargs="?")
             parser.add_argument("destination", nargs="?", type=Path)
             parser.add_argument("--limit", type=int)
+            parser.add_argument("--format", choices=('json', 'markdown'))
+            parser.add_argument("--include-passages", action='store_true')
             options = parser.parse_args(arguments)
+            if (options.format is not None or options.include_passages) and options.action != 'export':
+                raise ValueError('--format and --include-passages are only available for workspace export')
+            if options.include_passages and options.format != 'markdown':
+                raise ValueError('--include-passages requires workspace export --format markdown')
             if options.action in {"backup", "upgrade"}:
                 if options.destination is None or options.limit is not None:
                     raise ValueError(f"workspace {options.action} requires FILE.sqlite3 and does not accept --limit")
@@ -390,7 +413,8 @@ class WorkspaceReader:
             if options.destination is not None or (options.limit is not None and options.action != "history"):
                 raise ValueError("only backup/upgrade accept a destination; only history accepts --limit")
             if options.action == "export":
-                return CommandResult(json.dumps(self.store.export(), ensure_ascii=False, indent=2))
+                return CommandResult(self.export_text(options.format or 'json',
+                                                      include_passages=options.include_passages))
             if options.action == "check":
                 return CommandResult(self.render_health(self.health()))
             if options.action == "history":

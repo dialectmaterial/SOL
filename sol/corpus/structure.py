@@ -195,7 +195,7 @@ def build_hierarchy(pdf_path: str | Path) -> dict:
     use canonical Markdown and generated indexes. Unsupported editions fail
     verification rather than silently receiving this edition's structure.
     """
-    import sol as reader
+    from sol.corpus import layout as reader
 
     pages = reader.extract_pages(Path(pdf_path).expanduser())
     page_map = {page.number: page for page in pages}
@@ -318,7 +318,7 @@ def build_hierarchy(pdf_path: str | Path) -> dict:
             "target_audit_id": target})
 
     return {
-        "schema": "sol.heading-audit.v1",
+        "schema": "sol.reader.app.heading-audit.v1",
         "scope": {"first_pdf_page": 80, "last_pdf_page": 826, "pages_examined": 747,
                   "edition": "Cambridge, George di Giovanni translation, 2010",
                   "runtime_verification": "Poppler word geometry, anchors, and exact structural counts",

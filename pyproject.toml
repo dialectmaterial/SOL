@@ -24,8 +24,9 @@ shell = ["prompt-toolkit>=3.0.52,<4"]
 
 [project.scripts]
 sol = "sol:cli"
-sol-corpus = "sol_corpus:main"
-sol-corpus-check = "sol_corpus_contract:main"
+sol-kitty = "sol.terminal.kitty:main"
+sol-corpus = "sol.corpus.convert:main"
+sol-corpus-check = "sol.corpus.contract:main"
 
 [project.urls]
 Repository = "https://github.com/dialectmaterial/SOL"
@@ -33,17 +34,8 @@ Issues = "https://github.com/dialectmaterial/SOL/issues"
 
 [tool.setuptools]
 include-package-data = false
-py-modules = [
-    "sol",
-    "sol_corpus",
-    "sol_corpus_contract",
-    "sol_corpus_notes",
-    "sol_corpus_references",
-    "sol_corpus_structure",
-    "sol_workspace",
-    "sol_workspace_reader",
-    "sol_workspace_diagnostics",
-    "sol_workspace_catalog",
-    "sol_prompt",
-    "sol_profiles",
-]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sol", "sol.*"]
+namespaces = false

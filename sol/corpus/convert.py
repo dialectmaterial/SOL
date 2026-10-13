@@ -13,17 +13,15 @@ import json
 import os
 from pathlib import Path
 import re
-import statistics
 import subprocess
-import sys
 import tempfile
 import unicodedata
 import xml.etree.ElementTree as ET
 
-from sol_corpus_contract import CorpusError, new_id, reindex, render_record
-from sol_corpus_notes import extract_notes
-from sol_corpus_structure import build_hierarchy
-from sol import PDF_FILENAME as PDF_NAME, default_pdf
+from sol.corpus.contract import CorpusError, new_id, reindex, render_record
+from sol.corpus.notes import extract_notes
+from sol.corpus.structure import build_hierarchy
+from sol.corpus.edition import PDF_FILENAME as PDF_NAME, default_pdf
 
 AUDITED_SOURCE_SHA256 = "f48a2272a6daa80f2742de91e271a2b4b8a93d0a29193b6f02a6e3c010fc0e26"
 GAPS = [
@@ -711,7 +709,7 @@ class Importer:
                                     "label": container["label"], "sources": container["sources"]})
 
     def references(self, cleaned):
-        from sol_corpus_references import segment_references
+        from sol.corpus.references import segment_references
         for kind, lo, hi in (("bibliography", 830, 849), ("index", 850, 863)):
             result = segment_references([p for p in cleaned if lo <= p["number"] <= hi], kind)
             self.review.extend(result["warnings"])

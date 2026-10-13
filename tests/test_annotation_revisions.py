@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from sol_workspace import (APPLICATION_ID, Workspace, WorkspaceConflict, WorkspaceError,
+from sol.workspace.store import (APPLICATION_ID, Workspace, WorkspaceConflict, WorkspaceError,
                            _SCHEMA, _ANNOTATION_SCHEMA)
 from test_workspace import A, B, C, CORPUS_ID, CONTENT_SHA, PROVENANCE, state, stable_export
 
@@ -104,7 +104,7 @@ class AnnotationRevisionTests(unittest.TestCase):
     def test_same_body_is_noop_but_stale_revision_still_conflicts(self):
         note = self.workspace.add_annotation(A, "Original.", CONTENT_SHA)
         before = stable_export(self.workspace)
-        with patch("sol_workspace._now", side_effect=AssertionError("no timestamp needed")):
+        with patch("sol.workspace.store._now", side_effect=AssertionError("no timestamp needed")):
             same = self.workspace.update_annotation(note["id"], note["body"], CONTENT_SHA,
                                                     expected_revision=1)
         self.assertEqual(same, note)
@@ -185,11 +185,11 @@ class AnnotationRevisionTests(unittest.TestCase):
 
     def test_clock_rollback_refuses_edit_before_any_saved_changes(self):
         self.workspace.save_state(state())
-        with patch("sol_workspace._now", return_value="2026-10-12T12:00:00Z"):
+        with patch("sol.workspace.store._now", return_value="2026-10-12T12:00:00Z"):
             note = self.workspace.add_annotation(A, "Original.")
         before = stable_export(self.workspace)
         source_bytes = self.path.read_bytes()
-        with patch("sol_workspace._now", return_value="2026-10-12T11:59:59Z"):
+        with patch("sol.workspace.store._now", return_value="2026-10-12T11:59:59Z"):
             with self.assertRaisesRegex(WorkspaceError, "system clock precedes"):
                 self.workspace.update_annotation(note["id"], "Changed.", expected_revision=1)
         self.assertEqual(stable_export(self.workspace), before)
@@ -302,7 +302,7 @@ class AnnotationRevisionTests(unittest.TestCase):
         before = stable_export(legacy)
         source_bytes = legacy.path.read_bytes()
         target = self.root / "upgraded.sqlite3"
-        with patch("sol_workspace._now", return_value=UPGRADE_TIME):
+        with patch("sol.workspace.store._now", return_value=UPGRADE_TIME):
             self.assertEqual(legacy.upgrade_copy(target), target)
         upgraded = self.open(target)
         self.assertEqual(legacy.path.read_bytes(), source_bytes)
@@ -385,7 +385,7 @@ class AnnotationRevisionTests(unittest.TestCase):
         legacy = self.legacy()
         source_bytes = legacy.path.read_bytes()
         target = self.root / "publish-failed.sqlite3"
-        with patch("sol_workspace.os.link", side_effect=OSError("synthetic publish failure")):
+        with patch("sol.workspace.store.os.link", side_effect=OSError("synthetic publish failure")):
             with self.assertRaisesRegex(WorkspaceError, "synthetic publish failure"):
                 legacy.upgrade_copy(target)
         self.assertFalse(target.exists())
@@ -402,7 +402,7 @@ class AnnotationRevisionTests(unittest.TestCase):
             Path(destination).write_bytes(b"unrelated winner")
             original_link(staged, destination)
 
-        with patch("sol_workspace.os.link", side_effect=another_process_wins):
+        with patch("sol.workspace.store.os.link", side_effect=another_process_wins):
             with self.assertRaisesRegex(WorkspaceError, "already exists"):
                 legacy.upgrade_copy(target)
         self.assertEqual(target.read_bytes(), b"unrelated winner")
@@ -430,7 +430,7 @@ class AnnotationRevisionTests(unittest.TestCase):
         self.workspace._connection.execute("PRAGMA journal_mode = WAL")
         self.workspace.add_annotation(A, "A committed WAL note.")
         before = {path.name for path in self.root.iterdir()}
-        with patch("sol_workspace.sqlite3.connect", side_effect=AssertionError("must not connect")):
+        with patch("sol.workspace.store.sqlite3.connect", side_effect=AssertionError("must not connect")):
             with self.assertRaisesRegex(WorkspaceError, "does not open WAL"):
                 self.open(self.path, read_only=True)
         self.assertEqual(before, {path.name for path in self.root.iterdir()})

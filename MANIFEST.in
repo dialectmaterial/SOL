@@ -1,10 +1,7 @@
-include README.md CORPUS.md INTERFACE_RESEARCH.md WORKSPACE_PLAN.md OPENDATALOADER_RESEARCH.md
-include requirements-corpus.txt pyproject.toml MANIFEST.in
-include sol.py sol_corpus.py sol_corpus_contract.py
-include sol_corpus_notes.py sol_corpus_references.py sol_corpus_structure.py
-include sol_workspace.py sol_workspace_reader.py sol_workspace_diagnostics.py
-include sol_workspace_catalog.py
-include sol_prompt.py sol_profiles.py
+include README.md
+recursive-include docs *.md
+include pyproject.toml MANIFEST.in
+recursive-include sol *.py
 recursive-include tests *.py
 exclude AGENTS.md
 prune sources
@@ -15,4 +12,4 @@ prune .sol-corpus-work
 prune .venv
 prune build
 prune dist
-global-exclude *.pdf *.png *.jpg *.jpeg *.zip *.jsonl *.py[cod] *.sqlite3 *.sqlite3-* *.sol-workspace.json
+global-exclude *.pdf *.png *.jpg *.jpeg *.zip *.jsonl *.py[cod] *.sqlite3 *.sqlite3-* *.sol-workspace.json *.sol-workspace.md

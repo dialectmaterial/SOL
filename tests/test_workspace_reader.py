@@ -11,9 +11,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import sol
-from sol_workspace import Workspace, WorkspaceConflict
-from sol_workspace_reader import WorkspaceReader, resolve_reference, safe_output, workspace_path
+import sol.reader.app as sol
+from sol.workspace.store import Workspace, WorkspaceConflict
+from sol.workspace.reader import WorkspaceReader, resolve_reference, safe_output, workspace_path
 
 
 CORPUS_ID = 'dddddddd-0000-4000-8000-000000000001'
@@ -71,16 +71,16 @@ class WorkspaceReaderTests(unittest.TestCase):
     def shell(self, commands, reader=None):
         stdout = StringIO()
         with redirect_stdout(stdout), patch('builtins.input', side_effect=commands), \
-                patch('sol.install_completion', return_value=lambda: None):
+                patch('sol.reader.app.install_completion', return_value=lambda: None):
             status = sol.run_shell(self.book, 80, workspace_reader=reader or self.reader)
         return status, stdout.getvalue()
 
     def main(self, arguments):
         stdout, stderr = StringIO(), StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr), \
-                patch('sol.discover_corpus', return_value=Path('/invented/corpus')), \
-                patch('sol.load_corpus_book', return_value=self.book), \
-                patch('sol.load_book', side_effect=AssertionError('PDF extraction forbidden')):
+                patch('sol.reader.app.discover_corpus', return_value=Path('/invented/corpus')), \
+                patch('sol.reader.app.load_corpus_book', return_value=self.book), \
+                patch('sol.reader.app.load_book', side_effect=AssertionError('PDF extraction forbidden')):
             status = sol.main(arguments)
         return status, stdout.getvalue(), stderr.getvalue()
 
@@ -267,9 +267,9 @@ class WorkspaceReaderTests(unittest.TestCase):
         self.assertFalse((self.directory / 'x.sqlite3').exists())
 
     def test_standard_shell_never_opens_workspace_storage(self):
-        with patch('sol_workspace.Workspace', side_effect=AssertionError('No database for ordinary shell')), \
+        with patch('sol.workspace.store.Workspace', side_effect=AssertionError('No database for ordinary shell')), \
                 patch('builtins.input', side_effect=['first /being', 'exit']), \
-                patch('sol.install_completion', return_value=lambda: None):
+                patch('sol.reader.app.install_completion', return_value=lambda: None):
             status, _, stderr = self.main(['-n'])
         self.assertEqual(status, 0, stderr)
 
@@ -312,8 +312,8 @@ class WorkspaceReaderTests(unittest.TestCase):
                 return command
             stdout = StringIO()
             with redirect_stdout(stdout), patch('builtins.input', side_effect=entered), \
-                    patch('sol.ReadingSession', return_value=self.session), \
-                    patch('sol.install_completion', return_value=lambda: None):
+                    patch('sol.reader.app.ReadingSession', return_value=self.session), \
+                    patch('sol.reader.app.install_completion', return_value=lambda: None):
                 self.assertEqual(sol.run_shell(self.book, 80, workspace_reader=self.reader), 0)
         output = stdout.getvalue()
         self.assertIn('sol: ', output)
@@ -444,7 +444,7 @@ class WorkspaceReaderTests(unittest.TestCase):
 
     def test_queue_without_workspace_uses_no_database_and_backup_never_overwrites(self):
         self.book.canonical_records[IDS[0]]['transcription_status'] = 'needs_review'
-        with patch('sol_workspace.Workspace', side_effect=AssertionError('No workspace database')):
+        with patch('sol.workspace.store.Workspace', side_effect=AssertionError('No workspace database')):
             status, output, error = self.main(['--review-queue', '--json'])
         self.assertEqual(status, 0, error)
         self.assertEqual(json.loads(output)[0]['id'], IDS[0])
@@ -475,7 +475,7 @@ class WorkspaceReaderTests(unittest.TestCase):
             return next(commands)
         def emit(*values, **options):
             print(*values, file=stdout, **options)
-        with patch('sol.install_completion', side_effect=AssertionError('Custom adapter owns completion')):
+        with patch('sol.reader.app.install_completion', side_effect=AssertionError('Custom adapter owns completion')):
             status = sol.run_shell(self.book, 80, workspace_reader=self.reader,
                                    read_command=read_command, write_output=emit)
         self.assertEqual(status, 0)
@@ -567,7 +567,7 @@ class WorkspaceReaderTests(unittest.TestCase):
                                           draft_reader=lambda prompt: self.fail('No draft without actor')), 0)
 
     def test_changed_canonical_generation_refuses_writes_without_reading_pdf(self):
-        import sol_corpus_contract as contract
+        import sol.corpus.contract as contract
         from test_packaging import write_runtime_corpus
         corpus = self.directory / 'actual-corpus'
         write_runtime_corpus(corpus)
@@ -582,7 +582,7 @@ class WorkspaceReaderTests(unittest.TestCase):
             self.assertEqual(reader.corpus_freshness()['state'], 'current')
             document = corpus / 'sample.md'
             document.write_text(document.read_text(encoding='utf-8') + '\n', encoding='utf-8')
-            with patch('sol.load_book', side_effect=AssertionError('Never read the PDF')):
+            with patch('sol.reader.app.load_book', side_effect=AssertionError('Never read the PDF')):
                 with self.assertRaisesRegex(ValueError, 'loaded corpus changed'):
                     reader.execute('note', ['add', 'Preserve against stale generation'], session)
                 with self.assertRaisesRegex(ValueError, 'loaded corpus changed'):
@@ -594,7 +594,7 @@ class WorkspaceReaderTests(unittest.TestCase):
             self.assertEqual(report['status'], 'attention_required')
 
     def test_source_changed_during_draft_refuses_one_insert_and_preserves_checkpoint(self):
-        import sol_corpus_contract as contract
+        import sol.corpus.contract as contract
         from test_packaging import write_runtime_corpus
         corpus = self.directory / 'draft-corpus'
         write_runtime_corpus(corpus)
@@ -609,7 +609,7 @@ class WorkspaceReaderTests(unittest.TestCase):
                 document.write_text(document.read_text(encoding='utf-8') + '\n', encoding='utf-8')
                 return 'An annotation based on a now-stale source.'
             stdout = StringIO()
-            with redirect_stdout(stdout), patch('sol.load_book', side_effect=AssertionError('Never read the PDF')):
+            with redirect_stdout(stdout), patch('sol.reader.app.load_book', side_effect=AssertionError('Never read the PDF')):
                 self.assertEqual(sol.run_shell(book, 80, workspace_reader=reader,
                                               read_command=lambda prompt: next(commands), draft_reader=draft), 0)
             self.assertIn('loaded corpus changed', stdout.getvalue())

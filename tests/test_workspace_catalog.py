@@ -11,8 +11,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from sol_workspace import APPLICATION_ID, Workspace, WorkspaceError, _ANNOTATION_SCHEMA, _SCHEMA
-from sol_workspace_catalog import discover_workspaces
+from sol.workspace.store import APPLICATION_ID, Workspace, WorkspaceError, _ANNOTATION_SCHEMA, _SCHEMA
+from sol.workspace.catalog import discover_workspaces
 
 
 CORPUS = "dddddddd-0000-4000-8000-000000000004"
@@ -96,7 +96,7 @@ class CatalogTests(unittest.TestCase):
 
     def test_v2_workspace_is_recognized_without_mutation(self):
         path = self.directory / "modern.sqlite3"
-        with patch("sol_workspace._now", return_value=CREATED):
+        with patch("sol.workspace.store._now", return_value=CREATED):
             with Workspace(path, CORPUS, {"source_sha256": SOURCE}, actor="Dima") as workspace:
                 workspace.save_state({"cwd": "/BEING", "scope": "/BEING", "current_id": PASSAGE}, None)
                 workspace.add_annotation(PASSAGE, "Invented note")
@@ -151,10 +151,10 @@ class CatalogTests(unittest.TestCase):
 
     def test_v2_note_revisions_are_recognized_saved_activity(self):
         path = self.directory / "notes.sqlite3"
-        with patch("sol_workspace._now", return_value=CREATED):
+        with patch("sol.workspace.store._now", return_value=CREATED):
             with Workspace(path, CORPUS, {"source_sha256": SOURCE}, actor="Dima") as workspace:
                 note = workspace.add_annotation(PASSAGE, "First interpretation")
-                with patch("sol_workspace._now", return_value="2025-06-01T00:00:00Z"):
+                with patch("sol.workspace.store._now", return_value="2025-06-01T00:00:00Z"):
                     workspace.update_annotation(note["id"], "Second interpretation", expected_revision=1)
         before = self.fingerprints()
         found = self.discover()[0]
@@ -165,9 +165,9 @@ class CatalogTests(unittest.TestCase):
     def test_legacy_copy_upgrade_date_does_not_invent_an_editor(self):
         path = self.v1("legacy")
         with Workspace(path, CORPUS, {"source_sha256": SOURCE}, actor="Original author") as workspace:
-            with patch("sol_workspace._now", return_value=CREATED):
+            with patch("sol.workspace.store._now", return_value=CREATED):
                 workspace.add_annotation(PASSAGE, "A retained legacy note")
-            with patch("sol_workspace._now", return_value="2025-06-01T00:00:00Z"):
+            with patch("sol.workspace.store._now", return_value="2025-06-01T00:00:00Z"):
                 workspace.upgrade_copy(self.directory / "upgraded.sqlite3")
         before = self.fingerprints()
         found = self.discover()[0]
@@ -186,12 +186,12 @@ class CatalogTests(unittest.TestCase):
                 connection.execute("UPDATE workspace_metadata SET corpus_id=?", (OTHER_CORPUS,))
             return workspace
 
-        with patch("sol_workspace_catalog.Workspace", side_effect=identity_changed_after_open):
+        with patch("sol.workspace.catalog.Workspace", side_effect=identity_changed_after_open):
             self.assertEqual(self.discover(), [])
 
     def test_v2_damaged_audit_metadata_is_not_used_as_activity(self):
         path = self.directory / "damaged-history.sqlite3"
-        with patch("sol_workspace._now", return_value=CREATED):
+        with patch("sol.workspace.store._now", return_value=CREATED):
             with Workspace(path, CORPUS, {"source_sha256": SOURCE}, actor="Dima") as workspace:
                 workspace.add_annotation(PASSAGE, "An invented note")
         with database(path) as connection:

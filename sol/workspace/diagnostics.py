@@ -9,7 +9,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timezone
 
-from sol_workspace_reader import resolve_reference
+from sol.workspace.reader import resolve_reference
 
 
 _COLLECTIONS = ("bookmarks", "annotations", "comparisons", "reviews", "relations", "history")

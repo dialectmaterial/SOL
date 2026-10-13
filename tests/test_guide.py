@@ -4,7 +4,7 @@ from __future__ import annotations
 from unittest.mock import patch
 import unittest
 
-import sol
+import sol.reader.app as sol
 
 
 def synthetic_book():
@@ -81,8 +81,8 @@ class GuideTests(unittest.TestCase):
         self.assertIn("checkpoints stay local", text)
 
     def test_source_free_guide_explains_configuration_without_loading_or_conversion(self):
-        with patch("sol.load_corpus_book", side_effect=AssertionError("No corpus load")), \
-                patch("sol.load_book", side_effect=AssertionError("No PDF extraction")), \
+        with patch("sol.reader.app.load_corpus_book", side_effect=AssertionError("No corpus load")), \
+                patch("sol.reader.app.load_book", side_effect=AssertionError("No PDF extraction")), \
                 patch("builtins.open", side_effect=AssertionError("No file I/O")):
             text = sol.render_guide()
         self.assertIn("abbreviated fallback", text)

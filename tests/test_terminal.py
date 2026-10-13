@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-import sol
+import sol.reader.app as sol
 
 
 def synthetic_book():
@@ -48,10 +48,10 @@ class TerminalTests(unittest.TestCase):
         stdout, stderr = io.StringIO(), io.StringIO()
         effect = None if allow_source else AssertionError('No source should load')
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr), \
-                patch('sol.Path.cwd', return_value=Path('/synthetic-missing-directory')), \
-                patch('sol.discover_corpus', side_effect=lambda explicit=None: explicit), \
-                patch('sol.load_corpus_book', return_value=self.book, side_effect=effect), \
-                patch('sol.load_book', side_effect=AssertionError('PDF extraction forbidden')):
+                patch('sol.reader.app.Path.cwd', return_value=Path('/synthetic-missing-directory')), \
+                patch('sol.reader.app.discover_corpus', side_effect=lambda explicit=None: explicit), \
+                patch('sol.reader.app.load_corpus_book', return_value=self.book, side_effect=effect), \
+                patch('sol.reader.app.load_book', side_effect=AssertionError('PDF extraction forbidden')):
             try:
                 status = sol.main(arguments)
             except SystemExit as error:
@@ -61,7 +61,7 @@ class TerminalTests(unittest.TestCase):
     def run_shell(self, commands, width=80, plain=False, color=False):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout), patch('builtins.input', side_effect=commands), \
-                patch('sol.install_completion', return_value=lambda: None):
+                patch('sol.reader.app.install_completion', return_value=lambda: None):
             status = sol.run_shell(self.book, width, plain, color)
         return status, stdout.getvalue()
 
@@ -112,7 +112,7 @@ class TerminalTests(unittest.TestCase):
             source.write_bytes(b'Synthetic source fixture')
             direct = root / 'Hegel-SOL.pdf'
             direct.write_bytes(b'Synthetic working fixture')
-            with patch('sol.Path.cwd', return_value=root):
+            with patch('sol.reader.app.Path.cwd', return_value=root):
                 self.assertEqual(sol.default_pdf(), direct)
 
     def test_pdf_discovery_uses_short_name_in_sources(self):
@@ -121,7 +121,7 @@ class TerminalTests(unittest.TestCase):
             source = root / 'sources' / 'Hegel-SOL.pdf'
             source.parent.mkdir()
             source.write_bytes(b'Synthetic source fixture')
-            with patch('sol.Path.cwd', return_value=root):
+            with patch('sol.reader.app.Path.cwd', return_value=root):
                 self.assertEqual(sol.default_pdf(), source)
 
     def test_missing_pdf_diagnostic_uses_short_name(self):
@@ -253,9 +253,9 @@ class TerminalTests(unittest.TestCase):
 
     def test_neofetch_does_not_read_sources_or_inspect_the_host(self):
         forbidden = (
-            'sol.load_book', 'sol.load_corpus_book', 'sol.subprocess.run',
-            'sol.subprocess.Popen', 'platform.uname', 'socket.create_connection',
-            'socket.socket', 'sol.Path.read_text', 'sol.Path.read_bytes',
+            'sol.reader.app.load_book', 'sol.reader.app.load_corpus_book', 'subprocess.run',
+            'subprocess.Popen', 'platform.uname', 'socket.create_connection',
+            'socket.socket', 'sol.reader.app.Path.read_text', 'sol.reader.app.Path.read_bytes',
         )
         with contextlib.ExitStack() as guards:
             for target in forbidden:
@@ -340,7 +340,7 @@ class TerminalTests(unittest.TestCase):
         session = sol.ReadingSession(self.book)
         session.read(('BEING',), first=True)
         self.assertIs(session.move(1), formula)
-        with patch('sol.random.choice', side_effect=lambda indices: indices[-1]) as choose:
+        with patch('sol.reader.app.random.choice', side_effect=lambda indices: indices[-1]) as choose:
             self.assertIs(session.read(('BEING',)), self.third)
         self.assertEqual(choose.call_args.args[0], [0, 2])
 
@@ -362,7 +362,7 @@ class TerminalTests(unittest.TestCase):
             'markdown': 'Invented reader prose.\n\n![' + caption + '](../assets/source.png)',
         }
         snapshot = SimpleNamespace(records=[record], corpus_directory=Path('/synthetic'), manifest={})
-        with patch('sol_corpus_contract.load_snapshot', return_value=snapshot):
+        with patch('sol.corpus.contract.load_snapshot', return_value=snapshot):
             book = sol.load_corpus_book(Path('/synthetic'))
         passage = book.passages[0]
         self.assertIn(caption, passage.text)
@@ -370,7 +370,7 @@ class TerminalTests(unittest.TestCase):
         self.assertEqual(book.search('facsimile'), [])
         self.assertEqual(book.search('Invented reader prose'), [passage])
         record['markdown'] = record['plain_text']
-        with patch('sol_corpus_contract.load_snapshot', return_value=snapshot):
+        with patch('sol.corpus.contract.load_snapshot', return_value=snapshot):
             ordinary = sol.load_corpus_book(Path('/synthetic')).passages[0]
         self.assertIn(caption, sol.render_passage(ordinary, 80))
 
@@ -388,7 +388,7 @@ class TerminalTests(unittest.TestCase):
             'cd .', 'cd /being', 'cd /BEING', 'where', 'next', 'where',
             'open 2', 'where', 'pwd', 'exit',
         ]
-        with patch('sol.ReadingSession', return_value=session):
+        with patch('sol.reader.app.ReadingSession', return_value=session):
             status, output = self.run_shell(commands)
         self.assertEqual(status, 0)
         for position in (1, 2, 3):
@@ -400,7 +400,7 @@ class TerminalTests(unittest.TestCase):
 
     def test_shell_root_noop_navigation_preserves_reading_selection(self):
         session = sol.ReadingSession(self.book)
-        with patch('sol.ReadingSession', return_value=session):
+        with patch('sol.reader.app.ReadingSession', return_value=session):
             status, output = self.run_shell([
                 'first', 'next', 'cd /', 'up', 'cd .', 'where', 'pwd', 'exit',
             ])
@@ -448,8 +448,8 @@ class TerminalTests(unittest.TestCase):
             'neofetch', 'where', 'next', 'where', 'open 2', 'where', 'pwd', 'exit',
         ]
         session = sol.ReadingSession(self.book)
-        with patch('sol.ReadingSession', return_value=session), \
-                patch('sol.render_neofetch', wraps=sol.render_neofetch) as render:
+        with patch('sol.reader.app.ReadingSession', return_value=session), \
+                patch('sol.reader.app.render_neofetch', wraps=sol.render_neofetch) as render:
             status, output = self.run_shell(commands)
         self.assertEqual(status, 0)
         render.assert_called_once_with(self.book, ('BEING',), 80, False)
@@ -489,8 +489,8 @@ class TerminalTests(unittest.TestCase):
 
     def test_cli_plain_shell_keeps_neofetch_art_and_suppresses_color(self):
         with patch('builtins.input', side_effect=['neofetch', 'exit']), \
-                patch('sol.install_completion', return_value=lambda: None), \
-                patch('sol.terminal_color', return_value=True):
+                patch('sol.reader.app.install_completion', return_value=lambda: None), \
+                patch('sol.reader.app.terminal_color', return_value=True):
             status, output, error = self.run_main(['--corpus', 'synthetic', '-n', '--plain'])
         self.assertEqual(status, 0, error)
         self.assertNotIn('\x1b', output)

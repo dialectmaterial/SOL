@@ -16,7 +16,7 @@ import unicodedata
 _COMMANDS = (
     "ls", "cd", "up", "pwd", "tree", "read", "first", "next", "previous", "prev",
     "cat", "search", "open", "context", "info", "where",
-    "neofetch", "guide", "help", "exit", "quit",
+    "neofetch", "guide", "source", "help", "exit", "quit",
 )
 _SUBCOMMANDS = {
     "workspace": ("export", "check", "backup", "upgrade", "history"),
@@ -144,7 +144,10 @@ class CompletionCatalog:
             verb = words[0]
             arguments = words[1:]
             previous = arguments[-1] if arguments else ""
-            if self.workspace and verb in _SUBCOMMANDS and not arguments:
+            if verb == "source":
+                choices = (("show", "close", "set-pdf", "info") if not arguments else
+                           self.record_ids if arguments == ["show"] else ())
+            elif self.workspace and verb in _SUBCOMMANDS and not arguments:
                 choices = _SUBCOMMANDS[verb]
             elif previous == "--on":
                 choices = self.record_ids
@@ -195,6 +198,9 @@ class CompletionCatalog:
                            ("--on", "--reason") if prefix.startswith("--") else ())
             elif verb == "workspace" and self.workspace and arguments == ["history"]:
                 choices = ("--limit",)
+            elif verb == "workspace" and self.workspace and arguments and arguments[0] == "export":
+                choices = (('json', 'markdown') if previous == '--format' else
+                           ('--format', '--include-passages') if prefix.startswith('--') else ())
             else:
                 choices = ()
         result = []

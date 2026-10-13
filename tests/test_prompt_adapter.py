@@ -14,8 +14,8 @@ from types import ModuleType, SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-import sol
-import sol_prompt
+import sol.reader.app as sol
+import sol.terminal.prompt as sol_prompt
 
 
 A = "aaaaaaaa-0000-4000-8000-000000000001"
@@ -129,7 +129,7 @@ class PromptAdapterTests(unittest.TestCase):
         return adapter
 
     def test_module_import_never_imports_optional_library(self):
-        root = str(Path(sol_prompt.__file__).resolve().parent)
+        root = str(Path(sol_prompt.__file__).resolve().parents[2])
         script = """
 import builtins, sys
 original = builtins.__import__
@@ -139,7 +139,7 @@ def guarded(name, *arguments, **options):
     return original(name, *arguments, **options)
 builtins.__import__ = guarded
 sys.path.insert(0, sys.argv[1])
-import sol_prompt
+import sol.terminal.prompt as sol_prompt
 """
         result = subprocess.run([sys.executable, "-I", "-c", script, root],
                                 capture_output=True, text=True)
@@ -154,15 +154,15 @@ import sol_prompt
         for options in cases:
             arguments = {"input_stream": self.stdin, "output_stream": self.stdout, **options}
             with self.subTest(options=options), patch(
-                    "sol_prompt._load_toolkit", side_effect=AssertionError("No optional imports")):
+                    "sol.terminal.prompt._load_toolkit", side_effect=AssertionError("No optional imports")):
                 self.assertIsNone(sol_prompt.create_adapter(self.book, lambda: (), **arguments))
         with patch.dict(os.environ, {"TERM": "dumb"}), patch(
-                "sol_prompt._load_toolkit", side_effect=AssertionError("No optional imports")):
+                "sol.terminal.prompt._load_toolkit", side_effect=AssertionError("No optional imports")):
             self.assertIsNone(sol_prompt.create_adapter(self.book, lambda: (), mode="prompt",
                                                         input_stream=self.stdin, output_stream=self.stdout))
 
     def test_auto_missing_library_falls_back_and_explicit_mode_explains_extra(self):
-        with patch("sol_prompt._load_toolkit", side_effect=ImportError("missing")):
+        with patch("sol.terminal.prompt._load_toolkit", side_effect=ImportError("missing")):
             self.assertIsNone(sol_prompt.create_adapter(self.book, lambda: (), mode="auto",
                                                         input_stream=self.stdin, output_stream=self.stdout))
             with self.assertRaisesRegex(ValueError, r"\.\[shell\]"):
@@ -172,7 +172,7 @@ import sol_prompt
     def test_modes_are_validated_before_optional_imports(self):
         for options in ({"mode": "unknown"}, {"editing_mode": "unknown"}):
             with self.subTest(options=options), patch(
-                    "sol_prompt._load_toolkit", side_effect=AssertionError("No imports")), \
+                    "sol.terminal.prompt._load_toolkit", side_effect=AssertionError("No imports")), \
                     self.assertRaises(ValueError):
                 sol_prompt.create_adapter(self.book, lambda: (), **options)
 
@@ -277,6 +277,9 @@ import sol_prompt
             "note edit cccccccc": {NOTE}, "note history cccccccc": {NOTE},
             "note edit " + NOTE + ' "Text" --ex': {"--expect-revision"},
             "workspace up": {"upgrade"},
+            "workspace export --f": {"--format"},
+            "workspace export --format mar": {"markdown"},
+            "workspace export --format markdown --in": {"--include-passages"},
             "note draft --on bbbbbbbb": {B},
             "compare show Being": {"Being and Essence"},
             'bookmark open "Ground n': {"Ground notes"},

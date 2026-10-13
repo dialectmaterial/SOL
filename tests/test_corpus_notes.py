@@ -2,7 +2,7 @@
 from collections import Counter
 import unittest
 
-from sol_corpus_notes import extract_notes
+from sol.corpus.notes import extract_notes
 
 
 def span(identifier,text,x,y,width=50,size=8,height=7.97,family='AGaramond'):

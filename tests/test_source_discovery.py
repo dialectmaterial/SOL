@@ -8,14 +8,14 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-import sol
+import sol.reader.app as sol
 
 
 class InstallationOriginTests(unittest.TestCase):
     def origin(self, content: str | None) -> Path | None:
         distribution = Mock()
         distribution.read_text.return_value = content
-        with patch("sol.package_metadata.distribution", return_value=distribution):
+        with patch("sol.reader.app.package_metadata.distribution", return_value=distribution):
             result = sol.installed_project_directory()
         distribution.read_text.assert_called_once_with("direct_url.json")
         return result
@@ -53,7 +53,7 @@ class InstallationOriginTests(unittest.TestCase):
                 self.assertIsNone(self.origin(value))
 
     def test_missing_distribution_is_not_an_error_for_direct_script(self) -> None:
-        with patch("sol.package_metadata.distribution", side_effect=sol.package_metadata.PackageNotFoundError):
+        with patch("sol.reader.app.package_metadata.distribution", side_effect=sol.package_metadata.PackageNotFoundError):
             self.assertIsNone(sol.installed_project_directory())
 
     def test_local_install_corpus_is_found_outside_checkout(self) -> None:
@@ -63,8 +63,8 @@ class InstallationOriginTests(unittest.TestCase):
             corpus.mkdir(parents=True)
             (corpus / "corpus.json").write_text("{}", encoding="utf-8")
             with patch.dict("os.environ", {"XDG_CONFIG_HOME": str(root / "configuration")}, clear=True), \
-                    patch("sol.Path.cwd", return_value=root / "elsewhere"), \
-                    patch("sol.installed_project_directory", return_value=corpus.parent):
+                    patch("sol.reader.app.Path.cwd", return_value=root / "elsewhere"), \
+                    patch("sol.reader.app.installed_project_directory", return_value=corpus.parent):
                 self.assertEqual(sol.discover_corpus(), corpus)
 
 
@@ -74,7 +74,7 @@ class ConfigurationPathTests(unittest.TestCase):
             self.assertEqual(sol.config_path(), Path("/tmp/sol-xdg-fixture/sol/config.json"))
 
     def test_default_config_uses_home(self) -> None:
-        with patch.dict("os.environ", {}, clear=True), patch("sol.Path.home", return_value=Path("/tmp/sol-home-fixture")):
+        with patch.dict("os.environ", {}, clear=True), patch("sol.reader.app.Path.home", return_value=Path("/tmp/sol-home-fixture")):
             self.assertEqual(sol.config_path(), Path("/tmp/sol-home-fixture/.config/sol/config.json"))
 
     def test_relative_xdg_home_is_rejected(self) -> None:

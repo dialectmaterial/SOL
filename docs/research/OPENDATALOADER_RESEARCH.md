@@ -76,12 +76,12 @@ quality. Neither detected headings nor model descriptions establish Hegel's
 logical hierarchy. Generated descriptions must remain labelled as generated, never
 Hegel's prose. [Reading-order documentation](https://opendataloader.org/docs/reading-order).
 
-SOL's [corpus contract](CORPUS.md) remains authoritative. An alternative extractor
+SOL's [corpus contract](../CORPUS.md) remains authoritative. An alternative extractor
 must not allocate replacement IDs, change `corpus_id`, silently reconcile passages,
 or transfer workspace reviews. Current workspace reviews bind text and declared
 PDF fingerprints, not complete page/attribution/rectangle metadata; a new rectangle
 is not automatically covered by an existing “verified” event.
-[Workspace boundaries](WORKSPACE_PLAN.md).
+[Workspace boundaries](../WORKSPACE_PLAN.md).
 
 ## Claims that still need testing
 

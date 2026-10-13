@@ -8,9 +8,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import sol
-from sol_workspace import APPLICATION_ID, Workspace, _SCHEMA
-from sol_workspace_reader import WorkspaceReader
+import sol.reader.app as sol
+from sol.workspace.store import APPLICATION_ID, Workspace, _SCHEMA
+from sol.workspace.reader import WorkspaceReader
 from test_workspace_reader import invented_book, CORPUS_ID, IDS
 
 
@@ -171,7 +171,7 @@ class AnnotationEditingTests(unittest.TestCase):
             self.assertIn('earlier edits and editor are unknown', shown)
 
     def test_changed_disk_generation_during_edit_refuses_commit(self):
-        import sol_corpus_contract as contract
+        import sol.corpus.contract as contract
         from test_packaging import write_runtime_corpus
         corpus = self.directory / 'edit-corpus'
         write_runtime_corpus(corpus)
@@ -203,8 +203,8 @@ class AnnotationEditingTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'lowercase .sqlite3'):
                 reader.execute('workspace', ['upgrade', str(target)], self.session)
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()) as error, \
-                patch('sol.discover_corpus', return_value=self.book.corpus_directory), \
-                patch('sol.load_corpus_book', return_value=self.book):
+                patch('sol.reader.app.discover_corpus', return_value=self.book.corpus_directory), \
+                patch('sol.reader.app.load_corpus_book', return_value=self.book):
             status = sol.main(['--workspace', 'legacy', '--workspace-dir', str(self.directory),
                                '--workspace-upgrade', str(target)])
         self.assertEqual(status, 2)
