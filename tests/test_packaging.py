@@ -19,13 +19,16 @@ import zipfile
 
 PACKAGE_FILES = {
     "sol/__init__.py", "sol/__main__.py",
+    "sol/core/__init__.py", "sol/core/config.py", "sol/core/corpus.py",
+    "sol/core/models.py", "sol/core/paths.py", "sol/core/references.py",
     "sol/reader/__init__.py", "sol/reader/app.py", "sol/reader/models.py", "sol/reader/legacy_pdf.py",
+    "sol/reader/options.py",
     "sol/corpus/__init__.py", "sol/corpus/convert.py", "sol/corpus/contract.py", "sol/corpus/notes.py",
     "sol/corpus/references.py", "sol/corpus/structure.py", "sol/corpus/layout.py", "sol/corpus/edition.py",
     "sol/workspace/__init__.py", "sol/workspace/store.py", "sol/workspace/reader.py",
     "sol/workspace/diagnostics.py", "sol/workspace/catalog.py", "sol/workspace/export.py",
-    "sol/workspace/profiles.py", "sol/terminal/__init__.py", "sol/terminal/prompt.py",
-    "sol/terminal/source.py", "sol/terminal/kitty.py",
+    "sol/workspace/profiles.py", "sol/workspace/comparison.py", "sol/terminal/__init__.py", "sol/terminal/prompt.py",
+    "sol/terminal/source.py", "sol/terminal/kitty.py", "sol/terminal/comparison.py",
 }
 ENTRY_POINTS = {
     "sol": "sol:cli",
@@ -35,7 +38,7 @@ ENTRY_POINTS = {
 }
 PUBLIC_FILES = {
     "pyproject.toml", "MANIFEST.in", "README.md", "docs/CORPUS.md", "docs/USAGE.md",
-    "docs/WORKSPACE_PLAN.md", "docs/WORKSPACE_EXPORT.md",
+    "docs/WORKSPACE_PLAN.md", "docs/WORKSPACE_EXPORT.md", "docs/MODULARITY.md",
     "docs/research/INTERFACE_RESEARCH.md", "docs/research/OPENDATALOADER_RESEARCH.md",
 } | PACKAGE_FILES
 
@@ -207,6 +210,112 @@ class PackagingTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("usage:", result.stdout)
+
+    def test_core_only_wheel_proves_interface_dependency_boundary(self):
+        """Release-gate fixture only: this is not another installable SOL product."""
+        fixture = Path(self.temporary.name) / "core-only-release-gate"
+        stage, destination = fixture / "source", fixture / "dist"
+        stage.mkdir(parents=True)
+        destination.mkdir()
+        root = Path(__file__).resolve().parents[1]
+        selected = {"sol/__init__.py", "sol/corpus/__init__.py", "sol/corpus/contract.py"}
+        selected.update(path for path in PACKAGE_FILES if path.startswith("sol/core/"))
+        for filename in selected:
+            target = stage / filename
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(root / filename, target)
+        (stage / "pyproject.toml").write_text(
+            '[build-system]\nrequires = ["setuptools>=68"]\n'
+            'build-backend = "setuptools.build_meta"\n\n'
+            '[project]\nname = "sol-core-boundary-fixture"\nversion = "0.0.0"\n'
+            'description = "Synthetic dependency-boundary release gate, not a SOL product"\n'
+            'requires-python = ">=3.10"\ndependencies = []\n\n'
+            '[tool.setuptools]\ninclude-package-data = false\n\n'
+            '[tool.setuptools.packages.find]\nwhere = ["."]\n'
+            'include = ["sol", "sol.core", "sol.corpus"]\nnamespaces = false\n',
+            encoding="utf-8",
+        )
+        built = subprocess.run(
+            [sys.executable, "-B", "-c",
+             "import setuptools.build_meta as build, sys; build.build_wheel(sys.argv[1])",
+             str(destination)],
+            cwd=stage, text=True, capture_output=True,
+        )
+        self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+        wheel = next(destination.glob("*.whl"))
+        installed = fixture / "unpacked-core-only"
+        with zipfile.ZipFile(wheel) as archive:
+            members = archive.namelist()
+            self.assertEqual({name for name in members if name.endswith(".py")}, selected)
+            self.assertTrue(all(name in selected or ".dist-info/" in name for name in members))
+            info = next(name for name in members if name.endswith("/METADATA"))
+            metadata = Parser().parsestr(archive.read(info).decode("utf-8"))
+            self.assertEqual(metadata["Name"], "sol-core-boundary-fixture")
+            self.assertFalse(metadata.get_all("Requires-Dist"))
+            self.assertFalse(any(name.endswith("/entry_points.txt") for name in members))
+            archive.extractall(installed)
+        for directory in ("reader", "workspace", "terminal"):
+            self.assertFalse((installed / "sol" / directory).exists())
+        corpus = fixture / "invented-corpus"
+        passage_id, body = write_runtime_corpus(corpus)
+        fingerprints = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                        for path in corpus.iterdir() if path.is_file()}
+        elsewhere = fixture / "outside-source-and-installation"
+        elsewhere.mkdir()
+        program = """
+import builtins, json, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+forbidden = ('sol.reader', 'sol.workspace', 'sol.terminal', 'markdown_it',
+             'prompt_toolkit', 'rich', 'textual', 'pypdf', 'pdfplumber')
+original_import = builtins.__import__
+def guard(name, *args, **kwargs):
+    if any(name == prefix or name.startswith(prefix + '.') for prefix in forbidden):
+        raise AssertionError('Core-only fixture imported forbidden component ' + name)
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = guard
+from sol import core
+assert Path(core.__file__).parents[2] == Path(sys.argv[1])
+assert core.API_VERSION == 1
+corpus = Path(sys.argv[2])
+snapshot = core.load_snapshot(corpus)
+assert isinstance(snapshot, core.CorpusSnapshot)
+core.verify_snapshot_current(snapshot)
+book = core.load_corpus_book(corpus)
+assert isinstance(book, core.Book)
+passage = book.find_passage(sys.argv[3])
+assert isinstance(passage, core.Passage)
+reference = core.resolve_reference(book, sys.argv[3])
+assert isinstance(reference, core.Reference)
+assert reference.requested_id == reference.target_id == passage.identifier
+assert reference.chain == (passage.identifier,)
+node, path = core.resolve_path('/being/synthetic', (), book.root)
+assert isinstance(node, core.Node)
+assert core.child_by_name(book.root, 'being') is node.parent
+assert core.node_path(node) == path == ('BEING', 'synthetic.txt')
+assert core.alias('00-synthetic.txt') == 'synthetic'
+assert core.presentation_text(passage.text) == sys.argv[4]
+assert not any(name == prefix or name.startswith(prefix + '.')
+               for name in sys.modules for prefix in forbidden)
+print(json.dumps({'api_version': core.API_VERSION, 'id': reference.target_id,
+                  'path': core.display_path(path), 'text': passage.text}))
+"""
+        environment = os.environ.copy()
+        environment.pop("SOL_CORPUS", None)
+        environment["XDG_CONFIG_HOME"] = str(fixture / "isolated-config")
+        environment["XDG_DATA_HOME"] = str(fixture / "isolated-data")
+        inspected = subprocess.run(
+            [sys.executable, "-I", "-B", "-c", program, str(installed), str(corpus), passage_id, body],
+            cwd=elsewhere, env=environment, text=True, capture_output=True,
+        )
+        self.assertEqual(inspected.returncode, 0, inspected.stdout + inspected.stderr)
+        self.assertEqual(json.loads(inspected.stdout), {
+            "api_version": 1, "id": passage_id, "path": "/BEING/synthetic.txt", "text": body,
+        })
+        self.assertEqual({path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                          for path in corpus.iterdir() if path.is_file()}, fingerprints)
+        self.assertFalse((fixture / "isolated-config").exists())
+        self.assertFalse((fixture / "isolated-data").exists())
 
     def test_installed_local_origin_finds_corpus_outside_checkout_without_pdf_or_parser(self):
         # A source-directory pip install builds a wheel and then records dir_info.

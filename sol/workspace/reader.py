@@ -16,6 +16,7 @@ import shlex
 import textwrap
 import unicodedata
 
+from sol.core.references import Reference, resolve_reference
 from sol.workspace.store import Workspace, WorkspaceError
 
 
@@ -31,14 +32,6 @@ def workspace_path(name: str, directory: Path | None = None) -> Path:
 
 
 @dataclass(frozen=True)
-class Reference:
-    requested_id: str
-    target_id: str
-    record: dict
-    chain: tuple[str, ...]
-
-
-@dataclass(frozen=True)
 class AnnotationEdit:
     """A captured note and source version; not an authority to edit the book."""
     identifier: str
@@ -48,30 +41,6 @@ class AnnotationEdit:
     resolved_target: str
     inspected_digest: str
     body: str
-
-
-def resolve_reference(book, identifier: str) -> Reference:
-    key = identifier.strip().lower()
-    records = book.canonical_records
-    if not key:
-        raise ValueError("a canonical record ID is required")
-    if key in records:
-        requested = key
-    else:
-        matches = [value for value in records if value.startswith(key)]
-        if len(matches) == 1:
-            requested = matches[0]
-        elif len(matches) > 1:
-            raise ValueError("ambiguous record ID; supply more of its UUID")
-        else:
-            raise ValueError(f"unresolved canonical record: {identifier}")
-    chain = [requested]
-    while records[chain[-1]]["type"] == "retired_record":
-        target = records[chain[-1]]["redirect_id"]
-        if target not in records or target in chain:
-            raise ValueError("invalid canonical retirement redirect")
-        chain.append(target)
-    return Reference(requested, chain[-1], records[chain[-1]], tuple(chain))
 
 
 def safe_output(text: str) -> str:
@@ -132,6 +101,9 @@ note edit NOTE_ID [TEXT --expect-revision N]
 note history NOTE_ID              inspect preserved note revisions
 compare save NAME ID ID... --question TEXT
 compare list / show NAME           saved, ordered passage comparison
+compare PATH_A PATH_B              compare complete files; Tab completes paths
+compare open / close              refresh the last desk / close it
+compare open NAME                 open a saved passage comparison
 review show [ID]                   canonical Markdown and source provenance
 review record OUTCOME --issue TEXT [--on ID]
 review list [--on ID]              version-aware reader review testimony

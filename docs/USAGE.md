@@ -324,6 +324,61 @@ source info
 
 Verified PDF snapshots and rendered pages are disposable local cache files under `$XDG_CACHE_HOME/sol/source`, or `~/.cache/sol/source`. The remembered source mapping is separate from the corpus pointer, in `$XDG_CONFIG_HOME/sol/sources.json` or `~/.config/sol/sources.json`. Canonical Markdown remains the reading source.
 
+## Open a comparison desk
+
+Open `sol-kitty` and choose two files using their paths. For example:
+
+~~~text
+cd /BEING/i-determinateness-quality/1-being
+compare a-being.txt b-nothing.txt
+~~~
+
+Tab completes each path. Absolute SOL paths, relative paths, aliases and directory
+scopes work just as they do for `cat`. Each side shows the complete selected text
+in corpus order. Opening a desk does not choose a random paragraph or change your
+reading position.
+
+You can also use real Markdown files from the configured corpus. These paths are
+relative to the corpus directory; absolute filenames work too:
+
+~~~text
+compare hegel/being/i-determinateness-quality/1-being.md hegel/being/i-determinateness-quality/2-existence.md
+~~~
+
+Each selected file stays on its own side, even when it contains many paragraphs.
+SOL uses the loaded canonical text and retains each passage's source information
+and related personal notes. A Markdown file must belong to the configured corpus.
+
+A question is optional:
+
+~~~text
+compare a-being.txt b-nothing.txt --question "How do being and nothing differ?"
+~~~
+
+Use Ctrl-Shift-Left or Ctrl-Shift-Right to focus the desk. Press `a` or `b` to select
+which text to scroll, then use arrows or Page Up/Page Down. Tab switches between
+text and notes, and also shows the full question when one was supplied. Wide panes
+show the texts beside each other; narrow panes stack them or show the selected side
+when space is limited. The paths remain identified, with full source details
+available below the text. Press `q` to close the pane.
+
+After editing a note in the main reader, refresh the last desk without entering
+its paths again:
+
+~~~text
+compare open
+compare close
+~~~
+
+Refreshing remembers the chosen paths even if you navigate to another directory.
+The comparison remains a pinned view until refreshed. Only the main reader edits
+notes and saves reading position.
+
+Existing saved passage comparisons still work with `compare list` and
+`compare open NAME`. They retain their original canonical references, including
+visible missing or retired references and note version status. Direct file
+comparison requires neither a saved name nor a new workspace record.
+
 ## Development checks
 
 Use a separate environment in the project directory. Editable installation exposes the current package and includes both optional extras for testing:
@@ -344,12 +399,15 @@ The [workspace plan](WORKSPACE_PLAN.md) separates implemented behavior from sele
 
 | Directory | Responsibility |
 | --- | --- |
-| `sol/reader/` | CLI, virtual shell, passage models, navigation, and presentation. Explicit PDF compatibility is isolated in the lazy-loaded `legacy_pdf.py`. |
+| `sol/core/` | Shared book/passage models, verified indexed corpus loading, canonical reference resolution, virtual paths, and corpus configuration. The public API is versioned independently of storage schemas. |
+| `sol/reader/` | CLI, virtual shell, navigation, and presentation. CLI options are defined separately in `options.py`; explicit PDF compatibility is isolated in the lazy-loaded `legacy_pdf.py`. |
 | `sol/corpus/` | Edition structure and extraction layout, conversion, canonical record validation, and generated indexing. Ordinary reading uses the verified index. |
 | `sol/workspace/` | SQLite storage, attribution profiles, reference operations, recent-workspace discovery, diagnostics, and inquiry export. |
 | `sol/terminal/` | Optional prompt input, source-page viewing, and kitty launch integration. These adapters do not redefine corpus or workspace semantics. |
 
-`sol/reader/app.py` coordinates commands; shared book and passage objects live in `sol/reader/models.py`. Edition-specific geometry and extraction helpers live in `sol/corpus/edition.py` and `sol/corpus/layout.py`, not the main command loop. The installed `sol` command and `python -m sol` use the same entry point.
+`sol/reader/app.py` coordinates commands and consumes the `sol.core` boundary. Shared models now belong to CORE; `sol/reader/models.py` retains compatibility exports. Canonical reference exports from `sol/workspace/reader.py` remain compatible while their implementation moves to CORE. The existing corpus contract remains a shared-domain dependency, without importing reader, workspace, or terminal layers. Edition-specific geometry and extraction helpers stay in `sol/corpus/edition.py` and `sol/corpus/layout.py`.
+
+The installed `sol` command and `python -m sol` still use the same entry point, and the aggregate `sol-organizes-logic` installation remains unchanged. [The modularity contract](MODULARITY.md) distinguishes this internal separation from future independent distributions, cross-process integration, and optional NixOS composition.
 
 ## Appendix: Hegel on computational externality
 

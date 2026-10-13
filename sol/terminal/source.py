@@ -20,7 +20,7 @@ import tempfile
 import zlib
 
 from sol.corpus.contract import CorpusError, load_snapshot, verify_snapshot_current
-from sol.workspace.reader import resolve_reference
+from sol.core.references import resolve_reference
 
 
 class SourceError(ValueError):

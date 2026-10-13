@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sol.reader.models import Node
+from sol.core.models import Node
 
 
 # This index is specific to the Cambridge di Giovanni edition supplied with the

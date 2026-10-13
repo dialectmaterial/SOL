@@ -13,7 +13,7 @@ import unicodedata
 
 from sol.corpus.edition import PRINTED_PAGE_OFFSET
 from sol.corpus.layout import Line, extract_pages, heading_key, indexed_tree, is_heading
-from sol.reader.models import Book, Node, Passage, node_path
+from sol.core.models import Book, Node, Passage, node_path
 
 
 # 4. Prose reconstruction: paragraphs, their source spans, and readable text.

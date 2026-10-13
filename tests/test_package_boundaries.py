@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from sol.reader import app
+from sol.core import config
 
 
 class PackageBoundaryTests(unittest.TestCase):
@@ -43,6 +43,28 @@ class PackageBoundaryTests(unittest.TestCase):
         self.assertNotIn("sol.reader.legacy_pdf", modules)
         self.assertFalse(any(name.startswith("sol.terminal.") for name in modules))
 
+    def test_config_import_has_no_reader_corpus_or_interface_dependency(self):
+        modules = self.imported_modules("import sol.core.config")
+        self.assertFalse(any(name.startswith("sol.reader.") for name in modules))
+        self.assertFalse(any(name.startswith("sol.terminal.") for name in modules))
+        self.assertNotIn("sol.core.corpus", modules)
+        self.assertNotIn("sol.corpus.contract", modules)
+
+    def test_options_parser_does_not_import_the_reader_application(self):
+        modules = self.imported_modules("from sol.reader.options import build_parser; build_parser()")
+        self.assertNotIn("sol.reader.app", modules)
+        self.assertNotIn("sol.core.corpus", modules)
+        self.assertFalse(any(name.startswith("sol.terminal.") for name in modules))
+
+    def test_kitty_help_does_not_import_the_reader_application(self):
+        modules = self.imported_modules(
+            "import io; from sol.terminal import kitty; "
+            "sys.stdout = io.StringIO(); assert kitty.main(['--help']) == 0; "
+            "sys.stdout = sys.__stdout__"
+        )
+        self.assertNotIn("sol.reader.app", modules)
+        self.assertNotIn("sol.core.corpus", modules)
+
 
 class SourceCheckoutDiscoveryTests(unittest.TestCase):
     def setUp(self):
@@ -50,9 +72,9 @@ class SourceCheckoutDiscoveryTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.directory = Path(self.temporary.name)
         self.checkout = self.directory / "checkout"
-        self.reader = self.checkout / "sol" / "reader" / "app.py"
-        self.reader.parent.mkdir(parents=True)
-        self.reader.write_text("# Synthetic package source\n", encoding="utf-8")
+        self.module = self.checkout / "sol" / "core" / "config.py"
+        self.module.parent.mkdir(parents=True)
+        self.module.write_text("# Synthetic package source\n", encoding="utf-8")
         self.metadata = self.checkout / "pyproject.toml"
         self.metadata.write_text('[project]\nname = "sol-organizes-logic"\n', encoding="utf-8")
         self.corpus = self.checkout / "local-corpus"
@@ -60,11 +82,11 @@ class SourceCheckoutDiscoveryTests(unittest.TestCase):
         (self.corpus / "corpus.json").write_text("{}\n", encoding="utf-8")
 
     def discover(self):
-        with patch.object(app, "__file__", str(self.reader)), \
-                patch.object(app.Path, "cwd", return_value=self.directory), \
-                patch.object(app, "installed_project_directory", return_value=None), \
+        with patch.object(config, "__file__", str(self.module)), \
+                patch.object(config.Path, "cwd", return_value=self.directory), \
+                patch.object(config, "installed_project_directory", return_value=None), \
                 patch.dict(os.environ, {"XDG_CONFIG_HOME": str(self.directory / "config")}, clear=True):
-            return app.discover_corpus()
+            return config.discover_corpus()
 
     def test_recognized_checkout_finds_root_corpus_from_elsewhere(self):
         self.assertEqual(self.discover(), self.corpus)
@@ -93,7 +115,7 @@ class SourceCheckoutDiscoveryTests(unittest.TestCase):
 
     def test_saved_choice_has_precedence_over_checkout_fallback(self):
         selected = self.directory / "selected-corpus"
-        with patch.object(app, "configured_corpus", return_value=selected):
+        with patch.object(config, "configured_corpus", return_value=selected):
             self.assertEqual(self.discover(), selected)
 
 

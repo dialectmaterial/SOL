@@ -22,7 +22,7 @@ from sol.corpus.edition import (
     FIRST_TEXT_PAGE, LAST_TEXT_PAGE, PRINTED_PAGE_OFFSET,
     ROOT, SUBDIVISIONS, SECOND_LEVEL, THIRD_LEVEL,
 )
-from sol.reader.models import Node
+from sol.core.models import Node
 
 XML_NS = {"p": "http://www.w3.org/1999/xhtml"}
 

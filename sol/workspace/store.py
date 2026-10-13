@@ -360,7 +360,7 @@ class Workspace:
             connection.execute("BEGIN IMMEDIATE" if write else "BEGIN")
             yield connection
             connection.commit()
-        except Exception as error:
+        except BaseException as error:
             connection.rollback()
             if isinstance(error, sqlite3.Error):
                 raise WorkspaceError(f"workspace database operation failed: {error}") from error

@@ -113,7 +113,7 @@ def _option(arguments: list[str], name: str) -> str | None:
 
 def launcher_arguments(arguments: list[str]) -> list[str]:
     """Pin corpus discovery before kitty starts, while preserving SOL arguments."""
-    from sol.reader.app import discover_corpus
+    from sol.core.config import discover_corpus
 
     if any(not isinstance(value, str) or any(c in value for c in "\r\n\0") for value in arguments):
         raise KittyError("SOL launcher arguments cannot contain line breaks or NUL characters.")
@@ -157,6 +157,10 @@ def launch_reader(arguments: list[str]) -> int:
 class SourcePane:
     """The reader owns one specific kitty window and one private mailbox."""
 
+    pane_name = "source"
+    pane_title = "SOL source"
+    viewer_option = "--viewer"
+
     def __init__(self):
         self.window_id: int | None = None
         self.reader_id: int | None = None
@@ -166,10 +170,10 @@ class SourcePane:
 
     def _require_session(self) -> None:
         if os.environ.get("SOL_KITTY_SESSION") != "1" or not os.environ.get("KITTY_RC_PASSWORD"):
-            raise KittyError("Open this reader with sol-kitty to use its source pane.")
+            raise KittyError(f"Open this reader with sol-kitty to use its {self.pane_name} pane.")
         self.reader_id = _number(os.environ.get("KITTY_WINDOW_ID", ""), "reader window")
         if shutil.which("kitten") is None:
-            raise KittyError("The standalone kitten command is required for the source pane.")
+            raise KittyError(f"The standalone kitten command is required for the {self.pane_name} pane.")
 
     def _remote(self, *arguments: str) -> str:
         try:
@@ -182,7 +186,7 @@ class SourcePane:
             raise KittyError(f"Cannot reach this SOL kitty session: {error}") from error
         if completed.returncode:
             detail = completed.stderr.strip() or "remote control was refused"
-            raise KittyError(f"Source pane action failed: {detail}")
+            raise KittyError(f"{self.pane_name.capitalize()} pane action failed: {detail}")
         return completed.stdout
 
     def _is_open(self) -> bool:
@@ -194,7 +198,7 @@ class SourcePane:
                        for os_window in windows for tab in os_window.get("tabs", [])
                        for window in tab.get("windows", []))
         except (TypeError, ValueError, AttributeError) as error:
-            raise KittyError("kitty returned an invalid source pane inventory.") from error
+            raise KittyError(f"kitty returned an invalid {self.pane_name} pane inventory.") from error
 
     def _forget(self) -> None:
         if self._temporary is not None:
@@ -209,11 +213,11 @@ class SourcePane:
             payload = json.dumps({"sequence": self._sequence, "request": request},
                                  ensure_ascii=False, allow_nan=False)
         except (TypeError, ValueError) as error:
-            raise KittyError(f"Invalid source selection: {error}") from error
+            raise KittyError(f"Invalid {self.pane_name} selection: {error}") from error
         if self.window_id is not None and not self._is_open():
             self._forget()
         if self._temporary is None:
-            self._temporary = tempfile.TemporaryDirectory(prefix="sol-source-pane-")
+            self._temporary = tempfile.TemporaryDirectory(prefix=f"sol-{self.pane_name}-pane-")
             self.mailbox = Path(self._temporary.name) / "selection.json"
         temporary = self.mailbox.with_suffix(".tmp")
         try:
@@ -224,18 +228,18 @@ class SourcePane:
                 response = self._remote(
                     "launch", "--match", f"window_id:{self.reader_id}",
                     "--source-window", f"id:{self.reader_id}", "--next-to", f"id:{self.reader_id}",
-                    "--location", "vsplit", "--dont-take-focus", "--title", "SOL source",
+                    "--location", "vsplit", "--dont-take-focus", "--title", self.pane_title,
                     "--env=KITTY_LISTEN_ON", "--env=KITTY_RC_PASSWORD", "--env=SOL_KITTY_SESSION",
-                    sys.executable, "-m", "sol.terminal.kitty", "--viewer", str(self.mailbox),
+                    sys.executable, "-m", "sol.terminal.kitty", self.viewer_option, str(self.mailbox),
                 )
-                identifier = _number(response.strip(), "source window")
+                identifier = _number(response.strip(), f"{self.pane_name} window")
                 if identifier == self.reader_id:
-                    raise KittyError("kitty returned the reader window as the source pane; refusing ownership.")
+                    raise KittyError(f"kitty returned the reader window as the {self.pane_name} pane; refusing ownership.")
                 self.window_id = identifier
         except OSError as error:
             if self.window_id is None:
                 self._forget()
-            raise KittyError(f"Could not update the source pane selection: {error}") from error
+            raise KittyError(f"Could not update the {self.pane_name} pane selection: {error}") from error
         except KittyError:
             if self.window_id is None:
                 self._forget()
@@ -246,7 +250,7 @@ class SourcePane:
         if self.window_id is not None:
             self._require_session()
             if self.window_id == self.reader_id:
-                raise KittyError("Refusing to close the reader as a source pane.")
+                raise KittyError(f"Refusing to close the reader as a {self.pane_name} pane.")
             self._remote("close-window", "--match", f"id:{self.window_id}", "--ignore-no-match")
         self._forget()
 
@@ -256,6 +260,14 @@ class SourcePane:
         except KittyError:
             # Removing the mailbox also tells an independently alive viewer to exit.
             self._forget()
+
+
+class ComparisonPane(SourcePane):
+    """A second auxiliary pane, using the same reader-owned lifecycle."""
+
+    pane_name = "comparison"
+    pane_title = "SOL comparison"
+    viewer_option = "--comparison-viewer"
 
 
 @dataclass(frozen=True)
@@ -378,20 +390,24 @@ def _key_action(data: bytes) -> str | None:
     return None
 
 
-def consume_keys(buffer: bytes) -> tuple[list[str], bytes]:
+def consume_keys(buffer: bytes, key_action=None) -> tuple[list[str], bytes]:
     """Consume batched/split keys and ignore terminal protocol replies."""
     actions = []
-    sequences = (b"\x1b[C", b"\x1b[B", b"\x1b[D", b"\x1b[A", b"\x1b[5~", b"\x1b[6~")
+    key_action = key_action or _key_action
+    sequences = (b"\x1b[C", b"\x1b[B", b"\x1b[D", b"\x1b[A", b"\x1b[5~", b"\x1b[6~",
+                 b"\x1b[H", b"\x1b[F", b"\x1b[1~", b"\x1b[4~")
     while buffer:
         if buffer[0] != 27:
-            action = _key_action(buffer[:1])
+            action = key_action(buffer[:1])
             if action:
                 actions.append(action)
             buffer = buffer[1:]
             continue
         known = next((key for key in sequences if buffer.startswith(key)), None)
         if known:
-            actions.append(_key_action(known))
+            action = key_action(known)
+            if action:
+                actions.append(action)
             buffer = buffer[len(known):]
             continue
         if any(key.startswith(buffer) for key in sequences):
@@ -596,6 +612,11 @@ def render_child(page_index: int) -> int:
 def main(argv=None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     try:
+        if arguments and arguments[0] == "--comparison-viewer":
+            if len(arguments) != 2:
+                raise KittyError("Internal comparison usage: --comparison-viewer SELECTION_MAILBOX")
+            from sol.terminal.comparison import viewer_main as comparison_viewer
+            return comparison_viewer(Path(arguments[1]))
         if arguments and arguments[0] == "--render-page":
             if len(arguments) != 2 or not arguments[1].isdecimal():
                 raise KittyError("Internal rendering usage: --render-page PAGE_INDEX")
@@ -605,7 +626,7 @@ def main(argv=None) -> int:
                 raise KittyError("Internal viewer usage: --viewer SELECTION_MAILBOX")
             return viewer_main(Path(arguments[1]))
         if arguments in (["-h"], ["--help"]):
-            from sol.reader.app import build_parser
+            from sol.reader.options import build_parser
             print("Usage: sol-kitty [SOL options]\n\nOpen SOL in its private kitty profile. "
                   "Use source show in the reader to open the verified source pane.\n"
                   "Ctrl+Alt+Left/Right switches panes; add Shift to resize.\n"
@@ -613,7 +634,7 @@ def main(argv=None) -> int:
             print(build_parser().format_help())
             return 0
         if arguments == ["--version"]:
-            from sol.reader.app import VERSION
+            from sol import __version__ as VERSION
             print(f"sol-kitty {VERSION}")
             return 0
         return launch_reader(arguments)

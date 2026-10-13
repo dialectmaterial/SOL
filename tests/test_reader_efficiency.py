@@ -5,7 +5,8 @@ from dataclasses import replace
 import unittest
 from unittest.mock import patch
 
-from sol.reader import app, models
+from sol.core import models
+from sol.reader import app
 
 
 def invented_book():

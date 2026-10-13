@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import sol.reader.app as sol
 import sol.corpus.contract as contract
+from sol.core import config
 
 
 class CorpusReaderTests(unittest.TestCase):
@@ -23,10 +24,10 @@ class CorpusReaderTests(unittest.TestCase):
         environment = patch.dict("os.environ", {"XDG_CONFIG_HOME": str(self.cwd / "config")}, clear=True)
         environment.start()
         self.addCleanup(environment.stop)
-        origin = patch("sol.reader.app.installed_project_directory", return_value=None)
+        origin = patch("sol.core.config.installed_project_directory", return_value=None)
         origin.start()
         self.addCleanup(origin.stop)
-        script = patch("sol.reader.app.__file__", str(self.cwd / "not-a-checkout" / "sol" / "reader" / "app.py"))
+        script = patch("sol.core.config.__file__", str(self.cwd / "not-a-checkout" / "sol" / "core" / "config.py"))
         script.start()
         self.addCleanup(script.stop)
         self.corpus = self.cwd / "local-corpus"
@@ -195,7 +196,7 @@ class CorpusReaderTests(unittest.TestCase):
                 ["--passage", self.ids[4], "--context", "1", "--json"], cwd=self.cwd / "elsewhere")
         self.assertEqual(status, 0, stderr)
         self.assertEqual([row["id"] for row in json.loads(stdout)], [self.ids[2], self.ids[4], self.ids[5]])
-        saved = json.loads(sol.config_path().read_text(encoding="utf-8"))
+        saved = json.loads(config.config_path().read_text(encoding="utf-8"))
         self.assertEqual(saved["corpus"], str(self.corpus.resolve()))
 
     def test_relative_set_corpus_is_resolved_when_saved(self) -> None:
@@ -211,25 +212,25 @@ class CorpusReaderTests(unittest.TestCase):
     def test_invalid_set_corpus_preserves_previous_setting(self) -> None:
         status, _, stderr = self.run_main(["--set-corpus", str(self.corpus)])
         self.assertEqual(status, 0, stderr)
-        original = sol.config_path().read_bytes()
+        original = config.config_path().read_bytes()
         status, _, stderr = self.run_main(["--set-corpus", str(self.cwd / "missing")])
         self.assertEqual(status, 2)
         self.assertIn("Cannot use local corpus", stderr)
-        self.assertEqual(sol.config_path().read_bytes(), original)
+        self.assertEqual(config.config_path().read_bytes(), original)
 
     def test_missing_saved_corpus_errors_without_install_or_pdf_fallback(self) -> None:
-        configuration = sol.config_path()
+        configuration = config.config_path()
         configuration.parent.mkdir(parents=True)
         configuration.write_text(json.dumps({"corpus": str(self.cwd / "missing")}), encoding="utf-8")
         with patch("sol.reader.app.load_book", side_effect=AssertionError("PDF extraction forbidden")), \
-                patch("sol.reader.app.installed_project_directory", side_effect=AssertionError("No source substitution")):
+                patch("sol.core.config.installed_project_directory", side_effect=AssertionError("No source substitution")):
             status, _, stderr = self.run_main([], cwd=self.cwd / "elsewhere")
         self.assertEqual(status, 2)
         self.assertIn(str(self.cwd / "missing"), stderr)
         self.assertIn("--set-corpus", stderr)
 
     def test_guide_survives_broken_automatic_configuration(self) -> None:
-        configuration = sol.config_path()
+        configuration = config.config_path()
         configuration.parent.mkdir(parents=True)
         for content in ("{broken", json.dumps({"corpus": str(self.cwd / "missing")})):
             with self.subTest(content=content), \
@@ -257,7 +258,7 @@ class CorpusReaderTests(unittest.TestCase):
         self.assertIn(self.ids[2], stdout)
 
     def test_cwd_corpus_precedes_saved_default(self) -> None:
-        configuration = sol.config_path()
+        configuration = config.config_path()
         configuration.parent.mkdir(parents=True)
         configuration.write_text(json.dumps({"corpus": str(self.cwd / "missing")}), encoding="utf-8")
         status, stdout, stderr = self.run_main(["--passage", self.ids[2]])
@@ -268,7 +269,7 @@ class CorpusReaderTests(unittest.TestCase):
         pdf = self.cwd / "explicit.pdf"
         pdf.write_bytes(b"Synthetic placeholder; loader is mocked")
         book = sol.load_corpus_book(self.corpus)
-        configuration = sol.config_path()
+        configuration = config.config_path()
         configuration.parent.mkdir(parents=True)
         configuration.write_text("{broken", encoding="utf-8")
         with patch.dict("os.environ", {"SOL_CORPUS": str(self.cwd / "missing")}), \
@@ -296,7 +297,7 @@ class CorpusReaderTests(unittest.TestCase):
         self.assertTrue(json.loads(stdout)["abbreviated"])
 
     def test_malformed_and_relative_configuration_are_actionable(self) -> None:
-        configuration = sol.config_path()
+        configuration = config.config_path()
         configuration.parent.mkdir(parents=True)
         for content in ("{broken", "[]", '{"corpus":"local-corpus"}'):
             with self.subTest(content=content):
@@ -316,7 +317,7 @@ class CorpusReaderTests(unittest.TestCase):
     def test_source_checkout_corpus_is_discovered_from_another_directory(self) -> None:
         (self.cwd / "pyproject.toml").write_text(
             '[project]\nname = "sol-organizes-logic"\n', encoding="utf-8")
-        with patch("sol.reader.app.__file__", str(self.cwd / "sol" / "reader" / "app.py")), \
+        with patch("sol.core.config.__file__", str(self.cwd / "sol" / "core" / "config.py")), \
                 patch("sol.reader.app.load_book", side_effect=AssertionError("PDF extraction forbidden")):
             status, stdout, stderr = self.run_main(["--passage", self.ids[2]], cwd=self.cwd / "elsewhere")
         self.assertEqual(status, 0, stderr)

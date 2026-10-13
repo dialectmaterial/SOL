@@ -62,7 +62,7 @@ class LauncherTests(unittest.TestCase):
             return SimpleNamespace(returncode=17)
 
         with patch.dict(os.environ, {"KITTY_LISTEN_ON": "fd:9", "KITTY_RC_PASSWORD": "ambient"}), \
-                patch("sol.reader.app.discover_corpus", return_value=Path("/tmp/corpus with spaces")), \
+                patch("sol.core.config.discover_corpus", return_value=Path("/tmp/corpus with spaces")), \
                 patch("sol.terminal.kitty.shutil.which", side_effect=lambda command: "/usr/bin/" + command), \
                 patch("sol.terminal.kitty.subprocess.run", side_effect=run):
             self.assertEqual(sol_kitty.launch_reader(args), 17)
@@ -70,13 +70,13 @@ class LauncherTests(unittest.TestCase):
         self.assertFalse(observed["profile"].exists())
 
     def test_legacy_pdf_does_not_gain_corpus_option(self):
-        with patch("sol.reader.app.discover_corpus") as discover:
+        with patch("sol.core.config.discover_corpus") as discover:
             args = ["--pdf", "a file.pdf", "-n"]
             self.assertEqual(sol_kitty.launcher_arguments(args), args)
             discover.assert_not_called()
 
     def test_corpus_setup_can_repair_a_broken_existing_pointer(self):
-        with patch("sol.reader.app.discover_corpus", side_effect=ValueError("broken saved pointer")) as discover:
+        with patch("sol.core.config.discover_corpus", side_effect=ValueError("broken saved pointer")) as discover:
             args = ["--set-corpus", "/new/corpus"]
             self.assertEqual(sol_kitty.launcher_arguments(args), args)
             discover.assert_not_called()

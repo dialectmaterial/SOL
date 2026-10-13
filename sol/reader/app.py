@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 from copy import deepcopy
 from dataclasses import dataclass
-from importlib import metadata as package_metadata
 import json
 import os
 import random
@@ -19,16 +18,21 @@ import re
 import shlex
 import shutil
 import sys
-import tempfile
 import textwrap
 import unicodedata
-from urllib.parse import unquote, urlsplit
 from pathlib import Path
 
 
 from sol import __version__ as VERSION
 from sol.corpus.edition import PDF_FILENAME, ROOT, default_pdf
-from sol.reader.models import Book, Node, Passage, node_path, presentation_text
+from sol.core.config import (
+    config_path, configured_corpus, discover_corpus, installed_project_directory,
+    save_corpus, source_project_directory,
+)
+from sol.core.models import Book, Node, Passage, node_path, presentation_text
+from sol.core.paths import alias, child_by_name, display_path
+from sol.core.paths import resolve_path as resolve_book_path
+from sol.reader.options import build_parser
 
 
 def load_book(pdf: Path) -> Book:
@@ -39,147 +43,13 @@ def load_book(pdf: Path) -> Book:
 
 
 def load_corpus_book(corpus: Path) -> Book:
-    """Load the three-doctrine reader view without opening or parsing the PDF.
+    """Compatibility entry point for the shared verified-corpus loader."""
+    from sol.core.corpus import load_corpus_book as load_canonical_book
 
-    The canonical corpus retains its richer edition/volume hierarchy. Its
-    explicitly supplied reader_path metadata defines this convenient view;
-    it is not reconstructed from heading spellings or assigned new IDs.
-    """
-    from sol.corpus.contract import CorpusError, load_snapshot
-
-    try:
-        snapshot = load_snapshot(corpus)
-        records = snapshot.records
-    except CorpusError as error:
-        if not (corpus / "corpus.json").is_file():
-            raise ValueError(
-                f"Cannot use local corpus {corpus}: corpus.json not found.\n"
-                "Select its actual location with sol --set-corpus DIRECTORY or --corpus DIRECTORY.\n"
-                "If SOL_CORPUS is set, update or unset that environment override."
-            ) from error
-        instruction = f"{shlex.quote(sys.executable)} -m sol.corpus.contract {shlex.quote(str(corpus))}"
-        raise ValueError(
-            f"Cannot use local corpus {corpus}: {error}\n"
-            f"After correcting canonical Markdown if necessary, rebuild the index with:\n{instruction}"
-        ) from error
-
-    root = Node("", "The Science of Logic", 7)
-    nodes: dict[tuple[str, ...], Node] = {(): root}
-    children: dict[tuple[str, ...], list[Node]] = {(): []}
-    node_orders: dict[tuple[str, ...], int] = {}
-    # Reader-facing names are intentionally shorter than the edition outline.
-    for name, title, start in (
-        ("BEING", "Doctrine of Being (Book One)", 7),
-        ("ESSENCE", "Doctrine of Essence (Book Two)", 337),
-        ("CONCEPT", "Doctrine of the Concept", 507),
-    ):
-        node = Node(name, title, start, parent=root)
-        nodes[(name,)] = node
-        children[()] += [node]
-        children[(name,)] = []
-
-    def reader_path(record: dict) -> tuple[str, ...]:
-        value = record.get("reader_path")
-        if not isinstance(value, str) or not value.startswith("/"):
-            raise ValueError(f"Corpus record {record['id']} requires an absolute reader_path")
-        parts = tuple(value[1:].split("/"))
-        if not parts or parts[0] not in {"BEING", "ESSENCE", "CONCEPT"} or any(
-            part in {"", ".", ".."} or "\\" in part for part in parts
-        ):
-            raise ValueError(f"Invalid corpus reader_path on {record['id']}: {value}")
-        if any(part.endswith(".txt") for part in parts[:-1]):
-            raise ValueError(f"Corpus reader_path descends through a virtual file: {value}")
-        return parts
-
-    def printed(source: dict, identifier: str) -> int:
-        value = source["printed_page"]
-        if not isinstance(value, str) or not re.fullmatch(r"\d+", value):
-            raise ValueError(f"Main Hegel reader record {identifier} needs an Arabic printed-page label")
-        return int(value)
-
-    def ensure_node(path: tuple[str, ...], title: str, start: int, order: int, label: str = "") -> Node:
-        if not isinstance(title, str) or not title.strip():
-            raise ValueError(f"Corpus reader title must be a nonempty string: /{'/'.join(path)}")
-        for length in range(1, len(path) + 1):
-            prefix = path[:length]
-            node_orders[prefix] = min(node_orders.get(prefix, order), order)
-            if prefix not in nodes:
-                parent_path = prefix[:-1]
-                name = prefix[-1]
-                descriptive = name.removesuffix(".txt").replace("-", " ")
-                node = Node(name, descriptive, start, parent=nodes[parent_path])
-                nodes[prefix] = node
-                children.setdefault(parent_path, []).append(node)
-                children[prefix] = []
-        node = nodes[path]
-        node.title = title
-        node.start_page = min(node.start_page, start)
-        if label:
-            node.label = label
-        return node
-
-    # Section metadata establishes titles, labels, and source order before leaf
-    # passage files are attached. Editorial sections without reader_path belong
-    # to the canonical corpus, not to this default Hegel-only convenience view.
-    for record in records:
-        if record["type"] == "section" and "reader_path" in record:
-            path = reader_path(record)
-            first = record["sources"][0]
-            ensure_node(path, record.get("reader_title", record.get("title", record["plain_text"])),
-                        printed(first, record["id"]), record["order"], record.get("label", ""))
-
-    passages: list[Passage] = []
-    for record in records:
-        attribution = record["attribution"]
-        if record["type"] not in {"paragraph", "list_item", "quotation", "formula"} or (
-            attribution["author"] != "G. W. F. Hegel" or attribution["role"] != "main_text"
-        ):
-            continue
-        path = reader_path(record)
-        eligible = record.get("random_eligible", True)
-        if not isinstance(eligible, bool):
-            raise ValueError(f"Corpus random_eligible must be boolean: {record['id']}")
-        if not path[-1].endswith(".txt"):
-            raise ValueError(f"Main-text reader_path must identify a virtual .txt file: /{'/'.join(path)}")
-        first, last = record["sources"][0], record["sources"][-1]
-        title = record.get("reader_title", record.get("heading", path[-1].removesuffix(".txt")))
-        node = ensure_node(path, title, printed(first, record["id"]), record["order"])
-        # The first source paragraph determines the file's displayed start page.
-        node.start_page = min(node.start_page, printed(first, record["id"]))
-        passages.append(Passage(
-            record["plain_text"], first["pdf_page"], printed(first, record["id"]),
-            node, path, last["pdf_page"], printed(last, record["id"]),
-            record["id"], record.get("heading", title), record["type"], eligible,
-            record.get("transcription_status", ""),
-            tuple(re.findall(r"(?m)^!\[(Source facsimile, printed page [0-9ivxlcdm]+)\]"
-                             r"\((?:\.\./)*assets/[^\s)]+\.png\)\s*$", record.get("markdown", ""))),
-        ))
-
-    for path, node in nodes.items():
-        node.children = tuple(children[path])
-        if node.children and node.name.endswith(".txt"):
-            raise ValueError(f"Corpus maps both file and directory to /{'/'.join(path)}")
-        # Put a directory's own introductory text before its subdivisions.
-        node.children = tuple(sorted(node.children, key=lambda child: (
-            child.name != "00-introduction.txt", node_orders.get(path + (child.name,), float("inf"))
-        )))
-    if not passages:
-        raise ValueError("The local corpus contains no indexed Hegel main-text paragraphs for the reader")
-    redirects = {record["id"]: record["redirect_id"] for record in records
-                 if record["type"] == "retired_record"}
-    # Keep the complete verified record graph beside the convenient reader view.
-    # Markdown, attribution, notes, source rectangles and retirement history must
-    # not disappear merely because the terminal presents Hegel's prose as text.
-    return Book(root, passages, redirects,
-                {record["id"]: record for record in records}, snapshot.corpus_directory,
-                snapshot.manifest, snapshot)
+    return load_canonical_book(corpus)
 
 
 # 5. Navigation and display: no PDF extraction details belong in the shell.
-
-
-def display_path(path: tuple[str, ...]) -> str:
-    return "/" + "/".join(path)
 
 
 def sensible_width(requested: int | None) -> int:
@@ -365,44 +235,9 @@ def render_info(book: Book, node: Node, path: tuple[str, ...], width: int = 80) 
     return "\n".join(textwrap.fill(line, width=width, break_on_hyphens=False) for line in lines)
 
 
-def alias(name: str) -> str:
-    name = name.removesuffix(".txt").casefold()
-    return re.sub(r"^(?:\d+|[a-d]|[ivxlcdm]+|[αβγ])-", "", name)
-
-
-def child_by_name(node: Node, name: str) -> Node | None:
-    exact = [child for child in node.children if child.name == name]
-    if exact:
-        return exact[0]
-    matches = [child for child in node.children if
-               child.name.casefold().removesuffix(".txt") == name.casefold().removesuffix(".txt")
-               or alias(child.name) == alias(name)]
-    if len(matches) > 1:
-        raise ValueError(f"ambiguous name: {name}; use its full listed name")
-    return matches[0] if matches else None
-
-
 def resolve_path(value: str | None, cwd: tuple[str, ...], root: Node = ROOT) -> tuple[Node, tuple[str, ...]]:
-    node = root
-    if not value or not value.startswith("/"):
-        for piece in cwd:
-            child = child_by_name(node, piece)
-            if child is None:
-                raise ValueError("the current path no longer exists")
-            node = child
-    for piece in (value or "").split("/"):
-        if piece in ("", "."):
-            continue
-        if not node.is_directory:
-            raise ValueError(f"not a directory: {node.name}")
-        if piece == "..":
-            node = node.parent or root
-            continue
-        child = child_by_name(node, piece)
-        if child is None:
-            raise ValueError(f"no such path: {value}")
-        node = child
-    return node, node_path(node)
+    """Keep the reader's edition-outline default over the shared path resolver."""
+    return resolve_book_path(value, cwd, root)
 
 
 def render_listing(node: Node) -> str:
@@ -720,6 +555,8 @@ open ID|RESULT                    open a passage or latest search result
 context [N]                       neighbors in book order (default 1; maximum 10)
 where                             show current passage and reading position
 info [PATH]                       title, pages, counts, and pending review
+compare PATH_A PATH_B              open complete files together in kitty
+compare open / close              refresh the last desk / close it
 guide [PATH] --depth N             beginner guide and book tree (default depth 1)
 neofetch                          ASCII Hegel and SOL's concept-preview identity
 help / exit                       show commands / leave SOL
@@ -749,7 +586,7 @@ def shell_options(verb: str, arguments: list[str]) -> argparse.Namespace:
 def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
               workspace_reader=None, read_command=None, write_output=None,
               ui_mode="basic", editing_mode="emacs", draft_reader=None,
-              source_pdf=None, source_pane=None, auto_width=False) -> int:
+              source_pdf=None, source_pane=None, auto_width=False, comparison_pane=None) -> int:
     """Run the linear shell through replaceable, synchronous input/output seams.
 
     The optional adapter owns completion and accepts one command at a time;
@@ -764,6 +601,7 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
     restore = lambda: None
     adapter = None
     source_service = None
+    last_comparison = None
 
     def reflow_current():
         nonlocal width
@@ -828,6 +666,61 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                     width = sensible_width(None)
                     if workspace_reader is not None:
                         workspace_reader.width = width
+                if verb == "compare" and (not arguments or arguments[0] not in {"save", "list", "show"}):
+                    from sol.workspace.reader import safe_output
+                    from sol.workspace.comparison import capture_comparison, capture_paths
+                    action = arguments[0] if arguments else ""
+                    if action == "close":
+                        if len(arguments) != 1:
+                            raise ValueError("compare close does not take a name")
+                        if comparison_pane is not None:
+                            comparison_pane.close()
+                        reflow_current()
+                        emit("Comparison desk closed.")
+                        continue
+                    operands = arguments[1:] if action == "open" else arguments
+                    parser = ShellParser(prog="compare", add_help=False)
+                    parser.add_argument("paths", nargs="*")
+                    parser.add_argument("--question", default=None)
+                    options = parser.parse_intermixed_args(operands)
+                    if not options.paths and action == "open" and options.question is None:
+                        if last_comparison is None:
+                            raise ValueError("Choose two paths: compare PATH_A PATH_B. "
+                                             "Or use compare open NAME for a saved comparison.")
+                        kind, targets, question = last_comparison
+                    elif action == "open" and len(options.paths) == 1 and options.question is None:
+                        kind, targets, question = "saved", options.paths[0], ""
+                    elif len(options.paths) == 2:
+                        kind, targets, question = "paths", options.paths, options.question or ""
+                    else:
+                        raise ValueError("Choose two paths: compare PATH_A PATH_B [--question TEXT]. "
+                                         "Use compare open NAME for a saved comparison.")
+                    if kind == "saved":
+                        if workspace_reader is None:
+                            raise ValueError("compare open NAME requires a reading workspace; start with sol-kitty")
+                        captured = capture_comparison(workspace_reader, targets)
+                        remembered = (kind, targets, question)
+                        captured["refresh_command"] = "compare open"
+                    else:
+                        captured = capture_paths(book, targets, cwd=cwd, resolve_path=resolve_path,
+                                                 workspace_reader=workspace_reader, question=question)
+                        remembered = (kind, [s["path"] for s in captured["selections"]], question)
+                    if comparison_pane is None:
+                        from sol.terminal.kitty import ComparisonPane
+                        comparison_pane = ComparisonPane()
+                    comparison_pane.show(captured)
+                    last_comparison = remembered
+                    reflow_current()
+                    if kind == "paths":
+                        lines = ["Comparison desk opened."]
+                        for label, card in zip(("A", "B"), captured["records"]):
+                            lines.append(f"{label}: {card.get('display_path') or card['path']} ({len(card['members'])} text records)")
+                        emit(safe_output("\n".join(lines)))
+                    else:
+                        emit(safe_output(f"Comparison desk: {captured['comparison']['name']}"))
+                    emit("Select A or B in the desk to scroll that text. "
+                         "Use compare open to refresh; compare close to close.")
+                    continue
                 if verb == "source":
                     from sol.terminal.source import SourceService
                     from sol.workspace.reader import safe_output
@@ -1058,198 +951,12 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
             adapter.close()
         if source_pane is not None:
             source_pane.cleanup()
+        if comparison_pane is not None:
+            comparison_pane.cleanup()
 
 
 
 
-def config_path() -> Path:
-    """Keep the corpus pointer outside the package, following the XDG layout."""
-    configured = os.environ.get("XDG_CONFIG_HOME")
-    directory = Path(configured).expanduser() if configured else Path.home() / ".config"
-    if not directory.is_absolute():
-        raise ValueError("XDG_CONFIG_HOME must be an absolute directory")
-    return directory / "sol" / "config.json"
-
-
-def configured_corpus() -> Path | None:
-    path = config_path()
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return None
-    except (OSError, ValueError, UnicodeError) as error:
-        raise ValueError(f"Cannot read SOL configuration {path}: {error}\n"
-                         "Reset it with sol --set-corpus DIRECTORY.") from error
-    value = data.get("corpus") if isinstance(data, dict) else None
-    if not isinstance(value, str) or not value or not Path(value).is_absolute():
-        raise ValueError(f"Invalid SOL configuration {path}: corpus must be an absolute path.\n"
-                         "Reset it with sol --set-corpus DIRECTORY.")
-    return Path(value)
-
-
-def installed_project_directory() -> Path | None:
-    """Recover a local pip/pipx checkout, without putting its corpus in a wheel.
-
-    PEP 610 records a local-directory install's file URL in direct_url.json.
-    Archive and remote Git installations do not identify a persistent checkout.
-    """
-    try:
-        origin = package_metadata.distribution("sol-organizes-logic").read_text("direct_url.json")
-        if not origin:
-            return None
-        data = json.loads(origin)
-        if not isinstance(data, dict) or not isinstance(data.get("dir_info"), dict):
-            return None
-        if "archive_info" in data or "vcs_info" in data:
-            return None
-        url = data.get("url")
-        if not isinstance(url, str):
-            return None
-        parsed = urlsplit(url)
-        if (parsed.scheme != "file" or parsed.netloc not in {"", "localhost"}
-                or parsed.query or parsed.fragment):
-            return None
-        decoded = unquote(parsed.path, errors="strict")
-        if os.name == "nt" and re.match(r"^/[A-Za-z]:/", decoded):
-            decoded = decoded[1:]
-        directory = Path(decoded)
-        if not directory.is_absolute():
-            return None
-        subdirectory = data.get("subdirectory", "")
-        if not isinstance(subdirectory, str):
-            return None
-        relative = Path(subdirectory)
-        if relative.is_absolute() or ".." in relative.parts:
-            return None
-        return directory / relative
-    except (package_metadata.PackageNotFoundError, OSError, ValueError, TypeError):
-        return None
-
-
-def source_project_directory() -> Path | None:
-    """Recognize this source checkout, never guess a corpus beside a module.
-
-    The fallback is for running ``python -m sol`` directly. Installed wheels
-    normally have no project metadata; local pipx installs use PEP 610 instead.
-    Match the known project's identity within its project table, without adding
-    a TOML parser dependency to the Python 3.10 standard-library reader.
-    """
-    module = Path(__file__).resolve()
-    try:
-        directory = module.parents[2]
-        if module != directory / "sol" / "reader" / "app.py":
-            return None
-        metadata = (directory / "pyproject.toml").read_text(encoding="utf-8")
-    except (IndexError, OSError, UnicodeError):
-        return None
-    project = re.search(r"(?ms)^[ \t]*\[project\][ \t]*(?:#[^\n]*)?\r?\n(.*?)(?=^[ \t]*\[|\Z)", metadata)
-    if project is None:
-        return None
-    identity = re.search(
-        r"(?m)^[ \t]*name[ \t]*=[ \t]*(['\"])sol-organizes-logic\1[ \t]*(?:#[^\n]*)?\r?$",
-        project.group(1),
-    )
-    return directory if identity is not None else None
-
-
-def discover_corpus(explicit: Path | None = None) -> Path | None:
-    """Select a canonical corpus independently of the shell's working directory.
-
-    An explicitly selected or saved location must never silently change sources
-    when broken. Auto-discovered locations are used only when a manifest exists.
-    """
-    if explicit is not None:
-        return explicit.expanduser()
-    environment = os.environ.get("SOL_CORPUS")
-    if environment:
-        return Path(environment).expanduser()
-    local = Path.cwd() / "local-corpus"
-    if (local / "corpus.json").is_file():
-        return local
-    saved = configured_corpus()
-    if saved is not None:
-        return saved
-    project = installed_project_directory()
-    candidates = ([project / "local-corpus"] if project is not None else [])
-    source = source_project_directory()
-    if source is not None:
-        candidates.append(source / "local-corpus")
-    return next((candidate for candidate in candidates if (candidate / "corpus.json").is_file()), None)
-
-
-def save_corpus(directory: Path) -> tuple[Path, Path]:
-    """Validate first, then atomically save a portable absolute corpus pointer."""
-    corpus = directory.expanduser().resolve()
-    load_corpus_book(corpus)
-    path = config_path()
-    temporary = None
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
-                                         prefix=".config-", suffix=".tmp", delete=False) as stream:
-            temporary = Path(stream.name)
-            json.dump({"version": 1, "corpus": str(corpus)}, stream, indent=2)
-            stream.write("\n")
-        temporary.replace(path)
-    except OSError as error:
-        raise ValueError(f"Cannot save SOL configuration {path}: {error}") from error
-    finally:
-        if temporary is not None and temporary.exists():
-            temporary.unlink()
-    return corpus, path
-
-
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="sol", description="Read and navigate Hegel's Science of Logic.")
-    parser.add_argument("command", nargs="?", choices=("guide",), help="open the beginner guide")
-    parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--structure", action="store_true", help="show the outline (prefer the indexed local corpus)")
-    mode.add_argument("--guide", action="store_true", help="beginner guide, examples, and book tree")
-    mode.add_argument("--shell", action="store_true", help="open the workspace reader (also the default)")
-    mode.add_argument("-n", "--none", action="store_true", help="open the shell without workspace or actor")
-    mode.add_argument("-r", "--random", action="store_true", help="print a random passage and leave")
-    mode.add_argument("--read", metavar="PATH", help="read a random paragraph within a virtual path")
-    mode.add_argument("--first", metavar="PATH", help="read the first paragraph within a virtual path")
-    mode.add_argument("--cat", metavar="FILE", help="display a virtual file completely, in book order")
-    mode.add_argument("--search", metavar="QUERY", help="literal case-insensitive passage search")
-    mode.add_argument("--passage", metavar="ID", help="open a passage by exact ID or unique prefix")
-    mode.add_argument("--info", metavar="PATH", help="show location, source range, and passage counts")
-    mode.add_argument("--set-corpus", type=Path, metavar="DIRECTORY",
-                      help="validate and remember the default corpus for reading from any directory")
-    mode.add_argument("--resume", action="store_true", help="resume the named workspace's saved passage")
-    mode.add_argument("--workspace-export", action="store_true", help="export a workspace snapshot (JSON by default)")
-    mode.add_argument("--workspace-check", action="store_true", help="report unresolved, retired and versioned workspace references")
-    mode.add_argument("--workspace-backup", type=Path, metavar="FILE", help="create a new, verified .sqlite3 backup without overwriting")
-    mode.add_argument("--workspace-upgrade", type=Path, metavar="FILE", help="upgrade a version-1 workspace into a separate verified copy")
-    mode.add_argument("--review-queue", action="store_true", help="show canonical pending transcriptions; optionally include workspace testimony")
-    parser.add_argument("--workspace", metavar="NAME", help="choose a named reading workspace without prompting")
-    parser.add_argument("--workspace-dir", type=Path, metavar="DIRECTORY", help="directory for local workspace databases")
-    parser.add_argument("--actor", metavar="NAME", help="explicit author for workspace notes and assertions")
-    parser.add_argument("--export-format", choices=("json", "markdown"),
-                        help="format for --workspace-export (default JSON)")
-    parser.add_argument("--include-passages", action="store_true",
-                        help="include current referenced canonical Markdown in a Markdown workspace export")
-    parser.add_argument("--resume-revision", type=int, metavar="N", help="with --resume, restore a historical checkpoint as a new visit")
-    parser.add_argument("--ui", choices=("auto", "basic", "prompt"), help="shell input: optional enhanced prompt or basic input (default auto)")
-    parser.add_argument("--editing-mode", choices=("emacs", "vi"), help="editing keys for the enhanced shell prompt")
-    source = parser.add_mutually_exclusive_group()
-    source.add_argument("--corpus", type=Path, metavar="DIRECTORY",
-                        help="canonical corpus for this run (otherwise discover a local or saved corpus)")
-    source.add_argument("--pdf", type=Path, metavar="PATH",
-                        help="explicit legacy PDF reading (slow; not used for ordinary reading)")
-    parser.add_argument("--source-pdf", type=Path, metavar="PATH",
-                        help="local evidence PDF for source viewing in the canonical shell")
-    parser.add_argument("--width", type=int, metavar="COLUMNS", help="line width (20–240; default fits the terminal, up to 88)")
-    parser.add_argument("--within", metavar="PATH", help="restrict --search to this subtree")
-    parser.add_argument("--word", action="store_true", help="whole-word --search rather than substring")
-    parser.add_argument("--limit", type=int, metavar="N", help="maximum search results (1–1000; default 20)")
-    parser.add_argument("--context", type=int, metavar="N", help="neighbors around --passage (0–10 on each side)")
-    parser.add_argument("--depth", type=int, metavar="N", help="outline depth (0–32; guide default 1)")
-    output = parser.add_mutually_exclusive_group()
-    output.add_argument("--plain", action="store_true", help="passage text without metadata or ANSI styling")
-    output.add_argument("--json", action="store_true", help="structured output for scripts")
-    return parser
 
 
 def validate_options(args: argparse.Namespace) -> None:

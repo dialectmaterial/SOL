@@ -35,6 +35,11 @@ After updating a local checkout, refresh an existing installation with:
 pipx reinstall sol-organizes-logic
 ~~~
 
+In the kitty reading workspace, `compare PATH_A PATH_B` opens two complete files
+with related personal notes. Tab completes paths; `a` / `b` selects the text to
+scroll. `compare open` refreshes the last desk; `compare close` closes it.
+See [the comparison desk](docs/USAGE.md#open-a-comparison-desk) for the workflow.
+
 ## Choose a local corpus
 
 Installing SOL does not supply or download the book. Point it at an existing SOL corpus once:
@@ -87,6 +92,8 @@ sol -r --json
 Replace `ID` with an identifier displayed by your own corpus. Passage output shows its location and source pages; `--plain` and `--json` support pipelines and scripts.
 
 ## The three stages
+
+SOL is being organized as one repository with independently selectable BEING, ESSENCE, and CONCEPT components. A shared CORE library is their foundation, not a fourth stage; the first internal API boundary is in place, while separate distributions remain future work. See the [modularity contract](docs/MODULARITY.md).
 
 ### BEING: reader and virtual shell
 

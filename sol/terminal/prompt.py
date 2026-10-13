@@ -7,6 +7,7 @@ interactive terminal. Private drafting never uses command or file history.
 from __future__ import annotations
 
 import os
+from pathlib import PurePosixPath
 import re
 import shlex
 import sys
@@ -16,13 +17,13 @@ import unicodedata
 _COMMANDS = (
     "ls", "cd", "up", "pwd", "tree", "read", "first", "next", "previous", "prev",
     "cat", "search", "open", "context", "info", "where",
-    "neofetch", "guide", "source", "help", "exit", "quit",
+    "neofetch", "guide", "source", "compare", "help", "exit", "quit",
 )
 _SUBCOMMANDS = {
     "workspace": ("export", "check", "backup", "upgrade", "history"),
     "bookmark": ("add", "set", "list", "open", "remove"),
     "note": ("add", "draft", "list", "show", "edit", "history"),
-    "compare": ("save", "list", "show"),
+    "compare": ("save", "list", "show", "open", "close"),
     "review": ("show", "record", "list", "queue"),
     "relate": ("add", "list"),
 }
@@ -97,6 +98,18 @@ class CompletionCatalog:
         self.reader_ids = tuple(dict.fromkeys(
             [p.identifier for p in book.passages if p.identifier] +
             list(getattr(book, "redirects", {}))))
+        manifest = getattr(book, "corpus_manifest", {})
+        documents = manifest.get("documents", ()) if isinstance(manifest, dict) else ()
+        # Capture the declared document tree once. Keypresses never discover or
+        # read host files, and arbitrary neighboring Markdown stays invisible.
+        self.documents = tuple(document for document in documents
+                               if isinstance(document, str) and document.endswith(".md")
+                               and not PurePosixPath(document).is_absolute()
+                               and not any(piece in {"", ".", ".."}
+                                           for piece in document.split("/")))
+        directory = getattr(book, "corpus_directory", None)
+        self.absolute_documents = tuple(str(PurePosixPath(str(directory), document))
+                                        for document in self.documents) if directory is not None else ()
 
     def _node(self, path):
         node = self.root
@@ -134,6 +147,50 @@ class CompletionCatalog:
                  or _alias(child.name).startswith(_alias(fragment)))
         )
 
+    def _document_paths(self, prefix):
+        explicit_relative = prefix.startswith("./")
+        wanted = prefix[2:] if explicit_relative else prefix
+        paths = self.absolute_documents if wanted.startswith("/") else self.documents
+        choices = []
+        for document in paths:
+            if not document.casefold().startswith(wanted.casefold()):
+                continue
+            # Present the next declared directory or file, like virtual paths.
+            boundary = document.find("/", len(wanted))
+            choice = document[:boundary + 1] if boundary >= 0 else document
+            choices.append(("./" if explicit_relative else "") + choice)
+        return tuple(dict.fromkeys(choices))
+
+    def _comparison_choices(self, arguments, prefix):
+        starts = lambda values: tuple(value for value in values
+                                      if value.casefold().startswith(prefix.casefold()))
+        if arguments and arguments[0] in {"save", "list", "show", "close"}:
+            action = arguments[0]
+            if self.workspace and action == "show" and len(arguments) == 1:
+                return starts(self.comparisons)
+            if self.workspace and action == "save":
+                if "--question" in arguments:
+                    return ()
+                if prefix.startswith("--"):
+                    return starts(("--question",))
+                if len(arguments) >= 2:
+                    return starts(self.record_ids)
+            return ()
+        if "--question" in arguments:
+            return ()
+        opening = bool(arguments and arguments[0] == "open")
+        operands = arguments[1:] if opening else arguments
+        if prefix.startswith("--") or len(operands) >= 2:
+            return starts(("--question",))
+        choices = self._paths(prefix) + self._document_paths(prefix)
+        if not arguments:
+            actions = _SUBCOMMANDS["compare"] if self.workspace else ("open", "close")
+            choices = starts(actions) + choices
+        elif opening and not operands and self.workspace:
+            # These are names, so filter them separately from aliased paths.
+            choices = starts(self.comparisons) + choices
+        return choices
+
     def suggestions(self, text: str) -> list[tuple[str, int]]:
         words, prefix, raw = _prefix(text)
         path_choices = False
@@ -144,7 +201,10 @@ class CompletionCatalog:
             verb = words[0]
             arguments = words[1:]
             previous = arguments[-1] if arguments else ""
-            if verb == "source":
+            if verb == "compare":
+                choices = self._comparison_choices(arguments, prefix)
+                path_choices = True
+            elif verb == "source":
                 choices = (("show", "close", "set-pdf", "info") if not arguments else
                            self.record_ids if arguments == ["show"] else ())
             elif self.workspace and verb in _SUBCOMMANDS and not arguments:
@@ -176,11 +236,6 @@ class CompletionCatalog:
                 action = arguments[0]
                 choices = (self.bookmarks if len(arguments) == 1 and action in {"open", "remove", "set"}
                            else self.reader_ids if len(arguments) == 2 and action in {"add", "set"} else ())
-            elif verb == "compare" and self.workspace and arguments:
-                choices = (self.comparisons if arguments[0] == "show" and len(arguments) == 1 else
-                           ("--question",) if prefix.startswith("--") and arguments[0] == "save" else
-                           self.record_ids if arguments[0] == "save" and len(arguments) >= 2
-                           and "--question" not in arguments else ())
             elif verb == "note" and self.workspace and arguments:
                 choices = (self.annotations if arguments[0] in {"show", "edit", "history"} and len(arguments) == 1 else
                            ("--expect-revision",) if arguments[0] == "edit" and prefix.startswith("--") else
