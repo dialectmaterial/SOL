@@ -7,6 +7,7 @@ this adapter does not author span notes or turn screen rows into source identity
 """
 from __future__ import annotations
 
+from bisect import bisect_right
 import os
 import sys
 import unicodedata
@@ -123,13 +124,21 @@ def _reading_processor(toolkit, plan_line):
     return ReadingProjection()
 
 
-def _typography_lexer(toolkit, typography):
+def _typography_lexer(toolkit, typography, search_spans=lambda: ()):
     class SourceTypography(toolkit["Lexer"]):
+        def invalidation_hash(self):
+            # BufferControl caches lexed lines even when the source is unchanged.
+            # Include presentation ranges so same-passage queries, dismissals,
+            # and semantic style changes cannot reuse stale character styles.
+            return typography().spans, search_spans()
+
         def lex_document(self, document):
             offsets = [0]
             for line in document.lines:
                 offsets.append(offsets[-1] + len(line) + 1)
             spans = typography().spans
+            matches = search_spans()
+            match_starts = tuple(left for left, _ in matches)
 
             def get_line(number):
                 line = document.lines[number]
@@ -138,6 +147,9 @@ def _typography_lexer(toolkit, typography):
                 for index, character in enumerate(line, start):
                     styles = {style for span in spans if span.start <= index < span.end
                               for style in span.styles}
+                    match = bisect_right(match_starts, index) - 1
+                    if match >= 0 and index < matches[match][1]:
+                        styles.add("search")
                     fragments.append((" ".join("class:source." + style for style in sorted(styles)), character))
                 return fragments
             return get_line
@@ -157,6 +169,7 @@ class ReaderView:
         self._state = actions.snapshot()
         self.status = ""
         self._searching = False
+        self._search_marks_visible = True
         self._results_visible = bool(self._state.results)
         self._result_index = 0
         self._help_visible = False
@@ -174,9 +187,13 @@ class ReaderView:
         self.body = toolkit["TextArea"](
             text="", read_only=True, wrap_lines=True, scrollbar=False,
             width=toolkit["Dimension"](min=1, preferred=width, max=width),
-            lexer=_typography_lexer(toolkit, lambda: self.typography),
+            lexer=_typography_lexer(toolkit, lambda: self.typography, self._search_spans),
             input_processors=[self.reading_processor], name="sol-reader-source",
         )
+        # TextArea's DynamicLexer keys its cache by lexer identity alone. This
+        # reader never switches lexers; use ours directly so changing semantic
+        # ranges invalidates the cache without changing canonical source text.
+        self.body.control.lexer = self.body.lexer
         self.search_input = toolkit["TextArea"](
             multiline=False, prompt="Search book: ", history=toolkit["DummyHistory"](),
             input_processors=[self.source_processor], name="sol-reader-query",
@@ -198,12 +215,16 @@ class ReaderView:
             toolkit["FormattedTextControl"](self._header),
             height=toolkit["Dimension"](min=1, max=6, preferred=4),
             style="class:context", wrap_lines=True)
+        self.top_gap = toolkit["Window"](height=lambda: self._gap_height(0))
+        self.body_gap = toolkit["Window"](height=lambda: self._gap_height(1))
         column = toolkit["HSplit"]([
+            self.top_gap,
             toolkit["ConditionalContainer"](
                 self.heading_window, toolkit["Condition"](lambda: not self._focus_mode)),
             toolkit["ConditionalContainer"](
                 self.context_window,
                 toolkit["Condition"](lambda: self._context_visible)),
+            self.body_gap,
             self.body,
         ], width=measure)
         container = toolkit["HSplit"]([
@@ -214,9 +235,9 @@ class ReaderView:
                 self.results_window, toolkit["Condition"](lambda: self._results_visible)),
             toolkit["ConditionalContainer"](
                 toolkit["Window"](toolkit["FormattedTextControl"](
-                    "j/k or arrows: displayed rows  h/l: characters  Ctrl-D/U: half page\n"
-                    "gg/G: scope start/end  {/}: previous/next paragraph  v: select\n"
-                    "/: search book  n/N: next/previous result  Alt-Left/Right: history\n"
+                    "j/k or arrows: reading rows, continuing at edges  h/l: characters\n"
+                    "Ctrl-D/U: half page  gg/G: scope ends  b/n: passages  v: select\n"
+                    "/: search  Ctrl-P/N: previous/next result  Alt-Left/Right: history\n"
                     "c: context  f: focus  Esc: clear/close  Ctrl-Q: save & quit\n"
                     "Selections are session-local; Ctrl-C quits without saving the cursor."), height=5),
                 toolkit["Condition"](lambda: self._help_visible)),
@@ -224,9 +245,11 @@ class ReaderView:
                 toolkit["Window"](toolkit["FormattedTextControl"](self._status_text),
                                   height=self._status_height, wrap_lines=True,
                                   style=lambda: "class:status class:warning" if (
-                                      self.status or self._needs_review() or self.typography.degraded) else "class:status"),
+                                      self.status or self._needs_review() or self.typography.degraded
+                                      or self._search_degraded()) else "class:status"),
                 toolkit["Condition"](lambda: not self._focus_mode or bool(self.status)
-                                      or self._needs_review() or self.typography.degraded)),
+                                      or self._needs_review() or self.typography.degraded
+                                      or self._search_degraded())),
             toolkit["ConditionalContainer"](
                 toolkit["Window"](toolkit["FormattedTextControl"](self._footer_text),
                     height=1, style="class:footer"),
@@ -249,20 +272,23 @@ class ReaderView:
             event.app.exit(result=0)
 
         @bindings.add("}", filter=body_focus)
+        @bindings.add("n", filter=body_focus)
         @bindings.add("pagedown", filter=~query_focus)
         def next_passage(event):
             self._act(lambda: self.actions.move_paragraph(1))
 
         @bindings.add("p", filter=~query_focus)
         @bindings.add("{", filter=body_focus)
+        @bindings.add("b", filter=body_focus)
         @bindings.add("pageup", filter=~query_focus)
         def previous_passage(event):
             self._act(lambda: self.actions.move_paragraph(-1))
 
-        @bindings.add("n", filter=body_focus)
-        @bindings.add("N", filter=body_focus)
+        @bindings.add("c-n", filter=body_focus)
+        @bindings.add("c-p", filter=body_focus)
         def repeat_search(event):
-            self._act(lambda: self.actions.search_next(reverse=event.data == "N"))
+            self._search_marks_visible = True
+            self._act(lambda: self.actions.search_next(reverse=event.key_sequence[-1].key == "c-p"))
             if self._state.current is not None:
                 self._results_visible = False
 
@@ -279,7 +305,7 @@ class ReaderView:
         def half_page(event):
             direction = -1 if event.key_sequence[-1].key == "c-u" else 1
             rows = self.body.window.render_info.window_height if self.body.window.render_info else 20
-            self._cursor_action(lambda: self.actions.half_page(direction, rows, layout=self._source_positions()))
+            self._advance_reading(direction * max(1, rows // 2))
 
         @bindings.add("v", filter=body_focus)
         def visual_selection(event):
@@ -317,6 +343,7 @@ class ReaderView:
         def search(event):
             if self._act(lambda: self.actions.search(self.search_input.text, (), limit=20), project=False):
                 self._result_index = 0
+                self._search_marks_visible = True
                 self._results_visible = True
                 self._searching = False
                 event.app.layout.focus(self.results)
@@ -355,6 +382,7 @@ class ReaderView:
                 self._help_visible = False
                 self._context_visible = False
                 self._results_visible = False
+                self._search_marks_visible = False
                 event.app.layout.focus(self.body)
 
         @bindings.add("?", filter=~query_focus)
@@ -387,6 +415,7 @@ class ReaderView:
                 "results": "", "result.selected": "reverse", "selected-text": "reverse",
                 "source.emphasis": self.emphasis, "source.strong": "bold",
                 "source.code": "underline", "source.quotation": "",
+                "source.search": "underline bg:ansiyellow fg:ansiblack",
                 "source.heading": "bold",
             }),
         )
@@ -401,7 +430,15 @@ class ReaderView:
             self._move_vertical(direction)
 
     def _cursor_action(self, operation):
+        before = self._state.current
         if self._act(operation, project=False):
+            current = self._state.current
+            if (None if before is None else before.identifier) != (
+                    None if current is None else current.identifier):
+                self._results_visible = False
+                self._project_body()
+                self.application.layout.focus(self.body)
+                return
             self._projecting = True
             try:
                 self.body.buffer.cursor_position = self._state.cursor_offset
@@ -436,9 +473,13 @@ class ReaderView:
         return self._line_plans[key]
 
     def _move_vertical(self, direction):
-        """Move between visually wrapped rows without changing source offsets."""
-        operation = self.actions.move_down if direction > 0 else self.actions.move_up
-        self._cursor_action(lambda: operation(layout=self._source_positions()))
+        """Read visual rows, continuing from edges with passage-bound offsets."""
+        self._advance_reading(direction)
+
+    def _advance_reading(self, rows):
+        self._cursor_action(lambda: self.actions.advance_reading(
+            rows, layout=self._source_positions(),
+            selecting=self.body.buffer.selection_state is not None))
 
     def _project_body(self):
         current, selection = self._state.current, self._state.selection
@@ -544,7 +585,9 @@ class ReaderView:
                 + safe_reader_text(path)
                 + f"\nPrinted {printed} | PDF {pdf} | " + safe_reader_text(label)
                 + "\nScope: " + safe_reader_text(self._scope_label())
-                + (" | " + safe_reader_text(self.typography.reason) if self.typography.degraded else ""))
+                + (" | " + safe_reader_text(self.typography.reason) if self.typography.degraded else "")
+                + (" | " + safe_reader_text(self.actions.search_highlights().reason)
+                   if self._search_degraded() else ""))
 
     def _scope_label(self):
         return "work" if not self._state.scope else "/" + "/".join(self._state.scope)
@@ -565,6 +608,12 @@ class ReaderView:
     def _needs_review(self):
         return self._state.current is not None and self._state.current.needs_source_review
 
+    def _search_spans(self):
+        return self.actions.search_highlights().spans if self._search_marks_visible else ()
+
+    def _search_degraded(self):
+        return self._search_marks_visible and self.actions.search_highlights().degraded
+
     def _status_text(self):
         passage = self._state.current
         position = "No position"
@@ -577,6 +626,8 @@ class ReaderView:
         warnings = (["[source review]"] if self._needs_review() else [])
         if self.typography.degraded:
             warnings.append("Typography fallback (c for context)")
+        if self._search_degraded():
+            warnings.append("Search highlight fallback (c for context)")
         if self.status:
             warnings.append(safe_reader_text(self.status))
         return " | ".join(warnings + [position + selection])
@@ -584,15 +635,37 @@ class ReaderView:
     def _status_height(self):
         width = max(1, self.application.output.get_size().columns)
         rows = (self._toolkit["get_cwidth"](self._status_text()) + width - 1) // width
-        return self._toolkit["Dimension"](min=1, max=3, preferred=min(3, max(1, rows)))
+        needed = min(3, max(1, rows))
+        return self._toolkit["Dimension"](min=1, max=needed, preferred=needed)
+
+    def _reading_gaps(self):
+        """Quiet top/lead space, relinquished before reading room gets cramped."""
+        rows = self.application.output.get_size().rows
+        desired = min(3, max(0, (rows - 12) // 6))
+        chrome = 0 if self._focus_mode else 3  # Two heading rows and footer.
+        if (not self._focus_mode or self.status or self._needs_review() or self.typography.degraded
+                or self._search_degraded()):
+            chrome += self._status_height().preferred
+        # Context may grow beyond its preferred height for long source paths.
+        chrome += (6 if self._context_visible else 0) + (5 if self._help_visible else 0)
+        chrome += int(self._searching)
+        if self._results_visible:
+            chrome += min(6, len(self._state.results) + 1)
+        budget = max(0, rows - chrome - 8)
+        lead = int(not self._focus_mode and desired > 0 and budget > desired)
+        return min(desired, max(0, budget - lead)), lead
+
+    def _gap_height(self, index):
+        gap = self._reading_gaps()[index]
+        return self._toolkit["Dimension"](min=0, max=gap, preferred=gap)
 
     def _footer_text(self):
         columns = self.application.output.get_size().columns
         if columns < 28:
-            return "j/k  /  ? help"
+            return "j/k b/n / ? help"
         if columns < 60:
-            return "j/k read  / search  ? help"
-        return "j/k read  {/} paragraphs  / search  v select  c context  ? help"
+            return "j/k  b/n  / search  ? help"
+        return "j/k read  b/n passages  / search  v select  c context  ? help"
 
     def _save_position(self):
         self._exit_notice = self.actions.save_position() or ""

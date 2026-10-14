@@ -54,6 +54,11 @@ permits and narrowed to fit a smaller terminal.
 The body displays one active canonical record's exact `plain_text` in a continuous,
 read-only view. Its title and printed page align with the prose column. A quiet
 footer keeps passage position, selection count, and essential keys secondary.
+Responsive space above the column separates the title from the terminal's window
+bar, with a small blank lead before prose. This is a stable reading margin, not
+paragraph-by-paragraph vertical centering. It shrinks first when the terminal is
+short or contextual panels/warnings need room. Focus mode retains a quiet top
+margin without reserving space for a hidden title.
 Press `c` for the full structural path, PDF pages, workspace, current reading
 scope, and any typography fallback explanation. Press `f` to hide ordinary
 metadata. Source-review warnings, operational errors, and typography fallback
@@ -96,11 +101,12 @@ or conceal their uncertainty.
 
 | Key | Action |
 | --- | --- |
-| `j` / `k`, Up / Down | Move through displayed, wrapped rows |
+| `j` / `k`, Up / Down | Move through wrapped rows; continue at passage edges |
 | `h` / `l`, Left / Right | Move by source character |
 | Ctrl-D / Ctrl-U | Move about half a visible page |
 | `gg` / `G` | Beginning / end of the current reading scope (`c` identifies it) |
-| `}` / `{` | Next / previous semantic passage |
+| `b` / `n` | Previous / next semantic passage (at its beginning) |
+| `{` / `}` | Previous / next passage aliases |
 | Page Down / Page Up; `p` | Compatibility passage navigation; `p` goes backward |
 | Alt-Left / Alt-Right | Back / forward through the session's reading trail |
 | `v`, then movement | Begin a local selection; press `v` again to stop selecting |
@@ -108,17 +114,34 @@ or conceal their uncertainty.
 | `/` | Focus the query field while the passage remains visible |
 | Enter in the query field | Search and focus the results |
 | Up / Down or `j` / `k` in results, then Enter | Choose and open a result without typing a UUID |
-| `n` / `N` in the body | Next / previous search-result passage, wrapping |
+| Ctrl-P / Ctrl-N in the body | Previous / next search-result passage, wrapping |
 | Tab / Shift-Tab | Switch focus between body and results |
-| Escape | Cancel the query, clear the current selection, or close help |
+| Escape | Cancel query, clear selection, dismiss match marks, or close help |
 | `c` / `f` / `?` | Context / focus mode / keyboard help |
 | Ctrl-Q | Save changed reading position and quit |
 | Ctrl-C | Quit without an extra cursor-position save |
 
+Ordinary reading no longer stops at each passage boundary. From the last wrapped
+row, another `j`, Down, or Ctrl-D enters the next passage at its beginning. From
+the first row, `k`, Up, or Ctrl-U returns to the previous passage's end. A large
+half-page motion first reaches the current passage's edge; it does not skip the
+tail or carry its row budget across several passages. Flow stays inside the
+current reading scope and does not wrap at its ends. `b/n` (and the retained
+`{`/`}` aliases) deliberately jump to the beginning of the previous/next passage,
+regardless of the cursor's visual row. These units are canonical passages, not
+fixed printed/PDF pages; page numbers remain provenance.
+
+Automatic crossing is disabled while selecting, including an empty `v` or
+Shift-arrow anchor. Finish or clear selection before continuing. Selected spans
+never acquire offsets from another passage. Each actual crossing records one
+ordinary guarded passage visit, with the backward end offset captured before
+the checkpoint. Row motion within a passage remains transient.
+
 For example, search `/ground`, open a result, read with `j`/`k`, move between
-matching passages with `n`/`N`, and return with Alt-Left. Here `n` means the next
-matching passage, not the next occurrence within a passage or the next paragraph;
-use `}` for paragraph movement. `gg`/`G` act on the current scope, not just the
+matching passages with Ctrl-N/Ctrl-P, and return with Alt-Left. `n` always means
+the next passage in the reading scope, even when a search exists. Ctrl-N means
+the next matching passage, not an occurrence within the current paragraph.
+`gg`/`G` act on the current scope, not just the
 currently displayed paragraph. Vertical movement follows visual rows; horizontal
 movement follows source characters. A layout change resets the preferred visual
 column without changing the semantic cursor or selected span.
@@ -127,7 +150,25 @@ Search covers the whole reader book and shows up to 20 matches in a bounded resu
 pane. A browsing directory retained from the compatibility command interface
 does not silently restrict the new view's search. Results preserve passage
 identity internally; their display numbers and highlights are reading aids.
-Opening a result is an ordinary navigation action. Typing a query and inspecting
+Opening a result lands at its first verified source occurrence, rather than the
+paragraph beginning. Current-passage matches receive a generic terminal underline
+and a color accent when supported, retaining the source's italics/bold/code styles.
+Escape dismisses the marks without deleting the query; Ctrl-N/Ctrl-P or a new
+search reveal them again. Marks are presentation, not a text selection.
+
+Search uses the existing literal NFC/casefold semantics, including whole-word mode
+for callers that request it. A verified mapping connects these normalized matches
+to original source-codepoint spans. If a match cannot be represented exactly
+(for example one `s` inside the casefold expansion of `ß`), only verified peers
+are marked. An explicit fallback notice remains visible in focus mode; `c` gives
+the reason. With no verified span the matching passage opens at its beginning,
+without guessing an offset or altering canonical text.
+
+Opening a result is one ordinary guarded navigation action, setting the source
+position before its checkpoint. Even a jump within the current paragraph retains
+the originating cursor, viewport, and selection for Alt-Left return. Returning
+to an unchanged match preserves its viewport and adds no duplicate trail entry.
+Typing a query and inspecting
 results do not save a visit. Cursor movement and text selection also create no
 checkpoint or authored workspace record.
 Opening a passage or returning through history dismisses the result pane without
@@ -220,10 +261,10 @@ For a manual acceptance pass, open `sol --reader` directly in Alacritty:
 1. Inspect a long prose paragraph and one containing several italic spans.
 2. Try measures of 40, 72, and 100 columns, then make the terminal narrower than
    the selected measure. Ordinary words should remain intact where they fit.
-3. Check `j`/`k`, `h`/`l`, Ctrl-D/U, `gg`/`G`, and `}`/`{` with context revealed.
+3. Check `j`/`k`, `h`/`l`, Ctrl-D/U, `gg`/`G`, and `b`/`n` with context revealed.
 4. Select across styled words with `v`; resize and verify that the selected source
    words remain the same.
-5. Search, open a match, use `n`/`N`, and return through Alt-Left.
+5. Search, open a match, use Ctrl-N/Ctrl-P, and return through Alt-Left.
 6. Quit with Ctrl-Q, reopen the same schema-3 workspace at another terminal width,
    and check the meaningful text location rather than the former screen row.
 7. Compare ordinary, `c` context, and `f` focus views; genuine warnings must remain

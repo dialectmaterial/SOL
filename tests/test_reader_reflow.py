@@ -243,6 +243,69 @@ class ReaderReflowTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(reopened.get_state()["position"]["cursor_offset"], cursor)
                     reopened.close()
 
+    async def test_boundary_flow_uses_current_reflow_and_preserves_canonical_records(self):
+        book = styled_book()
+        records = {identifier: dict(record) for identifier, record in book.canonical_records.items()}
+        actions = ReaderActions(book)
+        first = actions.read(first=True)
+        async with self.running_view(actions) as (view, pipe, output, task):
+            for columns in (40, 72, 100):
+                await self.resize(view, output, columns)
+                layout = view._source_positions()
+                offset = next(index for index, point in enumerate(layout)
+                              if point[0] == layout[-1][0])
+                view._cursor_action(lambda: actions.set_cursor(offset))
+                pipe.send_text("j")
+                await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+                self.assertEqual(view.body.text, book.passages[1].text)
+                self.assertEqual(actions.cursor_offset, 0)
+                self.assert_cursor_visible(view)
+                pipe.send_text("k")
+                await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[0])
+                self.assertEqual(view.body.text, first.text)
+                self.assertEqual(actions.cursor_offset, len(first.text))
+                self.assert_cursor_visible(view)
+                self.assertEqual(book.canonical_records, records)
+
+    async def test_backward_entry_is_saved_atomically_and_reopens_at_source_tail(self):
+        book = styled_book()
+        provenance = {key: book.corpus_manifest[key] for key in ("edition", "source")}
+        with tempfile.TemporaryDirectory(prefix="sol-flow-reopen-") as directory:
+            path = Path(directory) / "reading.sqlite3"
+            store = Workspace(path, CORPUS_ID, provenance, actor="Ada")
+            self.addCleanup(store.close)
+            adapter = WorkspaceReader(book, store, "Ada", resolve_path, display_path,
+                                      lambda *args, **kwargs: None)
+            actions = ReaderActions(book, adapter)
+            first = actions.read(first=True)
+            async with self.running_view(actions) as (view, pipe, output, task):
+                view._cursor_action(lambda: actions.set_cursor(len(first.text)))
+                pipe.send_text("j")
+                await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+                self.assertEqual(store.get_state()["position"]["cursor_offset"], 0)
+                pipe.send_text("k")
+                await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[0])
+                # Verify the passage checkpoint BEFORE a separate quit/save.
+                saved = store.get_state()
+                self.assertEqual(saved["current_id"], IDS[0])
+                self.assertEqual(saved["position"]["cursor_offset"], len(first.text))
+                pipe.send_text("\x11")
+                self.assertEqual(await asyncio.wait_for(task, 3), 0)
+            store.close()
+            reopened = Workspace(path, CORPUS_ID, provenance, actor="Ada")
+            self.addCleanup(reopened.close)
+            adapter = WorkspaceReader(book, reopened, "Ada", resolve_path, display_path,
+                                      lambda *args, **kwargs: None)
+            restored = ReaderActions(book, adapter)
+            restored.restore()
+            self.assertEqual(restored.cursor_offset, len(first.text))
+            revision = reopened.get_state()["revision"]
+            async with self.running_view(restored, columns=40) as (view, pipe, output, task):
+                self.assertEqual(view.body.text, first.text)
+                self.assertEqual(view.body.buffer.cursor_position, len(first.text))
+                self.assertEqual(reopened.get_state()["revision"], revision)
+                self.assert_cursor_visible(view)
+
 
 if __name__ == "__main__":
     unittest.main()

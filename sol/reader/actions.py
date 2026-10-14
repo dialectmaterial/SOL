@@ -110,6 +110,7 @@ class ReaderState:
     results: tuple[Passage, ...]
     cursor_offset: int = 0
     viewport_offset: int | None = None
+    search_whole_word: bool = False
 
 
 @dataclass(frozen=True)
@@ -124,6 +125,7 @@ class _ReadingContext:
     result_ids: tuple[str, ...]
     cursor_offset: int
     viewport_offset: int | None
+    search_whole_word: bool = False
 
 
 @dataclass(frozen=True)
@@ -144,6 +146,7 @@ class _LocalState:
     viewport_offset: int | None
     preferred_column: int | None
     preferred_layout: tuple | None
+    search_whole_word: bool = False
 
 
 class ReaderActions:
@@ -165,6 +168,8 @@ class ReaderActions:
         self.previous_cwd: tuple[str, ...] | None = None
         self.results: list[Passage] = []
         self.search_query: str | None = None
+        self.search_whole_word = False
+        self._search_projection_cache = None
         self._requested_id: str | None = None
         self._requested_target: str | None = None
         self._selection: TextSelection | None = None
@@ -184,7 +189,7 @@ class ReaderActions:
             self.current_reference_id() if current is not None else None,
             self._selection, self.search_query,
             tuple(passage.identifier for passage in self.results),
-            self.session.cursor_offset, self.session.viewport_offset)
+            self.session.cursor_offset, self.session.viewport_offset, self.search_whole_word)
 
     def _amend_context(self):
         context = self._context()
@@ -208,7 +213,8 @@ class ReaderActions:
                            self.session.cursor, reference, self._requested_id, self._requested_target,
                            self._selection, self.search_query, tuple(self.results),
                            self._trail, self._history_index, self.session.cursor_offset,
-                           self.session.viewport_offset, self._preferred_column, self._preferred_layout)
+                           self.session.viewport_offset, self._preferred_column, self._preferred_layout,
+                           self.search_whole_word)
 
     def _rollback(self, state):
         self.cwd, self.previous_cwd = state.cwd, state.previous_cwd
@@ -216,6 +222,7 @@ class ReaderActions:
         self._requested_id, self._requested_target = state.requested_id, state.requested_target
         self._selection, self.search_query = state.selection, state.search_query
         self.results = list(state.results)
+        self.search_whole_word = state.search_whole_word
         self._trail, self._history_index = state.trail, state.history_index
         self.session.cursor_offset, self.session.viewport_offset = state.cursor_offset, state.viewport_offset
         self._preferred_column = state.preferred_column
@@ -223,7 +230,7 @@ class ReaderActions:
         if self.workspace_reader is not None:
             self.workspace_reader.resumed_reference = state.resumed_reference
 
-    def _transition(self, operation, *, checkpoint=True, history=True):
+    def _transition(self, operation, *, checkpoint=True, history=True, history_locations=False):
         before = self._capture()
         origin = self._context()
         try:
@@ -237,6 +244,9 @@ class ReaderActions:
                     self._validate_selection(self._selection)
             destination = self._context()
             changed = self._navigation_key(origin) != self._navigation_key(destination)
+            if history_locations:
+                changed = changed or (origin.cursor_offset, origin.viewport_offset, origin.selection) != (
+                    destination.cursor_offset, destination.viewport_offset, destination.selection)
             if origin.current_id != destination.current_id:
                 self._preferred_column = None
             if checkpoint and self.workspace_reader is not None:
@@ -246,7 +256,7 @@ class ReaderActions:
             elif history:
                 self._amend_context()
             return result
-        except (ValueError, RuntimeError):
+        except (ValueError, RuntimeError, OSError):
             self._rollback(before)
             raise
 
@@ -388,6 +398,46 @@ class ReaderActions:
             raise ValueError("visible row count must be a positive integer")
         return self._move_vertical(direction * max(1, rows // 2), width, layout=layout)
 
+    def advance_reading(self, rows, width=None, *, layout=None, selecting=False):
+        """Read visual rows, continuing one passage only from an outer edge.
+
+        Local motion stays transient. Crossing a passage boundary is one
+        ordinary guarded visit, with its source entry offset set BEFORE saving.
+        A selection (including an adapter's empty anchor) remains passage-local.
+        Row budgets never skip across several passages or wrap the reading scope.
+        """
+        from sol.reader.navigation import source_layout, validate_layout
+        if type(rows) is not int:
+            raise ValueError("cursor row movement must be an integer")
+        if type(selecting) is not bool:
+            raise ValueError("selection mode must be a boolean")
+        current = self.snapshot().current
+        if current is None:
+            raise ValueError("no current paragraph; use first, read, or open")
+        positions = (source_layout(current.text, width) if layout is None
+                     else validate_layout(layout, len(current.text)))
+        if rows == 0:
+            return self.cursor_offset
+        row = positions[self.cursor_offset][0]
+        outward = (rows < 0 and row == positions[0][0]
+                   or rows > 0 and row == positions[-1][0])
+        if not outward or selecting or self._selection is not None:
+            return self._move_vertical(rows, layout=positions)
+        direction = 1 if rows > 0 else -1
+        index = self.session.cursor + direction
+        if not 0 <= index < len(self.book.selection(self.session.path)):
+            return self.cursor_offset
+
+        def change():
+            passage = self.session.move(direction)
+            if self._requested_target != passage.identifier:
+                self._requested_id = self._requested_target = None
+            self.session.cursor_offset = 0 if direction > 0 else len(passage.text)
+            self.session.viewport_offset = None
+            self._preferred_column = self._preferred_layout = None
+            return self.cursor_offset
+        return self._transition(change)
+
     def move_paragraph(self, offset):
         """Visit a neighboring semantic paragraph at its beginning."""
         if type(offset) is not int:
@@ -488,6 +538,7 @@ class ReaderActions:
             if self.workspace_reader is not None:
                 self.workspace_reader.resumed_reference = reference
             self._selection, self.search_query, self.results = context.selection, context.search_query, results
+            self.search_whole_word = context.search_whole_word
             self._history_index = index
             return passage
 
@@ -517,7 +568,7 @@ class ReaderActions:
                            self.selection, self._history_target(-1) is not None,
                            self._history_target(1) is not None, self.search_query,
                            tuple(self.results), self.session.cursor_offset,
-                           self.session.viewport_offset)
+                           self.session.viewport_offset, self.search_whole_word)
 
     def locate(self, value=None):
         """Resolve a book location; virtual aliases remain a compatibility view."""
@@ -557,30 +608,58 @@ class ReaderActions:
         return self._transition(change)
 
     def open(self, identifier: str):
-        def change():
-            if self.workspace_reader is not None:
-                # Durable work uses the canonical graph, not a projection cache
-                # or prefix match limited to readable main-text passages.
-                reference = self.workspace_reader.current_reference(self.session, identifier)
-                passage = self.session.open(reference.target_id)
-                self.workspace_reader.resumed_reference = reference
-                self._requested_id, self._requested_target = reference.requested_id, reference.target_id
-            elif self.book.canonical_records:
-                from sol.core.references import resolve_reference
-                reference = resolve_reference(self.book, identifier)
-                passage = self.session.open(reference.target_id)
-                self._requested_id, self._requested_target = reference.requested_id, reference.target_id
-            else:
-                passage = self.session.open(identifier)
-                self._requested_id = self._requested_target = None
-            return passage
+        return self._transition(lambda: self._open_resolution(identifier))
 
-        return self._transition(change)
+    def _open_resolution(self, identifier):
+        """Resolve/open inside a caller's single guarded navigation action."""
+        if self.workspace_reader is not None:
+            reference = self.workspace_reader.current_reference(self.session, identifier)
+            passage = self.session.open(reference.target_id)
+            self.workspace_reader.resumed_reference = reference
+            self._requested_id, self._requested_target = reference.requested_id, reference.target_id
+        elif self.book.canonical_records:
+            from sol.core.references import resolve_reference
+            reference = resolve_reference(self.book, identifier)
+            passage = self.session.open(reference.target_id)
+            self._requested_id, self._requested_target = reference.requested_id, reference.target_id
+        else:
+            passage = self.session.open(identifier)
+            self._requested_id = self._requested_target = None
+        return passage
 
     def open_result(self, number: int):
         if type(number) is not int or not 1 <= number <= len(self.results):
             raise ValueError("no such result in the latest search")
-        return self.open(self.results[number - 1].identifier)
+        identifier = self.results[number - 1].identifier
+        if self.search_query is None:
+            return self.open(identifier)
+        def change():
+            passage = self._open_resolution(identifier)
+            from sol.reader.search import search_projection
+            projection = search_projection(passage.text, self.search_query,
+                whole_word=self.search_whole_word, facsimile_labels=passage.facsimile_labels)
+            if not projection.spans and not projection.degraded:
+                raise ValueError("this result no longer matches the query; search again")
+            cursor = projection.spans[0][0] if projection.spans else 0
+            if self.session.cursor_offset != cursor:
+                self.session.viewport_offset = None
+            self.session.cursor_offset = cursor
+            self._selection = None
+            self._preferred_column = self._preferred_layout = None
+            return passage
+        return self._transition(change, history_locations=True)
+
+    def search_highlights(self):
+        """Derived source ranges, never a second selection or persistent ID."""
+        from sol.reader.search import SearchProjection, search_projection
+        current = self._current()
+        if current is None or self.search_query is None:
+            return SearchProjection(())
+        key = (current.text, self.search_query, self.search_whole_word, current.facsimile_labels)
+        if self._search_projection_cache is None or self._search_projection_cache[0] != key:
+            self._search_projection_cache = key, search_projection(current.text, self.search_query,
+                whole_word=self.search_whole_word, facsimile_labels=current.facsimile_labels)
+        return self._search_projection_cache[1]
 
     def move(self, offset: int):
         def change():
@@ -592,9 +671,12 @@ class ReaderActions:
 
     def search(self, query: str, path: tuple[str, ...] | None = None,
                whole_word=False, limit=20):
+        if type(whole_word) is not bool:
+            raise ValueError("whole-word search mode must be a boolean")
         matches = self.book.search(query, self.cwd if path is None else path, whole_word, limit)
         self.results = list(matches)
         self.search_query = query
+        self.search_whole_word = whole_word
         self._amend_context()
         return list(matches)
 
@@ -610,6 +692,7 @@ class ReaderActions:
             self.cwd, self.previous_cwd = cwd, previous
             self._requested_id = self._requested_target = None
             self._selection, self.search_query, self.results = None, None, []
+            self.search_whole_word = False
             return passage, message
 
         result = self._transition(change, checkpoint=False, history=revision is not None)

@@ -37,7 +37,8 @@ neighbors = reader.context(1)
 
 The example does not create a workspace or record a visit. Search and context
 do not move the reading cursor. Search results contain existing passage IDs;
-`reader.open_result(1)` deliberately opens the first result, if there is one.
+`reader.open_result(1)` deliberately opens the first result at its first verified
+source match, if there is one. Exact offsets are set before its guarded checkpoint.
 `reader.open(identifier)` accepts the existing identifier/retirement resolution
 rules. These are reader passages, not the entire canonical corpus: applications
 handling editorial material or notes should use CORE's full canonical records.
@@ -70,7 +71,7 @@ Without a workspace, changed browsing locations reset the reading selection and
 cursor, as before. A same-location browse preserves both cursor and search
 results. Search and inspection never create checkpoints.
 
-If an action or checkpoint fails with a domain/runtime error, local browsing,
+If an action or checkpoint fails with a domain, runtime, or storage error, local browsing,
 reading cursor, restored reference, selection, search, and trail are rolled back
 before the error reaches the interface. Concurrent or stale writes are not retried
 or forced. This is
@@ -122,6 +123,15 @@ display-only padding and hidden wrap separators. Those separators remain source
 codepoints; visual motion chooses the following visible glyph when boundaries
 coincide. Changing layout resets the preferred visual column, not the semantic
 cursor. Neither layout nor preferred column is saved as reading identity.
+`advance_reading(rows, ..., selecting=False)` is the bounded reading-flow action.
+It moves within the supplied visual layout first; an outward motion already at
+the outer row can make one guarded adjacent-passage visit within the same scope.
+Forward entry is source offset zero, backward entry is the previous text's end,
+set before its checkpoint. At scope ends it stays put without another visit.
+An existing semantic selection or explicit selecting flag prevents crossing;
+the flag also covers a still-empty interface anchor. This is not a global text
+buffer or a multi-passage selection scheme. Existing `move_up`, `move_down`, and
+`half_page` remain passage-local for other clients.
 `move_paragraph(offset)` changes the canonical passage and starts its source
 cursor at zero. `jump()` accepts `passage-start`, `passage-end`, `scope-start`, or
 `scope-end`; scope boundaries retain the current reading selection.
@@ -130,6 +140,13 @@ cursor at zero. `jump()` accepts `passage-start`, `passage-end`, `scope-start`, 
 wrapping at the result boundary. It changes passages, not character-level matches,
 and refuses an absent result set. The screen chooses whole-book search explicitly;
 other clients can still search a selected subtree.
+Query and whole-word mode belong to transient reader context and survive history
+return, not workspace schema. `search_highlights()` returns a frozen derived
+projection of half-open source ranges plus any explicit degradation reason. It
+does not allocate selection IDs, change canonical text, or authorize a workspace
+write. Normal repeated `open()` still preserves the current selection/location;
+explicit search opening clears destination selection but keeps its origin in the
+return trail, including same-passage jumps.
 
 These local movement actions do not write per-key checkpoints. `save_position()`
 deliberately saves a changed semantic position through the injected workspace

@@ -63,6 +63,9 @@ class ObservedView(reader.ReaderView):
                 columns = self.application.output.get_size().columns
                 width = self.body.window.render_info.window_width
                 assert self.reading_width == 72 and width <= min(72, columns)
+                if self.application.output.get_size().rows >= 24:
+                    assert self.heading_window.render_info._y_offset >= 2
+                    assert self.body.window.render_info._y_offset > self.heading_window.render_info._y_offset + 2
                 if phase == "first":
                     keys("j")
                     await wait(lambda: self.actions.cursor_offset > 0)
@@ -82,10 +85,45 @@ class ObservedView(reader.ReaderView):
                     assert len(self.actions.snapshot().results) == 1
                     keys(Keys.ControlM)
                     await wait(lambda: self.actions.snapshot().current.identifier != first)
+                    match = self.body.text.index("specific")
+                    assert self.actions.cursor_offset == match
+                    fragments = self.body.control._get_formatted_text_for_line_func(self.body.buffer.document)(0)
+                    assert all("source.search" in style for style, _ in fragments[match:match + 8])
+                    def marked():
+                        screen = self.application.renderer._last_screen
+                        return any("class:source.search" in cell.style
+                                   for row in screen.data_buffer.values() for cell in row.values())
+                    await wait(marked)
+                    keys(Keys.Escape)
+                    await wait(lambda: not marked())
+                    assert self.actions.search_query == "specific"
+                    keys(Keys.ControlN)
+                    await wait(marked)
+                    assert self.actions.cursor_offset == match
                     keys(Keys.Escape, Keys.Left)
                     await wait(lambda: self.actions.snapshot().current.identifier == first)
                     assert self.actions.selection == selected
                     assert self.actions.cursor_offset == selected.end
+                    # Ordinary reading continues through one passage edge,
+                    # while the existing source-span contract stays local.
+                    keys(Keys.Escape)
+                    self._cursor_action(lambda: self.actions.set_cursor(len(source)))
+                    keys("j")
+                    await wait(lambda: self.actions.snapshot().current.identifier != first)
+                    assert self.body.text != source and self.actions.cursor_offset == 0
+                    keys("k")
+                    await wait(lambda: self.actions.snapshot().current.identifier == first)
+                    assert self.body.text == source and self.actions.cursor_offset == len(source)
+                    saved = self.actions.workspace_reader.store.get_state()
+                    assert saved["position"]["cursor_offset"] == len(source)
+                    keys("n")
+                    await wait(lambda: self.actions.snapshot().current.identifier != first)
+                    keys(Keys.ControlN)
+                    await wait(lambda: self.actions.cursor_offset == self.body.text.index("specific"))
+                    assert self.actions.snapshot().current.identifier != first
+                    keys("b")
+                    await wait(lambda: self.actions.snapshot().current.identifier == first)
+                    self._cursor_action(lambda: self.actions.set_cursor(selected.end))
                 else:
                     previous = json.loads((root / "first-result.json").read_text())
                     assert self.actions.cursor_offset == previous["cursor"] == 160

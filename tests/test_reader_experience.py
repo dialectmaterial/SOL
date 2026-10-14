@@ -122,6 +122,114 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
             await self.wait_for(lambda: view.application.layout.has_focus(view.results))
             self.assertTrue(view._results_visible)
 
+    async def test_reading_edge_motion_projects_new_passage_styles_and_returns_to_old_tail(self):
+        book = reader_book()
+        first = "The thought remains source-bound. " * 60
+        second = "The Idea is present in another paragraph."
+        for index, plain, markdown in ((0, first.rstrip(), first.replace("thought", "*thought*").rstrip()),
+                                       (1, second, second.replace("Idea", "**Idea**"))):
+            book.passages[index] = replace(book.passages[index], text=plain)
+            book.canonical_records[IDS[index]].update(plain_text=plain, markdown=markdown,
+                content_sha256=sha256(markdown.encode()).hexdigest())
+        async with self.view(book=book, width=40) as (view, pipe, actions, output):
+            source = view.body.text
+            view._cursor_action(lambda: actions.set_cursor(len(source)))
+            view.application.invalidate()
+            await self.wait_for(lambda: view.body.window.render_info.cursor_position.y >= 0)
+            pipe.send_text("j")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+            self.assertEqual(view.body.text, second)
+            self.assertEqual(view.body.buffer.cursor_position, 0)
+            self.assertFalse(view.typography.degraded)
+            self.assertTrue(any("strong" in span.styles for span in view.typography.spans))
+            self.assertIsNone(view.body.buffer.selection_state)
+            pipe.send_text("k")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[0])
+            self.assertEqual(view.body.text, source)
+            self.assertEqual(view.body.buffer.cursor_position, len(source))
+            self.assertTrue(any("emphasis" in span.styles for span in view.typography.spans))
+            await self.wait_for(lambda: view.body.window.render_info.cursor_position.y <
+                                view.body.window.render_info.window_height)
+            self.assertGreater(view.body.window.vertical_scroll_2, 0)
+            pipe.send_text("\x1b[1;3D")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+            self.assertEqual(actions.cursor_offset, 0)
+
+    async def test_empty_visual_and_shift_anchors_cannot_cross_passage_boundaries(self):
+        async with self.view() as (view, pipe, actions, output):
+            source = view.body.text
+            view._cursor_action(lambda: actions.set_cursor(len(source)))
+            pipe.send_text("vj")
+            await self.wait_for(lambda: view.body.buffer.selection_state is not None)
+            self.assertEqual(actions.snapshot().current.identifier, IDS[0])
+            self.assertEqual(actions.cursor_offset, len(source))
+            self.assertIsNone(actions.selection)
+            pipe.send_text("v")
+            await self.wait_for(lambda: view.body.buffer.selection_state is None)
+            pipe.send_text("j")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+            pipe.send_text("\x1b[1;2A")
+            await self.wait_for(lambda: view.body.buffer.selection_state is not None)
+            self.assertEqual(actions.snapshot().current.identifier, IDS[1])
+            self.assertEqual(actions.cursor_offset, 0)
+            self.assertIsNone(actions.selection)
+            pipe.send_text("\x1b")
+            await self.wait_for(lambda: view.body.buffer.selection_state is None)
+            pipe.send_text("k")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[0])
+            self.assertEqual(actions.cursor_offset, len(source))
+
+    async def test_selected_source_at_last_row_stays_in_its_original_passage(self):
+        async with self.view() as (view, pipe, actions, output):
+            source = view.body.text
+            view._cursor_action(lambda: actions.set_cursor(len(source) - 4))
+            pipe.send_text("vllll")
+            await self.wait_for(lambda: actions.selection is not None)
+            selected = actions.selection
+            pipe.send_text("j\x04")
+            await self.wait_for(lambda: actions.cursor_offset == len(source))
+            self.assertEqual(actions.selection, selected)
+            self.assertEqual(actions.snapshot().current.identifier, IDS[0])
+            pipe.send_text("v")
+            await self.wait_for(lambda: actions.selection is None)
+            pipe.send_text("j")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+            self.assertIsNone(actions.selection)
+
+    async def test_half_page_reaches_edge_before_visiting_one_neighbor(self):
+        book = reader_book()
+        plain = ("source thought remains readable " * 60).rstrip()
+        book.passages[0] = replace(book.passages[0], text=plain)
+        book.canonical_records[IDS[0]].update(plain_text=plain, markdown=plain,
+            content_sha256=sha256(plain.encode()).hexdigest())
+        async with self.view(book=book, width=40) as (view, pipe, actions, output):
+            positions = view._source_positions()
+            row = positions[-1][0] - 1
+            offset = next(index for index, point in enumerate(positions) if point[0] == row)
+            view._cursor_action(lambda: actions.set_cursor(offset))
+            pipe.send_text("\x04")
+            await self.wait_for(lambda: positions[actions.cursor_offset][0] == positions[-1][0])
+            self.assertEqual(actions.snapshot().current.identifier, IDS[0])
+            pipe.send_text("\x04")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+            self.assertEqual(actions.cursor_offset, 0)
+            pipe.send_text("\x15")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[0])
+            self.assertEqual(actions.cursor_offset, len(plain))
+
+    async def test_boundary_storage_error_preserves_the_visible_reading_context(self):
+        from test_reader_cursor import InjectedWorkspace
+        book = reader_book()
+        workspace = InjectedWorkspace(book)
+        async with self.view(book=book, workspace=workspace) as (view, pipe, actions, output):
+            view._cursor_action(lambda: actions.set_cursor(len(view.body.text)))
+            before = view.body.text, view.body.buffer.cursor_position, actions.snapshot()
+            with patch.object(workspace, "checkpoint", side_effect=OSError("temporary storage failure")):
+                pipe.send_text("j")
+                await self.wait_for(lambda: "storage failure" in view.status)
+                self.assertEqual((view.body.text, view.body.buffer.cursor_position, actions.snapshot()), before)
+                self.assertTrue(view.application.is_running)
+
     async def test_narrow_focus_view_keeps_review_and_typography_warnings_visible(self):
         book = reader_book()
         book.passages[0] = replace(book.passages[0], transcription_status="needs_review")
@@ -140,6 +248,15 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Typography fallback", self.screen_text(view).replace("\n", ""))
             self.assertEqual(view.body.text, book.passages[0].text)
 
+    async def test_status_reserves_only_the_rows_its_text_needs(self):
+        async with self.view() as (view, pipe, actions, output):
+            height = view._status_height()
+            self.assertEqual((height.preferred, height.max), (1, 1))
+            output.columns = 20
+            view.status = "A long message must stay visible in a narrow reading surface."
+            height = view._status_height()
+            self.assertEqual((height.preferred, height.max), (3, 3))
+
     @staticmethod
     def screen_text(view):
         screen = view.application.renderer._last_screen
@@ -147,6 +264,12 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
         return "\n".join("".join(screen.data_buffer[row][column].char
                                  for column in range(size.columns))
                          for row in range(size.rows))
+
+    @staticmethod
+    def screen_has_search_marks(view):
+        screen = view.application.renderer._last_screen
+        return any("class:source.search" in cell.style
+                   for row in screen.data_buffer.values() for cell in row.values())
 
     async def test_vim_selection_survives_resize_without_changing_source_identity(self):
         async with self.view() as (view, pipe, actions, output):
@@ -176,7 +299,7 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
         async with self.view(book=book) as (view, pipe, actions, output):
             self.assertEqual(view.body.text, plain)
             self.assertFalse(view.typography.degraded)
-            fragments = view.body.control.lexer.lex_document(view.body.buffer.document)(0)
+            fragments = view.body.control._get_formatted_text_for_line_func(view.body.buffer.document)(0)
             self.assertEqual("".join(text for _, text in fragments), plain)
             self.assertTrue(all("class:source.emphasis" in style for style, _ in fragments[:5]))
             start = plain.index("nothing")
@@ -201,9 +324,134 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
             await self.wait_for(lambda: view.application.layout.has_focus(view.results))
             pipe.send_text("\r")
             await self.wait_for(lambda: view.application.layout.has_focus(view.body))
-            pipe.send_text("n")
+            pipe.send_text("\x0e")
             await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[0])
             self.assertEqual(len(actions.snapshot().results), 1)
+
+    async def test_back_next_passages_are_independent_of_search_results(self):
+        async with self.view() as (view, pipe, actions, output):
+            pipe.send_text("/source\r")
+            await self.wait_for(lambda: view.application.layout.has_focus(view.results))
+            pipe.send_text("\r")
+            await self.wait_for(lambda: view.application.layout.has_focus(view.body))
+            self.assertEqual(len(actions.results), 1)
+            pipe.send_text("n")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+            self.assertEqual(actions.cursor_offset, 0)
+            pipe.send_text("\x0e")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[0])
+            pipe.send_text("n")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+            pipe.send_text("\x10")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[0])
+            pipe.send_text("nnb")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+            self.assertEqual(actions.search_query, "source")
+            self.assertEqual(len(actions.results), 1)
+            pipe.send_text("/\x01\x0be\r")
+            await self.wait_for(lambda: view.application.layout.has_focus(view.results))
+            self.assertEqual(len(actions.results), 3)
+            pipe.send_text("\r")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[0])
+            pipe.send_text("\x0e")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+            pipe.send_text("\x10")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[0])
+            pipe.send_text("\x10")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[2])
+
+    async def test_back_next_letters_are_plain_text_in_the_search_field(self):
+        async with self.view() as (view, pipe, actions, output):
+            first = actions.snapshot().current
+            pipe.send_text("/being and nothing")
+            await self.wait_for(lambda: view.search_input.text == "being and nothing")
+            self.assertIs(actions.snapshot().current, first)
+            self.assertEqual(view.body.text, first.text)
+            pipe.send_text("\x1b")
+            await self.wait_for(lambda: view.application.layout.has_focus(view.body))
+            pipe.send_text("nb")
+            await self.wait_for(lambda: actions.snapshot().current is first
+                                and actions.snapshot().can_go_back)
+            self.assertEqual(actions.cursor_offset, 0)
+
+    async def test_search_lands_on_styled_words_and_same_passage_history_restores_selection(self):
+        book = reader_book()
+        prefix = "An introductory sentence remains in the original source. " * 50
+        plain = prefix + "ground returns to ground."
+        markdown = prefix + "*ground* returns to **ground**."
+        book.passages[0] = replace(book.passages[0], text=plain)
+        book.canonical_records[IDS[0]].update(plain_text=plain, markdown=markdown,
+            content_sha256=sha256(markdown.encode()).hexdigest())
+        async with self.view(book=book, width=40) as (view, pipe, actions, output):
+            pipe.send_text("vllll")
+            await self.wait_for(lambda: actions.selection is not None)
+            selected = actions.selection
+            pipe.send_text("/ground\r")
+            await self.wait_for(lambda: view.application.layout.has_focus(view.results))
+            pipe.send_text("\r")
+            await self.wait_for(lambda: actions.cursor_offset == len(prefix)
+                                and view.application.layout.has_focus(view.body))
+            self.assertIsNone(actions.selection)
+            self.assertIsNone(view.body.buffer.selection_state)
+            self.assertEqual(view.body.text, plain)
+            self.assertGreater(view.body.window.vertical_scroll_2, 0)
+            fragments = view.body.control._get_formatted_text_for_line_func(view.body.buffer.document)(0)
+            self.assertTrue(all("source.search" in style and "source.emphasis" in style
+                                for style, _ in fragments[len(prefix):len(prefix) + 6]))
+            last = plain.rindex("ground")
+            self.assertTrue(all("source.search" in style and "source.strong" in style
+                                for style, _ in fragments[last:last + 6]))
+            trail = len(actions._trail)
+            pipe.send_text("\x0e")
+            await self.wait_for(lambda: view.application.layout.has_focus(view.body))
+            self.assertEqual(len(actions._trail), trail)
+            pipe.send_text("\x1b[1;3D")
+            await self.wait_for(lambda: actions.cursor_offset == 4)
+            self.assertEqual(actions.selection, selected)
+            self.assertEqual(view.body.buffer.cursor_position, 4)
+            pipe.send_text("\x1b[1;3C")
+            await self.wait_for(lambda: actions.cursor_offset == len(prefix))
+            self.assertIsNone(actions.selection)
+
+    async def test_search_marks_can_be_dismissed_without_discarding_query(self):
+        async with self.view() as (view, pipe, actions, output):
+            pipe.send_text("/source\r\r")
+            await self.wait_for(lambda: view.application.layout.has_focus(view.body)
+                                and actions.cursor_offset == view.body.text.index("source"))
+            self.assertTrue(view._search_spans())
+            await self.wait_for(lambda: self.screen_has_search_marks(view))
+            source = view.body.text
+            pipe.send_text("\x1b")
+            await self.wait_for(lambda: not view._search_marks_visible)
+            self.assertFalse(view._search_spans())
+            await self.wait_for(lambda: not self.screen_has_search_marks(view))
+            self.assertEqual(actions.search_query, "source")
+            self.assertTrue(actions.results)
+            pipe.send_text("\x0e")
+            await self.wait_for(lambda: view._search_marks_visible)
+            self.assertTrue(view._search_spans())
+            await self.wait_for(lambda: self.screen_has_search_marks(view))
+            self.assertEqual(view.body.text, source)
+
+    async def test_unrepresentable_unicode_search_warns_in_focus_without_guessing_spans(self):
+        book = reader_book()
+        plain = "A ß character."
+        book.passages[0] = replace(book.passages[0], text=plain)
+        book.canonical_records[IDS[0]].update(plain_text=plain, markdown=plain,
+            content_sha256=sha256(plain.encode()).hexdigest())
+        async with self.view(book=book) as (view, pipe, actions, output):
+            pipe.send_text("/s\r\r")
+            await self.wait_for(lambda: view.application.layout.has_focus(view.body)
+                                and actions.search_query == "s")
+            self.assertTrue(view._search_degraded())
+            self.assertFalse(view._search_spans())
+            self.assertEqual(actions.cursor_offset, 0)
+            pipe.send_text("f")
+            await self.wait_for(lambda: view._focus_mode)
+            self.assertIn("Search highlight fallback", view._status_text())
+            await self.wait_for(lambda: "Search highlight fallback" in self.screen_text(view))
+            self.assertIn("only verified matches", view._header())
+            self.assertEqual(view.body.text, plain)
 
     async def test_half_page_uses_half_the_visible_height_and_keeps_codepoint_cursor(self):
         book = reader_book()

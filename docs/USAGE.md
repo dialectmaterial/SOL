@@ -139,8 +139,9 @@ CommonMark parser for canonical typography. Checks happen before onboarding.
 240 columns), narrowing responsively on smaller terminals. Prose wraps at word
 boundaries; unavoidable overlong sequences can wrap by character. Wrapping never
 inserts canonical newlines or changes source-codepoint offsets. Title and printed
-page align with the prose; the full path, PDF pages, workspace, and scope live
-behind `c`, while the footer remains secondary.
+page align with the prose; responsive top/lead spacing keeps them clear of the
+window bar without wasting space on short terminals. The full path, PDF pages,
+workspace, and scope live behind `c`, while the footer remains secondary.
 
 `--emphasis` accepts `auto`, `italic`, or `underline`. Auto uses a `TERM` heuristic:
 Alacritty and Kitty use standard terminal italics; unknown/basic terminals use
@@ -150,13 +151,24 @@ these styles, never ANSI-decorated canonical text. A projection disagreement is
 reported rather than styled at guessed offsets. Underline remains the explicit
 compatibility choice when the terminal or font does not show italics.
 
-Begin with `j`/`k` for displayed rows, `h`/`l` for characters, `}`/`{` for passages,
-and `/` for whole-book search. `n`/`N` repeat search-result navigation, not paragraph
+Begin with `j`/`k` for displayed rows, `h`/`l` for characters, `b`/`n` for previous/next passages,
+and `/` for whole-book search. Reading-row motions continue from a passage edge
+to its neighbor within the current scope: forward to its beginning, backward to
+its end. Selection remains passage-local and blocks automatic crossing.
+Ctrl-D/U first reach the current edge rather than skipping unread rows;
+another outward motion continues. `{`/`}` remain passage aliases. Ctrl-P/Ctrl-N
+repeat previous/next search-result navigation, not paragraph
 movement or the next occurrence within one passage. `gg`/`G` go to the beginning
 or end of the current reading scope, identified by `c`. `f` reduces chrome, and
 `?` shows the compact key guide; focus mode still shows source-review, error, and
-typography-fallback notices. Ctrl-Q saves changed cursor/viewport state before
-leaving; Ctrl-C skips this extra save without undoing passage checkpoints. Durable offsets require
+typography-fallback notices. Opening a search result lands at its first verified
+source occurrence;
+matches are marked without replacing source emphasis. Escape hides those marks
+without discarding the query, and Ctrl-P/Ctrl-N reveal them again. Alt-Left restores
+the originating selection/location even for a search jump in the same paragraph.
+An explicit warning reports Unicode matches that cannot map safely to a source
+span. Ctrl-Q saves changed cursor/viewport state before leaving; Ctrl-C skips this
+extra save without undoing passage checkpoints. Durable offsets require
 workspace schema 3; selections and the bounded reading trail remain session-local.
 Resize or reopen in another terminal without changing the canonical corpus, and
 the same semantic cursor remains valid; wrapped rows are never persisted as its

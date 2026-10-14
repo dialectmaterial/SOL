@@ -24,6 +24,7 @@ PACKAGE_FILES = {
     "sol/essence/__init__.py", "sol/essence/terms.py", "sol/essence/cli.py",
     "sol/reader/__init__.py", "sol/reader/app.py", "sol/reader/models.py", "sol/reader/legacy_pdf.py",
     "sol/reader/options.py", "sol/reader/actions.py", "sol/reader/navigation.py", "sol/reader/typography.py",
+    "sol/reader/search.py",
     "sol/corpus/__init__.py", "sol/corpus/convert.py", "sol/corpus/contract.py", "sol/corpus/notes.py",
     "sol/corpus/references.py", "sol/corpus/structure.py", "sol/corpus/layout.py", "sol/corpus/edition.py",
     "sol/corpus/extraction.py", "sol/corpus/ingest.py",

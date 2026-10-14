@@ -262,7 +262,7 @@ class ReaderCursorTests(unittest.TestCase):
         self.actions.search('invented', ())
         for identifier in (IDS[1], IDS[2], IDS[0]):
             self.assertEqual(self.actions.search_next().identifier, identifier)
-            self.assertEqual(self.actions.cursor_offset, 0)
+            self.assertEqual(self.actions.cursor_offset, self.actions.snapshot().current.text.index('invented'))
         self.assertEqual(self.actions.search_next(reverse=True).identifier, IDS[2])
         self.assertEqual(self.actions.session.path, ())
         self.actions.search('absent word', ())

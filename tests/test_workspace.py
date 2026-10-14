@@ -1,6 +1,7 @@
 """A personal workspace references invented UUIDs and never needs a corpus."""
 from __future__ import annotations
 
+from contextlib import closing
 from copy import deepcopy
 import json
 import os
@@ -397,7 +398,7 @@ class WorkspaceTests(unittest.TestCase):
 
     def test_unrecognized_database_and_non_database_are_never_initialized(self):
         database = self.root / "unrelated.sqlite3"
-        with sqlite3.connect(database) as connection:
+        with closing(sqlite3.connect(database)) as connection, connection:
             connection.execute("CREATE TABLE unrelated(value TEXT)")
             connection.execute("INSERT INTO unrelated VALUES ('keep me')")
         text = self.root / "not-a-database"
