@@ -2,7 +2,7 @@
 
 [Back to SOL](../README.md)
 
-This manual covers the reader, virtual shell, personal workspaces, corpus maintenance, and optional source-view integration. Start with the [README](../README.md) for installation and a first reading session. Use `sol guide` for a compact guide in the terminal and `sol --help` for current CLI syntax.
+This manual covers the reader, virtual shell, personal workspaces, corpus maintenance, and optional source-view and ESSENCE handoff integrations. Start with the [README](../README.md) for installation and a first reading session. Use `sol guide` for a compact guide in the terminal and `sol --help` for current CLI syntax.
 
 ## Contents
 
@@ -14,7 +14,9 @@ This manual covers the reader, virtual shell, personal workspaces, corpus mainte
 6. [Source-review queue](#work-through-a-source-review-queue)
 7. [Corpus maintenance](#maintain-and-review-the-corpus)
 8. [Optional kitty integration and source viewing](#read-in-kitty-and-inspect-the-source)
-9. [Development checks](#development-checks)
+9. [Explicit BEING–ESSENCE handoff](HANDOFF.md)
+10. [Reproducible term study](TERM_STUDY.md)
+11. [Development checks](#development-checks)
 
 ## Install with pipx
 
@@ -160,7 +162,57 @@ through the existing reader while their native command adapters are developed.
 Existing one-shot commands continue to compose with normal tools, for example
 `sol --search "contradiction" --within /ESSENCE --json | jq 'length'`.
 
+### Exchange a canonical reference
+
+Capture a reference in one process and check it against the receiver's selected
+local corpus in another:
+
+~~~sh
+sol reference capture ID --corpus /path/to/corpus > /tmp/reference.json
+sol reference check /tmp/reference.json --corpus /path/to/corpus
+sol reference capture ID --corpus /path/to/corpus | sol reference check --corpus /path/to/corpus
+~~~
+
+Replace `ID` with a canonical UUID or unique prefix. Capture resolves retirement
+redirects and preserves the requested UUID and complete redirect chain. Checking
+prints JSON with `status: "current"`, identifiers, the current content digest,
+source references, and attribution. A stale generation, different corpus, or
+invalid input produces a nonzero exit and a JSON error. The receiver selects its
+corpus using `--corpus` or normal local discovery; the payload cannot choose a
+directory or execute a command. Reference JSON is limited to 65,536 bytes. File
+input must be a regular file, and omitted `FILE` or `-` reads piped input.
+
+These commands inspect the complete canonical index, including editorial records
+outside the default Hegel reader view. They do not display passage text or open a
+reader, and do not write a workspace, configuration, or corpus. An older corpus
+without a UUID requires explicit initialization with
+`sol-corpus-check /path/to/corpus --initialize-identity` before reference exchange.
+Moving or copying a corpus preserves its identity and permits checking when its
+verified generation is unchanged. Editing and rebuilding its index requires a
+new capture. Help remains available without a corpus.
+
+### Return from an ESSENCE pane
+
+From a reader launched with `sol-kitty`, select a passage and use `essence open`.
+In its ordinary zsh pane, run `sol reference check "$SOL_REFERENCE_FILE"`, then
+`sol reference return [ID]` to propose one return; omit `ID` for the original
+requested UUID. Back in BEING, `essence check` inspects and `essence return`
+deliberately accepts navigation once. If the reader position changed, inspect
+first and use `essence return --accept-move` to accept that move explicitly.
+
+One exchange is active at a time, and corpus generation checks remain strict.
+The pane stays open after return. Save native work before `essence close` or
+leaving BEING; unexpected transport data is retained and reported. This shell
+is not a sandbox, and the protocol transfers no actor or workspace authority.
+See the [complete handoff workflow](HANDOFF.md) for setup and refusal behavior.
+
 ## Work inside the virtual shell
+
+For computational work in an ordinary shell, `sol analyze term ground` measures
+a literal word's distribution across the three doctrines. `--json` retains the
+method, corpus generation, and passage evidence; `sol analyze check FILE`
+recomputes a saved study. This does not write notes or infer philosophical
+relations. See the [term-study workflow and selection policy](TERM_STUDY.md).
 
 Start with `sol`; `sol --shell` means the same persistent reader. The workspace picker shows up to ten recognized workspaces bound to the current corpus and source fingerprint, ordered by their latest recorded activity. Enter a displayed number to reopen one, or a name to create or select a workspace. Press Enter to choose the first displayed workspace; if none is available, the default is `reading`. The picker inspects candidates without modifying them and skips unrelated, incompatible, symlink, or WAL/sidecar-bearing files. A name entered explicitly still receives normal validation and can open a workspace omitted from suggestions rather than silently choosing another one.
 
@@ -435,6 +487,17 @@ python3 -m unittest discover -s tests -v
 
 Most tests use invented text. To include edition-specific PDF checks when you have the local source available, run `SOL_TEST_PDF=Hegel-SOL.pdf python3 -m unittest discover -s tests -v`. No test should require uploading the book or changing a personal workspace.
 
+The real Kitty/Zsh handoff test is separate and opt-in. It briefly opens its own
+desktop window, uses invented text and an isolated shell startup file, verifies
+one explicit return and owned-pane cleanup, and leaves personal settings alone:
+
+~~~sh
+SOL_TEST_LIVE_KITTY=1 python3 -B -m unittest discover -s tests -p test_kitty_handoff_integration.py
+~~~
+
+This requires Kitty, its standalone `kitten` command, Zsh, and desktop access.
+Ordinary test runs skip the GUI check.
+
 The [workspace plan](WORKSPACE_PLAN.md) separates implemented behavior from selected-span annotations and future imports. [Interface research](research/INTERFACE_RESEARCH.md) explains the optional prompt adapter and evaluates alternatives without making them dependencies.
 
 ### Code responsibilities
@@ -445,11 +508,12 @@ The [workspace plan](WORKSPACE_PLAN.md) separates implemented behavior from sele
 | `sol/reader/` | CLI, virtual shell, navigation, and presentation. CLI options are defined separately in `options.py`; explicit PDF compatibility is isolated in the lazy-loaded `legacy_pdf.py`. |
 | `sol/corpus/` | Edition structure and extraction layout, conversion, canonical record validation, and generated indexing. Ordinary reading uses the verified index. |
 | `sol/workspace/` | SQLite storage, attribution profiles, reference operations, recent-workspace discovery, diagnostics, and inquiry export. |
-| `sol/terminal/` | Optional prompt input, source-page viewing, and kitty launch integration. These adapters do not redefine corpus or workspace semantics. |
+| `sol/terminal/` | Optional prompt input, source-page viewing, kitty launch integration, and private reference-handoff transport/native CLI. These adapters do not redefine corpus or workspace semantics. |
+| `sol/essence/` | Optional computation over CORE snapshots: the first bounded term-distribution study and its native CLI. No reader or workspace dependency; results remain source-bound measurements. |
 
 `sol/reader/app.py` coordinates commands and consumes the `sol.core` boundary. Shared models now belong to CORE; `sol/reader/models.py` retains compatibility exports. Canonical reference exports from `sol/workspace/reader.py` remain compatible while their implementation moves to CORE. The existing corpus contract remains a shared-domain dependency, without importing reader, workspace, or terminal layers. Edition-specific geometry and extraction helpers stay in `sol/corpus/edition.py` and `sol/corpus/layout.py`.
 
-The installed `sol` command and `python -m sol` still use the same entry point, and the aggregate `sol-organizes-logic` installation remains unchanged. [The modularity contract](MODULARITY.md) distinguishes this internal separation from future independent distributions, cross-process integration, and optional NixOS composition.
+The installed `sol` command and `python -m sol` still use the same entry point, and the aggregate `sol-organizes-logic` installation remains unchanged. [The modularity contract](MODULARITY.md) distinguishes the implemented CORE/action boundary and explicit process handoff from future independent distributions, result-ingestion policies, and optional NixOS composition.
 
 ## Appendix: Hegel on computational externality
 

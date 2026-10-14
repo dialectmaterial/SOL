@@ -8,7 +8,7 @@ Independent selection is the architectural destination. The first implemented st
 
 | Component | Responsibility | Boundary |
 | --- | --- | --- |
-| CORE | Shared book and passage models, verified corpus loading, canonical reference resolution, virtual paths, and corpus configuration | Does not import reader command loops, workspace storage, terminal adapters, or machine-learning frameworks |
+| CORE | Shared book and passage models, verified corpus loading, canonical reference resolution and serialization, virtual paths, and corpus configuration | Does not import reader command loops, workspace storage, terminal adapters, or machine-learning frameworks |
 | BEING | Scholarly reading, continuity, attributed notes, comparison, review testimony, and relations | Consumes shared corpus APIs; owns reader actions and personal workspace operations; the virtual shell is one optional interface |
 | ESSENCE | Optional applications, terminal-host integrations, linguistic experiments, classifiers, and other research tools | Consumes shared APIs or an explicit data protocol; does not redefine passage identity or require the BEING shell to start |
 | CONCEPT | Future reproducible environment and operating-system composition | Selects applications and configuration deliberately; installing the reader must not require a SOL operating system |
@@ -36,6 +36,26 @@ SOL preserves existing identities and semantic metadata rather than deriving the
 from an engine's headings, element IDs, or rectangles. This is not a from-scratch
 generic book importer. [Extraction workflow](EXTRACTION.md).
 
+BEING's paragraph-reading state now lives in `sol.reader.actions`: the current
+shell consumes the same `ReaderActions` boundary available to non-interactive
+clients. This separates cursor, browsing, search, and checkpoint transitions from
+prompts and rendering without replacing workspace services or canonical identity.
+Its capture/check/accept actions now give the handoff adapter an explicit entry
+point; pane and transport lifecycle remain outside those actions. Further
+workspace-interface separation can proceed incrementally. [Reader actions](READER_ACTIONS.md).
+
+CORE now supplies version-1 serialized references through capture/check and
+bounded JSON encoding/decoding. They bind existing corpus/record UUIDs to edition,
+source, generation, content, attribution, and source-page evidence without carrying
+execution or workspace authority. [Reference protocol](REFERENCE_PROTOCOL.md).
+
+The optional Kitty/Zsh bridge now implements one explicit BEING–ESSENCE exchange.
+BEING captures an active reference; the native process proposes a correlated
+return; BEING inspects it and accepts navigation once through its existing action
+and checkpoint guards. The private transport and pane adapters live in
+`sol.terminal`, outside CORE. Actor and workspace authority stay in BEING, and
+ordinary zsh remains a normal shell rather than a sandbox. [Handoff workflow](HANDOFF.md).
+
 ## Public CORE API, version 1
 
 `sol.core.API_VERSION` is `1`. This describes the public Python boundary, not the installed distribution version, corpus contract version, or workspace schema version. Those are separate compatibility decisions.
@@ -46,6 +66,8 @@ generic book importer. [Extraction workflow](EXTRACTION.md).
 | `load_corpus_book(directory)` | Load a verified existing corpus as a book without opening or extracting the PDF |
 | `CorpusError`, `CorpusSnapshot`, `load_snapshot`, `verify_snapshot_current` | Existing contract verification and explicit generation checks |
 | `Reference`, `resolve_reference(book, identifier)` | Resolve canonical references while retaining requested UUIDs, resolved targets, and retirement chains; do not guess by textual similarity |
+| `resolve_record_reference(records, identifier)` | Apply the same identity resolution to an explicitly supplied full canonical record mapping |
+| `PROTOCOL_VERSION`, `capture_reference`, `check_reference`, `encode_reference`, `decode_reference`, `ProtocolError` | Transfer and check bounded, versioned references against a caller-selected verified corpus snapshot; no navigation or write authority |
 | Virtual-path helpers | Resolve locations against an explicitly supplied book root, rather than an implicit edition-global tree |
 | `sol.core.config` | Shared corpus discovery and explicit configuration operations, using the existing settings and source-checkout discovery rules |
 
@@ -82,7 +104,7 @@ A Python import package and an installable distribution are different things. Cr
 
 The existing `shell` and `corpus` extras add optional dependencies to the aggregate installation. Extras do not remove application files from its wheel. Future split packages will need deliberate ownership of each module, compatible dependency ranges, and console-script entry points, without two wheels accidentally owning the same file. [Python Packaging: dependencies and extras](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#dependencies-and-requirements).
 
-pipx installs applications into isolated environments. Installing two SOL applications separately with pipx will not make one application's Python imports visible to the other. Each must declare its own compatible CORE dependency. In-process integration can use an explicitly configured shared environment or deliberate injection; communication between separately launched applications needs a documented, versioned protocol, for example JSON carrying corpus identity, record IDs, and provenance. A process protocol is future work, not an implicit feature of this refactor. [How pipx works](https://pipx.pypa.io/stable/explanation/how-pipx-works.html).
+pipx installs applications into isolated environments. Installing two SOL applications separately with pipx will not make one application's Python imports visible to the other. Each must declare its own compatible CORE dependency. In-process integration can use an explicitly configured shared environment or deliberate injection; communication between separately launched applications uses documented, versioned messages. CORE's reference protocol supplies the JSON contract used by the explicit local handoff, not shared Python imports, workspace synchronization, or automatic return navigation. [How pipx works](https://pipx.pypa.io/stable/explanation/how-pipx-works.html).
 
 ## CONCEPT composition remains opt-in
 
@@ -94,9 +116,16 @@ The immediate order is: an extraction adapter with a reviewed-copy proof,
 semantic/interface separation, a minimal CORE reference protocol, one reversible
 BEING–ESSENCE handoff, then one substantial experiment. These refine the longer
 packaging roadmap below rather than requiring a broad rewrite. Dependencies remain
-replaceable, and existing corpus/workspace contracts remain binding. The current
-extraction step does not claim that a cross-process protocol or reversible shell
-bridge has already shipped.
+replaceable, and existing corpus/workspace contracts remain binding. Extraction,
+a bounded reader-action seam, the version-1 reference contract, and the explicit
+local shell bridge are implemented. The first application gate is one substantial
+ESSENCE experiment with a bounded result format and deliberate review/ingestion
+policy. A first lexical term-distribution experiment now meets that bounded gate:
+it consumes CORE snapshots and optional originating references, records its
+selection and method, recomputes results on check, and returns selected passage
+IDs through the existing explicit bridge. This establishes no automatic ingestion
+or classification framework. [Term study](TERM_STUDY.md). Independent distributions
+and CONCEPT composition remain separate gates.
 
 1. **Establish the internal CORE boundary.** Move shared models, reference/path operations, configuration, and indexed corpus loading behind `sol.core`. Keep compatibility imports and the current aggregate installation. Test that importing CORE and CLI options does not import the shell, workspace, terminal, extraction tooling, or optional frameworks.
 2. **Exercise it with real consumers.** The reader and launcher should use this boundary; future ESSENCE applications can do likewise. Preserve existing reader behavior, corpus verification, workspace reopenability, and installed command tests. Add new APIs only for demonstrated cross-component needs.
@@ -104,4 +133,11 @@ bridge has already shipped.
 4. **Add applications and process contracts as needed.** Package actual ESSENCE tools when they exist, not empty placeholder packages. Version cross-process messages, reject incompatible identities or schemas, and test missing applications as ordinary optional cases.
 5. **Compose the operating-system layer later.** Test opt-in NixOS modules independently before a combined profile. Shared development in one repository must not become compulsory installation of every stage.
 
-The current acceptance gate is code/import separation plus preserved aggregate behavior. A temporary core-only wheel fixture also checks that the shared API can read and resolve records without any reader, workspace, or terminal files present. This is a dependency-boundary test, not a published SOL product. Passing it is not a claim that independent distributions or a NixOS distribution have shipped. Compatibility, isolated builds, and clean installs are the evidence required before making that claim.
+The implemented gate includes code/import separation, preserved aggregate behavior,
+and explicit handoff refusal/acceptance rules. A temporary core-only wheel fixture
+also checks that the shared API can read and resolve records without reader,
+workspace, or terminal files. That fixture is a dependency-boundary test, not a
+published product. The local bridge does not establish compatibility between
+future independently installed applications. Independent distribution claims
+still require compatible versions, isolated builds, and clean-install evidence;
+CONCEPT composition has not shipped.

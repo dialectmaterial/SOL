@@ -10,10 +10,9 @@ from __future__ import annotations
 
 import argparse
 from copy import deepcopy
-from dataclasses import dataclass
 import json
 import os
-import random
+import random  # Compatibility: historical callers patch app.random.choice.
 import re
 import shlex
 import shutil
@@ -33,6 +32,7 @@ from sol.core.models import Book, Node, Passage, node_path, presentation_text
 from sol.core.paths import alias, child_by_name, display_path
 from sol.core.paths import resolve_path as resolve_book_path
 from sol.reader.options import build_parser
+from sol.reader.actions import ReaderActions, ReadingSession, context_passages
 
 
 def load_book(pdf: Path) -> Book:
@@ -154,16 +154,6 @@ def passage_data(passage: Passage, book: Book | None = None) -> dict:
             "source": deepcopy(book.corpus_manifest.get("source", {})),
         }
     return result
-
-
-def context_passages(book: Book, passage: Passage, radius: int) -> list[Passage]:
-    if not 0 <= radius <= 10:
-        raise ValueError("context must be between 0 and 10 paragraphs on each side")
-    index = next((i for i, item in enumerate(book.passages)
-                  if item.identifier == passage.identifier), None)
-    if index is None:
-        raise ValueError("this passage is not in the book")
-    return book.passages[max(0, index - radius):index + radius + 1]
 
 
 def render_context(book: Book, passage: Passage, radius: int, width: int,
@@ -330,11 +320,13 @@ KEEP EXPLORING
   help             see command syntax
   neofetch         ASCII Hegel and SOL's concept preview
   tree --depth 3   explore divisions without the guide
+  essence          open a real zsh pane in sol-kitty (optional)
   exit             leave SOL
 
-Directories are divisions; files contain passages. '...' hides deeper divisions.
+Book paths are virtual; directories are divisions and files contain passages.
 Search is literal and case-insensitive; --word matches whole words, not concepts.
-Book paths are virtual: SOL never runs your host shell or edits canonical text.
+Reading never runs your host shell or edits canonical text.
+Optional essence opens real Zsh; accept returns explicitly in BEING.
 Workspace notes and checkpoints stay local; backups and exports are your choice."""
     if book is None:
         starting += """\n\nCORPUS SETUP (the tree above is an abbreviated fallback)
@@ -450,56 +442,6 @@ def render_neofetch(book: Book, cwd: tuple[str, ...] = (), width: int = 80,
     return "\n".join(rows)
 
 
-@dataclass
-class ReadingSession:
-    """A cursor within an explicit selection; random reads also set the cursor."""
-    book: Book
-    path: tuple[str, ...] = ()
-    cursor: int | None = None
-
-    def current(self) -> Passage:
-        if self.cursor is None:
-            raise ValueError("no current paragraph; use first, read, or open")
-        return self.book.selection(self.path)[self.cursor]
-
-    def open(self, identifier: str) -> Passage:
-        passage = self.book.find_passage(identifier)
-        if self.cursor is None or passage.path[:len(self.path)] != self.path:
-            self.path = passage.path
-        matches = self.book.selection(self.path)
-        self.cursor = next(index for index, item in enumerate(matches)
-                           if item.identifier == passage.identifier)
-        return passage
-
-    def read(self, path: tuple[str, ...], first: bool = False) -> Passage:
-        matches = self.book.selection(path)
-        if first:
-            self.path, self.cursor = path, 0
-            return matches[0]
-        candidates = [index for index, p in enumerate(matches)
-                      if p.kind != "formula" and p.random_eligible and len(re.findall(r"[A-Za-z]{2,}", p.text)) >= 8]
-        if not candidates:
-            candidates = [index for index, p in enumerate(matches)
-                          if p.kind != "formula" and p.random_eligible and len(re.findall(r"[A-Za-z]{2,}", p.text)) >= 3]
-        if not candidates:
-            raise ValueError("this file has no suitable random prose paragraph; use cat")
-        index = random.choice(candidates)
-        self.path, self.cursor = path, index
-        return matches[index]
-
-    def move(self, offset: int) -> Passage:
-        if self.cursor is None and offset < 0:
-            raise ValueError("no current paragraph; use first or read")
-        matches = self.book.selection(self.path)
-        index = 0 if self.cursor is None else self.cursor + offset
-        if index < 0:
-            raise ValueError("already at the beginning of this selection")
-        if index >= len(matches):
-            raise ValueError("already at the end of this selection")
-        self.cursor = index
-        return matches[index]
-
-
 def install_completion(root: Node, get_cwd, workspace: bool = False):
     """Optional standard-library tab completion; safe on systems without readline."""
     try:
@@ -509,7 +451,7 @@ def install_completion(root: Node, get_cwd, workspace: bool = False):
     old_completer = readline.get_completer()
     old_delimiters = readline.get_completer_delims()
     commands = ("ls", "cd", "up", "pwd", "tree", "read", "first", "next", "previous",
-                "cat", "search", "open", "context", "info", "where", "guide", "neofetch", "source", "help", "exit")
+                "cat", "search", "open", "context", "info", "where", "guide", "neofetch", "source", "essence", "help", "exit")
     if workspace:
         commands += ("workspace", "resume", "bookmark", "note", "compare", "review", "relate")
     def complete(text: str, state: int):
@@ -519,6 +461,9 @@ def install_completion(root: Node, get_cwd, workspace: bool = False):
                 choices = [command for command in commands if command.startswith(text)]
             elif buffer.startswith("source "):
                 choices = [action for action in ("show", "close", "set-pdf", "info")
+                           if action.startswith(text)] if buffer.count(" ") == 1 else []
+            elif buffer.startswith("essence "):
+                choices = [action for action in ("open", "check", "return", "close")
                            if action.startswith(text)] if buffer.count(" ") == 1 else []
             else:
                 parent, _, fragment = text.rpartition("/")
@@ -555,6 +500,8 @@ open ID|RESULT                    open a passage or latest search result
 context [N]                       neighbors in book order (default 1; maximum 10)
 where                             show current passage and reading position
 info [PATH]                       title, pages, counts, and pending review
+essence [open|check|return|close]   explicit reference handoff to a real zsh pane
+essence return --accept-move       accept after deliberately changing reading position
 compare PATH_A PATH_B              open complete files together in kitty
 compare open / close              refresh the last desk / close it
 guide [PATH] --depth N             beginner guide and book tree (default depth 1)
@@ -586,22 +533,31 @@ def shell_options(verb: str, arguments: list[str]) -> argparse.Namespace:
 def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
               workspace_reader=None, read_command=None, write_output=None,
               ui_mode="basic", editing_mode="emacs", draft_reader=None,
-              source_pdf=None, source_pane=None, auto_width=False, comparison_pane=None) -> int:
+              source_pdf=None, source_pane=None, auto_width=False, comparison_pane=None,
+              essence_pane=None) -> int:
     """Run the linear shell through replaceable, synchronous input/output seams.
 
     The optional adapter owns completion and accepts one command at a time;
     workspace operations remain unchanged. No third-party UI is required here.
     write_output follows print's calling convention, including end= for cat.
     """
-    cwd: tuple[str, ...] = ()
-    previous_cwd: tuple[str, ...] | None = None
-    results: list[Passage] = []
-    session = ReadingSession(book)
+    actions = ReaderActions(book, workspace_reader, session=ReadingSession(book))
+    session = actions.session
     emit = write_output if write_output is not None else print
     restore = lambda: None
     adapter = None
     source_service = None
     last_comparison = None
+    handoff = None
+    handoff_origin = None
+    handoff_accepted = False
+
+    def reader_position():
+        try:
+            identifier = actions.current_reference_id()
+        except ValueError:
+            identifier = None
+        return actions.cwd, actions.previous_cwd, session.path, session.cursor, identifier
 
     def reflow_current():
         nonlocal width
@@ -628,7 +584,7 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                  "No actor selected; authored writes require --actor NAME.")
             if workspace_reader.store.get_state() is not None:
                 try:
-                    cwd, previous_cwd, passage, message = workspace_reader.restore(session)
+                    passage, message = actions.restore()
                     if message:
                         emit(message)
                     emit(render_passage(passage, width, plain, color))
@@ -637,24 +593,22 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                          "The reference is retained. Inspect the workspace or deliberately start another reading.")
         if read_command is None and ui_mode != "basic":
             from sol.terminal.prompt import create_adapter
-            adapter = create_adapter(book, lambda: cwd, workspace_reader, mode=ui_mode,
+            adapter = create_adapter(book, lambda: actions.cwd, workspace_reader, mode=ui_mode,
                                      plain=plain, editing_mode=editing_mode)
             if adapter is not None:
                 read_command = adapter.read_command
                 draft_reader = adapter.read_draft
         if read_command is None:
-            restore = install_completion(book.root, lambda: cwd, workspace=workspace_reader is not None)
+            restore = install_completion(book.root, lambda: actions.cwd, workspace=workspace_reader is not None)
         while True:
             try:
-                command = (read_command if read_command is not None else input)(f"sol:{display_path(cwd)}$ ")
+                command = (read_command if read_command is not None else input)(f"sol:{display_path(actions.cwd)}$ ")
             except EOFError:
                 emit()
                 return 0
             except KeyboardInterrupt:
                 emit("\nType 'exit' to leave.")
                 continue
-            before_command = (cwd, previous_cwd, session.path, session.cursor,
-                              workspace_reader.resumed_reference if workspace_reader else None)
             try:
                 if not isinstance(command, str):
                     raise ValueError("command input must be text; adapters must signal cancellation or EOF explicitly")
@@ -666,6 +620,73 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                     width = sensible_width(None)
                     if workspace_reader is not None:
                         workspace_reader.width = width
+                if verb == "essence":
+                    action = arguments[0] if arguments else "open"
+                    if action not in {"open", "check", "return", "close"}:
+                        raise ValueError("use essence open, essence check, essence return [--accept-move], or essence close")
+                    extra = arguments[1:]
+                    accept_move = extra == ["--accept-move"]
+                    if extra and not (action == "return" and accept_move):
+                        raise ValueError(f"essence {action}: unexpected arguments")
+                    if action == "close":
+                        if essence_pane is not None:
+                            essence_pane.close()
+                        try:
+                            if handoff is not None:
+                                handoff.close()
+                        except (ValueError, OSError) as error:
+                            raise ValueError(f"ESSENCE cleanup incomplete; data retained at {handoff.directory}: {error}") from error
+                        finally:
+                            handoff = handoff_origin = None
+                            handoff_accepted = False
+                        reflow_current()
+                        emit("ESSENCE pane closed; its temporary reference exchange ended.")
+                    elif action == "open":
+                        if handoff is not None:
+                            raise ValueError("An ESSENCE exchange is already active; close it before opening another")
+                        from sol.terminal.handoff import HandoffSession
+                        packet = actions.capture_active_reference()
+                        if essence_pane is None:
+                            from sol.terminal.kitty import EssencePane
+                            essence_pane = EssencePane()
+                        candidate = HandoffSession.create(packet)
+                        try:
+                            essence_pane.show(candidate.directory, book.corpus_directory)
+                        except (ValueError, RuntimeError, OSError):
+                            candidate.close()
+                            raise
+                        handoff, handoff_origin = candidate, reader_position()
+                        handoff_accepted = False
+                        reflow_current()
+                        emit(f"ESSENCE opened for {packet['reference']['requested_id']}.\n"
+                             "Switch to its zsh pane. Use sol reference return [ID] to propose a return.\n"
+                             "Back here, use essence check, then essence return. No reading visit was saved.")
+                    else:
+                        if handoff is None:
+                            raise ValueError("No ESSENCE exchange is active; read a passage and use essence first")
+                        packet = handoff.read_return()
+                        reference = actions.check_return_reference(packet)
+                        if action == "check":
+                            from sol.workspace.reader import safe_output
+                            current = {"status": "accepted" if handoff_accepted else "ready",
+                                       "requested_id": reference.requested_id, "target_id": reference.target_id,
+                                       "sources": packet["reference"]["sources"],
+                                       "reader_position_changed": reader_position() != handoff_origin}
+                            emit(safe_output(json.dumps(current, ensure_ascii=True, indent=2)))
+                            emit("Inspection only; no navigation or visit. " +
+                                 ("Already accepted; finish native work before essence close." if handoff_accepted else
+                                  "Use essence return to accept."))
+                        else:
+                            if handoff_accepted:
+                                raise ValueError("This return was already accepted; close and reopen for another exchange")
+                            if reader_position() != handoff_origin and not accept_move:
+                                raise ValueError("Your reading position changed after this handoff. Inspect essence check, "
+                                                 "then use essence return --accept-move to navigate deliberately")
+                            passage = actions.accept_return_reference(packet)
+                            handoff_accepted = True
+                            emit(render_passage(passage, width, plain, color))
+                            emit("Return accepted. The zsh pane remains open; finish its work before essence close.")
+                    continue
                 if verb == "compare" and (not arguments or arguments[0] not in {"save", "list", "show"}):
                     from sol.workspace.reader import safe_output
                     from sol.workspace.comparison import capture_comparison, capture_paths
@@ -702,7 +723,7 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                         remembered = (kind, targets, question)
                         captured["refresh_command"] = "compare open"
                     else:
-                        captured = capture_paths(book, targets, cwd=cwd, resolve_path=resolve_path,
+                        captured = capture_paths(book, targets, cwd=actions.cwd, resolve_path=resolve_path,
                                                  workspace_reader=workspace_reader, question=question)
                         remembered = (kind, [s["path"] for s in captured["selections"]], question)
                     if comparison_pane is None:
@@ -809,8 +830,7 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                     if workspace_reader is None:
                         raise ValueError("resume requires starting SOL with --workspace NAME")
                     revision = int(arguments[0]) if arguments else None
-                    cwd, previous_cwd, passage, message = workspace_reader.restore(session, revision)
-                    results = []
+                    passage, message = actions.restore(revision)
                     if message:
                         emit(message)
                     emit(render_passage(passage, width, plain, color))
@@ -821,20 +841,16 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                     from sol.workspace.reader import safe_output
                     outcome = workspace_reader.execute(verb, arguments, session)
                     if outcome.open_id:
-                        reference = workspace_reader.current_reference(session, outcome.open_id)
-                        passage = session.open(reference.target_id)
-                        workspace_reader.resumed_reference = reference
-                        workspace_reader.checkpoint(session, cwd, previous_cwd)
+                        passage = actions.open(outcome.open_id)
                         emit(render_passage(passage, width, plain, color))
                     if outcome.text:
                         emit(safe_output(outcome.text))
                     continue
                 if verb in {"search", "tree", "guide"}:
                     options = shell_options(verb, arguments)
-                    node, path = resolve_path(options.path, cwd, book.root)
+                    node, path = actions.locate(options.path)
                     if verb == "search":
-                        matches = book.search(options.query, path, options.word, options.limit)
-                        results = matches
+                        matches = actions.search(options.query, path, options.word, options.limit)
                         emit(render_search_results(matches, options.query, width, options.word))
                     elif verb == "tree":
                         emit(render_tree(node, depth=options.depth))
@@ -862,55 +878,39 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                 elif verb == "neofetch":
                     if argument is not None:
                         raise ValueError("neofetch does not take an argument")
-                    emit(render_neofetch(book, cwd, width, color and not plain))
+                    emit(render_neofetch(book, actions.cwd, width, color and not plain))
                 elif verb == "pwd":
                     if argument is not None:
                         raise ValueError("pwd does not take an argument")
-                    emit(display_path(cwd))
+                    emit(display_path(actions.cwd))
                 elif verb in {"next", "previous", "prev"}:
                     if argument is not None:
                         raise ValueError(f"{verb} does not take a path")
-                    passage = session.move(1 if verb == "next" else -1)
-                    if workspace_reader is not None:
-                        workspace_reader.checkpoint(session, cwd, previous_cwd)
+                    passage = actions.move(1 if verb == "next" else -1)
                     emit(render_passage(passage, width, plain, color))
                 elif verb in {"cd", "up"}:
                     if verb == "up" and argument is not None:
                         raise ValueError("up does not take an argument")
                     if verb == "cd" and argument == "-":
-                        if previous_cwd is None:
-                            raise ValueError("no previous directory")
-                        node, path = resolve_path(display_path(previous_cwd), (), book.root)
+                        actions.back()
                     else:
-                        node, path = resolve_path(".." if verb == "up" else argument or "/", cwd, book.root)
-                    if not node.is_directory:
-                        raise ValueError("not a directory")
-                    if path != cwd:
-                        previous_cwd = cwd
-                        cwd = path
-                        if workspace_reader is None:
-                            session.path, session.cursor = cwd, None
+                        if verb == "up":
+                            actions.up()
                         else:
-                            # Browsing and reading are independent in a workspace.
-                            workspace_reader.checkpoint(session, cwd, previous_cwd)
+                            _, path = actions.locate(argument or "/")
+                            actions.browse(path)
                 elif verb == "open":
                     if argument is None:
                         raise ValueError("open requires a passage ID or search result number")
                     if argument.isdecimal():
-                        number = int(argument)
-                        if not 1 <= number <= len(results):
-                            raise ValueError("no such result in the latest search")
-                        identifier = results[number - 1].identifier
+                        passage = actions.open_result(int(argument))
                     else:
-                        identifier = argument
-                    passage = session.open(identifier)
-                    if workspace_reader is not None:
-                        workspace_reader.resumed_reference = workspace_reader.current_reference(session, identifier)
-                        workspace_reader.checkpoint(session, cwd, previous_cwd)
+                        passage = actions.open(argument)
                     emit(render_passage(passage, width, plain, color))
                 elif verb == "context":
                     radius = 1 if argument is None else int(argument)
-                    emit(render_context(book, session.current(), radius, width, plain, color))
+                    emit("\n\n".join(render_passage(item, width, plain, color)
+                                     for item in actions.context(radius)))
                 elif verb == "where":
                     if argument is not None:
                         raise ValueError("where does not take an argument")
@@ -920,15 +920,13 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
                     emit(f"Position {session.cursor + 1} of {len(book.selection(session.path))} "
                           f"in {display_path(session.path)}")
                 elif verb in {"ls", "read", "first", "cat", "info"}:
-                    node, path = resolve_path(argument, cwd, book.root)
+                    node, path = actions.locate(argument)
                     if verb == "ls":
                         emit(render_listing(node))
                     elif verb == "info":
                         emit(render_info(book, node, path, width))
                     elif verb in {"read", "first"}:
-                        passage = session.read(path, verb == "first")
-                        if workspace_reader is not None:
-                            workspace_reader.checkpoint(session, cwd, previous_cwd)
+                        passage = actions.read(path, verb == "first")
                         emit(render_passage(passage, width, plain, color))
                     else:
                         if node.is_directory:
@@ -940,10 +938,6 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
             except KeyboardInterrupt:
                 emit("Command cancelled.")
             except (ValueError, RuntimeError) as error:
-                if workspace_reader is not None:
-                    from sol.workspace.store import WorkspaceError
-                    if isinstance(error, WorkspaceError):
-                        cwd, previous_cwd, session.path, session.cursor, workspace_reader.resumed_reference = before_command
                 emit(f"sol: {error}")
     finally:
         restore()
@@ -953,6 +947,13 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
             source_pane.cleanup()
         if comparison_pane is not None:
             comparison_pane.cleanup()
+        if essence_pane is not None:
+            essence_pane.cleanup()
+        if handoff is not None:
+            try:
+                handoff.close()
+            except (ValueError, OSError) as error:
+                emit(f"sol: temporary ESSENCE cleanup incomplete; data retained at {handoff.directory}: {error}")
 
 
 
@@ -1186,23 +1187,18 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
             return run_shell(book, width, args.plain, color, reader,
                              ui_mode=args.ui or 'auto', editing_mode=args.editing_mode or 'emacs',
                              source_pdf=args.source_pdf, auto_width=args.width is None)
-        session = ReadingSession(book)
-        cwd, previous = (), None
+        actions = ReaderActions(book, reader, session=ReadingSession(book))
         if args.resume:
-            cwd, previous, passage, message = reader.restore(session, args.resume_revision)
+            passage, message = actions.restore(args.resume_revision)
             if message:
                 print(message, file=sys.stderr)
             # Latest resume is inspection; a historical resume appends a new visit.
         elif args.passage is not None:
-            reference = reader.current_reference(session, args.passage)
-            passage = session.open(reference.target_id)
-            reader.resumed_reference = reference
-            reader.checkpoint(session, cwd, previous)
+            passage = actions.open(args.passage)
         else:
             value = args.first if args.first is not None else args.read
-            _, path = resolve_path(value, (), book.root)
-            passage = session.read(path, args.first is not None)
-            reader.checkpoint(session, cwd, previous)
+            _, path = actions.locate(value)
+            passage = actions.read(path, args.first is not None)
         if args.json:
             data = passage_data(passage, book)
             data["workspace"] = {"name": args.workspace, "corpus_id": identity,
@@ -1217,6 +1213,12 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "analyze":
+        from sol.essence.cli import main as analyze_main
+        return analyze_main(arguments[1:])
+    if arguments and arguments[0] == "reference":
+        from sol.terminal.reference import main as reference_main
+        return reference_main(arguments[1:])
     if arguments and arguments[0] in {"read", "compare"}:
         from sol.terminal.commands import main as command_main
         return command_main(arguments)
@@ -1339,7 +1341,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             value = args.first if args.first is not None else args.read
             _, path = resolve_path(value, (), book.root)
-            passage = ReadingSession(book).read(path, args.first is not None)
+            passage = ReaderActions(book, session=ReadingSession(book)).read(path, args.first is not None)
             if args.json:
                 emit_json(passage_data(passage, book))
             else:

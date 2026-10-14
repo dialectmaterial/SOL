@@ -24,3 +24,6 @@ dist/
 *.sqlite3-*
 *.sol-workspace.json
 *.sol-workspace.md
+
+# Local analysis artifacts can include passages from the private corpus.
+*.sol-analysis.json

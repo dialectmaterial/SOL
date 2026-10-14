@@ -17,9 +17,10 @@ import unicodedata
 _COMMANDS = (
     "ls", "cd", "up", "pwd", "tree", "read", "first", "next", "previous", "prev",
     "cat", "search", "open", "context", "info", "where",
-    "neofetch", "guide", "source", "compare", "help", "exit", "quit",
+    "neofetch", "guide", "source", "compare", "essence", "help", "exit", "quit",
 )
 _SUBCOMMANDS = {
+    "essence": ("open", "check", "return", "close"),
     "workspace": ("export", "check", "backup", "upgrade", "history"),
     "bookmark": ("add", "set", "list", "open", "remove"),
     "note": ("add", "draft", "list", "show", "edit", "history"),
@@ -207,6 +208,9 @@ class CompletionCatalog:
             elif verb == "source":
                 choices = (("show", "close", "set-pdf", "info") if not arguments else
                            self.record_ids if arguments == ["show"] else ())
+            elif verb == "essence":
+                choices = (_SUBCOMMANDS["essence"] if not arguments else
+                           ("--accept-move",) if arguments == ["return"] else ())
             elif self.workspace and verb in _SUBCOMMANDS and not arguments:
                 choices = _SUBCOMMANDS[verb]
             elif previous == "--on":

@@ -168,8 +168,8 @@ archives. Inside a repository, a different output location must also be explicit
 ignored. Source material and extracted text remain local; the public repository
 contains adapters, contracts, documentation, and invented test fixtures.
 
-The next architectural steps are semantic/interface separation and a minimal
-cross-process CORE reference protocol, followed by one reversible BEING–ESSENCE
-handoff. This extraction phase does not implement that protocol, a new terminal,
-or an ESSENCE computation environment. See the [modularity contract](MODULARITY.md)
+The [reader action seam](READER_ACTIONS.md) and [CORE reference protocol](REFERENCE_PROTOCOL.md)
+are implemented separately. The next boundary is one reversible BEING–ESSENCE
+handoff. This extraction phase does not launch a new terminal or create an ESSENCE
+computation environment. See the [modularity contract](MODULARITY.md)
 and [historical OpenDataLoader investigation](research/OPENDATALOADER_RESEARCH.md).

@@ -19,8 +19,12 @@ class Reference:
 
 
 def resolve_reference(book, identifier: str) -> Reference:
+    return resolve_record_reference(book.canonical_records, identifier)
+
+
+def resolve_record_reference(records, identifier: str) -> Reference:
+    """Use the same identity rules for the full canonical graph or reader view."""
     key = identifier.strip().lower()
-    records = book.canonical_records
     if not key:
         raise ValueError("a canonical record ID is required")
     if key in records:

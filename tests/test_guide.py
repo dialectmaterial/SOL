@@ -78,6 +78,8 @@ class GuideTests(unittest.TestCase):
         self.assertIn("not concepts", " ".join(text.split()))
         self.assertIn("Book paths are virtual", text)
         self.assertIn("never runs your host shell or edits canonical text", text)
+        self.assertIn("Optional essence opens real Zsh", text)
+        self.assertIn("accept returns explicitly in BEING", text)
         self.assertIn("checkpoints stay local", text)
 
     def test_source_free_guide_explains_configuration_without_loading_or_conversion(self):

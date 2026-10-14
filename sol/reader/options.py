@@ -11,7 +11,10 @@ from sol import __version__ as VERSION
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sol", description="Read and navigate Hegel's Science of Logic.",
                                      epilog="Native shell commands: sol read FILE [--plain|--markdown|--json]; "
-                                            "sol compare FILE_A FILE_B [--question TEXT]. Use COMMAND --help for details.")
+                                            "sol compare FILE_A FILE_B [--question TEXT]; "
+                                            "sol reference capture ID; sol reference check [FILE|-]; "
+                                            "sol analyze term WORD; sol analyze check FILE. "
+                                            "Use COMMAND --help for details.")
     parser.add_argument("command", nargs="?", choices=("guide",), help="open the beginner guide")
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     mode = parser.add_mutually_exclusive_group()

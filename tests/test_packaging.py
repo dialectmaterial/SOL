@@ -20,9 +20,10 @@ import zipfile
 PACKAGE_FILES = {
     "sol/__init__.py", "sol/__main__.py",
     "sol/core/__init__.py", "sol/core/config.py", "sol/core/corpus.py",
-    "sol/core/models.py", "sol/core/paths.py", "sol/core/references.py",
+    "sol/core/models.py", "sol/core/paths.py", "sol/core/references.py", "sol/core/protocol.py", "sol/core/wire.py",
+    "sol/essence/__init__.py", "sol/essence/terms.py", "sol/essence/cli.py",
     "sol/reader/__init__.py", "sol/reader/app.py", "sol/reader/models.py", "sol/reader/legacy_pdf.py",
-    "sol/reader/options.py",
+    "sol/reader/options.py", "sol/reader/actions.py",
     "sol/corpus/__init__.py", "sol/corpus/convert.py", "sol/corpus/contract.py", "sol/corpus/notes.py",
     "sol/corpus/references.py", "sol/corpus/structure.py", "sol/corpus/layout.py", "sol/corpus/edition.py",
     "sol/corpus/extraction.py", "sol/corpus/ingest.py",
@@ -31,6 +32,7 @@ PACKAGE_FILES = {
     "sol/workspace/diagnostics.py", "sol/workspace/catalog.py", "sol/workspace/export.py",
     "sol/workspace/profiles.py", "sol/workspace/comparison.py", "sol/terminal/__init__.py", "sol/terminal/prompt.py",
     "sol/terminal/source.py", "sol/terminal/kitty.py", "sol/terminal/comparison.py", "sol/terminal/commands.py",
+    "sol/terminal/reference.py", "sol/terminal/handoff.py", "sol/terminal/essence.py",
 }
 ENTRY_POINTS = {
     "sol": "sol:cli",
@@ -41,6 +43,10 @@ ENTRY_POINTS = {
 PUBLIC_FILES = {
     "pyproject.toml", "MANIFEST.in", "README.md", "docs/CORPUS.md", "docs/USAGE.md",
     "docs/WORKSPACE_PLAN.md", "docs/WORKSPACE_EXPORT.md", "docs/MODULARITY.md", "docs/EXTRACTION.md",
+    "docs/READER_ACTIONS.md",
+    "docs/REFERENCE_PROTOCOL.md",
+    "docs/HANDOFF.md",
+    "docs/TERM_STUDY.md",
     "docs/research/INTERFACE_RESEARCH.md", "docs/research/OPENDATALOADER_RESEARCH.md",
 } | PACKAGE_FILES
 
@@ -129,7 +135,8 @@ class PackagingTests(unittest.TestCase):
                          "reading.sqlite3", "reading.sqlite3-wal", "reading.sqlite3-shm",
                          "tests/private-workspace/reading.sqlite3-journal",
                          "profiles.sqlite3", "tests/private-profile/profiles.sqlite3-wal",
-                         "personal.sol-workspace.json",
+                         "personal.sol-workspace.json", "personal.sol-analysis.json",
+                         "tests/private-workspace/personal.sol-analysis.json",
                          "personal.sol-workspace.md", "tests/private-workspace/personal.sol-workspace.md",
                          "AGENTS.md"):
             sentinel = cls.stage / relative
@@ -138,7 +145,7 @@ class PackagingTests(unittest.TestCase):
         # Deliberately nominate the workspace sentinels before the real exclusions,
         # so this test exercises MANIFEST.in rather than an incidental omission.
         manifest = cls.stage / "MANIFEST.in"
-        manifest.write_text("recursive-include . *.sqlite3 *.sqlite3-* *.sol-workspace.json *.sol-workspace.md\n"
+        manifest.write_text("recursive-include . *.sqlite3 *.sqlite3-* *.sol-workspace.json *.sol-workspace.md *.sol-analysis.json\n"
                             "recursive-include .sol-extractions *\nrecursive-include .sol-ingest-work *\n"
                             + manifest.read_text(encoding="utf-8"), encoding="utf-8")
         cls.dist = Path(cls.temporary.name) / "dist"
@@ -197,7 +204,8 @@ class PackagingTests(unittest.TestCase):
                          ".sol-ingest-work", "AGENTS.md"}
         for name in names:
             self.assertFalse(private_parts.intersection(Path(name).parts), name)
-            self.assertFalse(name.endswith((".pdf", ".png", ".zip", ".jsonl", ".sol-workspace.json", ".sol-workspace.md")), name)
+            self.assertFalse(name.endswith((".pdf", ".png", ".zip", ".jsonl", ".sol-workspace.json", ".sol-workspace.md",
+                                           ".sol-analysis.json")), name)
             self.assertFalse(Path(name).name.endswith(".sqlite3")
                              or ".sqlite3-" in Path(name).name, name)
 
@@ -253,6 +261,46 @@ assert 'markdown_it' not in sys.modules
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertIn("usage:", result.stdout)
 
+    def test_installed_experiment_runs_without_reader_workspace_or_optional_libraries(self):
+        installed = Path(self.temporary.name) / "term-study-wheel"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        corpus = Path(self.temporary.name) / "installed-experiment-corpus"
+        write_runtime_corpus(corpus)
+        from sol.corpus.contract import initialize_corpus_identity
+        initialize_corpus_identity(corpus)
+        before = {path.name: path.read_bytes() for path in corpus.iterdir()}
+        program = """
+import builtins, contextlib, io, json, sys
+sys.path.insert(0, sys.argv[1])
+forbidden = ('sol.reader', 'sol.workspace', 'sol.terminal', 'prompt_toolkit',
+             'markdown_it', 'rich', 'textual', 'openai', 'pypdf', 'pdfplumber',
+             'sol.corpus.convert', 'sol.corpus.extraction', 'opendataloader_pdf')
+original_import = builtins.__import__
+def guard(name, *args, **kwargs):
+    if any(name == prefix or name.startswith(prefix + '.') for prefix in forbidden):
+        raise AssertionError('Experiment imported unrelated component ' + name)
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = guard
+from sol.essence.cli import main
+from sol.essence.terms import check_term_result
+from sol.core import load_snapshot
+output = io.StringIO()
+with contextlib.redirect_stdout(output):
+    assert main(['term', 'invented', '--corpus', sys.argv[2], '--json']) == 0
+result = json.loads(output.getvalue())
+assert result['totals']['occurrences'] == 1
+assert check_term_result(load_snapshot(sys.argv[2]), result) == result
+assert not any(name == prefix or name.startswith(prefix + '.')
+               for name in sys.modules for prefix in forbidden)
+print(json.dumps({'query': result['query'], 'occurrences': result['totals']['occurrences']}))
+"""
+        completed = subprocess.run([sys.executable, "-I", "-B", "-c", program, str(installed), str(corpus)],
+                                   cwd=self.temporary.name, capture_output=True, text=True)
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertEqual(json.loads(completed.stdout), {"query": "invented", "occurrences": 1})
+        self.assertEqual(before, {path.name: path.read_bytes() for path in corpus.iterdir()})
+
     def test_core_only_wheel_proves_interface_dependency_boundary(self):
         """Release-gate fixture only: this is not another installable SOL product."""
         fixture = Path(self.temporary.name) / "core-only-release-gate"
@@ -300,6 +348,8 @@ assert 'markdown_it' not in sys.modules
             self.assertFalse((installed / "sol" / directory).exists())
         corpus = fixture / "invented-corpus"
         passage_id, body = write_runtime_corpus(corpus)
+        from sol.corpus.contract import initialize_corpus_identity
+        initialize_corpus_identity(corpus)  # Explicit fixture setup, never automatic protocol behavior.
         fingerprints = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
                         for path in corpus.iterdir() if path.is_file()}
         elsewhere = fixture / "outside-source-and-installation"
@@ -332,6 +382,10 @@ reference = core.resolve_reference(book, sys.argv[3])
 assert isinstance(reference, core.Reference)
 assert reference.requested_id == reference.target_id == passage.identifier
 assert reference.chain == (passage.identifier,)
+packet = core.capture_reference(snapshot, passage.identifier)
+checked = core.check_reference(snapshot, core.decode_reference(core.encode_reference(packet)))
+assert checked.requested_id == checked.target_id == passage.identifier
+assert core.PROTOCOL_VERSION == packet['version'] == 1
 node, path = core.resolve_path('/being/synthetic', (), book.root)
 assert isinstance(node, core.Node)
 assert core.child_by_name(book.root, 'being') is node.parent

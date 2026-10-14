@@ -335,6 +335,104 @@ class ComparisonPane(SourcePane):
     viewer_option = "--comparison-viewer"
 
 
+class EssencePane(SourcePane):
+    """Own an interactive ESSENCE window; its transport belongs to the reader."""
+
+    pane_name = "essence"
+    pane_title = "SOL ESSENCE"
+
+    def __init__(self):
+        super().__init__()
+        self._owned_window_id: int | None = None
+
+    @staticmethod
+    def _validated_directory(value: Path, label: str) -> Path:
+        try:
+            path = Path(value).expanduser()
+            if any(character in str(path) for character in "\r\n\0"):
+                raise KittyError(f"The {label} directory cannot contain line breaks or NUL characters.")
+            path = path.absolute()
+            if any(component.is_symlink() for component in (path, *path.parents)):
+                raise KittyError(f"The {label} directory cannot use symbolic links.")
+            path = path.resolve(strict=True)
+            if not path.is_dir():
+                raise KittyError(f"The {label} directory is not a directory: {path}")
+        except KittyError:
+            raise
+        except (OSError, TypeError, ValueError, RuntimeError) as error:
+            raise KittyError(f"Invalid {label} directory: {error}") from error
+        return path
+
+    def _require_pinned_session(self) -> None:
+        reader = self.reader_id
+        try:
+            self._require_session()
+        except KittyError:
+            self.reader_id = reader
+            raise
+        if reader is not None and reader != self.reader_id:
+            self.reader_id = reader
+            raise KittyError("The ESSENCE pane belongs to a different reader window.")
+
+    def _owned_identifier(self) -> int:
+        identifier = self._owned_window_id
+        if (not isinstance(identifier, int) or isinstance(identifier, bool) or identifier < 1
+                or identifier != self.window_id):
+            raise KittyError("Refusing to control an unowned ESSENCE window.")
+        if identifier == self.reader_id:
+            raise KittyError("Refusing to control the reader as an ESSENCE pane.")
+        return identifier
+
+    def _forget(self) -> None:
+        # The reader owns the transport and may still need its returned location.
+        self.window_id = self._owned_window_id = None
+
+    def show(self, directory: Path, corpus: Path) -> int:
+        directory = self._validated_directory(directory, "handoff")
+        corpus = self._validated_directory(corpus, "corpus")
+        self._require_pinned_session()
+        if self.window_id is not None:
+            self._owned_identifier()
+            if self._is_open():
+                raise KittyError("An ESSENCE handoff is already open; return or close it before opening another.")
+            self._forget()
+        package_root = str(Path(__file__).resolve().parents[2])
+        if any(character in package_root for character in "\r\n\0"):
+            raise KittyError("The ESSENCE package path cannot contain line breaks or NUL characters.")
+        # Isolated mode prevents a corpus-local package or ambient PYTHONPATH
+        # from replacing SOL. The trusted checkout path remains an argument.
+        bootstrap = ("import sys; sys.path.insert(0, sys.argv.pop(1)); import runpy; "
+                     "runpy.run_module('sol.terminal.essence', run_name='__main__')")
+        response = self._remote(
+            "launch", "--match", f"window_id:{self.reader_id}",
+            "--source-window", f"id:{self.reader_id}", "--next-to", f"id:{self.reader_id}",
+            "--location", "vsplit", "--dont-take-focus", "--title", self.pane_title,
+            "--cwd", str(corpus),
+            "--env=KITTY_LISTEN_ON", "--env=KITTY_RC_PASSWORD", "--env=SOL_KITTY_SESSION",
+            "--env=SOL_CORPUS=" + str(corpus), "--env=SOL_HANDOFF_DIR=" + str(directory),
+            sys.executable, "-I", "-B", "-c", bootstrap, package_root,
+            "--handoff-dir", str(directory), "--corpus", str(corpus),
+        )
+        identifier = _number(response.strip() if isinstance(response, str) else response, "essence window")
+        if identifier == self.reader_id:
+            raise KittyError("kitty returned the reader window as the ESSENCE pane; refusing ownership.")
+        self.window_id = self._owned_window_id = identifier
+        return identifier
+
+    def close(self) -> None:
+        if self.window_id is not None:
+            identifier = self._owned_identifier()
+            self._require_pinned_session()
+            self._remote("close-window", "--match", f"id:{identifier}", "--ignore-no-match")
+        self._forget()
+
+    def cleanup(self) -> None:
+        try:
+            self.close()
+        except KittyError:
+            self._forget()
+
+
 @dataclass(frozen=True)
 class WindowSize:
     columns: int

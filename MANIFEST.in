@@ -14,4 +14,4 @@ prune .sol-ingest-work
 prune .venv
 prune build
 prune dist
-global-exclude *.pdf *.png *.jpg *.jpeg *.zip *.jsonl *.py[cod] *.sqlite3 *.sqlite3-* *.sol-workspace.json *.sol-workspace.md
+global-exclude *.pdf *.png *.jpg *.jpeg *.zip *.jsonl *.py[cod] *.sqlite3 *.sqlite3-* *.sol-workspace.json *.sol-workspace.md *.sol-analysis.json
