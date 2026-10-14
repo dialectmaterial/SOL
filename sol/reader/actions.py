@@ -22,6 +22,15 @@ class ReadingSession:
     book: Book
     path: tuple[str, ...] = ()
     cursor: int | None = None
+    cursor_offset: int = 0
+    viewport_offset: int | None = None
+
+    def _position(self, path, index, passage):
+        previous = None if self.cursor is None else self.current().identifier
+        self.path, self.cursor = path, index
+        if previous != passage.identifier:
+            self.cursor_offset, self.viewport_offset = 0, None
+        return passage
 
     def current(self) -> Passage:
         if self.cursor is None:
@@ -30,18 +39,16 @@ class ReadingSession:
 
     def open(self, identifier: str) -> Passage:
         passage = self.book.find_passage(identifier)
-        if self.cursor is None or passage.path[:len(self.path)] != self.path:
-            self.path = passage.path
-        matches = self.book.selection(self.path)
-        self.cursor = next(index for index, item in enumerate(matches)
-                           if item.identifier == passage.identifier)
-        return passage
+        path = passage.path if self.cursor is None or passage.path[:len(self.path)] != self.path else self.path
+        matches = self.book.selection(path)
+        index = next(index for index, item in enumerate(matches)
+                     if item.identifier == passage.identifier)
+        return self._position(path, index, passage)
 
     def read(self, path: tuple[str, ...], first: bool = False) -> Passage:
         matches = self.book.selection(path)
         if first:
-            self.path, self.cursor = path, 0
-            return matches[0]
+            return self._position(path, 0, matches[0])
         candidates = [index for index, p in enumerate(matches)
                       if p.kind != "formula" and p.random_eligible
                       and len(re.findall(r"[A-Za-z]{2,}", p.text)) >= 8]
@@ -52,8 +59,7 @@ class ReadingSession:
         if not candidates:
             raise ValueError("this file has no suitable random prose paragraph; use cat")
         index = random.choice(candidates)
-        self.path, self.cursor = path, index
-        return matches[index]
+        return self._position(path, index, matches[index])
 
     def move(self, offset: int) -> Passage:
         if self.cursor is None and offset < 0:
@@ -64,8 +70,7 @@ class ReadingSession:
             raise ValueError("already at the beginning of this selection")
         if index >= len(matches):
             raise ValueError("already at the end of this selection")
-        self.cursor = index
-        return matches[index]
+        return self._position(self.path, index, matches[index])
 
 
 def context_passages(book: Book, passage: Passage, radius: int) -> list[Passage]:
@@ -103,6 +108,8 @@ class ReaderState:
     can_go_forward: bool
     search_query: str | None
     results: tuple[Passage, ...]
+    cursor_offset: int = 0
+    viewport_offset: int | None = None
 
 
 @dataclass(frozen=True)
@@ -115,6 +122,8 @@ class _ReadingContext:
     selection: TextSelection | None
     search_query: str | None
     result_ids: tuple[str, ...]
+    cursor_offset: int
+    viewport_offset: int | None
 
 
 @dataclass(frozen=True)
@@ -131,6 +140,9 @@ class _LocalState:
     results: tuple[Passage, ...]
     trail: tuple[_ReadingContext, ...]
     history_index: int
+    cursor_offset: int
+    viewport_offset: int | None
+    preferred_column: int | None
 
 
 class ReaderActions:
@@ -155,6 +167,7 @@ class ReaderActions:
         self._requested_id: str | None = None
         self._requested_target: str | None = None
         self._selection: TextSelection | None = None
+        self._preferred_column: int | None = None
         self._trail = (self._context(),)
         self._history_index = 0
 
@@ -168,7 +181,8 @@ class ReaderActions:
             current.identifier if current is not None else None,
             self.current_reference_id() if current is not None else None,
             self._selection, self.search_query,
-            tuple(passage.identifier for passage in self.results))
+            tuple(passage.identifier for passage in self.results),
+            self.session.cursor_offset, self.session.viewport_offset)
 
     def _amend_context(self):
         context = self._context()
@@ -191,7 +205,8 @@ class ReaderActions:
         return _LocalState(self.cwd, self.previous_cwd, self.session.path,
                            self.session.cursor, reference, self._requested_id, self._requested_target,
                            self._selection, self.search_query, tuple(self.results),
-                           self._trail, self._history_index)
+                           self._trail, self._history_index, self.session.cursor_offset,
+                           self.session.viewport_offset, self._preferred_column)
 
     def _rollback(self, state):
         self.cwd, self.previous_cwd = state.cwd, state.previous_cwd
@@ -200,6 +215,8 @@ class ReaderActions:
         self._selection, self.search_query = state.selection, state.search_query
         self.results = list(state.results)
         self._trail, self._history_index = state.trail, state.history_index
+        self.session.cursor_offset, self.session.viewport_offset = state.cursor_offset, state.viewport_offset
+        self._preferred_column = state.preferred_column
         if self.workspace_reader is not None:
             self.workspace_reader.resumed_reference = state.resumed_reference
 
@@ -217,10 +234,14 @@ class ReaderActions:
                     self._validate_selection(self._selection)
             destination = self._context()
             changed = self._navigation_key(origin) != self._navigation_key(destination)
+            if origin.current_id != destination.current_id:
+                self._preferred_column = None
             if checkpoint and self.workspace_reader is not None:
                 self.workspace_reader.checkpoint(self.session, self.cwd, self.previous_cwd)
             if history and changed:
                 self._append_context(destination)
+            elif history:
+                self._amend_context()
             return result
         except (ValueError, RuntimeError):
             self._rollback(before)
@@ -290,12 +311,136 @@ class ReaderActions:
         selected = TextSelection(requested_id, current.identifier, start, end,
                                  plain_text[start:end], content_digest, plain_digest)
         self._selection = selected
+        if self.session.cursor_offset not in {start, end}:
+            self.session.cursor_offset = end
+            self._preferred_column = None
         self._amend_context()
         return selected
 
     def clear_selection(self):
         self._selection = None
         self._amend_context()
+
+    @property
+    def cursor_offset(self):
+        """Insertion boundary in canonical plain text, never a display column."""
+        return self.session.cursor_offset
+
+    def set_cursor(self, offset):
+        """Move the transient source cursor without a checkpoint or new visit."""
+        current = self.snapshot().current
+        if current is None:
+            raise ValueError("no current paragraph; use first, read, or open")
+        if type(offset) is not int or not 0 <= offset <= len(current.text):
+            raise ValueError("cursor offset must be an integer boundary within the source text")
+        self.session.cursor_offset = offset
+        self._preferred_column = None
+        self._amend_context()
+        return offset
+
+    def set_viewport(self, offset):
+        """Remember a source boundary at the viewport top, without persisting."""
+        current = self.snapshot().current
+        if current is None:
+            raise ValueError("no current paragraph; use first, read, or open")
+        if offset is not None and (type(offset) is not int or not 0 <= offset <= len(current.text)):
+            raise ValueError("viewport offset must be a source boundary or None")
+        self.session.viewport_offset = offset
+        self._amend_context()
+        return offset
+
+    def move_horizontal(self, delta):
+        if type(delta) is not int:
+            raise ValueError("cursor movement must be an integer")
+        current = self.session.current()
+        return self.set_cursor(max(0, min(len(current.text), self.cursor_offset + delta)))
+
+    def _move_vertical(self, rows, width=None, *, layout=None):
+        from sol.reader.navigation import source_layout, validate_layout, vertical_offset
+        if type(rows) is not int:
+            raise ValueError("cursor row movement must be an integer")
+        current = self.snapshot().current
+        if current is None:
+            raise ValueError("no current paragraph; use first, read, or open")
+        positions = (source_layout(current.text, width) if layout is None
+                     else validate_layout(layout, len(current.text)))
+        offset, preferred = vertical_offset(positions, self.cursor_offset, rows, self._preferred_column)
+        self.session.cursor_offset, self._preferred_column = offset, preferred
+        self._amend_context()
+        return offset
+
+    def move_up(self, width=None, *, layout=None):
+        return self._move_vertical(-1, width, layout=layout)
+
+    def move_down(self, width=None, *, layout=None):
+        return self._move_vertical(1, width, layout=layout)
+
+    def half_page(self, direction, rows, width=None, *, layout=None):
+        if type(direction) is not int or direction not in {-1, 1}:
+            raise ValueError("half-page direction must be -1 or 1")
+        if type(rows) is not int or rows < 1:
+            raise ValueError("visible row count must be a positive integer")
+        return self._move_vertical(direction * max(1, rows // 2), width, layout=layout)
+
+    def move_paragraph(self, offset):
+        """Visit a neighboring semantic paragraph at its beginning."""
+        if type(offset) is not int:
+            raise ValueError("paragraph movement must be an integer")
+        def change():
+            passage = self.session.move(offset)
+            if self._requested_target != passage.identifier:
+                self._requested_id = self._requested_target = None
+            self.session.cursor_offset, self.session.viewport_offset = 0, None
+            self._preferred_column = None
+            return passage
+        return self._transition(change)
+
+    def jump(self, where):
+        """Jump to a source boundary or the beginning/end of the reading scope."""
+        if where in {"passage-start", "passage-end"}:
+            current = self.session.current()
+            return self.set_cursor(0 if where == "passage-start" else len(current.text))
+        if where not in {"scope-start", "scope-end"}:
+            raise ValueError("jump needs passage-start/end or scope-start/end")
+        scope = self.session.path
+        matches = self.book.selection(scope)
+        index = 0 if where == "scope-start" else len(matches) - 1
+        def change():
+            passage = self.session._position(scope, index, matches[index])
+            if self._requested_target != passage.identifier:
+                self._requested_id = self._requested_target = None
+            self.session.cursor_offset = 0 if where == "scope-start" else len(passage.text)
+            self.session.viewport_offset = None
+            self._preferred_column = None
+            return passage
+        return self._transition(change)
+
+    def search_next(self, reverse=False):
+        """Visit the next/previous passage in the latest literal search, wrapping."""
+        if type(reverse) is not bool:
+            raise ValueError("reverse search direction must be a boolean")
+        if not self.results:
+            raise ValueError("no search results; search the book first")
+        current = self._current()
+        index = next((index for index, passage in enumerate(self.results)
+                      if current is not None and passage.identifier == current.identifier), None)
+        target = ((index + (-1 if reverse else 1)) % len(self.results) if index is not None
+                  else len(self.results) - 1 if reverse else 0)
+        return self.open_result(target + 1)
+
+    def save_position(self):
+        """Save a changed semantic position explicitly using existing CAS guards.
+
+        Returns a legacy-schema warning or an empty success value. Temporary readers and older
+        injected workspace adapters have no position-saving side effects.
+        """
+        if self._current() is None or self.workspace_reader is None:
+            return None
+        save = getattr(self.workspace_reader, "save_position", None)
+        if save is None:
+            return None
+        return self._transition(lambda: save(self.session, self.cwd, self.previous_cwd),
+                                checkpoint=False, history=False)
 
     def _history_target(self, direction):
         index = self._history_index + direction
@@ -328,6 +473,11 @@ class ReaderActions:
             results = [self.book.find_passage(identifier) for identifier in context.result_ids]
             self.cwd, self.previous_cwd = context.cwd, context.previous_cwd
             self.session.path, self.session.cursor = context.scope, cursor
+            if not 0 <= context.cursor_offset <= len(passage.text):
+                raise ValueError("The historical cursor is no longer within its source text")
+            self.session.cursor_offset = context.cursor_offset
+            self.session.viewport_offset = context.viewport_offset
+            self._preferred_column = None
             self._requested_id, self._requested_target = context.requested_id, context.current_id
             if self.workspace_reader is not None:
                 self.workspace_reader.resumed_reference = reference
@@ -349,11 +499,19 @@ class ReaderActions:
         expected_id = self._trail[self._history_index].current_id
         if (None if current is None else current.identifier) != expected_id:
             raise ValueError("The current reader projection disagrees with its reading context; reopen SOL")
+        if (type(self.session.cursor_offset) is not int or self.session.cursor_offset < 0
+                or self.session.cursor_offset > (0 if current is None else len(current.text))):
+            raise ValueError("The reader cursor is outside its source text; reopen SOL")
+        viewport = self.session.viewport_offset
+        if viewport is not None and (type(viewport) is not int or current is None
+                                     or not 0 <= viewport <= len(current.text)):
+            raise ValueError("The reader viewport anchor is outside its source text; reopen SOL")
         return ReaderState(current, self.cwd, self.session.path,
                            self.current_reference_id() if current is not None else None,
                            self.selection, self._history_target(-1) is not None,
                            self._history_target(1) is not None, self.search_query,
-                           tuple(self.results))
+                           tuple(self.results), self.session.cursor_offset,
+                           self.session.viewport_offset)
 
     def locate(self, value=None):
         """Resolve a book location; virtual aliases remain a compatibility view."""
@@ -370,6 +528,7 @@ class ReaderActions:
             self.previous_cwd, self.cwd = self.cwd, path
             if self.workspace_reader is None:
                 self.session.path, self.session.cursor = path, None
+                self.session.cursor_offset, self.session.viewport_offset = 0, None
                 self._requested_id = self._requested_target = None
             return node
 

@@ -58,7 +58,7 @@ class AnnotationRevisionTests(unittest.TestCase):
         return self.open(path)
 
     def test_created_note_has_truthful_first_snapshot(self):
-        self.assertEqual(self.workspace.schema_version, 2)
+        self.assertEqual(self.workspace.schema_version, 3)
         note = self.workspace.add_annotation(A, "Personal note.", CONTENT_SHA)
         self.assertEqual(note["revision"], 1)
         history = self.workspace.list_annotation_history(note["id"])
@@ -266,7 +266,7 @@ class AnnotationRevisionTests(unittest.TestCase):
         note = self.workspace.add_annotation(A, "Original.")
         self.workspace.update_annotation(note["id"], "Changed.", expected_revision=1)
         exported = self.workspace.export()
-        self.assertEqual(exported["schema_version"], 2)
+        self.assertEqual(exported["schema_version"], 3)
         self.assertEqual([row["revision"] for row in exported["annotation_history"]], [1, 2])
         exported["annotation_history"][0]["body"] = "change to exported value only"
         exported["annotations"][0]["body"] = "also independent"
@@ -308,7 +308,7 @@ class AnnotationRevisionTests(unittest.TestCase):
         self.assertEqual(legacy.path.read_bytes(), source_bytes)
         self.assertEqual(stable_export(legacy), before)
         self.assertEqual(legacy.schema_version, 1)
-        self.assertEqual(upgraded.schema_version, 2)
+        self.assertEqual(upgraded.schema_version, 3)
         old, new = legacy.get_annotation(C), upgraded.get_annotation(C)
         self.assertEqual({k: v for k, v in new.items() if k != "revision"},
                          {k: v for k, v in old.items() if k != "revision"})
@@ -334,19 +334,19 @@ class AnnotationRevisionTests(unittest.TestCase):
         note = upgraded.add_annotation(A, "New after upgrade.")
         self.assertEqual(upgraded.list_annotation_history(note["id"])[0]["kind"], "created")
 
-    def test_backup_preserves_actual_format_for_v1_and_v2(self):
-        self.workspace.add_annotation(A, "A v2 note.")
+    def test_backup_preserves_actual_format_for_v1_and_current(self):
+        self.workspace.add_annotation(A, "An audited note.")
         for workspace in (self.workspace, self.legacy()):
             target = self.root / f"backup-v{workspace.schema_version}.sqlite3"
             workspace.backup(target)
             copy = self.open(target)
             self.assertEqual(copy.schema_version, workspace.schema_version)
             self.assertEqual(stable_export(copy), stable_export(workspace))
-            if workspace.schema_version == 2:
+            if workspace.schema_version >= 2:
                 self.assertIn("annotation_history", copy.export())
 
-    def test_copy_upgrade_refuses_v2_existing_self_symlink_and_missing_parent(self):
-        with self.assertRaisesRegex(WorkspaceError, "already schema 2"):
+    def test_copy_upgrade_refuses_current_existing_self_symlink_and_missing_parent(self):
+        with self.assertRaisesRegex(WorkspaceError, "already schema 3"):
             self.workspace.upgrade_copy(self.root / "bad.sqlite3")
         legacy = self.legacy()
         target = self.root / "existing.sqlite3"

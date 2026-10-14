@@ -94,7 +94,7 @@ class CatalogTests(unittest.TestCase):
         with database(path) as connection:
             self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 1)
 
-    def test_v2_workspace_is_recognized_without_mutation(self):
+    def test_current_workspace_is_recognized_without_mutation(self):
         path = self.directory / "modern.sqlite3"
         with patch("sol.workspace.store._now", return_value=CREATED):
             with Workspace(path, CORPUS, {"source_sha256": SOURCE}, actor="Dima") as workspace:
@@ -103,7 +103,7 @@ class CatalogTests(unittest.TestCase):
         before = self.fingerprints()
         found = self.discover()
         self.assertEqual(len(found), 1)
-        self.assertEqual(found[0]["schema_version"], 2)
+        self.assertEqual(found[0]["schema_version"], 3)
         self.assertEqual(found[0]["current_id"], PASSAGE)
         self.assertEqual(found[0]["scope"], "/BEING")
         self.assertEqual(found[0]["last_actor"], "Dima")
@@ -172,7 +172,7 @@ class CatalogTests(unittest.TestCase):
         before = self.fingerprints()
         found = self.discover()[0]
         self.assertEqual(found["name"], "upgraded")
-        self.assertEqual(found["schema_version"], 2)
+        self.assertEqual(found["schema_version"], 3)
         self.assertEqual(found["last_activity"], "2025-06-01T00:00:00Z")
         self.assertIsNone(found["last_actor"])
         self.assertEqual(self.fingerprints(), before)

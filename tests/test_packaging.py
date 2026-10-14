@@ -23,7 +23,7 @@ PACKAGE_FILES = {
     "sol/core/models.py", "sol/core/paths.py", "sol/core/references.py", "sol/core/protocol.py", "sol/core/wire.py",
     "sol/essence/__init__.py", "sol/essence/terms.py", "sol/essence/cli.py",
     "sol/reader/__init__.py", "sol/reader/app.py", "sol/reader/models.py", "sol/reader/legacy_pdf.py",
-    "sol/reader/options.py", "sol/reader/actions.py",
+    "sol/reader/options.py", "sol/reader/actions.py", "sol/reader/navigation.py", "sol/reader/typography.py",
     "sol/corpus/__init__.py", "sol/corpus/convert.py", "sol/corpus/contract.py", "sol/corpus/notes.py",
     "sol/corpus/references.py", "sol/corpus/structure.py", "sol/corpus/layout.py", "sol/corpus/edition.py",
     "sol/corpus/extraction.py", "sol/corpus/ingest.py",
@@ -185,15 +185,16 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(dict(entry_points["console_scripts"]), ENTRY_POINTS)
         requirements = metadata.get_all("Requires-Dist") or []
         self.assertEqual(set(metadata.get_all("Provides-Extra") or []), {"corpus", "shell", "extraction"})
-        self.assertEqual(len(requirements), 3)
+        self.assertEqual(len(requirements), 4)
         corpus = [requirement for requirement in requirements if 'extra == "corpus"' in requirement]
         shell = [requirement for requirement in requirements if 'extra == "shell"' in requirement]
         extraction = [requirement for requirement in requirements if 'extra == "extraction"' in requirement]
         self.assertEqual(len(corpus), 1)
-        self.assertEqual(len(shell), 1)
+        self.assertEqual(len(shell), 2)
         self.assertEqual(len(extraction), 1)
         self.assertTrue(corpus[0].startswith("markdown-it-py<4,>=3;"))
-        self.assertTrue(shell[0].startswith("prompt-toolkit<4,>=3.0.52;"))
+        self.assertEqual({requirement.split(";")[0] for requirement in shell},
+                         {"prompt-toolkit<4,>=3.0.52", "markdown-it-py<4,>=3"})
         self.assertTrue(extraction[0].startswith("opendataloader-pdf==2.5.13;"))
 
     def test_sdist_contains_sources_and_docs_without_local_material(self):
@@ -593,7 +594,7 @@ raise SystemExit(status)
         self.assertEqual(resumed["id"], passage_id)
         self.assertEqual(resumed["text"], body)
         exported = json.loads(run("sol.reader.app", [*inspection, "--workspace-export"]).stdout)
-        self.assertEqual(exported["schema_version"], 2)
+        self.assertEqual(exported["schema_version"], 3)
         self.assertEqual(exported["state"]["current_id"], passage_id)
         self.assertEqual(len(exported["annotations"]), 1)
         self.assertEqual(exported["annotations"][0]["actor"], "Installed author")
@@ -695,17 +696,17 @@ with closing(sqlite3.connect(sys.argv[2])) as connection, connection:
         self.assertEqual(original["schema_version"], 1)
         self.assertNotIn("annotation_history", original)
         self.assertIsNone(original["annotations"][0]["revision"])
-        upgraded = storage / "legacy-v2.sqlite3"
+        upgraded = storage / "legacy-v3.sqlite3"
         result = json.loads(run("sol.reader.app", [*arguments, "--workspace-upgrade", str(upgraded), "--json"]).stdout)
         self.assertEqual(result["upgraded_copy"], str(upgraded))
         self.assertEqual(result["source_workspace"], str(legacy))
-        self.assertEqual(result["schema_version"], 2)
+        self.assertEqual(result["schema_version"], 3)
         self.assertEqual(hashlib.sha256(legacy.read_bytes()).hexdigest(), before_digest)
         if os.name == "posix":
             self.assertEqual(upgraded.stat().st_mode & 0o777, 0o600)
-        copy_arguments = ["--corpus", str(corpus), "--workspace", "legacy-v2", "--workspace-dir", str(storage)]
+        copy_arguments = ["--corpus", str(corpus), "--workspace", "legacy-v3", "--workspace-dir", str(storage)]
         baseline = json.loads(run("sol.reader.app", [*copy_arguments, "--workspace-export"]).stdout)
-        self.assertEqual(baseline["schema_version"], 2)
+        self.assertEqual(baseline["schema_version"], 3)
         self.assertEqual(len(baseline["annotation_history"]), 1)
         snapshot = baseline["annotation_history"][0]
         self.assertEqual(snapshot["kind"], "legacy_baseline")

@@ -4,11 +4,14 @@ The first workspace foundation is implemented through the existing CLI and
 command shell. Reading continuity, attributed annotations, comparison, source
 inspection and review testimony, and relations beyond the tree are available
 without installing an interface framework. The optional [reader view](READER_VIEW.md)
-now supplies visible text, local selection, search, and a session reading trail;
+now supplies centered, typographically faithful text, Vim-style movement,
+source-codepoint cursor continuity, local selection, search, and a session reading trail;
 durable selected-span annotations and active investigations remain future work.
 An optional input-only prompt supports multiline
-drafts and revision-aware editing. New workspaces use schema version 2; older
-version-1 workspaces remain readable and are upgraded only through an explicit copy.
+drafts and revision-aware editing. New workspaces use schema version 3; older
+version-1 and version-2 workspaces remain readable and are upgraded only through
+an explicit copy. Version 3 binds optional cursor and viewport source offsets to
+the existing checkpoint revision, resolved target and text fingerprints.
 Interface research is kept separately in
 [INTERFACE_RESEARCH.md](research/INTERFACE_RESEARCH.md).
 
@@ -221,8 +224,9 @@ target. Never quietly match a missing passage by similar wording or page number.
 
 Each named workspace is a local SQLite file, using Python’s standard-library
 support. Transactions and related tables store bookmarks, notes, comparisons,
-review events and graph edges. Newly created workspaces use schema version 2 with
-annotation history; recognized version-1 workspaces still open in their original
+review events and graph edges. Newly created workspaces use schema version 3 with
+annotation history and checkpoint-bound semantic reading positions; recognized
+version-1 and version-2 workspaces still open in their original
 format. An unrecognized or incompatible database is rejected; no migration occurs
 on ordinary open. Reading checkpoints use revision checks to detect competing saves
 instead of silently overwriting another session’s position.
@@ -239,7 +243,7 @@ that corpus is not implemented. An already-open shell can back up its database
 even when the loaded corpus generation has changed.
 
 `workspace upgrade FILE.sqlite3` and `--workspace-upgrade FILE.sqlite3` explicitly
-upgrade a version-1 workspace into a separately named version-2 copy. The operation
+upgrade a version-1 or version-2 workspace into a separately named version-3 copy. The operation
 takes and verifies a consistent SQLite snapshot, migrates only the staged copy,
 validates it, and publishes it without overwriting an existing destination. Its
 parent directory must exist and POSIX files use mode `0600`. The original file
@@ -256,7 +260,7 @@ references, authored records and history, not another canonical book. Foreign-ke
 enforcement is enabled on each database connection. Markdown inquiry reports are
 implemented alongside the unchanged default JSON export. Both go to standard
 output and neither adds reading activity nor changes authored records. Import,
-JSONL workspace export and previewed restore remain future work. Version-2 JSON
+JSONL workspace export and previewed restore remain future work. Version-2 and version-3 JSON
 exports include
 `annotation_history`; version-1 exports do not fabricate that history.
 [SQLite foreign keys](https://www.sqlite.org/foreignkeys.html)

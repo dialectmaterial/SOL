@@ -960,11 +960,11 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
 
 
 
-def run_reader(book: Book, workspace_reader=None) -> int:
+def run_reader(book: Book, workspace_reader=None, *, width=88, emphasis="auto") -> int:
     """Keep the optional reading view out of normal command/interface imports."""
     from sol.terminal.reader import run_reader as run_view
 
-    return run_view(book, workspace_reader)
+    return run_view(book, workspace_reader, width=width, emphasis=emphasis)
 
 
 def validate_options(args: argparse.Namespace) -> None:
@@ -993,8 +993,10 @@ def validate_options(args: argparse.Namespace) -> None:
             raise ValueError("--reader requires the indexed canonical corpus, not --pdf")
         if args.plain or args.json:
             raise ValueError("--reader is interactive; omit --plain and --json")
-        if args.ui is not None or args.editing_mode is not None or args.source_pdf is not None or args.width is not None:
-            raise ValueError("--reader uses its own keyboard view and terminal width; omit --ui, --editing-mode, --source-pdf and --width")
+        if args.ui is not None or args.editing_mode is not None or args.source_pdf is not None:
+            raise ValueError("--reader uses its own keyboard view; omit --ui, --editing-mode and --source-pdf")
+    elif args.emphasis is not None:
+        raise ValueError("--emphasis requires --reader")
     if args.shell and not args.none and args.pdf is not None:
         raise ValueError("the persistent shell requires an indexed Markdown corpus, not --pdf. "
                          "Use sol -n --pdf PATH for a temporary legacy shell or sol -r --pdf PATH "
@@ -1137,7 +1139,7 @@ def emit_json(value: object) -> None:
 
 def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
     """Named durable state, kept separate from corpus-only one-shot reading."""
-    from sol.workspace.store import Workspace
+    from sol.workspace.store import SCHEMA_VERSION, Workspace
     from sol.workspace.reader import WorkspaceReader, workspace_path
 
     identity = book.corpus_manifest.get("corpus_id")
@@ -1191,7 +1193,7 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
                                  "so reopening its workspace name selects the same file")
             destination = store.upgrade_copy(requested)
             result = {"upgraded_copy": str(destination), "source_workspace": str(store.path),
-                      "schema_version": 2, "corpus_id": identity}
+                      "schema_version": SCHEMA_VERSION, "corpus_id": identity}
             if args.json:
                 emit_json(result)
             else:
@@ -1201,7 +1203,7 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
             return 0
         if args.shell:
             if args.reader:
-                return run_reader(book, reader)
+                return run_reader(book, reader, width=args.width or 88, emphasis=args.emphasis or "auto")
             return run_shell(book, width, args.plain, color, reader,
                              ui_mode=args.ui or 'auto', editing_mode=args.editing_mode or 'emacs',
                              source_pdf=args.source_pdf, auto_width=args.width is None)
@@ -1323,7 +1325,7 @@ def main(argv: list[str] | None = None) -> int:
             print(render_guide(book, width, 1 if args.depth is None else args.depth))
         elif args.shell:
             if args.reader:
-                return run_reader(book)
+                return run_reader(book, width=args.width or 88, emphasis=args.emphasis or "auto")
             return run_shell(book, width, args.plain, color, ui_mode=args.ui or 'auto',
                              editing_mode=args.editing_mode or 'emacs', source_pdf=args.source_pdf,
                              auto_width=args.width is None)

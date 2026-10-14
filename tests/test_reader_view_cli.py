@@ -48,7 +48,7 @@ class ReaderViewCLITests(unittest.TestCase):
         for arguments in (["--reader", "-r"], ["--reader", "--search", "ground"],
                           ["--reader", "--json"], ["--reader", "--plain"], ["--reader", "--pdf", "absent.pdf"],
                           ["--reader", "--ui", "basic"], ["--reader", "--editing-mode", "vi"],
-                          ["--reader", "--source-pdf", "absent.pdf"], ["--reader", "--width", "60"],
+                          ["--reader", "--source-pdf", "absent.pdf"],
                           ["--reader", "guide"], ["--reader", "--set-corpus", "absent"]):
             with self.subTest(arguments=arguments), \
                     patch.object(app, "discover_corpus", side_effect=AssertionError("No corpus I/O")), \
@@ -100,7 +100,24 @@ class ReaderViewCLITests(unittest.TestCase):
         self.assertIs(reader.book, book)
         self.assertEqual(reader.actor, "Invented reader")
         self.assertEqual(reader.store.path, self.root / "workspaces" / "reading.sqlite3")
-        self.assertEqual(reader.store.schema_version, 2)
+        from sol.workspace.store import SCHEMA_VERSION
+        self.assertEqual(reader.store.schema_version, SCHEMA_VERSION)
+
+    def test_width_and_emphasis_are_forwarded_to_the_reader(self):
+        with patch("sol.terminal.reader.validate_reader_environment"), \
+                patch.object(app, "run_reader", return_value=0) as view:
+            status, _, error = self.call(["--reader", "-n", "--width", "64", "--emphasis", "underline"])
+        self.assertEqual(status, 0, error)
+        self.assertEqual(view.call_args.kwargs, {"width": 64, "emphasis": "underline"})
+
+    def test_emphasis_is_reader_only_and_width_validation_precedes_data_access(self):
+        for arguments in (["-r", "--emphasis", "italic"], ["--reader", "--width", "19"],
+                          ["--reader", "--width", "241"]):
+            with self.subTest(arguments=arguments), \
+                    patch.object(app, "discover_corpus", side_effect=AssertionError("No source access")), \
+                    patch("sol.terminal.reader.validate_reader_environment"):
+                status, _, _ = self.call(arguments)
+            self.assertNotEqual(status, 0)
 
     def test_explicit_workspace_injects_existing_service_without_prompting(self):
         with patch("sol.terminal.reader.validate_reader_environment"), \

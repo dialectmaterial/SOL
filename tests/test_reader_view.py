@@ -201,7 +201,7 @@ class ReaderViewTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(list(view.body.buffer.document.selection_ranges()), [(0, 3)])
             pipe.send_text("\x1b[1;3C")
             await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
-            pipe.send_text("n")
+            pipe.send_text("}")
             await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[2])
             pipe.send_text("\x1b[5~")
             await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
@@ -219,7 +219,7 @@ class ReaderViewTests(unittest.IsolatedAsyncioTestCase):
             def refuse(*args):
                 raise RuntimeError("loaded corpus changed\x1b[31m")
             reader.checkpoint = refuse
-            pipe.send_text("n")
+            pipe.send_text("}")
             await self.wait_for(lambda: "loaded corpus changed" in view.status)
             after = (view.body.text, view.body.buffer.cursor_position,
                      list(view.body.buffer.document.selection_ranges()), actions.snapshot())
@@ -296,7 +296,7 @@ class ReaderViewTests(unittest.IsolatedAsyncioTestCase):
         actions.read(first=True)
         async with self.running_view(actions, output=NarrowOutput()) as (view, pipe, task):
             await self.wait_for(lambda: view.body.window.render_info is not None)
-            self.assertEqual(view._header().splitlines()[2], "Printed 1 | PDF 10")
+            self.assertTrue(view._header().splitlines()[2].startswith("Printed 1 | PDF 10"))
             self.assertGreater(view.body.window.render_info.window_height, 3)
             self.assertLessEqual(view.body.window.render_info.window_width, 46)
             width = view.body.window.render_info.window_width

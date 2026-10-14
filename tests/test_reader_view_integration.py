@@ -19,7 +19,7 @@ from test_packaging import write_runtime_corpus
 
 
 PROGRAM = '''
-import asyncio, json, os, subprocess, sys
+import asyncio, json, os, re, subprocess, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 root = Path(sys.argv[2])
@@ -37,7 +37,10 @@ class CheckedView(reader.ReaderView):
                 deadline = asyncio.get_running_loop().time() + 5
                 while not condition():
                     if asyncio.get_running_loop().time() >= deadline:
-                        raise AssertionError("Reader workflow did not reach its expected state")
+                        raise AssertionError("Reader workflow did not reach its expected state: " + repr({
+                            "cursor":self.body.buffer.cursor_position, "semantic":self.actions.cursor_offset,
+                            "selection":self.actions.selection, "status":self.status,
+                            "focus":self.application.layout.current_control}))
                     await asyncio.sleep(.01)
                 await asyncio.sleep(.05)
             def keys(*values):
@@ -52,8 +55,19 @@ class CheckedView(reader.ReaderView):
                 screen = subprocess.run(["kitten", "@", "--password-env=KITTY_RC_PASSWORD",
                         "--use-password=always", "get-text", "--match", "id:" + os.environ["KITTY_WINDOW_ID"]],
                         capture_output=True, text=True, pass_fds=descriptors, timeout=5, check=True).stdout
-                assert "Printed 7 | PDF 80" in screen, screen
+                assert "p. 7 | PDF 80" in screen, screen
                 assert "An invented passage" in screen, screen
+                assert self.body.window.render_info.window_width <= self.reading_width
+                assert not self.typography.degraded
+                assert any('emphasis' in span.styles for span in self.typography.spans)
+                styled_screen = subprocess.run(["kitten", "@", "--password-env=KITTY_RC_PASSWORD",
+                        "--use-password=always", "get-text", "--ansi", "--match", "id:" + os.environ["KITTY_WINDOW_ID"]],
+                        capture_output=True, text=True, pass_fds=descriptors, timeout=5, check=True).stdout
+                assert re.search(r"\\x1b\\[(?:[0-9]+;)*3(?:;[0-9]+)*m", styled_screen), repr(styled_screen)
+                keys("c")
+                await wait(lambda: self._context_visible)
+                keys("c")
+                await wait(lambda: not self._context_visible)
                 first = self.actions.snapshot().current.identifier
                 keys(Keys.ShiftRight, Keys.ShiftRight, Keys.ShiftRight)
                 await wait(lambda: self.actions.selection is not None and self.actions.selection.text == "An ")
@@ -98,6 +112,8 @@ class ReaderViewIntegrationTests(unittest.TestCase):
             manifest_bytes = (corpus / "corpus.json").read_bytes()
             manifest = json.loads(manifest_bytes)
             records = [json.loads(line) for line in (corpus / "index.jsonl").read_text().splitlines()]
+            records[1]["markdown"] = records[1]["markdown"].replace("invented passage", "*invented passage*")
+            records[1]["content_sha256"] = sha256(records[1]["markdown"].encode()).hexdigest()
             second = deepcopy(records[1])
             second.update(id="cccccccc-0000-4000-8000-000000000003", order=2,
                           markdown="A specific invented passage is reached through search, not copied identifiers.",

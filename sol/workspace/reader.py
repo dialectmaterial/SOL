@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -17,7 +18,7 @@ import textwrap
 import unicodedata
 
 from sol.core.references import Reference, resolve_reference
-from sol.workspace.store import Workspace, WorkspaceError
+from sol.workspace.store import Workspace, WorkspaceError, _position
 
 
 def workspace_path(name: str, directory: Path | None = None) -> Path:
@@ -124,7 +125,53 @@ class WorkspaceReader:
         self.width, self.plain, self.color = width, plain, color
         state = store.get_state()
         self.revision = state["revision"] if state else None
+        self._saved_state = self._state_values(state) if state else None
         self.resumed_reference: Reference | None = None
+
+    @staticmethod
+    def _state_values(state):
+        values = {field: state[field] for field in ("cwd", "scope", "current_id", "previous_cwd")}
+        if state.get("position") is not None:
+            values["position"] = dict(state["position"])
+        return values
+
+    def _capture_position(self, session):
+        passage = session.current()
+        record = self.book.canonical_records.get(passage.identifier)
+        if not isinstance(record, dict) or not isinstance(record.get("markdown"), str) or \
+                record.get("plain_text") != passage.text:
+            raise WorkspaceError("reading position cannot be bound to the current canonical passage")
+        if hashlib.sha256(record["markdown"].encode("utf-8")).hexdigest() != record.get("content_sha256"):
+            raise WorkspaceError("reading position canonical text fingerprint is inconsistent")
+        return _position({
+            "target_id": passage.identifier,
+            "content_sha256": record["content_sha256"],
+            "plain_text_sha256": hashlib.sha256(passage.text.encode("utf-8")).hexdigest(),
+            "plain_text_length": len(passage.text),
+            "cursor_offset": getattr(session, "cursor_offset", 0),
+            "viewport_offset": getattr(session, "viewport_offset", None),
+        })
+
+    def _restore_position(self, state, passage, messages):
+        position = state.get("position")
+        if self.store.schema_version < 3:
+            messages.append("This older workspace retains passages, not cursor positions. "
+                            "Use workspace upgrade FILE.sqlite3 to create a version-3 copy; "
+                            "the original is retained.")
+            return 0, None, False
+        if position is None:
+            return 0, None, False
+        position = _position(position)
+        record = self.book.canonical_records.get(passage.identifier, {})
+        current_plain = hashlib.sha256(passage.text.encode("utf-8")).hexdigest()
+        if (position["target_id"] != passage.identifier
+                or position["content_sha256"] != record.get("content_sha256")
+                or position["plain_text_sha256"] != current_plain
+                or position["plain_text_length"] != len(passage.text)):
+            messages.append("Saved cursor text binding changed; resumed the identified passage "
+                            "at its beginning without reusing the old offset.")
+            return 0, None, False
+        return position["cursor_offset"], position["viewport_offset"], True
 
     def require_author(self):
         if not self.actor:
@@ -241,38 +288,69 @@ class WorkspaceReader:
             except ValueError:
                 pass
         cursor = next(i for i, item in enumerate(matches) if item.identifier == passage.identifier)
+        cursor_offset, viewport_offset, position_valid = self._restore_position(state, passage, messages)
         revision = latest["revision"]
+        restored_state = {
+            "cwd": self.display_path(cwd), "scope": self.display_path(scope),
+            "current_id": reference.requested_id,
+            "previous_cwd": self.display_path(previous) if previous is not None else None,
+        }
+        if position_valid:
+            # A historical visit must not carry a stale binding into a new audit
+            # entry. Absence after invalidation deliberately means passage start.
+            restored_state["position"] = dict(state["position"])
         if historical_revision is not None:
             # A historical visit becomes a new checkpoint, not a rollback of audit
             # history. Save before changing the live cursor; CAS detects races.
-            revision = self.store.save_state({
-                "cwd": self.display_path(cwd), "scope": self.display_path(scope),
-                "current_id": reference.requested_id,
-                "previous_cwd": self.display_path(previous) if previous is not None else None,
-            }, expected_revision=latest["revision"])
+            revision = self.store.save_state(restored_state, expected_revision=latest["revision"])
             messages.append(f"Restored checkpoint {historical_revision} as new revision {revision}.")
         session.path, session.cursor = scope, cursor
+        session.cursor_offset, session.viewport_offset = cursor_offset, viewport_offset
         self.resumed_reference = reference
         self.revision = revision
+        self._saved_state = restored_state if historical_revision is not None else self._state_values(latest)
         if len(reference.chain) > 1:
             messages.append("Retired reference: " + " -> ".join(reference.chain))
         return cwd, previous, passage, "\n".join(messages)
+
+    def _checkpoint_values(self, session, cwd, previous):
+        identifier = session.current().identifier
+        if self.resumed_reference and self.resumed_reference.target_id == identifier:
+            identifier = self.resumed_reference.requested_id
+        values = {
+            "cwd": self.display_path(cwd), "scope": self.display_path(session.path),
+            "current_id": identifier,
+            "previous_cwd": self.display_path(previous) if previous is not None else None,
+        }
+        if self.store.schema_version >= 3:
+            values["position"] = self._capture_position(session)
+        return values
 
     def checkpoint(self, session, cwd, previous):
         if session.cursor is None:
             # Browsing alone must not replace an unresolved/absent reading position.
             return
         self.ensure_corpus_current()
-        identifier = session.current().identifier
-        if self.resumed_reference and self.resumed_reference.target_id == identifier:
-            identifier = self.resumed_reference.requested_id
-        else:
+        values = self._checkpoint_values(session, cwd, previous)
+        self.revision = self.store.save_state(values, expected_revision=self.revision)
+        self._saved_state = values
+        if self.resumed_reference and self.resumed_reference.target_id != session.current().identifier:
             self.resumed_reference = None
-        self.revision = self.store.save_state({
-            "cwd": self.display_path(cwd), "scope": self.display_path(session.path),
-            "current_id": identifier,
-            "previous_cwd": self.display_path(previous) if previous is not None else None,
-        }, expected_revision=self.revision)
+
+    def save_position(self, session, cwd, previous):
+        """Persist changed semantic position only; never write per cursor key."""
+        if session.cursor is None:
+            return ""
+        if self.store.schema_version < 3:
+            return ("Cursor position was not saved: this older workspace retains passages only. "
+                    "Use workspace upgrade FILE.sqlite3 to create a version-3 copy.")
+        values = self._checkpoint_values(session, cwd, previous)
+        if values == self._saved_state:
+            return ""
+        self.ensure_corpus_current()
+        self.revision = self.store.save_state(values, expected_revision=self.revision)
+        self._saved_state = values
+        return ""
 
     def describe(self, identifier):
         if identifier is None:

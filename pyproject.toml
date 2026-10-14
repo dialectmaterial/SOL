@@ -20,7 +20,7 @@ dependencies = []
 
 [project.optional-dependencies]
 corpus = ["markdown-it-py>=3,<4"]
-shell = ["prompt-toolkit>=3.0.52,<4"]
+shell = ["prompt-toolkit>=3.0.52,<4", "markdown-it-py>=3,<4"]
 extraction = ["opendataloader-pdf==2.5.13"]
 
 [project.scripts]

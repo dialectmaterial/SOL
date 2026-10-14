@@ -23,11 +23,13 @@ a real Unix shell and replaceable applications, with deliberate movement back to
 BEING. Existing virtual navigation remains compatible; it is not a second shell
 language or the canonical meaning of a passage.
 
-The optional `sol --reader` prototype is the first visible BEING reader slice:
+The optional `sol --reader` prototype is the visible BEING reader slice:
 continuous canonical text, local selection, search, and a bounded reading trail.
 It uses the existing reader-action seam and `shell` extra; the default command
 interface and existing panes remain available. Its selections and trail are
-session-local, with no new workspace schema. [Reader view](READER_VIEW.md).
+session-local. Schema 3 adds source-bound cursor and viewport positions through
+the existing checkpoint revision; older workspaces stay in their original format
+unless explicitly upgraded into a separate copy. [Reader view](READER_VIEW.md).
 
 ESSENCE follows a reuse-first boundary: compose suitable external applications
 and exchange explicit corpus-bound data before adding bespoke analyses. The

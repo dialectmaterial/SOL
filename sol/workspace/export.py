@@ -161,7 +161,7 @@ def _validate(book, snapshot: dict) -> tuple[dict, dict]:
     if (fingerprint(digest) is None or fingerprint(saved_digest) != fingerprint(digest)
             or (nested_digest is not None and fingerprint(nested_digest) != fingerprint(digest))):
         raise ValueError("workspace and loaded book source fingerprints do not match")
-    if snapshot.get("schema_version") not in (1, 2) or type(snapshot.get("schema_version")) is not int:
+    if snapshot.get("schema_version") not in (1, 2, 3) or type(snapshot.get("schema_version")) is not int:
         raise ValueError("unsupported workspace snapshot schema version")
     for name in _COLLECTIONS:
         values = snapshot.get(name, [])

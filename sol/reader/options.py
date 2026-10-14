@@ -35,11 +35,13 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--workspace-export", action="store_true", help="export a workspace snapshot (JSON by default)")
     mode.add_argument("--workspace-check", action="store_true", help="report unresolved, retired and versioned workspace references")
     mode.add_argument("--workspace-backup", type=Path, metavar="FILE", help="create a new, verified .sqlite3 backup without overwriting")
-    mode.add_argument("--workspace-upgrade", type=Path, metavar="FILE", help="upgrade a version-1 workspace into a separate verified copy")
+    mode.add_argument("--workspace-upgrade", type=Path, metavar="FILE", help="upgrade an older workspace into a separate verified copy")
     mode.add_argument("--review-queue", action="store_true", help="show canonical pending transcriptions; optionally include workspace testimony")
     parser.add_argument("--workspace", metavar="NAME", help="choose a named reading workspace without prompting")
     parser.add_argument("--reader", action="store_true",
                         help="optional continuous reading view with keyboard navigation (requires the shell extra)")
+    parser.add_argument("--emphasis", choices=("auto", "italic", "underline"),
+                        help="reader emphasis rendering; underline is the fallback for terminals without italics")
     parser.add_argument("--workspace-dir", type=Path, metavar="DIRECTORY", help="directory for local workspace databases")
     parser.add_argument("--actor", metavar="NAME", help="explicit author for workspace notes and assertions")
     parser.add_argument("--export-format", choices=("json", "markdown"),

@@ -20,7 +20,7 @@ import unicodedata
 from uuid import UUID, uuid4
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 APPLICATION_ID = 0x534F4C57  # SOLW
 REVIEW_OUTCOMES = ("inspected", "correction_needed", "verified")
 
@@ -265,6 +265,51 @@ _V2_DEFINITIONS = {**_DEFINITIONS, **{
     re.match(r"CREATE (?:TABLE|TRIGGER) (\w+)", statement).group(1):
     " ".join(statement.strip().rstrip(";").split()) for statement in _ANNOTATION_SCHEMA}}
 
+# Version 3 binds optional semantic reading positions to the SAME checkpoint
+# revision. It does not reinterpret older checkpoints or mutate legacy stores.
+_POSITION_SCHEMA = (
+    """CREATE TABLE reading_positions (
+        revision INTEGER PRIMARY KEY REFERENCES state_history(revision),
+        target_id TEXT NOT NULL, content_sha256 TEXT NOT NULL,
+        plain_text_sha256 TEXT NOT NULL, plain_text_length INTEGER NOT NULL CHECK (plain_text_length >= 0),
+        cursor_offset INTEGER NOT NULL CHECK (cursor_offset >= 0 AND cursor_offset <= plain_text_length),
+        viewport_offset INTEGER CHECK (viewport_offset >= 0 AND viewport_offset <= plain_text_length)
+    )""",
+    """CREATE TRIGGER reading_positions_no_update BEFORE UPDATE ON reading_positions
+        BEGIN SELECT RAISE(ABORT, 'reading positions are append-only'); END""",
+    """CREATE TRIGGER reading_positions_no_delete BEFORE DELETE ON reading_positions
+        BEGIN SELECT RAISE(ABORT, 'reading positions are append-only'); END""",
+)
+_POSITION_FIELDS = ("target_id", "content_sha256", "plain_text_sha256", "plain_text_length",
+                    "cursor_offset", "viewport_offset")
+_V3_COLUMNS = {**_V2_COLUMNS, "reading_positions": ("revision",) + _POSITION_FIELDS}
+_V3_DEFINITIONS = {**_V2_DEFINITIONS, **{
+    re.match(r"CREATE (?:TABLE|TRIGGER) (\w+)", statement).group(1):
+    " ".join(statement.strip().rstrip(";").split()) for statement in _POSITION_SCHEMA}}
+
+
+def _position(value: Any) -> dict:
+    if type(value) is not dict or set(value) != set(_POSITION_FIELDS):
+        raise WorkspaceError("reading position must contain exactly the documented position fields")
+    result = {"target_id": _uuid(value["target_id"], "reading position target")}
+    for field in ("content_sha256", "plain_text_sha256"):
+        result[field] = _hash(value[field], "reading position " + field)
+        if result[field] is None:
+            raise WorkspaceError("reading position requires text fingerprints")
+    length = value["plain_text_length"]
+    if type(length) is not int or not 0 <= length <= 2 ** 63 - 1:
+        raise WorkspaceError("reading position text length must be a nonnegative bounded integer")
+    result["plain_text_length"] = length
+    for field in ("cursor_offset", "viewport_offset"):
+        offset = value[field]
+        if field == "viewport_offset" and offset is None:
+            result[field] = None
+            continue
+        if type(offset) is not int or not 0 <= offset <= length:
+            raise WorkspaceError("reading position offsets must be codepoint indices within the bound text")
+        result[field] = offset
+    return result
+
 
 class Workspace:
     """Durable local records. Methods return JSON-compatible dictionaries."""
@@ -320,7 +365,7 @@ class Workspace:
             connection.execute("PRAGMA trusted_schema = OFF")
             if new:
                 with self._transaction():
-                    for statement in _SCHEMA + _ANNOTATION_SCHEMA:
+                    for statement in _SCHEMA + _ANNOTATION_SCHEMA + _POSITION_SCHEMA:
                         connection.execute(statement)
                     connection.execute(f"PRAGMA application_id = {APPLICATION_ID}")
                     connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
@@ -375,12 +420,12 @@ class Workspace:
         if connection.execute("PRAGMA application_id").fetchone()[0] != APPLICATION_ID:
             raise WorkspaceError("not a recognized SOL workspace; existing database was not changed")
         version = connection.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (1, SCHEMA_VERSION):
+        if version not in (1, 2, SCHEMA_VERSION):
             raise WorkspaceError(f"unsupported workspace schema version {version}; "
-                                 f"expected 1 or {SCHEMA_VERSION}; no migration was attempted")
+                                 f"expected 1, 2 or {SCHEMA_VERSION}; no migration was attempted")
         self.schema_version = version
-        columns_map = _COLUMNS if version == 1 else _V2_COLUMNS
-        definitions = _DEFINITIONS if version == 1 else _V2_DEFINITIONS
+        columns_map = {1: _COLUMNS, 2: _V2_COLUMNS, 3: _V3_COLUMNS}[version]
+        definitions = {1: _DEFINITIONS, 2: _V2_DEFINITIONS, 3: _V3_DEFINITIONS}[version]
         tables = {row[0] for row in connection.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table'")}
         if tables != set(columns_map):
@@ -439,8 +484,15 @@ class Workspace:
             self._history(row)
         self.list_bookmarks()
         self.list_annotations()
-        if version == 2:
+        if version >= 2:
             self._validate_annotation_history()
+        if version >= 3:
+            for row in connection.execute("SELECT * FROM reading_positions"):
+                _position({field: row[field] for field in _POSITION_FIELDS})
+                history_row = connection.execute("SELECT current_id FROM state_history WHERE revision = ?",
+                                                 (row["revision"],)).fetchone()
+                if history_row is None or history_row["current_id"] is None:
+                    raise WorkspaceError("reading position has no identified checkpoint passage")
         self.list_comparisons()
         self.list_reviews()
         self.list_relations()
@@ -488,7 +540,7 @@ class Workspace:
     @staticmethod
     def _state(state: Any) -> dict:
         if type(state) is not dict or set(state) - {
-                "cwd", "scope", "current_id", "previous_cwd", "revision"}:
+                "cwd", "scope", "current_id", "previous_cwd", "revision", "position"}:
             raise WorkspaceError("reading state must contain only the documented state fields")
         result = {}
         for field in ("cwd", "scope"):
@@ -504,7 +556,17 @@ class Workspace:
         result["previous_cwd"] = previous
         if "revision" in state and (type(state["revision"]) is not int or state["revision"] < 1):
             raise WorkspaceError("state revision must be a positive integer")
+        if state.get("position") is not None:
+            if result["current_id"] is None:
+                raise WorkspaceError("reading position requires an identified current passage")
+            result["position"] = _position(state["position"])
         return result
+
+    def _saved_position(self, revision: int) -> dict | None:
+        if self.schema_version < 3:
+            return None
+        row = self._one("SELECT * FROM reading_positions WHERE revision = ?", (revision,))
+        return None if row is None else _position({field: row[field] for field in _POSITION_FIELDS})
 
     def get_state(self) -> dict | None:
         row = self._one("SELECT cwd, scope, current_id, previous_cwd, revision "
@@ -516,10 +578,15 @@ class Workspace:
         if type(revision) is not int or revision < 1:
             raise WorkspaceError("stored reading state revision is invalid")
         state["revision"] = revision
+        position = self._saved_position(revision)
+        if position is not None:
+            state["position"] = position
         return state
 
     def save_state(self, state: dict, expected_revision: int | None = None) -> int:
         values = self._state(state)
+        if values.get("position") is not None and self.schema_version < 3:
+            raise WorkspaceError("reading positions need workspace version 3; upgrade a separate copy first")
         if expected_revision is not None and (type(expected_revision) is not int
                                                or expected_revision < 1):
             raise WorkspaceError("expected revision must be a positive integer or null")
@@ -547,12 +614,20 @@ class Workspace:
                 "VALUES(?,?,?,?,?,?,?)",
                 (revision, values["cwd"], values["scope"], values["current_id"],
                  values["previous_cwd"], self.actor, _now()))
+            if values.get("position") is not None:
+                position = values["position"]
+                connection.execute(
+                    "INSERT INTO reading_positions VALUES (?,?,?,?,?,?,?)",
+                    (revision,) + tuple(position[field] for field in _POSITION_FIELDS))
         return revision
 
     def _history(self, row: sqlite3.Row) -> dict:
         record = self._record(row)
         self._state({field: record[field] for field in (
             "cwd", "scope", "current_id", "previous_cwd", "revision")})
+        position = self._saved_position(record["revision"])
+        if position is not None:
+            record["position"] = position
         return record
 
     def list_history(self, limit: int = 20) -> list[dict]:
@@ -610,7 +685,7 @@ class Workspace:
                 "INSERT INTO annotations(id,target_id,body,actor,created_at,updated_at,content_sha256) "
                 "VALUES(?,?,?,?,?,?,?)",
                 (identifier, target_id, body, self.actor, timestamp, timestamp, digest))
-            if self.schema_version == 2:
+            if self.schema_version >= 2:
                 self._append_annotation_snapshot(connection, identifier, 1, self.actor,
                                                  timestamp, "created")
             result = self._annotation(connection.execute(
@@ -624,7 +699,7 @@ class Workspace:
             record["revision"] = None if self.schema_version == 1 else self._one(
                 "SELECT MAX(revision) AS revision FROM annotation_history WHERE annotation_id = ?",
                 (record["id"],))["revision"]
-            if self.schema_version == 2 and (
+            if self.schema_version >= 2 and (
                     type(record["revision"]) is not int or record["revision"] < 1):
                 raise WorkspaceError("annotation is missing its audited revision")
         return record
@@ -769,7 +844,7 @@ class Workspace:
         return result
 
     def delete_annotation(self, identifier: str) -> bool:
-        if self.schema_version == 2:
+        if self.schema_version >= 2:
             raise WorkspaceError("audited annotations cannot be deleted; their revision history "
                                  "is permanent")
         return self._delete("annotations", "id", _uuid(identifier, "annotation identifier"))
@@ -897,24 +972,27 @@ class Workspace:
         return self._publish_copy(destination, upgrade=False)
 
     def upgrade_copy(self, destination: str | Path) -> Path:
-        """Explicitly create an audited v2 copy of v1; never migrate the source."""
+        """Explicitly create a current-schema copy; never migrate the source."""
         self._db()
-        if self.schema_version != 1:
-            raise WorkspaceError("workspace is already schema 2; use backup for a same-version copy")
+        if self.schema_version == SCHEMA_VERSION:
+            raise WorkspaceError(f"workspace is already schema {SCHEMA_VERSION}; use backup for a same-version copy")
         return self._publish_copy(destination, upgrade=True)
 
-    def _migrate_staged_v1(self) -> None:
-        if self.schema_version != 1:
-            raise WorkspaceError("copy upgrade requires a verified version 1 workspace")
+    def _migrate_staged(self) -> None:
+        if self.schema_version not in (1, 2):
+            raise WorkspaceError("copy upgrade requires a verified version 1 or 2 workspace")
         timestamp = _now()
         with self._transaction() as connection:
-            for statement in _ANNOTATION_SCHEMA:
+            if self.schema_version == 1:
+                for statement in _ANNOTATION_SCHEMA:
+                    connection.execute(statement)
+                # A legacy snapshot is evidence of the body at upgrade time only.
+                # Preserve its original updated_at; no past editor is invented.
+                for row in connection.execute("SELECT id FROM annotations ORDER BY id").fetchall():
+                    self._append_annotation_snapshot(connection, row["id"], 1, None,
+                                                     timestamp, "legacy_baseline")
+            for statement in _POSITION_SCHEMA:
                 connection.execute(statement)
-            # A legacy snapshot is evidence of the body at upgrade time only.
-            # Preserve its original updated_at; no past editor is invented.
-            for row in connection.execute("SELECT id FROM annotations ORDER BY id").fetchall():
-                self._append_annotation_snapshot(connection, row["id"], 1, None,
-                                                 timestamp, "legacy_baseline")
             connection.execute("UPDATE workspace_metadata SET schema_version = ? WHERE singleton = 1",
                                (SCHEMA_VERSION,))
             connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
@@ -965,7 +1043,7 @@ class Workspace:
             # Opening an already initialized workspace performs only read checks.
             with Workspace(staged, self.corpus_id, self.provenance, self.actor) as snapshot_workspace:
                 if upgrade:
-                    snapshot_workspace._migrate_staged_v1()
+                    snapshot_workspace._migrate_staged()
             with staged.open("rb") as handle:
                 os.fsync(handle.fileno())
             try:
@@ -1011,7 +1089,7 @@ class Workspace:
                 "annotations": self.list_annotations(), "comparisons": self.list_comparisons(),
                 "reviews": self.list_reviews(), "relations": self.list_relations(),
             }
-            if self.schema_version == 2:
+            if self.schema_version >= 2:
                 exported["annotation_history"] = [self._annotation_snapshot(row) for row in self._all(
                     "SELECT * FROM annotation_history ORDER BY annotation_id,revision")]
             _json_value(exported)

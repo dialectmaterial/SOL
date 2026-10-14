@@ -26,7 +26,7 @@ The [README](../README.md#install) gives the initial installation. The base pack
 | Installation | Additional capability |
 | --- | --- |
 | `pipx install .` | Reader and basic shell |
-| `pipx install '.[shell]'` | Enhanced prompt, multiline drafts, and optional full-screen reader |
+| `pipx install '.[shell]'` | Enhanced prompt, multiline drafts, and full-screen reader with CommonMark typography |
 | `pipx install '.[corpus]'` | Markdown parsing for conversion and index rebuilding |
 | `pipx install '.[corpus,shell]'` | Both optional extras |
 
@@ -121,12 +121,30 @@ With `--json`, a single passage is an object; search, complete file, and context
 
 Help, version information, and the guide remain available without a corpus. `--structure` can show an abbreviated outline until the text is configured. One-shot actions such as search, passage opening and inspection do not ask for a workspace or actor. With redirected input, a persistent shell needs both `--workspace NAME` and `--actor NAME`; missing labels cause an actionable error without consuming input. Use `-n`, `-r`, or a one-shot action for scripts that need no saved workspace.
 
-For the optional screen that keeps text visible during navigation, selection, and
-search, run `sol --reader` or `sol-kitty --reader`; use `sol --reader -n` for a
-temporary session. It requires a real terminal and the existing `shell` extra,
-checked before workspace onboarding. The default `sol` command remains unchanged.
-See the [reader guide](READER_VIEW.md) for keys, supported options, and the
-session-local selection/trail boundary.
+For a quiet screen with text visible during navigation, selection, and search:
+
+~~~sh
+sol --reader
+sol --reader -n
+sol --reader --width 72 --emphasis underline
+sol-kitty --reader
+~~~
+
+The view needs an interactive terminal and the `shell` extra, now including the
+CommonMark parser for canonical typography. Checks happen before onboarding.
+`--width` limits a centered reading measure (default 88); `--emphasis` accepts
+`auto`, `italic`, or `underline`. Auto uses a terminal-family heuristic; underlining
+is the explicit compatibility choice when italics are unavailable. No source text
+or span offsets change with wrapping or styling.
+
+Begin with `j`/`k` for displayed rows, `h`/`l` for characters, `}`/`{` for passages,
+and `/` for whole-book search. `n`/`N` repeat search-result navigation, not paragraph
+movement. `c` reveals context, `f` reduces chrome, and `?` shows the compact key
+guide. Ctrl-Q saves changed cursor/viewport state before leaving; Ctrl-C skips
+this extra save without undoing passage checkpoints. Durable offsets require
+workspace schema 3; selections and the bounded reading trail remain session-local.
+The default `sol` command view is unchanged. See the [reader guide](READER_VIEW.md)
+for exact keys, upgrade steps, and the current implementation boundary.
 
 ## Use normal zsh commands
 
@@ -295,7 +313,11 @@ Use `bookmark list`, `bookmark set NAME`, or `bookmark remove NAME` to inspect, 
 
 With the enhanced prompt, `note draft` opens a multiline personal note for the current record; `note draft --on ID` chooses another target. Enter inserts a line break, Ctrl-S saves, and Ctrl-C cancels. The target UUID and inspected text digest are captured before drafting, then checked again before one annotation is inserted. Cancelled drafts are discarded and draft bodies never enter command history. Basic input retains `note add "TEXT"`.
 
-New workspaces use schema version 2, which retains a sequence of annotation snapshots. Use `note history NOTE_ID` to inspect them. `note edit NOTE_ID` opens the existing body in the enhanced multiline editor. In basic input, first inspect the note's current revision, then give an explicit expectation:
+New workspaces use schema version 3: annotation snapshots from version 2 remain,
+and optional text-bound cursor/viewport positions share the ordinary checkpoint
+revision. Use `note history NOTE_ID` to inspect annotation snapshots.
+`note edit NOTE_ID` opens the existing body in the enhanced multiline editor. In basic input,
+first inspect the note's current revision, then give an explicit expectation:
 
 ~~~text
 note show NOTE_ID
@@ -305,14 +327,22 @@ note history NOTE_ID
 
 Replace `NOTE_ID` with the identifier from `note list`. Only the note's original actor can edit it. Saving checks its revision and corpus generation again; a competing edit is refused, and saving an identical body adds no revision. Earlier bodies remain inspectable, while the original author, target, and inspected-source digest remain unchanged. Cancelling the editor changes neither notes nor reading position. This is local application-controlled revision history, not cryptographically tamper-proof evidence or authenticated identity.
 
-Existing version-1 workspaces still open without migration and support reading and new annotations. To enable audited editing, explicitly create a separately named upgraded copy:
+Existing versions 1 and 2 still open without automatic migration and retain
+passage-level reading continuity. Version 2 also retains its audited annotation
+editing. To add exact reader offsets, or audited editing to version 1, explicitly
+create a separately named schema-3 copy:
 
 ~~~sh
-sol --workspace quantity-study --workspace-upgrade quantity-study-v2.sqlite3
-sol --workspace quantity-study-v2 --workspace-dir . --actor "Your name"
+sol --workspace quantity-study --workspace-upgrade quantity-study-v3.sqlite3
+sol --reader --workspace quantity-study-v3 --workspace-dir . --actor "Your name"
 ~~~
 
-Inside a shell, `workspace upgrade FILE.sqlite3` creates the same kind of copy but does not switch the running session. The destination parent must exist and the destination must not already exist. The original is left untouched. Legacy notes receive a baseline of their current body; SOL does not invent earlier edits or an editor attribution. New edits in the upgraded copy are audited from there onward.
+Inside a shell, `workspace upgrade FILE.sqlite3` creates the same kind of copy but
+does not switch the running session. The destination parent must exist and the
+destination must not already exist. The original is left untouched. Version-1
+notes receive a baseline of their current body; SOL does not invent earlier edits
+or an editor attribution. Existing version-2 annotation history is retained.
+New edits in the upgraded copy are audited from there onward.
 
 Notes, comparisons, review decisions, and relations require the actor selected during setup or supplied with `--actor NAME`. Read-only one-shot workspace inspection needs no actor. Comparisons preserve an ordered set of record IDs and a question. Relations are directed, attributed assertions alongside the published tree. Their references point to live canonical records, not frozen quotations or captured endpoint versions:
 
@@ -323,7 +353,7 @@ relate add ID_A compares-with ID_B --reason "A connection to investigate, not an
 relate list
 ~~~
 
-Replace `ID_A` and `ID_B` with displayed record UUIDs or unambiguous prefixes. `compare list`, `review list`, and `relate list` inspect saved work without moving the reading cursor. Review outcomes are `inspected`, `correction_needed`, and `verified`. A reader's `verified` testimony never changes canonical transcription status or random eligibility. The current review binding compares the inspected Markdown digest and declared PDF fingerprint, not every attribution or page-location field; workspace version 2 does not expand that binding. Matching fingerprints are not proof of a correct transcription. Missing and retired references remain visible rather than being matched by similar wording.
+Replace `ID_A` and `ID_B` with displayed record UUIDs or unambiguous prefixes. `compare list`, `review list`, and `relate list` inspect saved work without moving the reading cursor. Review outcomes are `inspected`, `correction_needed`, and `verified`. A reader's `verified` testimony never changes canonical transcription status or random eligibility. The current review binding compares the inspected Markdown digest and declared PDF fingerprint, not every attribution or page-location field; the newer workspace schemas do not expand that review binding. Matching fingerprints are not proof of a correct transcription. Missing and retired references remain visible rather than being matched by similar wording.
 
 Resume or export outside the shell:
 
