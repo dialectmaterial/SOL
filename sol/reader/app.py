@@ -960,6 +960,13 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
 
 
 
+def run_reader(book: Book, workspace_reader=None) -> int:
+    """Keep the optional reading view out of normal command/interface imports."""
+    from sol.terminal.reader import run_reader as run_view
+
+    return run_view(book, workspace_reader)
+
+
 def validate_options(args: argparse.Namespace) -> None:
     if args.command:
         actions = (args.structure, args.guide, args.shell, args.none, args.random, args.read is not None,
@@ -979,6 +986,15 @@ def validate_options(args: argparse.Namespace) -> None:
                args.review_queue)
     if not any(actions) or args.none:
         args.shell = True
+    if args.reader:
+        if not args.shell:
+            raise ValueError("--reader is an interactive reading view; omit one-shot/guide actions")
+        if args.pdf is not None:
+            raise ValueError("--reader requires the indexed canonical corpus, not --pdf")
+        if args.plain or args.json:
+            raise ValueError("--reader is interactive; omit --plain and --json")
+        if args.ui is not None or args.editing_mode is not None or args.source_pdf is not None or args.width is not None:
+            raise ValueError("--reader uses its own keyboard view and terminal width; omit --ui, --editing-mode, --source-pdf and --width")
     if args.shell and not args.none and args.pdf is not None:
         raise ValueError("the persistent shell requires an indexed Markdown corpus, not --pdf. "
                          "Use sol -n --pdf PATH for a temporary legacy shell or sol -r --pdf PATH "
@@ -1184,6 +1200,8 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
                       f"--workspace-dir {shlex.quote(str(destination.parent))}")
             return 0
         if args.shell:
+            if args.reader:
+                return run_reader(book, reader)
             return run_shell(book, width, args.plain, color, reader,
                              ui_mode=args.ui or 'auto', editing_mode=args.editing_mode or 'emacs',
                              source_pdf=args.source_pdf, auto_width=args.width is None)
@@ -1226,6 +1244,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         validate_options(args)
+        if args.reader:
+            # Refuse an unavailable view before corpus discovery, onboarding,
+            # actor registration or opening/creating a personal workspace.
+            from sol.terminal.reader import validate_reader_environment
+            validate_reader_environment()
         if args.set_corpus is not None:
             corpus, configuration = save_corpus(args.set_corpus)
             if args.json:
@@ -1299,6 +1322,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.guide:
             print(render_guide(book, width, 1 if args.depth is None else args.depth))
         elif args.shell:
+            if args.reader:
+                return run_reader(book)
             return run_shell(book, width, args.plain, color, ui_mode=args.ui or 'auto',
                              editing_mode=args.editing_mode or 'emacs', source_pdf=args.source_pdf,
                              auto_width=args.width is None)

@@ -9,6 +9,7 @@ This manual covers the reader, virtual shell, personal workspaces, corpus mainte
 1. [Installation and extras](#install-with-pipx)
 2. [Corpus selection and configuration](#choose-the-text)
 3. [Reading, search, and structured output](#read-search-and-inspect)
+   ([optional reader view](READER_VIEW.md))
 4. [Virtual shell](#work-inside-the-virtual-shell)
 5. [Workspaces, notes, comparison, backup, and export](#keep-a-reading-workspace)
 6. [Source-review queue](#work-through-a-source-review-queue)
@@ -25,7 +26,7 @@ The [README](../README.md#install) gives the initial installation. The base pack
 | Installation | Additional capability |
 | --- | --- |
 | `pipx install .` | Reader and basic shell |
-| `pipx install '.[shell]'` | Enhanced prompt and multiline drafts |
+| `pipx install '.[shell]'` | Enhanced prompt, multiline drafts, and optional full-screen reader |
 | `pipx install '.[corpus]'` | Markdown parsing for conversion and index rebuilding |
 | `pipx install '.[corpus,shell]'` | Both optional extras |
 
@@ -119,6 +120,13 @@ With `--json`, a single passage is an object; search, complete file, and context
 `guide` and `--guide` open a compact ASCII starting guide containing the project roadmap, the three doctrines, and commands to try. Its default depth is 1; `sol guide --depth 2` reveals more detail. Use `--depth` from 0 to 32 to control how much of an outline appears. For random JSON or plain text, name the action explicitly: `sol -r --json` or `sol -r --plain`.
 
 Help, version information, and the guide remain available without a corpus. `--structure` can show an abbreviated outline until the text is configured. One-shot actions such as search, passage opening and inspection do not ask for a workspace or actor. With redirected input, a persistent shell needs both `--workspace NAME` and `--actor NAME`; missing labels cause an actionable error without consuming input. Use `-n`, `-r`, or a one-shot action for scripts that need no saved workspace.
+
+For the optional screen that keeps text visible during navigation, selection, and
+search, run `sol --reader` or `sol-kitty --reader`; use `sol --reader -n` for a
+temporary session. It requires a real terminal and the existing `shell` extra,
+checked before workspace onboarding. The default `sol` command remains unchanged.
+See the [reader guide](READER_VIEW.md) for keys, supported options, and the
+session-local selection/trail boundary.
 
 ## Use normal zsh commands
 
@@ -508,7 +516,7 @@ The [workspace plan](WORKSPACE_PLAN.md) separates implemented behavior from sele
 | `sol/reader/` | CLI, virtual shell, navigation, and presentation. CLI options are defined separately in `options.py`; explicit PDF compatibility is isolated in the lazy-loaded `legacy_pdf.py`. |
 | `sol/corpus/` | Edition structure and extraction layout, conversion, canonical record validation, and generated indexing. Ordinary reading uses the verified index. |
 | `sol/workspace/` | SQLite storage, attribution profiles, reference operations, recent-workspace discovery, diagnostics, and inquiry export. |
-| `sol/terminal/` | Optional prompt input, source-page viewing, kitty launch integration, and private reference-handoff transport/native CLI. These adapters do not redefine corpus or workspace semantics. |
+| `sol/terminal/` | Optional prompt input, full-screen reader view, source-page viewing, kitty launch integration, and private reference-handoff transport/native CLI. These adapters do not redefine corpus or workspace semantics. |
 | `sol/essence/` | Optional computation over CORE snapshots: the first bounded term-distribution study and its native CLI. No reader or workspace dependency; results remain source-bound measurements. |
 
 `sol/reader/app.py` coordinates commands and consumes the `sol.core` boundary. Shared models now belong to CORE; `sol/reader/models.py` retains compatibility exports. Canonical reference exports from `sol/workspace/reader.py` remain compatible while their implementation moves to CORE. The existing corpus contract remains a shared-domain dependency, without importing reader, workspace, or terminal layers. Edition-specific geometry and extraction helpers stay in `sol/corpus/edition.py` and `sol/corpus/layout.py`.

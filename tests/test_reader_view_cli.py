@@ -1,0 +1,143 @@
+"""Reader-view routing without implicit setup on unavailable terminals."""
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
+import json
+import os
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+
+from sol.corpus import contract
+from sol.reader import app
+from sol.reader.options import build_parser
+from test_packaging import write_runtime_corpus
+
+
+class ReaderViewCLITests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="sol-reader-cli-test-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.corpus = self.root / "corpus"
+        write_runtime_corpus(self.corpus)
+        contract.initialize_corpus_identity(self.corpus)
+        self.environment = patch.dict(os.environ, {"SOL_CORPUS": str(self.corpus),
+                                      "XDG_CONFIG_HOME": str(self.root / "config"),
+                                      "XDG_DATA_HOME": str(self.root / "data")})
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+
+    def call(self, arguments):
+        output, error = StringIO(), StringIO()
+        with redirect_stdout(output), redirect_stderr(error):
+            status = app.main(arguments)
+        return status, output.getvalue(), error.getvalue()
+
+    def test_reader_is_a_view_modifier_not_a_change_to_the_default(self):
+        for arguments, selected, temporary in (([], False, False), (["--reader"], True, False),
+                                               (["--reader", "-n"], True, True),
+                                               (["--reader", "--shell"], True, False)):
+            args = build_parser().parse_args(arguments)
+            app.validate_options(args)
+            self.assertTrue(args.shell)
+            self.assertEqual(args.reader, selected)
+            self.assertEqual(args.none, temporary)
+
+    def test_unsupported_prototype_options_are_refused_before_loading_or_onboarding(self):
+        for arguments in (["--reader", "-r"], ["--reader", "--search", "ground"],
+                          ["--reader", "--json"], ["--reader", "--plain"], ["--reader", "--pdf", "absent.pdf"],
+                          ["--reader", "--ui", "basic"], ["--reader", "--editing-mode", "vi"],
+                          ["--reader", "--source-pdf", "absent.pdf"], ["--reader", "--width", "60"],
+                          ["--reader", "guide"], ["--reader", "--set-corpus", "absent"]):
+            with self.subTest(arguments=arguments), \
+                    patch.object(app, "discover_corpus", side_effect=AssertionError("No corpus I/O")), \
+                    patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")):
+                status, _, error = self.call(arguments)
+                self.assertNotEqual(status, 0)
+                self.assertIn("--reader", error)
+        self.assertFalse((self.root / "config").exists())
+        self.assertFalse((self.root / "data").exists())
+
+    def test_unavailable_view_fails_before_any_data_or_profile_access(self):
+        with patch("sol.terminal.reader.validate_reader_environment", side_effect=ValueError("Invented unavailable view")), \
+                patch.object(app, "discover_corpus", side_effect=AssertionError("No corpus I/O")), \
+                patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")), \
+                patch("sol.workspace.profiles.register_actor", side_effect=AssertionError("No profile write")):
+            status, _, error = self.call(["--reader"])
+        self.assertNotEqual(status, 0)
+        self.assertIn("Invented unavailable view", error)
+        self.assertFalse((self.root / "config").exists())
+        self.assertFalse((self.root / "data").exists())
+
+    def test_nonpersistent_view_bypasses_actor_and_workspace_storage(self):
+        with patch("sol.terminal.reader.validate_reader_environment"), \
+                patch.object(app, "run_reader", return_value=0) as view, \
+                patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")), \
+                patch("sol.workspace.store.Workspace", side_effect=AssertionError("No workspace")), \
+                patch("sol.workspace.profiles.register_actor", side_effect=AssertionError("No profile")):
+            status, _, error = self.call(["--reader", "-n"])
+        self.assertEqual(status, 0, error)
+        view.assert_called_once()
+        self.assertEqual(len(view.call_args.args), 1)
+        self.assertEqual(view.call_args.args[0].corpus_directory, self.corpus)
+        self.assertFalse((self.root / "config").exists())
+        self.assertFalse((self.root / "data").exists())
+
+    def test_default_view_routes_after_existing_workspace_onboarding(self):
+        def choose(book, args):
+            args.workspace, args.actor = "reading", "Invented reader"
+            args.workspace_dir = self.root / "workspaces"
+
+        with patch("sol.terminal.reader.validate_reader_environment"), \
+                patch.object(app, "shell_identity", side_effect=choose) as onboarding, \
+                patch.object(app, "run_reader", return_value=0) as view:
+            status, _, error = self.call(["--reader"])
+        self.assertEqual(status, 0, error)
+        onboarding.assert_called_once()
+        view.assert_called_once()
+        book, reader = view.call_args.args
+        self.assertIs(reader.book, book)
+        self.assertEqual(reader.actor, "Invented reader")
+        self.assertEqual(reader.store.path, self.root / "workspaces" / "reading.sqlite3")
+        self.assertEqual(reader.store.schema_version, 2)
+
+    def test_explicit_workspace_injects_existing_service_without_prompting(self):
+        with patch("sol.terminal.reader.validate_reader_environment"), \
+                patch("builtins.input", side_effect=AssertionError("No prompt needed")), \
+                patch.object(app, "run_reader", return_value=0) as view:
+            status, _, error = self.call(["--reader", "--workspace", "reading", "--actor", "Invented reader",
+                                           "--workspace-dir", str(self.root / "workspaces")])
+        self.assertEqual(status, 0, error)
+        self.assertEqual(view.call_args.args[1].actor, "Invented reader")
+
+    def test_help_remains_source_and_optional_dependency_free(self):
+        with patch.object(app, "discover_corpus", side_effect=AssertionError("No source")), \
+                patch("sol.terminal.reader.validate_reader_environment", side_effect=AssertionError("No TTY needed")), \
+                redirect_stdout(StringIO()) as output, self.assertRaises(SystemExit) as caught:
+            app.main(["--help"])
+        self.assertEqual(caught.exception.code, 0)
+        self.assertIn("--reader", output.getvalue())
+
+    def test_ordinary_random_output_does_not_import_the_reader_adapter(self):
+        import subprocess
+        import sys
+        statement = '''
+import builtins, sys
+original = builtins.__import__
+def guard(name, *args, **kwargs):
+    if name == 'sol.terminal.reader' or name.startswith('prompt_toolkit'):
+        raise AssertionError('Ordinary reading imported optional reader ' + name)
+    return original(name, *args, **kwargs)
+builtins.__import__ = guard
+from sol.reader.app import main
+assert main(['-r', '--json', '--corpus', sys.argv[1]]) == 0
+'''
+        result = subprocess.run([sys.executable, "-B", "-c", statement, str(self.corpus)],
+                                cwd=Path(__file__).resolve().parents[1], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("id", json.loads(result.stdout))
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -38,6 +38,8 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--workspace-upgrade", type=Path, metavar="FILE", help="upgrade a version-1 workspace into a separate verified copy")
     mode.add_argument("--review-queue", action="store_true", help="show canonical pending transcriptions; optionally include workspace testimony")
     parser.add_argument("--workspace", metavar="NAME", help="choose a named reading workspace without prompting")
+    parser.add_argument("--reader", action="store_true",
+                        help="optional continuous reading view with keyboard navigation (requires the shell extra)")
     parser.add_argument("--workspace-dir", type=Path, metavar="DIRECTORY", help="directory for local workspace databases")
     parser.add_argument("--actor", metavar="NAME", help="explicit author for workspace notes and assertions")
     parser.add_argument("--export-format", choices=("json", "markdown"),

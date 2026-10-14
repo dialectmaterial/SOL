@@ -23,6 +23,17 @@ a real Unix shell and replaceable applications, with deliberate movement back to
 BEING. Existing virtual navigation remains compatible; it is not a second shell
 language or the canonical meaning of a passage.
 
+The optional `sol --reader` prototype is the first visible BEING reader slice:
+continuous canonical text, local selection, search, and a bounded reading trail.
+It uses the existing reader-action seam and `shell` extra; the default command
+interface and existing panes remain available. Its selections and trail are
+session-local, with no new workspace schema. [Reader view](READER_VIEW.md).
+
+ESSENCE follows a reuse-first boundary: compose suitable external applications
+and exchange explicit corpus-bound data before adding bespoke analyses. The
+existing term study is a bounded reference-integration experiment, not the main
+reader workflow or a commitment to build a catalog of SOL-specific analyses.
+
 ### The shared corpus contract
 
 `sol.corpus.contract` remains the implementation of canonical validation and verified snapshots. It is a shared-domain dependency, not reader application code: it does not import the reader, workspace, or terminal layers. `sol.core` exposes its snapshot and error types through the public boundary rather than duplicating the contract.
@@ -112,20 +123,21 @@ Later NixOS modules or profiles can compose a reader, selected ESSENCE applicati
 
 ## Handoff priorities and acceptance gates
 
-The immediate order is: an extraction adapter with a reviewed-copy proof,
-semantic/interface separation, a minimal CORE reference protocol, one reversible
-BEING–ESSENCE handoff, then one substantial experiment. These refine the longer
-packaging roadmap below rather than requiring a broad rewrite. Dependencies remain
-replaceable, and existing corpus/workspace contracts remain binding. Extraction,
-a bounded reader-action seam, the version-1 reference contract, and the explicit
-local shell bridge are implemented. The first application gate is one substantial
-ESSENCE experiment with a bounded result format and deliberate review/ingestion
-policy. A first lexical term-distribution experiment now meets that bounded gate:
-it consumes CORE snapshots and optional originating references, records its
-selection and method, recomputes results on check, and returns selected passage
-IDs through the existing explicit bridge. This establishes no automatic ingestion
-or classification framework. [Term study](TERM_STUDY.md). Independent distributions
-and CONCEPT composition remain separate gates.
+Implemented foundations include the extraction adapter and reviewed-copy proof,
+the CORE/action seam, the version-1 reference contract, the explicit local shell
+bridge, and a bounded [term study](TERM_STUDY.md) exercising that bridge. The
+[optional reader view](READER_VIEW.md) adds the first BEING reading slice. These
+are bounded results, not completion of every architecture-handoff phase.
+
+The immediate priorities are durable selected spans and active investigations
+integrated with comparison and relations; a contextual BEING–ESSENCE loop; reuse
+of external tools and deliberate data export; then validated heterogeneous
+ingestion. Existing corpus, authorship, checkpoint, and freshness contracts remain
+binding. The current strict reference-generation guards remain unchanged.
+Ordinary object identity and exact experiment-generation binding need a separate
+future policy and tests; a reader interface must not weaken those checks
+automatically. Independent distributions and CONCEPT composition remain separate
+gates in the longer roadmap below.
 
 1. **Establish the internal CORE boundary.** Move shared models, reference/path operations, configuration, and indexed corpus loading behind `sol.core`. Keep compatibility imports and the current aggregate installation. Test that importing CORE and CLI options does not import the shell, workspace, terminal, extraction tooling, or optional frameworks.
 2. **Exercise it with real consumers.** The reader and launcher should use this boundary; future ESSENCE applications can do likewise. Preserve existing reader behavior, corpus verification, workspace reopenability, and installed command tests. Add new APIs only for demonstrated cross-component needs.

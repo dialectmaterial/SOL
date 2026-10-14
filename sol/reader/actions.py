@@ -7,7 +7,8 @@ the interface. No database, actor profile, or PDF is opened implicitly.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from hashlib import sha256
 import random
 import re
 
@@ -79,6 +80,44 @@ def context_passages(book: Book, passage: Passage, radius: int) -> list[Passage]
 
 
 @dataclass(frozen=True)
+class TextSelection:
+    """A transient span in exact canonical plain text, using codepoint offsets."""
+    requested_id: str
+    target_id: str
+    start: int
+    end: int
+    text: str
+    content_sha256: str
+    plain_text_sha256: str
+
+
+@dataclass(frozen=True)
+class ReaderState:
+    """The reader context an interface can inspect without writing a visit."""
+    current: Passage | None
+    cwd: tuple[str, ...]
+    scope: tuple[str, ...]
+    requested_id: str | None
+    selection: TextSelection | None
+    can_go_back: bool
+    can_go_forward: bool
+    search_query: str | None
+    results: tuple[Passage, ...]
+
+
+@dataclass(frozen=True)
+class _ReadingContext:
+    cwd: tuple[str, ...]
+    previous_cwd: tuple[str, ...] | None
+    scope: tuple[str, ...]
+    current_id: str | None
+    requested_id: str | None
+    selection: TextSelection | None
+    search_query: str | None
+    result_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class _LocalState:
     cwd: tuple[str, ...]
     previous_cwd: tuple[str, ...] | None
@@ -87,6 +126,11 @@ class _LocalState:
     resumed_reference: object | None
     requested_id: str | None
     requested_target: str | None
+    selection: TextSelection | None
+    search_query: str | None
+    results: tuple[Passage, ...]
+    trail: tuple[_ReadingContext, ...]
+    history_index: int
 
 
 class ReaderActions:
@@ -107,32 +151,209 @@ class ReaderActions:
         self.cwd: tuple[str, ...] = ()
         self.previous_cwd: tuple[str, ...] | None = None
         self.results: list[Passage] = []
+        self.search_query: str | None = None
         self._requested_id: str | None = None
         self._requested_target: str | None = None
+        self._selection: TextSelection | None = None
+        self._trail = (self._context(),)
+        self._history_index = 0
+
+    def _current(self):
+        return None if self.session.cursor is None else self.session.current()
+
+    def _context(self):
+        current = self._current()
+        return _ReadingContext(
+            self.cwd, self.previous_cwd, self.session.path,
+            current.identifier if current is not None else None,
+            self.current_reference_id() if current is not None else None,
+            self._selection, self.search_query,
+            tuple(passage.identifier for passage in self.results))
+
+    def _amend_context(self):
+        context = self._context()
+        self._trail = (self._trail[:self._history_index] + (context,)
+                       + self._trail[self._history_index + 1:])
+
+    def _append_context(self, context):
+        trail = self._trail[:self._history_index + 1] + (context,)
+        self._trail = trail[-100:]
+        self._history_index = len(self._trail) - 1
+
+    @staticmethod
+    def _navigation_key(context):
+        return (context.cwd, context.previous_cwd, context.scope,
+                context.current_id, context.requested_id)
 
     def _capture(self):
         reference = (self.workspace_reader.resumed_reference
                      if self.workspace_reader is not None else None)
         return _LocalState(self.cwd, self.previous_cwd, self.session.path,
-                           self.session.cursor, reference, self._requested_id, self._requested_target)
+                           self.session.cursor, reference, self._requested_id, self._requested_target,
+                           self._selection, self.search_query, tuple(self.results),
+                           self._trail, self._history_index)
 
     def _rollback(self, state):
         self.cwd, self.previous_cwd = state.cwd, state.previous_cwd
         self.session.path, self.session.cursor = state.path, state.cursor
         self._requested_id, self._requested_target = state.requested_id, state.requested_target
+        self._selection, self.search_query = state.selection, state.search_query
+        self.results = list(state.results)
+        self._trail, self._history_index = state.trail, state.history_index
         if self.workspace_reader is not None:
             self.workspace_reader.resumed_reference = state.resumed_reference
 
-    def _transition(self, operation, *, checkpoint=True):
+    def _transition(self, operation, *, checkpoint=True, history=True):
         before = self._capture()
+        origin = self._context()
         try:
             result = operation()
+            current = self._current()
+            if self._selection is not None:
+                if current is None or current.identifier != self._selection.target_id:
+                    self._selection = None
+                else:
+                    self._selection = replace(self._selection, requested_id=self.current_reference_id())
+                    self._validate_selection(self._selection)
+            destination = self._context()
+            changed = self._navigation_key(origin) != self._navigation_key(destination)
             if checkpoint and self.workspace_reader is not None:
                 self.workspace_reader.checkpoint(self.session, self.cwd, self.previous_cwd)
+            if history and changed:
+                self._append_context(destination)
             return result
         except (ValueError, RuntimeError):
             self._rollback(before)
             raise
+
+    def _selection_source(self, requested_id, target_id):
+        """Validate the explicit loaded generation, without reading source files."""
+        if not self.book.canonical_records:
+            raise ValueError("text selection requires canonical Book records")
+        from sol.core.references import resolve_reference
+        try:
+            reference = resolve_reference(self.book, requested_id)
+            record = reference.record
+            plain_text, markdown = record["plain_text"], record["markdown"]
+            digest = record["content_sha256"]
+            sources = record["sources"]
+            first, last = sources[0], sources[-1]
+            passage = self.book.find_passage(target_id)
+            valid = (
+                reference.target_id == target_id and record["id"] == target_id
+                and record["type"] in {"paragraph", "list_item", "quotation", "formula"}
+                and isinstance(plain_text, str) and isinstance(markdown, str)
+                and digest == sha256(markdown.encode("utf-8")).hexdigest()
+                and passage.identifier == target_id and passage.text == plain_text
+                and passage.kind == record["type"]
+                and display_path(passage.path) == record["reader_path"]
+                and (passage.pdf_page, passage.printed_page,
+                     passage.end_pdf_page, passage.end_printed_page)
+                == (first["pdf_page"], int(first["printed_page"]),
+                    last["pdf_page"], int(last["printed_page"])))
+        except (KeyError, IndexError, TypeError, AttributeError) as error:
+            raise ValueError("The canonical selection source is corrupted; reopen SOL") from error
+        if not valid:
+            raise ValueError("The reader projection or canonical selection source disagrees; reopen SOL")
+        return plain_text, digest, sha256(plain_text.encode("utf-8")).hexdigest()
+
+    def _validate_selection(self, selection):
+        current = self._current()
+        if (current is None or current.identifier != selection.target_id
+                or self.current_reference_id() != selection.requested_id):
+            raise ValueError("The selected span no longer belongs to the current passage")
+        plain_text, content_digest, plain_digest = self._selection_source(
+            selection.requested_id, selection.target_id)
+        if (content_digest != selection.content_sha256
+                or plain_digest != selection.plain_text_sha256
+                or not 0 <= selection.start < selection.end <= len(plain_text)
+                or plain_text[selection.start:selection.end] != selection.text):
+            raise ValueError("The selected span's source text changed; select it again after reopening SOL")
+        return selection
+
+    @property
+    def selection(self):
+        return None if self._selection is None else self._validate_selection(self._selection)
+
+    def select_span(self, start, end):
+        """Select a nonempty half-open span; selection creates no personal object."""
+        if type(start) is not int or type(end) is not int:
+            raise ValueError("selection offsets must be integer codepoint positions")
+        current = self.session.current()
+        expected_id = self._trail[self._history_index].current_id
+        if expected_id is not None and current.identifier != expected_id:
+            raise ValueError("The current reader projection disagrees with its reading context; reopen SOL")
+        requested_id = self.current_reference_id()
+        plain_text, content_digest, plain_digest = self._selection_source(requested_id, current.identifier)
+        if not 0 <= start < end <= len(plain_text):
+            raise ValueError("selection requires a nonempty span within the canonical plain text")
+        selected = TextSelection(requested_id, current.identifier, start, end,
+                                 plain_text[start:end], content_digest, plain_digest)
+        self._selection = selected
+        self._amend_context()
+        return selected
+
+    def clear_selection(self):
+        self._selection = None
+        self._amend_context()
+
+    def _history_target(self, direction):
+        index = self._history_index + direction
+        while 0 <= index < len(self._trail):
+            if self._trail[index].current_id is not None:
+                return index
+            index += direction
+        return None
+
+    def _history_move(self, direction):
+        index = self._history_target(direction)
+        if index is None:
+            raise ValueError("no previous reading context" if direction < 0 else "no next reading context")
+        context = self._trail[index]
+
+        def change():
+            # Resolve IDs and scope before touching the active reader context.
+            passage = self.book.find_passage(context.current_id)
+            reference = None
+            if self.book.canonical_records:
+                from sol.core.references import resolve_reference
+                reference = resolve_reference(self.book, context.requested_id)
+                if reference.target_id != context.current_id:
+                    raise ValueError("The historical reading reference changed; reopen SOL")
+            matches = self.book.selection(context.scope)
+            cursor = next((i for i, row in enumerate(matches)
+                           if row.identifier == context.current_id), None)
+            if cursor is None:
+                raise ValueError("The passage is no longer in its historical reading scope")
+            results = [self.book.find_passage(identifier) for identifier in context.result_ids]
+            self.cwd, self.previous_cwd = context.cwd, context.previous_cwd
+            self.session.path, self.session.cursor = context.scope, cursor
+            self._requested_id, self._requested_target = context.requested_id, context.current_id
+            if self.workspace_reader is not None:
+                self.workspace_reader.resumed_reference = reference
+            self._selection, self.search_query, self.results = context.selection, context.search_query, results
+            self._history_index = index
+            return passage
+
+        return self._transition(change, history=False)
+
+    def history_back(self):
+        """Restore a prior complete reading context through normal checkpoint guards."""
+        return self._history_move(-1)
+
+    def history_forward(self):
+        return self._history_move(1)
+
+    def snapshot(self):
+        current = self._current()
+        expected_id = self._trail[self._history_index].current_id
+        if (None if current is None else current.identifier) != expected_id:
+            raise ValueError("The current reader projection disagrees with its reading context; reopen SOL")
+        return ReaderState(current, self.cwd, self.session.path,
+                           self.current_reference_id() if current is not None else None,
+                           self.selection, self._history_target(-1) is not None,
+                           self._history_target(1) is not None, self.search_query,
+                           tuple(self.results))
 
     def locate(self, value=None):
         """Resolve a book location; virtual aliases remain a compatibility view."""
@@ -208,6 +429,8 @@ class ReaderActions:
                whole_word=False, limit=20):
         matches = self.book.search(query, self.cwd if path is None else path, whole_word, limit)
         self.results = list(matches)
+        self.search_query = query
+        self._amend_context()
         return list(matches)
 
     def context(self, radius=1):
@@ -220,11 +443,13 @@ class ReaderActions:
         def change():
             cwd, previous, passage, message = self.workspace_reader.restore(self.session, revision)
             self.cwd, self.previous_cwd = cwd, previous
+            self._requested_id = self._requested_target = None
+            self._selection, self.search_query, self.results = None, None, []
             return passage, message
 
-        result = self._transition(change, checkpoint=False)
-        self._requested_id = self._requested_target = None
-        self.results = []
+        result = self._transition(change, checkpoint=False, history=revision is not None)
+        if revision is None:
+            self._trail, self._history_index = (self._context(),), 0
         return result
 
     def current_reference_id(self):

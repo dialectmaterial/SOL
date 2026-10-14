@@ -10,8 +10,9 @@ and latest search results. `ReaderActions` returns passages, locations, and
 search results. It does not prompt, print, launch panes, open databases, register
 actors, extract PDFs, or import optional interface frameworks.
 
-The shell and one-shot workspace reading use this boundary. Parsing command
-strings, choosing colors and width, editing drafts, rendering output, and managing
+The shell, one-shot workspace reading, and [optional reader view](READER_VIEW.md)
+use this boundary. Parsing command strings, choosing colors and width, editing
+drafts, rendering output, and managing
 source/comparison panes remain interface responsibilities. Native `sol read FILE`
 retains its separate whole-file and real-shell path semantics; it is not changed
 into a random paragraph operation.
@@ -68,13 +69,42 @@ cursor, as before. A same-location browse preserves both cursor and search
 results. Search and inspection never create checkpoints.
 
 If an action or checkpoint fails with a domain/runtime error, local browsing,
-reading cursor, and restored reference are rolled back before the error reaches
-the interface. Concurrent or stale writes are not retried or forced. This is
+reading cursor, restored reference, selection, search, and trail are rolled back
+before the error reaches the interface. Concurrent or stale writes are not retried
+or forced. This is
 local navigation recovery, not a transaction over arbitrary external effects.
 Successful latest restoration only inspects the existing checkpoint; historical
 restoration creates a new visit through the existing workspace rules. Both clear
 the transient latest-search list. Retired requested IDs remain distinct from
 their resolved targets in durable state.
+
+## Selection and the session reading trail
+
+`snapshot()` returns a frozen `ReaderState` containing the current passage,
+browsing location, reading scope, requested UUID, selection, back/forward
+availability, query, and a tuple of results. Inspecting it does not create a visit.
+The adapter renders and moves its text cursor from loaded state without disk I/O.
+
+`select_span(start, end)` accepts a nonempty half-open span in the canonical
+record's exact `plain_text`, measured in raw Python Unicode codepoints. It checks
+the canonical source and reader projection, retaining the requested retired alias
+separately from its resolved target. It returns a frozen `TextSelection` with
+`requested_id`, `target_id`, `start`, `end`, `text`, `content_sha256`, and
+`plain_text_sha256`. These are not byte offsets, Markdown offsets, or screen
+columns. `clear_selection()` clears that local span. Both operate on the loaded
+generation and create no checkpoint, note, or other durable object.
+
+`history_back()` and `history_forward()` restore session-local reading contexts.
+The bounded trail holds at most 100 contexts: location, scope, requested alias,
+selected span, query, and results. Search and selection amend the current context
+without adding a visit. New navigation discards any forward branch. With a
+workspace, successful trail navigation still uses its ordinary freshness and
+revision guards; failures restore the complete prior state. This is separate from
+durable checkpoint history and does not introduce an investigation database.
+
+The screen restores a valid latest checkpoint without another visit. It opens the
+first passage with one guarded checkpoint only when no saved position exists;
+an invalid saved reference remains visible and is not replaced automatically.
 
 ## What remains separate
 
@@ -107,6 +137,7 @@ The terminal adapter owns the native shell and private transport. Actor and
 workspace authority remain local to BEING. See the [handoff workflow](HANDOFF.md)
 and [modularity contract](MODULARITY.md).
 
-The next action-layer work can separate remaining workspace parsing/presentation
-incrementally. An ESSENCE experiment and any result-ingestion policy are separate
-application contracts, not implicit capabilities of a returned reference.
+Remaining workspace parsing/presentation can be separated incrementally. Durable
+spans and active investigations are future workspace contracts. ESSENCE tools and
+their result-ingestion policies remain separate application contracts, not
+implicit capabilities of a returned reference.

@@ -3,8 +3,10 @@
 The first workspace foundation is implemented through the existing CLI and
 command shell. Reading continuity, attributed annotations, comparison, source
 inspection and review testimony, and relations beyond the tree are available
-without installing an interface framework. Richer interfaces and selected-span
-annotations remain future work. An optional input-only prompt supports multiline
+without installing an interface framework. The optional [reader view](READER_VIEW.md)
+now supplies visible text, local selection, search, and a session reading trail;
+durable selected-span annotations and active investigations remain future work.
+An optional input-only prompt supports multiline
 drafts and revision-aware editing. New workspaces use schema version 2; older
 version-1 workspaces remain readable and are upgraded only through an explicit copy.
 Interface research is kept separately in
@@ -13,7 +15,8 @@ Interface research is kept separately in
 The aim is a workspace that remembers an inquiry, not merely a terminal that
 remembers its commands. The five developments are reading continuity, attributed
 annotations, comparison, a source-review desk, and relations beyond the tree.
-They belong to the BEING stage: the reader and virtual shell.
+They belong to the BEING stage: the reader and philosophical workspace, with the
+virtual shell retained as one interface.
 
 ## Keep the text and the reader’s work distinct
 
@@ -57,8 +60,10 @@ target readable passages and support add, explicit replacement, opening and
 removal. `workspace history --limit N` lists previous checkpoints. `resume REVISION`
 restores a historical position as a new checkpoint using revision conflict checks;
 it never deletes or rewinds later history. These are visits, not claims that
-displaying a passage means it was read or understood. Richer reading trails remain
-future work.
+displaying a passage means it was read or understood. The optional reader's
+back/forward trail is bounded to 100 session-local contexts and restores scope,
+location, requested alias, selected span, and search results. It is not a second
+durable checkpoint history.
 
 The implemented vertical slice is: open a workspace, start ordered reading,
 move to another passage, exit, reopen, and resume the same UUID. Failed operations
@@ -99,9 +104,11 @@ session. Existing notes receive a `legacy_baseline` snapshot of their current bo
 with no invented editor or lost history reconstructed. Its recorded time is the
 upgrade time, while the original note's author and timestamps are preserved.
 
-The current notes target whole canonical records. Later, a selected quotation can
-carry a text snapshot, offsets and the inspected content digest. If the passage
-changes, old offsets must not silently attach the note to different words.
+The current notes target whole canonical records. The reader's selection is an
+exact half-open span in canonical `plain_text`, with requested/target IDs and
+content/plain-text digests, but it creates no durable note. Later, a selected
+quotation can carry a text snapshot, offsets and the inspected content digest.
+If the passage changes, old offsets must not silently attach the note to different words.
 
 If machine-generated suggestions are introduced later, retain their tool/model
 provenance and whether a reader adopted them. Never silently turn a suggestion
@@ -278,13 +285,14 @@ guard checks the manifest, index and canonical Markdown, not PDF or PNG asset
 bytes. A matching generation proves consistency of the loaded files, not a
 philosophically or typographically correct transcription.
 
-The CLI and shell use the same operations; any future Textual desk should do
-likewise. `run_shell` now accepts injected `read_command` and `write_output`
+The CLI, shell, and optional reader use the same guarded operations. `run_shell`
+now accepts injected `read_command` and `write_output`
 functions, so an input experiment can avoid replacing command semantics or
 storage. `sol/terminal/prompt.py` implements the optional PromptSession adapter through this
 seam; basic, plain and redirected input need no optional import. `sol/workspace/profiles.py`
 owns actor-label onboarding storage. Read-only discovery is isolated in
-`sol/workspace/catalog.py`. No full-screen framework is required. The optional
+`sol/workspace/catalog.py`. The reader adapter reuses prompt_toolkit from the
+existing `shell` extra and adds no framework dependency. The optional
 source renderer and kitty launcher live in `sol/terminal/source.py` and
 `sol/terminal/kitty.py`, separate from the base reader and workspace storage.
 
@@ -372,29 +380,30 @@ are inspection, not saved-position changes or a way to clear quality flags.
 
 ## Next work, in priority order
 
-New-note drafts, revision-aware editing and explicit version-1 upgrade copies are
-implemented. The next work remains deliberately separate:
+New-note drafts, revision-aware editing, explicit version-1 upgrade copies, and
+the first optional reader slice are implemented. Its selection and trail remain
+session-local; no active-investigation schema is introduced. Next:
 
-1. Design review binding version 2 around an explicitly defined full-record digest,
-   including the relevant attribution and provenance fields. Captured version
-   binding for comparison and relation endpoints can also be considered without
-   creating a second canonical book. Asset verification needs its own stated
-   scope. Require a backup and explicit migration plan; never reinterpret old
-   text/PDF-only testimony as proof of metadata it did not record. The
-   review binding remains text/PDF-only even inside a version-2 workspace.
-2. Add explicit backup restore and import previews. Show identity mismatches,
-   unresolved references, duplicate IDs and authorship conflicts before any
-   accepted change. Do not automatically merge workspaces or overwrite a newer
-   checkpoint. Continue to provide export independently of a graphical interface.
-3. Introduce selected-span annotations with verified quote snapshots, a documented
-   offset basis and target-version binding. If the text changes, show an unresolved
-   anchor rather than selecting similar words silently.
-4. Consider richer comparison and review layouts only after these workflows expose
-   a measured need for simultaneous views. Computational similarities or classifier
-   suggestions must retain their own provenance and must never silently become
-   reader-asserted philosophical relations or changes to Hegel's published tree.
+1. Make selected spans durable with verified quotation snapshots, raw-codepoint
+   offsets, and target-version binding. Integrate an active investigation with
+   existing comparisons, notes, and relations. A changed source must expose an
+   unresolved anchor rather than silently attach to similar words.
+2. Develop a contextual BEING–ESSENCE loop from the current reading context and
+   deliberate return. Existing strict reference-generation checks stay in place.
+   Any distinction between ordinary object identity and exact experiment-generation
+   binding needs its own explicit policy and tests.
+3. Reuse suitable external tools through bounded data exports and explicit result
+   review. The term study remains a reference-integration experiment. Computed
+   suggestions retain tool provenance and do not become reader assertions or
+   changes to the published tree automatically.
+4. Validate heterogeneous ingestion with explicit identity, attribution, source,
+   and review policies before material enters the canonical corpus or workspace.
 
-Each step should retain a useful plain-text workflow before adding a new screen.
+Further storage work includes full-record review binding with a stated asset
+verification scope, version binding for comparison/relation endpoints, and
+previewed backup restore/import. Require explicit migration and conflict handling;
+never reinterpret existing text/PDF-only testimony as wider verification. Continue
+to provide plain-text and export workflows alongside any richer screen.
 
 ## Acceptance boundaries
 
