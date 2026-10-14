@@ -31,7 +31,7 @@ from sol.core.config import (
 from sol.core.models import Book, Node, Passage, node_path, presentation_text
 from sol.core.paths import alias, child_by_name, display_path
 from sol.core.paths import resolve_path as resolve_book_path
-from sol.reader.options import build_parser
+from sol.reader.options import DEFAULT_READER_WIDTH, build_parser
 from sol.reader.actions import ReaderActions, ReadingSession, context_passages
 
 
@@ -960,7 +960,7 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
 
 
 
-def run_reader(book: Book, workspace_reader=None, *, width=88, emphasis="auto") -> int:
+def run_reader(book: Book, workspace_reader=None, *, width=DEFAULT_READER_WIDTH, emphasis="auto") -> int:
     """Keep the optional reading view out of normal command/interface imports."""
     from sol.terminal.reader import run_reader as run_view
 
@@ -1203,7 +1203,7 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
             return 0
         if args.shell:
             if args.reader:
-                return run_reader(book, reader, width=args.width or 88, emphasis=args.emphasis or "auto")
+                return run_reader(book, reader, width=args.width or DEFAULT_READER_WIDTH, emphasis=args.emphasis or "auto")
             return run_shell(book, width, args.plain, color, reader,
                              ui_mode=args.ui or 'auto', editing_mode=args.editing_mode or 'emacs',
                              source_pdf=args.source_pdf, auto_width=args.width is None)
@@ -1325,7 +1325,7 @@ def main(argv: list[str] | None = None) -> int:
             print(render_guide(book, width, 1 if args.depth is None else args.depth))
         elif args.shell:
             if args.reader:
-                return run_reader(book, width=args.width or 88, emphasis=args.emphasis or "auto")
+                return run_reader(book, width=args.width or DEFAULT_READER_WIDTH, emphasis=args.emphasis or "auto")
             return run_shell(book, width, args.plain, color, ui_mode=args.ui or 'auto',
                              editing_mode=args.editing_mode or 'emacs', source_pdf=args.source_pdf,
                              auto_width=args.width is None)

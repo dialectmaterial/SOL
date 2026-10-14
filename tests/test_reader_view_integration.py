@@ -55,7 +55,7 @@ class CheckedView(reader.ReaderView):
                 screen = subprocess.run(["kitten", "@", "--password-env=KITTY_RC_PASSWORD",
                         "--use-password=always", "get-text", "--match", "id:" + os.environ["KITTY_WINDOW_ID"]],
                         capture_output=True, text=True, pass_fds=descriptors, timeout=5, check=True).stdout
-                assert "p. 7 | PDF 80" in screen, screen
+                assert "p. 7" in screen and "Synthetic section" in screen, screen
                 assert "An invented passage" in screen, screen
                 assert self.body.window.render_info.window_width <= self.reading_width
                 assert not self.typography.degraded

@@ -35,7 +35,7 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(.01)
 
     @asynccontextmanager
-    async def view(self, *, book=None, width=64, emphasis="underline", workspace=None):
+    async def view(self, *, book=None, width=None, emphasis="underline", workspace=None):
         from prompt_toolkit.data_structures import Size
         from prompt_toolkit.input import create_pipe_input
         from prompt_toolkit.output import DummyOutput
@@ -50,7 +50,8 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
         actions.read(first=True)
         output = ResizableOutput()
         with create_pipe_input() as pipe:
-            view = ReaderView(actions, input=pipe, output=output, width=width, emphasis=emphasis)
+            measure = {} if width is None else {"width": width}
+            view = ReaderView(actions, input=pipe, output=output, emphasis=emphasis, **measure)
             view.application.ttimeoutlen = .01
             view.application.timeoutlen = .05
             task = asyncio.create_task(view.application.run_async())
@@ -63,7 +64,7 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(await asyncio.wait_for(task, 2), 0)
 
     async def test_reading_measure_is_centered_and_does_not_change_with_context(self):
-        async with self.view() as (view, pipe, actions, output):
+        async with self.view(width=64) as (view, pipe, actions, output):
             info = view.body.window.render_info
             self.assertEqual(info.window_width, 64)
             self.assertLessEqual(abs(info._x_offset - (160 - 64) // 2), 1)
@@ -76,6 +77,76 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
             await self.wait_for(lambda: view._focus_mode)
             self.assertFalse(view._context_visible)
             self.assertEqual(view.body.window.render_info.window_width, 64)
+
+    async def test_default_measure_and_primary_context_share_one_reading_column(self):
+        async with self.view() as (view, pipe, actions, output):
+            self.assertEqual(view.reading_width, 72)
+            for columns in (160, 100, 72, 40, 20):
+                output.columns = columns
+                view.application.invalidate()
+                await self.wait_for(lambda: view.body.window.render_info.window_width == min(72, columns)
+                                    and abs(view.body.window.render_info._x_offset -
+                                            (columns - min(72, columns)) // 2) <= 1)
+                body = view.body.window.render_info
+                heading = view.heading_window.render_info
+                self.assertEqual(heading._x_offset, body._x_offset)
+                self.assertEqual(heading.window_width, body.window_width)
+                self.assertLessEqual(abs(body._x_offset - (columns - body.window_width) // 2), 1)
+                self.assertLessEqual(view._toolkit["get_cwidth"](view._footer_text()), columns)
+            self.assertNotIn("/quality.txt", "".join(text for _, text in view._document_heading()))
+            pipe.send_text("c")
+            await self.wait_for(lambda: view._context_visible and view.context_window.render_info is not None)
+            self.assertEqual(view.context_window.render_info._x_offset, view.body.window.render_info._x_offset)
+            self.assertIn("Scope: work", view._header())
+
+    async def test_cached_results_do_not_reappear_when_returning_to_reading(self):
+        async with self.view() as (view, pipe, actions, output):
+            pipe.send_text("/Beta\r")
+            await self.wait_for(lambda: view.application.layout.has_focus(view.results))
+            self.assertTrue(view._results_visible)
+            pipe.send_text("\r")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+            self.assertFalse(view._results_visible)
+            self.assertTrue(actions.results)
+            pipe.send_text("}")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[2])
+            self.assertFalse(view._results_visible)
+            pipe.send_text("\x1b[1;3D")
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+            self.assertFalse(view._results_visible)
+            self.assertEqual(actions.search_query, "Beta")
+            pipe.send_text("/")
+            await self.wait_for(lambda: view.application.layout.has_focus(view.search_input))
+            self.assertEqual(view.search_input.text, "Beta")
+            pipe.send_text("\r")
+            await self.wait_for(lambda: view.application.layout.has_focus(view.results))
+            self.assertTrue(view._results_visible)
+
+    async def test_narrow_focus_view_keeps_review_and_typography_warnings_visible(self):
+        book = reader_book()
+        book.passages[0] = replace(book.passages[0], transcription_status="needs_review")
+        # An intentionally mismatched projection must warn, not guess emphasis.
+        book.canonical_records[IDS[0]]["markdown"] = "*Different source*"
+        async with self.view(book=book) as (view, pipe, actions, output):
+            output.columns = 20
+            view.application.invalidate()
+            await self.wait_for(lambda: view.body.window.render_info.window_width == 20)
+            pipe.send_text("f")
+            await self.wait_for(lambda: view._focus_mode)
+            self.assertTrue(view.typography.degraded)
+            self.assertTrue(view._status_text().startswith("[source review] | Typography fallback"))
+            self.assertEqual(view._status_height().preferred, 3)
+            await self.wait_for(lambda: "[source review]" in self.screen_text(view))
+            self.assertIn("Typography fallback", self.screen_text(view).replace("\n", ""))
+            self.assertEqual(view.body.text, book.passages[0].text)
+
+    @staticmethod
+    def screen_text(view):
+        screen = view.application.renderer._last_screen
+        size = view.application.output.get_size()
+        return "\n".join("".join(screen.data_buffer[row][column].char
+                                 for column in range(size.columns))
+                         for row in range(size.rows))
 
     async def test_vim_selection_survives_resize_without_changing_source_identity(self):
         async with self.view() as (view, pipe, actions, output):
@@ -144,7 +215,7 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
             rows = view.body.window.render_info.window_height
             pipe.send_text("\x04")
             await self.wait_for(lambda: actions.cursor_offset > 0)
-            self.assertEqual(actions.cursor_offset, 40 * (rows // 2))
+            self.assertEqual(view._source_positions()[actions.cursor_offset][0], rows // 2)
             pipe.send_text("\x15")
             await self.wait_for(lambda: actions.cursor_offset == 0)
             pipe.send_text("jk")

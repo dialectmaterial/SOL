@@ -7,6 +7,8 @@ from pathlib import Path
 
 from sol import __version__ as VERSION
 
+DEFAULT_READER_WIDTH = 72
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sol", description="Read and navigate Hegel's Science of Logic.",
@@ -58,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="explicit legacy PDF reading (slow; not used for ordinary reading)")
     parser.add_argument("--source-pdf", type=Path, metavar="PATH",
                         help="local evidence PDF for source viewing in the canonical shell")
-    parser.add_argument("--width", type=int, metavar="COLUMNS", help="line width (20–240; default fits the terminal, up to 88)")
+    parser.add_argument("--width", type=int, metavar="COLUMNS", help="line width (20–240; reader default 72, other output up to 88)")
     parser.add_argument("--within", metavar="PATH", help="restrict --search to this subtree")
     parser.add_argument("--word", action="store_true", help="whole-word --search rather than substring")
     parser.add_argument("--limit", type=int, metavar="N", help="maximum search results (1–1000; default 20)")

@@ -33,6 +33,7 @@ PACKAGE_FILES = {
     "sol/workspace/profiles.py", "sol/workspace/comparison.py", "sol/terminal/__init__.py", "sol/terminal/prompt.py",
     "sol/terminal/source.py", "sol/terminal/kitty.py", "sol/terminal/comparison.py", "sol/terminal/commands.py",
     "sol/terminal/reference.py", "sol/terminal/handoff.py", "sol/terminal/essence.py", "sol/terminal/reader.py",
+    "sol/terminal/reading_layout.py",
 }
 ENTRY_POINTS = {
     "sol": "sol:cli",
@@ -48,6 +49,7 @@ PUBLIC_FILES = {
     "docs/HANDOFF.md",
     "docs/TERM_STUDY.md",
     "docs/READER_VIEW.md",
+    "docs/READER_ACCEPTANCE.md",
     "docs/research/INTERFACE_RESEARCH.md", "docs/research/OPENDATALOADER_RESEARCH.md",
 } | PACKAGE_FILES
 

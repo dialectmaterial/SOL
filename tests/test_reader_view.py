@@ -296,17 +296,20 @@ class ReaderViewTests(unittest.IsolatedAsyncioTestCase):
         actions.read(first=True)
         async with self.running_view(actions, output=NarrowOutput()) as (view, pipe, task):
             await self.wait_for(lambda: view.body.window.render_info is not None)
-            self.assertTrue(view._header().splitlines()[2].startswith("Printed 1 | PDF 10"))
+            self.assertIn("Printed 1 | PDF 10", view._header())
             self.assertGreater(view.body.window.render_info.window_height, 3)
             self.assertLessEqual(view.body.window.render_info.window_width, 46)
-            width = view.body.window.render_info.window_width
+            from sol.reader.navigation import vertical_offset
+            positions = view._source_positions()
+            start, _ = vertical_offset(positions, 0, 20)
+            end, _ = vertical_offset(positions, start, 1)
             pipe.send_text("\x1b[B" * 20)
-            await self.wait_for(lambda: view.body.buffer.cursor_position >= width * 20)
+            await self.wait_for(lambda: view.body.buffer.cursor_position == start)
             self.assertEqual(view.body.text, raw)
             self.assertIsNone(actions.selection)
             pipe.send_text("\x1b[1;2B")
             await self.wait_for(lambda: actions.selection is not None)
-            self.assertEqual(actions.selection.text, raw[width * 20:width * 21])
+            self.assertEqual(actions.selection.text, raw[start:end])
 
     async def test_search_limit_result_scroll_and_result_cursor_open(self):
         book = reader_book()

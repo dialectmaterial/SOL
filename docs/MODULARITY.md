@@ -1,6 +1,6 @@
 # SOL modularity contract
 
-SOL is one project developed in one repository. Its modularity goal is three independently selectable stages: **BEING**, the reader and philosophical workspace; **ESSENCE**, applications and experiments; and **CONCEPT**, operating-system composition. **CORE** names the shared software foundation. It is not a fourth philosophical stage, a replacement for the three doctrines, or a second canonical book.
+SOL is one project developed in one repository. Its modularity goal is independently selectable components: **BEING**, the reader and philosophical workspace; **ESSENCE**, the real computational environment and applications; and **CONCEPT**, whose scope remains frozen pending justified scholarly necessity. **CORE** names the shared software foundation and stable-identity mediation. These project labels do not claim a software derivation of the three doctrines. CORE is not a fourth philosophical stage, a replacement for the doctrines, or a second canonical book.
 
 Independent selection is the architectural destination. The first implemented step is an internal public boundary, `sol.core`, so applications can use the corpus without importing the interactive shell. Separately released `sol-core`, `sol-being`, and future application distributions do **not** exist yet. The current `sol-organizes-logic` package, commands, and installation instructions remain in place.
 
@@ -11,7 +11,7 @@ Independent selection is the architectural destination. The first implemented st
 | CORE | Shared book and passage models, verified corpus loading, canonical reference resolution and serialization, virtual paths, and corpus configuration | Does not import reader command loops, workspace storage, terminal adapters, or machine-learning frameworks |
 | BEING | Scholarly reading, continuity, attributed notes, comparison, review testimony, and relations | Consumes shared corpus APIs; owns reader actions and personal workspace operations; the virtual shell is one optional interface |
 | ESSENCE | Optional applications, terminal-host integrations, linguistic experiments, classifiers, and other research tools | Consumes shared APIs or an explicit data protocol; does not redefine passage identity or require the BEING shell to start |
-| CONCEPT | Future reproducible environment and operating-system composition | Selects applications and configuration deliberately; installing the reader must not require a SOL operating system |
+| CONCEPT | Scope deferred until a justified scholarly necessity establishes its contribution | No new implementation mandate; installing the reader must not require a SOL operating system |
 
 Dependency direction is toward shared contracts, not toward another application's entry point. An experiment should not import `sol.reader.app` just to find a passage. A terminal launcher should not import the shell to inspect CLI options. The launcher can use `sol.core.config` for corpus discovery and `sol.reader.options` for option definitions, without starting a reader session.
 
@@ -21,9 +21,10 @@ The architecture handoff sets the reader and scholarly workspace, not a simulate
 POSIX environment, as BEING's governing purpose. ESSENCE computation belongs in
 a real Unix shell and replaceable applications, with deliberate movement back to
 BEING. Existing virtual navigation remains compatible; it is not a second shell
-language or the canonical meaning of a passage.
+language, an ontology of the Logic, or the canonical meaning of a passage.
 
-The optional `sol --reader` prototype is the visible BEING reader slice:
+The `sol --reader` view is the visible BEING reader slice, running directly in
+capable terminals including Alacritty; Kitty is an optional host, not a dependency:
 continuous canonical text, local selection, search, and a bounded reading trail.
 It uses the existing reader-action seam and `shell` extra; the default command
 interface and existing panes remain available. Its selections and trail are
@@ -119,9 +120,9 @@ The existing `shell` and `corpus` extras add optional dependencies to the aggreg
 
 pipx installs applications into isolated environments. Installing two SOL applications separately with pipx will not make one application's Python imports visible to the other. Each must declare its own compatible CORE dependency. In-process integration can use an explicitly configured shared environment or deliberate injection; communication between separately launched applications uses documented, versioned messages. CORE's reference protocol supplies the JSON contract used by the explicit local handoff, not shared Python imports, workspace synchronization, or automatic return navigation. [How pipx works](https://pipx.pypa.io/stable/explanation/how-pipx-works.html).
 
-## CONCEPT composition remains opt-in
+## Future environment composition remains opt-in
 
-Later NixOS modules or profiles can compose a reader, selected ESSENCE applications, and their configuration. Each service or integration should be enabled deliberately rather than treating CONCEPT as a mandatory runtime dependency for BEING. NixOS provides typed options and enable switches for such composition; the particular SOL options have not been designed or implemented here. No operating-system configuration is changed by this step. [NixOS: writing modules](https://nixos.org/manual/nixos/stable/#sec-writing-modules).
+NixOS remains one possible future reproducible environment, not the meaning of Hegel’s Concept or a methodological prerequisite for philosophical science. Later modules or profiles could compose a reader, selected ESSENCE applications, and their configuration, if demonstrated research needs justify the work. Each service or integration should be enabled deliberately; BEING must remain independently usable. NixOS provides typed options and enable switches for such composition; the particular SOL options have not been designed or implemented here. No operating-system configuration is changed by this step. [NixOS: writing modules](https://nixos.org/manual/nixos/stable/#sec-writing-modules).
 
 ## Handoff priorities and acceptance gates
 
@@ -131,21 +132,24 @@ bridge, and a bounded [term study](TERM_STUDY.md) exercising that bridge. The
 [optional reader view](READER_VIEW.md) adds the first BEING reading slice. These
 are bounded results, not completion of every architecture-handoff phase.
 
-The immediate priorities are durable selected spans and active investigations
-integrated with comparison and relations; a contextual BEING–ESSENCE loop; reuse
-of external tools and deliberate data export; then validated heterogeneous
-ingestion. Existing corpus, authorship, checkpoint, and freshness contracts remain
-binding. The current strict reference-generation guards remain unchanged.
+The immediate priority is sustained use of the reader: readable prose, coherent
+motion and selection, and meaningful return after resizing or reopening. Durable
+selected-span work, comparison, relations, and contextual BEING–ESSENCE exchange
+should follow demonstrated reading needs, not precede them as a new investigation
+framework. Reuse of external tools, deliberate export, and heterogeneous ingestion
+remain later possibilities. Existing corpus, authorship, checkpoint, and freshness
+contracts remain binding. The current strict reference-generation guards remain unchanged.
 Ordinary object identity and exact experiment-generation binding need a separate
 future policy and tests; a reader interface must not weaken those checks
-automatically. Independent distributions and CONCEPT composition remain separate
-gates in the longer roadmap below.
+automatically. Independent distributions remain a separate gate. CONCEPT’s scope
+is frozen pending scholarly justification; possible environment composition is
+not its predetermined implementation.
 
 1. **Establish the internal CORE boundary.** Move shared models, reference/path operations, configuration, and indexed corpus loading behind `sol.core`. Keep compatibility imports and the current aggregate installation. Test that importing CORE and CLI options does not import the shell, workspace, terminal, extraction tooling, or optional frameworks.
 2. **Exercise it with real consumers.** The reader and launcher should use this boundary; future ESSENCE applications can do likewise. Preserve existing reader behavior, corpus verification, workspace reopenability, and installed command tests. Add new APIs only for demonstrated cross-component needs.
 3. **Build independent distributions deliberately.** Prepare CORE and BEING wheels when their file and dependency ownership is settled. Test CORE-only and BEING-only installs in fresh environments, commands outside the source checkout, and sdist/wheel contents. Installing BEING must not require ESSENCE frameworks or CONCEPT configuration. Build without copying local text, source images, actor profiles, or workspace files.
 4. **Add applications and process contracts as needed.** Package actual ESSENCE tools when they exist, not empty placeholder packages. Version cross-process messages, reject incompatible identities or schemas, and test missing applications as ordinary optional cases.
-5. **Compose the operating-system layer later.** Test opt-in NixOS modules independently before a combined profile. Shared development in one repository must not become compulsory installation of every stage.
+5. **Evaluate environment composition only when justified.** If reproducibility needs warrant NixOS integration, test opt-in modules independently before a combined profile. This does not define CONCEPT; shared development in one repository must not become compulsory installation of every component.
 
 The implemented gate includes code/import separation, preserved aggregate behavior,
 and explicit handoff refusal/acceptance rules. A temporary core-only wheel fixture
@@ -154,4 +158,4 @@ workspace, or terminal files. That fixture is a dependency-boundary test, not a
 published product. The local bridge does not establish compatibility between
 future independently installed applications. Independent distribution claims
 still require compatible versions, isolated builds, and clean-install evidence;
-CONCEPT composition has not shipped.
+no CONCEPT implementation or SOL operating-system composition has shipped.

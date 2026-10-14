@@ -93,5 +93,8 @@ def vertical_offset(layout, offset: int, rows: int, preferred_column: int | None
                       and abs(point[0] - target) == distance]
     index, _ = min(candidates, key=lambda item: (
         abs(item[1][0] - target), abs(item[1][1] - preferred),
-        item[1][1] > preferred, item[0]))
+        # Hidden wrap separators/combining boundaries can share a coordinate
+        # with the following visible glyph. Visual motion lands on that glyph,
+        # while horizontal source-character motion still visits every offset.
+        item[1][1] > preferred, -item[0]))
     return index, preferred

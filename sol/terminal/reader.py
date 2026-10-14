@@ -11,6 +11,8 @@ import os
 import sys
 import unicodedata
 
+from sol.reader.options import DEFAULT_READER_WIDTH
+
 
 def emphasis_style(mode="auto"):
     """Unknown terminals use visible underlining; capabilities aren't assumed."""
@@ -19,8 +21,7 @@ def emphasis_style(mode="auto"):
     if mode != "auto":
         return mode
     term = os.environ.get("TERM", "").lower()
-    return "italic" if (os.environ.get("KITTY_WINDOW_ID") or
-                        term.startswith(("xterm", "screen", "tmux", "foot", "wezterm"))) else "underline"
+    return "italic" if term.startswith(("alacritty", "xterm", "screen", "tmux", "foot", "wezterm")) else "underline"
 
 
 def _character_display(character: str) -> str:
@@ -110,6 +111,18 @@ def _source_processor(toolkit):
     return EscapeSource()
 
 
+def _reading_processor(toolkit, plan_line):
+    class ReadingProjection(toolkit["Processor"]):
+        """Soft-wrap source prose without editing Buffer's text or positions."""
+        def apply_transformation(self, transformation_input):
+            source = transformation_input.document.lines[transformation_input.lineno]
+            plan = plan_line(source, max(1, transformation_input.width))
+            return toolkit["Transformation"](
+                plan.styled_fragments(transformation_input.fragments),
+                plan.source_to_display, plan.display_to_source)
+    return ReadingProjection()
+
+
 def _typography_lexer(toolkit, typography):
     class SourceTypography(toolkit["Lexer"]):
         def lex_document(self, document):
@@ -134,7 +147,7 @@ def _typography_lexer(toolkit, typography):
 class ReaderView:
     """A small reading surface; all domain mutations go through supplied actions."""
 
-    def __init__(self, actions, *, input=None, output=None, width=88, emphasis="auto"):
+    def __init__(self, actions, *, input=None, output=None, width=DEFAULT_READER_WIDTH, emphasis="auto"):
         if type(width) is not int or not 20 <= width <= 240:
             raise ValueError("reader width must be between 20 and 240 columns")
         self.actions = actions
@@ -153,14 +166,16 @@ class ReaderView:
         self._saved_on_exit = False
         self._projecting = False
         self._geometry_cache = None
+        self._line_plans = {}
         from sol.reader.typography import Typography
         self.typography = Typography(())
         self.source_processor = _source_processor(toolkit)
+        self.reading_processor = _reading_processor(toolkit, self._plan_line)
         self.body = toolkit["TextArea"](
             text="", read_only=True, wrap_lines=True, scrollbar=False,
             width=toolkit["Dimension"](min=1, preferred=width, max=width),
             lexer=_typography_lexer(toolkit, lambda: self.typography),
-            input_processors=[self.source_processor], name="sol-reader-source",
+            input_processors=[self.reading_processor], name="sol-reader-source",
         )
         self.search_input = toolkit["TextArea"](
             multiline=False, prompt="Search book: ", history=toolkit["DummyHistory"](),
@@ -175,12 +190,24 @@ class ReaderView:
                 min=1, max=6, preferred=min(6, len(self._state.results) + 1)),
             wrap_lines=False, style="class:results",
         )
-        container = toolkit["HSplit"]([
+        measure = toolkit["Dimension"](min=1, preferred=width, max=width)
+        self.heading_window = toolkit["Window"](
+            toolkit["FormattedTextControl"](self._document_heading), height=2,
+            style="class:document-context", wrap_lines=False)
+        self.context_window = toolkit["Window"](
+            toolkit["FormattedTextControl"](self._header),
+            height=toolkit["Dimension"](min=1, max=6, preferred=4),
+            style="class:context", wrap_lines=True)
+        column = toolkit["HSplit"]([
             toolkit["ConditionalContainer"](
-                toolkit["Window"](toolkit["FormattedTextControl"](self._header),
-                                  height=3, style="class:header"),
+                self.heading_window, toolkit["Condition"](lambda: not self._focus_mode)),
+            toolkit["ConditionalContainer"](
+                self.context_window,
                 toolkit["Condition"](lambda: self._context_visible)),
-            toolkit["VSplit"]([self.body], align=toolkit["HorizontalAlign"].CENTER),
+            self.body,
+        ], width=measure)
+        container = toolkit["HSplit"]([
+            toolkit["VSplit"]([column], align=toolkit["HorizontalAlign"].CENTER),
             toolkit["ConditionalContainer"](
                 self.search_input, toolkit["Condition"](lambda: self._searching)),
             toolkit["ConditionalContainer"](
@@ -195,12 +222,13 @@ class ReaderView:
                 toolkit["Condition"](lambda: self._help_visible)),
             toolkit["ConditionalContainer"](
                 toolkit["Window"](toolkit["FormattedTextControl"](self._status_text),
-                                  height=1, style="class:status"),
+                                  height=self._status_height, wrap_lines=True,
+                                  style=lambda: "class:status class:warning" if (
+                                      self.status or self._needs_review() or self.typography.degraded) else "class:status"),
                 toolkit["Condition"](lambda: not self._focus_mode or bool(self.status)
-                                      or self._needs_review())),
+                                      or self._needs_review() or self.typography.degraded)),
             toolkit["ConditionalContainer"](
-                toolkit["Window"](toolkit["FormattedTextControl"](
-                    "j/k read  {/} paragraphs  / search  v select  c context  ? help"),
+                toolkit["Window"](toolkit["FormattedTextControl"](self._footer_text),
                     height=1, style="class:footer"),
                 toolkit["Condition"](lambda: not self._focus_mode)),
         ])
@@ -352,7 +380,10 @@ class ReaderView:
             key_bindings=bindings, full_screen=True, editing_mode=toolkit["EditingMode"].EMACS,
             input=input, output=output, mouse_support=False,
             style=toolkit["Style"].from_dict({
-                "header": "", "footer": "fg:ansibrightblack", "status": "fg:ansibrightblack",
+                "header": "", "document-context": "", "document-title": "bold",
+                "document-pages": "fg:ansibrightblack", "context": "fg:ansibrightblack",
+                "footer": "fg:ansibrightblack", "status": "fg:ansibrightblack",
+                "warning": "bold",
                 "results": "", "result.selected": "reverse", "selected-text": "reverse",
                 "source.emphasis": self.emphasis, "source.strong": "bold",
                 "source.code": "underline", "source.quotation": "",
@@ -378,14 +409,7 @@ class ReaderView:
                 self._projecting = False
 
     def _source_positions(self):
-        """Project raw boundaries with the renderer's glyph-before-wrap rule.
-
-        BufferControl renders a cursor-space after EACH physical source line.
-        This matters for a line that exactly fills the reading width: its end
-        insertion point occupies the following display row. Escape expansion
-        and wide glyphs are processed before recording a boundary, so the
-        boundary never incorrectly remains before a wrapped wide character.
-        """
+        """Use the SAME presentation plan as rendering for semantic movement."""
         buffer = self.body.buffer
         info = self.body.window.render_info
         width = max(1, info.window_width if info is not None else min(
@@ -394,33 +418,22 @@ class ReaderView:
         if self._geometry_cache is not None and self._geometry_cache[0] == key:
             return self._geometry_cache[1]
         row, positions = 0, []
-        content = info.ui_content if info is not None else None
-        for number, line in enumerate(buffer.document.lines):
-            boundaries, fragments = [0], []
-            for character in line:
-                fragment = _character_display(character)
-                fragments.append(fragment)
-                boundaries.append(boundaries[-1] + len(fragment))
-            displayed = "".join(fragments) + " "
-            # A live render contains the exact processed glyphs. During a
-            # passage transition render_info may still refer to the old text;
-            # only reuse content agreeing with this source projection.
-            if content is not None and number < content.line_count:
-                rendered = "".join(fragment[1] for fragment in content.get_line(number)
-                                   if "[ZeroWidthEscape]" not in fragment[0])
-                if rendered == displayed:
-                    displayed = rendered
-            column, coordinates = 0, []
-            for character in displayed:
-                cells = self._toolkit["get_cwidth"](character)
-                if column + cells > width:
-                    row, column = row + 1, 0
-                coordinates.append((row, column))
-                column += cells
-            positions.extend(coordinates[index] for index in boundaries)
-            row += 1
+        for line in buffer.document.lines:
+            plan = self._plan_line(line, width)
+            positions.extend((row + y, x) for y, x in plan.positions)
+            row += plan.row_count
         self._geometry_cache = key, tuple(positions)
         return self._geometry_cache[1]
+
+    def _plan_line(self, source, width):
+        from sol.terminal.reading_layout import line_layout
+        key = (source, width)
+        if key not in self._line_plans:
+            if len(self._line_plans) >= 64:
+                self._line_plans.clear()
+            self._line_plans[key] = line_layout(source, width,
+                display_character=_character_display, cell_width=self._toolkit["get_cwidth"])
+        return self._line_plans[key]
 
     def _move_vertical(self, direction):
         """Move between visually wrapped rows without changing source offsets."""
@@ -505,7 +518,9 @@ class ReaderView:
         self._result_index = min(self._result_index, max(0, len(state.results) - 1))
         self.status = ""
         if project:
-            self._results_visible = bool(state.results or state.search_query)
+            # Results remain semantic context, not permanent reading chrome.
+            # Opening/returning to prose never resurrects a dismissed pane.
+            self._results_visible = False
             self._project_body()
             self.application.layout.focus(self.body)
         return True
@@ -525,9 +540,27 @@ class ReaderView:
         workspace = self.actions.workspace_reader
         label = "temporary" if workspace is None else "workspace " + str(
             getattr(getattr(getattr(workspace, "store", None), "path", None), "stem", "active"))
-        return (safe_reader_text(title) + "\n" + safe_reader_text(path)
+        return ((safe_reader_text(title) + "\n" if self._focus_mode else "")
+                + safe_reader_text(path)
                 + f"\nPrinted {printed} | PDF {pdf} | " + safe_reader_text(label)
+                + "\nScope: " + safe_reader_text(self._scope_label())
                 + (" | " + safe_reader_text(self.typography.reason) if self.typography.degraded else ""))
+
+    def _scope_label(self):
+        return "work" if not self._state.scope else "/" + "/".join(self._state.scope)
+
+    def _document_heading(self):
+        passage = self._state.current
+        if passage is None:
+            return [("class:document-title", "SOL reader\n"), ("class:document-pages", "No active passage; / searches")]
+        title = passage.heading or passage.node.title or self.actions.book.root.title
+        printed = str(passage.printed_page)
+        if passage.end_printed_page != passage.printed_page:
+            printed += f"–{passage.end_printed_page}"
+        label = "Quotation · " if passage.kind == "quotation" or any(
+            "quotation" in span.styles for span in self.typography.spans) else ""
+        return [("class:document-title", safe_reader_text(title) + "\n"),
+                ("class:document-pages", label + f"p. {printed}")]
 
     def _needs_review(self):
         return self._state.current is not None and self._state.current.needs_source_review
@@ -539,14 +572,27 @@ class ReaderView:
             matches = self.actions.book.selection(self._state.scope)
             index = next((i for i, item in enumerate(matches) if item.identifier == passage.identifier), 0)
             position = f"Passage {index + 1}/{len(matches)}"
-            if passage.needs_source_review:
-                position += " [source review]"
         selected = 0 if self._state.selection is None else self._state.selection.end - self._state.selection.start
-        location = "" if passage is None else f" | p. {passage.printed_page} | PDF {passage.pdf_page}"
         selection = "" if not selected else f" | {selected} selected"
-        typography = " | typography fallback (c for context)" if self.typography.degraded else ""
-        return (f"{position}{location}{selection}{typography}"
-                + (" | " + safe_reader_text(self.status) if self.status else ""))
+        warnings = (["[source review]"] if self._needs_review() else [])
+        if self.typography.degraded:
+            warnings.append("Typography fallback (c for context)")
+        if self.status:
+            warnings.append(safe_reader_text(self.status))
+        return " | ".join(warnings + [position + selection])
+
+    def _status_height(self):
+        width = max(1, self.application.output.get_size().columns)
+        rows = (self._toolkit["get_cwidth"](self._status_text()) + width - 1) // width
+        return self._toolkit["Dimension"](min=1, max=3, preferred=min(3, max(1, rows)))
+
+    def _footer_text(self):
+        columns = self.application.output.get_size().columns
+        if columns < 28:
+            return "j/k  /  ? help"
+        if columns < 60:
+            return "j/k read  / search  ? help"
+        return "j/k read  {/} paragraphs  / search  v select  c context  ? help"
 
     def _save_position(self):
         self._exit_notice = self.actions.save_position() or ""
@@ -580,7 +626,7 @@ class ReaderView:
         return status
 
 
-def run_reader(book, workspace_reader=None, *, width=88, emphasis="auto") -> int:
+def run_reader(book, workspace_reader=None, *, width=DEFAULT_READER_WIDTH, emphasis="auto") -> int:
     """Restore normal reading state; a refused restore never writes a new visit."""
     validate_reader_environment()
     from sol.reader.actions import ReaderActions
@@ -594,6 +640,6 @@ def run_reader(book, workspace_reader=None, *, width=88, emphasis="auto") -> int
     except (ValueError, RuntimeError, OSError) as error:
         message = str(error)
     view = ReaderView(actions, **({"width": width, "emphasis": emphasis}
-                                 if width != 88 or emphasis != "auto" else {}))
+                                 if width != DEFAULT_READER_WIDTH or emphasis != "auto" else {}))
     view.status = message
     return view.run()

@@ -143,6 +143,7 @@ class _LocalState:
     cursor_offset: int
     viewport_offset: int | None
     preferred_column: int | None
+    preferred_layout: tuple | None
 
 
 class ReaderActions:
@@ -168,6 +169,7 @@ class ReaderActions:
         self._requested_target: str | None = None
         self._selection: TextSelection | None = None
         self._preferred_column: int | None = None
+        self._preferred_layout: tuple | None = None
         self._trail = (self._context(),)
         self._history_index = 0
 
@@ -206,7 +208,7 @@ class ReaderActions:
                            self.session.cursor, reference, self._requested_id, self._requested_target,
                            self._selection, self.search_query, tuple(self.results),
                            self._trail, self._history_index, self.session.cursor_offset,
-                           self.session.viewport_offset, self._preferred_column)
+                           self.session.viewport_offset, self._preferred_column, self._preferred_layout)
 
     def _rollback(self, state):
         self.cwd, self.previous_cwd = state.cwd, state.previous_cwd
@@ -217,6 +219,7 @@ class ReaderActions:
         self._trail, self._history_index = state.trail, state.history_index
         self.session.cursor_offset, self.session.viewport_offset = state.cursor_offset, state.viewport_offset
         self._preferred_column = state.preferred_column
+        self._preferred_layout = state.preferred_layout
         if self.workspace_reader is not None:
             self.workspace_reader.resumed_reference = state.resumed_reference
 
@@ -364,6 +367,9 @@ class ReaderActions:
             raise ValueError("no current paragraph; use first, read, or open")
         positions = (source_layout(current.text, width) if layout is None
                      else validate_layout(layout, len(current.text)))
+        if positions != self._preferred_layout:
+            self._preferred_column = None
+            self._preferred_layout = positions
         offset, preferred = vertical_offset(positions, self.cursor_offset, rows, self._preferred_column)
         self.session.cursor_offset, self._preferred_column = offset, preferred
         self._amend_context()

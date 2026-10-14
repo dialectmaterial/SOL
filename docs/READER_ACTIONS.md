@@ -117,6 +117,11 @@ not bytes, terminal cells, wrapped rows, or Markdown positions. `move_horizontal
 moves by codepoint; `move_up`, `move_down`, and `half_page` accept a validated
 source-to-display layout so the adapter can account for wrapping, wide characters,
 and escaped controls. Width-only callers use the action layer's basic layout.
+The full-screen adapter supplies its word-aware renderer's layout, including
+display-only padding and hidden wrap separators. Those separators remain source
+codepoints; visual motion chooses the following visible glyph when boundaries
+coincide. Changing layout resets the preferred visual column, not the semantic
+cursor. Neither layout nor preferred column is saved as reading identity.
 `move_paragraph(offset)` changes the canonical passage and starts its source
 cursor at zero. `jump()` accepts `passage-start`, `passage-end`, `scope-start`, or
 `scope-end`; scope boundaries retain the current reading selection.
@@ -153,6 +158,9 @@ or a projection mismatch explicitly degrades to completely unstyled text rather
 than guessing alignment. The adapter decides how to display emphasis, including
 an underline fallback; neither mapping nor styling changes canonical text or
 selection coordinates. Importing this module loads no optional frameworks.
+The ordinary full-screen reader is terminal-emulator-independent: Alacritty and
+Kitty use standard terminal styles, with a visible underline fallback for unknown
+terminal families. Optional Kitty hosting is separate from this action contract.
 
 ## What remains separate
 

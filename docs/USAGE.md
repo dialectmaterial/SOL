@@ -127,24 +127,45 @@ For a quiet screen with text visible during navigation, selection, and search:
 sol --reader
 sol --reader -n
 sol --reader --width 72 --emphasis underline
-sol-kitty --reader
 ~~~
 
-The view needs an interactive terminal and the `shell` extra, now including the
+Run this directly in Alacritty or another capable terminal. BEING is not a Kitty
+application: the reader needs no Kitty executable, remote control, graphics, or
+window ID. It needs interactive input/output and the `shell` extra, including the
 CommonMark parser for canonical typography. Checks happen before onboarding.
-`--width` limits a centered reading measure (default 88); `--emphasis` accepts
-`auto`, `italic`, or `underline`. Auto uses a terminal-family heuristic; underlining
-is the explicit compatibility choice when italics are unavailable. No source text
-or span offsets change with wrapping or styling.
+`sol-kitty --reader` remains an optional host for exactly the same view.
+
+`--width` limits a centered reading measure (default 72, configurable from 20 to
+240 columns), narrowing responsively on smaller terminals. Prose wraps at word
+boundaries; unavoidable overlong sequences can wrap by character. Wrapping never
+inserts canonical newlines or changes source-codepoint offsets. Title and printed
+page align with the prose; the full path, PDF pages, workspace, and scope live
+behind `c`, while the footer remains secondary.
+
+`--emphasis` accepts `auto`, `italic`, or `underline`. Auto uses a `TERM` heuristic:
+Alacritty and Kitty use standard terminal italics; unknown/basic terminals use
+visible underline. Strong emphasis maps to bold, inline code to underline, and
+quotations have a context label. An exact semantic Markdown projection supplies
+these styles, never ANSI-decorated canonical text. A projection disagreement is
+reported rather than styled at guessed offsets. Underline remains the explicit
+compatibility choice when the terminal or font does not show italics.
 
 Begin with `j`/`k` for displayed rows, `h`/`l` for characters, `}`/`{` for passages,
 and `/` for whole-book search. `n`/`N` repeat search-result navigation, not paragraph
-movement. `c` reveals context, `f` reduces chrome, and `?` shows the compact key
-guide. Ctrl-Q saves changed cursor/viewport state before leaving; Ctrl-C skips
-this extra save without undoing passage checkpoints. Durable offsets require
+movement or the next occurrence within one passage. `gg`/`G` go to the beginning
+or end of the current reading scope, identified by `c`. `f` reduces chrome, and
+`?` shows the compact key guide; focus mode still shows source-review, error, and
+typography-fallback notices. Ctrl-Q saves changed cursor/viewport state before
+leaving; Ctrl-C skips this extra save without undoing passage checkpoints. Durable offsets require
 workspace schema 3; selections and the bounded reading trail remain session-local.
+Resize or reopen in another terminal without changing the canonical corpus, and
+the same semantic cursor remains valid; wrapped rows are never persisted as its
+identity. The source-bound selection already supplies canonical UUIDs, exact
+codepoint span, text, and digests for future workspace operations.
 The default `sol` command view is unchanged. See the [reader guide](READER_VIEW.md)
-for exact keys, upgrade steps, and the current implementation boundary.
+for exact keys, upgrade steps, the manual acceptance checklist, and the current
+implementation boundary. Tree navigation and new ESSENCE analysis remain outside
+this reader refinement.
 
 ## Use normal zsh commands
 
@@ -423,11 +444,15 @@ Copy the displayed identifier into `sol --passage ID --context 1`, replacing `ID
 
 ## Read in kitty and inspect the source
 
-With kitty installed, `sol-kitty` opens SOL in its own reading profile. It uses the same workspace picker, actors, commands, and annotations as `sol`:
+This is an optional integration, not the normal BEING reader architecture.
+`sol --reader` runs directly in Alacritty and other capable terminals without any
+of these facilities. With kitty installed, `sol-kitty` opens SOL in its own reading
+profile. It uses the same workspace picker, actors, commands, and annotations as `sol`:
 
 ~~~sh
 sol-kitty
 sol-kitty -n
+sol-kitty --reader
 sol-kitty --workspace study --actor "Your name"
 sol-kitty --source-pdf /absolute/path/to/Hegel-SOL.pdf
 ~~~
