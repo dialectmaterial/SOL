@@ -21,6 +21,12 @@ def main(argv=None):
     baseline.add_argument("--width", type=int, default=72)
     tui = commands.add_parser("tui", help="opt-in continuous terminal proof")
     tui.add_argument("--width", type=int, default=72)
+    nvim = commands.add_parser("nvim", help="opt-in native Neovim reader; isolated config, no workspace")
+    nvim.add_argument("--width", type=int, default=72)
+    nvim.add_argument("--export", dest="export_path", type=Path, metavar="FILE",
+                      help="save a validated position/selection research packet on exit; never overwrite")
+    nvim.add_argument("--restore", dest="restore_path", type=Path, metavar="FILE",
+                      help="restore a research packet within this same source sample")
     html = commands.add_parser("html", help="create one private offline typeset artifact, refusing overwrite")
     html.add_argument("--output", required=True, type=Path)
     validate = commands.add_parser("validate", help="validate a downloaded research packet; save nothing")
@@ -29,7 +35,10 @@ def main(argv=None):
     if args.trial is not None and args.count is not None:
         parser.error("--trial fixes its complete extent; do not combine it with --count")
     try:
-        if args.mode in {"baseline", "tui"}:
+        if args.mode == "nvim":
+            from .neovim import validate_environment
+            validate_environment(args.width)
+        elif args.mode in {"baseline", "tui"}:
             from sol.terminal.reader import validate_reader_environment
             validate_reader_environment()
         from sol.core.corpus import load_corpus_book
@@ -77,6 +86,9 @@ def main(argv=None):
         elif args.mode == "baseline":
             from sol.terminal.reader import ReaderView
             return ReaderView(sample.actions, width=args.width).run()
+        elif args.mode == "nvim":
+            from .neovim import run
+            return run(sample, width=args.width, export=args.export_path, restore=args.restore_path)
         else:
             from .tui import run
             return run(sample, width=args.width)

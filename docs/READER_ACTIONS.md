@@ -2,7 +2,8 @@
 
 BEING is a reader and philosophical workspace. Its virtual shell is one interface
 to that reader, not the application's governing architecture. The current
-`sol` commands remain compatible and the command view stays the default.
+`sol` opens the full-screen reader by default; `sol --shell` retains the optional
+command interface.
 
 `sol.reader.actions` now owns paragraph-reading state independently of the
 command loop: a `ReadingSession`, semantic source cursor, viewport anchor, browsing
@@ -11,7 +12,7 @@ returns passages, locations, and search results. It does not prompt, print,
 launch panes, open databases, register
 actors, extract PDFs, or import optional interface frameworks.
 
-The shell, one-shot workspace reading, and [optional reader view](READER_VIEW.md)
+The shell, one-shot workspace reading, and [reader view](READER_VIEW.md)
 use this boundary. Parsing command strings, choosing colors and width, editing
 drafts, rendering output, and managing
 source/comparison panes remain interface responsibilities. Native `sol read FILE`
