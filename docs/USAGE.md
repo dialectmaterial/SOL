@@ -9,7 +9,7 @@ This manual covers the reader, virtual shell, personal workspaces, corpus mainte
 1. [Installation and extras](#install-with-pipx)
 2. [Corpus selection and configuration](#choose-the-text)
 3. [Reading, search, and structured output](#read-search-and-inspect)
-   ([optional reader view](READER_VIEW.md))
+   ([reader keys and behavior](READER_VIEW.md))
 4. [Virtual shell](#work-inside-the-virtual-shell)
 5. [Workspaces, notes, comparison, backup, and export](#keep-a-reading-workspace)
 6. [Source-review queue](#work-through-a-source-review-queue)
@@ -21,16 +21,13 @@ This manual covers the reader, virtual shell, personal workspaces, corpus mainte
 
 ## Install with pipx
 
-The [README](../README.md#install) gives the initial installation. The base package uses the standard library for reading and basic input. Optional extras are independent:
+The [README](../README.md#install) gives the initial installation. The normal package includes prompt_toolkit for the full-screen reader and enhanced command input, plus a CommonMark parser for semantic typography:
 
-| Installation | Additional capability |
-| --- | --- |
-| `pipx install .` | Reader and basic shell |
-| `pipx install '.[shell]'` | Enhanced prompt, multiline drafts, and full-screen reader with CommonMark typography |
-| `pipx install '.[corpus]'` | Markdown parsing for conversion and index rebuilding |
-| `pipx install '.[corpus,shell]'` | Both optional extras |
+~~~sh
+pipx install .
+~~~
 
-Use one installation command for the capabilities you want. When changing extras on an existing installation, add `--force` to that command. This replaces SOL's environment; it does not authorize overwriting an unrelated `sol` executable. Use `pipx reinstall sol-organizes-logic` after updating an existing source checkout.
+The previous `shell` and `corpus` extras remain accepted for compatibility, but neither is required for ordinary reading. Use `pipx reinstall sol-organizes-logic` after updating an existing source checkout. If replacing an older installation, `pipx install --force .` refreshes SOL's environment; it does not authorize overwriting an unrelated `sol` executable.
 
 The package supplies `sol`, `sol-kitty`, `sol-corpus`, and `sol-corpus-check`. For a fresh GitHub installation without a local checkout, `pipx install git+https://github.com/dialectmaterial/SOL.git` is also supported; configure a local corpus separately.
 
@@ -44,7 +41,7 @@ If its target is your previous SOL script, preserve that link under another name
 
 ~~~sh
 mv -n ~/.local/bin/sol ~/.local/bin/sol-before-pipx
-pipx install '.[shell]'
+pipx install .
 ~~~
 
 The rename preserves the old link and does not overwrite an existing backup. If the name is still occupied, inspect it before proceeding.
@@ -57,7 +54,7 @@ The book is supplied locally; installing SOL does not download it or copy the pr
 sol
 ~~~
 
-If an older corpus lacks its permanent identity, initialize it explicitly before opening a persistent shell:
+If an older corpus lacks its permanent identity, initialize it explicitly before opening a persistent reader:
 
 ~~~sh
 sol-corpus-check local-corpus --initialize-identity
@@ -89,6 +86,7 @@ Ordinary reading never extracts a PDF. Renaming the PDF does not require reconve
 
 ~~~sh
 sol
+sol --actor "Your name"
 sol -r
 sol -r --width 72
 sol -n
@@ -117,22 +115,22 @@ sol --search "infinity" --within /being --json
 
 With `--json`, a single passage is an object; search, complete file, and context results are arrays in book order. Context includes the selected passage. Each passage carries its identifier, path, text, page references, and review status. Corpus-backed passages also include a `canonical` record containing the Markdown, attribution, note links, and full source references. Their `corpus` metadata retains the import identity, edition, and source fingerprint. Scripts can inspect this information without parsing decorated output.
 
-`guide` and `--guide` open a compact ASCII starting guide containing the project roadmap, the three doctrines, and commands to try. Its default depth is 1; `sol guide --depth 2` reveals more detail. Use `--depth` from 0 to 32 to control how much of an outline appears. For random JSON or plain text, name the action explicitly: `sol -r --json` or `sol -r --plain`.
+`guide` and `--guide` open a compact reader-first guide: how to begin, move, select, search, resume, and use the optional book shell. Its small book outline defaults to depth 1; `sol guide --depth 2` reveals more detail. Use `--depth` from 0 to 32 to control how much of an outline appears. For random JSON or plain text, name the action explicitly: `sol -r --json` or `sol -r --plain`.
 
-Help, version information, and the guide remain available without a corpus. `--structure` can show an abbreviated outline until the text is configured. One-shot actions such as search, passage opening and inspection do not ask for a workspace or actor. With redirected input, a persistent shell needs both `--workspace NAME` and `--actor NAME`; missing labels cause an actionable error without consuming input. Use `-n`, `-r`, or a one-shot action for scripts that need no saved workspace.
+Help, version information, and the guide remain available without a corpus. `--structure` can show an abbreviated outline until the text is configured. One-shot actions such as search, passage opening and inspection do not ask for a workspace or actor. The full-screen reader, including `-n`, needs interactive terminal input and output. For scripts, use `-r` or another one-shot action; an explicit `--shell --ui basic` command session can use redirected input when its actor and workspace are supplied or already remembered.
 
 For a quiet screen with text visible during navigation, selection, and search:
 
 ~~~sh
-sol --reader
-sol --reader -n
-sol --reader --width 72 --emphasis underline
+sol
+sol -n
+sol --width 72 --emphasis underline
 ~~~
 
 Run this directly in Alacritty or another capable terminal. BEING is not a Kitty
 application: the reader needs no Kitty executable, remote control, graphics, or
-window ID. It needs interactive input/output and the `shell` extra, including the
-CommonMark parser for canonical typography. Checks happen before onboarding.
+window ID. It needs interactive input/output and the normal package dependencies,
+including the CommonMark parser for canonical typography. Checks happen before onboarding.
 `sol-kitty --reader` remains an optional host for exactly the same view.
 
 `--width` limits a centered reading measure (default 72, configurable from 20 to
@@ -174,7 +172,7 @@ Resize or reopen in another terminal without changing the canonical corpus, and
 the same semantic cursor remains valid; wrapped rows are never persisted as its
 identity. The source-bound selection already supplies canonical UUIDs, exact
 codepoint span, text, and digests for future workspace operations.
-The default `sol` command view is unchanged. See the [reader guide](READER_VIEW.md)
+This is the default `sol` view; `--reader` remains an explicit alias. See the [reader guide](READER_VIEW.md)
 for exact keys, upgrade steps, the manual acceptance checklist, and the current
 implementation boundary. Tree navigation and new ESSENCE analysis remain outside
 this reader refinement.
@@ -252,7 +250,7 @@ new capture. Help remains available without a corpus.
 
 ### Return from an ESSENCE pane
 
-From a reader launched with `sol-kitty`, select a passage and use `essence open`.
+From the book command interface launched with `sol-kitty --shell`, select a passage and use `essence open`.
 In its ordinary zsh pane, run `sol reference check "$SOL_REFERENCE_FILE"`, then
 `sol reference return [ID]` to propose one return; omit `ID` for the original
 requested UUID. Back in BEING, `essence check` inspects and `essence return`
@@ -273,11 +271,11 @@ method, corpus generation, and passage evidence; `sol analyze check FILE`
 recomputes a saved study. This does not write notes or infer philosophical
 relations. See the [term-study workflow and selection policy](TERM_STUDY.md).
 
-Start with `sol`; `sol --shell` means the same persistent reader. The workspace picker shows up to ten recognized workspaces bound to the current corpus and source fingerprint, ordered by their latest recorded activity. Enter a displayed number to reopen one, or a name to create or select a workspace. Press Enter to choose the first displayed workspace; if none is available, the default is `reading`. The picker inspects candidates without modifying them and skips unrelated, incompatible, symlink, or WAL/sidecar-bearing files. A name entered explicitly still receives normal validation and can open a workspace omitted from suggestions rather than silently choosing another one.
+Open `sol --shell` for the book command interface instead of the default full-screen reader. It shares the reader's actor, workspace, and saved passage. SOL first reuses the last selected actor and that actor's last workspace for the current corpus and source fingerprint. When no remembered workspace is available, it offers up to ten recognized workspaces and asks you to select one or create a new name. Enter a displayed number, or a workspace name; an empty answer chooses `reading`, not whichever database happens to have the newest activity. The picker inspects candidates without modifying them and skips unrelated, incompatible, symlink, or WAL/sidecar-bearing files. Explicit names still receive normal validation.
 
-Supplying `--workspace NAME` or `--actor NAME` skips only the corresponding question. `sol --workspace reading --actor "Your name"` skips both. `sol -n` and `sol -r` do not consult the workspace picker or actor registry. Paths accept lowercase names and omit numbering prefixes when the result is unambiguous. The basic input path can use Python's optional `readline` module for Tab completion.
+Supplying `--workspace NAME` selects that workspace; `--actor NAME` selects that actor and, unless a workspace is explicit, resumes their remembered workspace. `sol --shell --workspace reading --actor "Your name"` skips both setup questions. `sol -n` opens a temporary full-screen reader; `sol --shell -n` opens a temporary command session. Neither these temporary modes nor `sol -r` consults the workspace picker or actor registry. Book paths accept lowercase names and omit numbering prefixes when the result is unambiguous. The basic input path can use Python's optional `readline` module for Tab completion.
 
-With the shell extra installed, `--ui auto` uses the enhanced prompt in an interactive terminal. `--ui basic` selects basic input; `--ui prompt` requests the enhanced prompt when eligible and explains a missing extra. `--editing-mode vi` selects Vi editing instead of the Emacs default. Plain output, redirected streams and `TERM=dumb` retain basic input without importing prompt_toolkit. Enhanced command history stays in memory, not a separate history file.
+For the explicit `--shell` interface, `--ui auto` uses the enhanced prompt in an interactive terminal. `sol --shell --ui basic` selects basic input; `--ui prompt` requests the enhanced prompt when eligible. `--editing-mode vi` selects Vi editing instead of the Emacs default. Plain output, redirected streams and `TERM=dumb` retain basic input without importing prompt_toolkit. Enhanced command history stays in memory, not a separate history file. These prompt options do not configure the full-screen reader.
 
 ~~~text
 cd being
@@ -296,7 +294,7 @@ cd -
 
 `ls` lists the current location, `pwd` displays its path, and `tree [PATH] --depth N` shows descendants. `up` moves to the parent; `cd -` returns to the previous directory. Both `/` and `..` work.
 
-`read` and `first` establish a reading selection. `next` and `previous` move within it. In a persistent workspace, browsing with `cd` preserves the selection and cursor. In the temporary `sol -n` shell, changing directories resets that selection; entering `cd .` or the current directory preserves it. Reaching its boundary does not jump elsewhere. `cat FILE` prints a complete file without moving the cursor.
+`read` and `first` establish a reading selection. `next` and `previous` move within it. In a persistent workspace, browsing with `cd` preserves the selection and cursor. In the temporary `sol --shell -n` session, changing directories resets that selection; entering `cd .` or the current directory preserves it. Reaching its boundary does not jump elsewhere. `cat FILE` prints a complete file without moving the cursor.
 
 Search the current subtree, then open a result and inspect its surroundings:
 
@@ -316,7 +314,7 @@ A useful comparison workflow is to search a term in one doctrine, inspect the su
 
 ## Keep a reading workspace
 
-The default shell remembers an inquiry. Before its first use with an older corpus, explicitly initialize the corpus identity from the project directory, then select the workspace and actor:
+The default reader remembers an inquiry. Before its first use with an older corpus, explicitly initialize the corpus identity from the project directory, then select the workspace and actor:
 
 ~~~sh
 sol-corpus-check local-corpus --initialize-identity
@@ -327,7 +325,9 @@ Initialization adds a permanent corpus UUID and updates its index metadata witho
 
 New conversions already include a corpus identity; this command retains it when present and initializes an older corpus once.
 
-A workspace restores its saved passage and reading scope when reopened. Actor labels are remembered separately in `$XDG_DATA_HOME/sol/profiles.sqlite3`, or `~/.local/share/sol/profiles.sqlite3`. Accepting a new name during shell setup records that label locally. This is not authentication; existing notes retain their original author names. Browsing with `cd` does not erase the saved scope or cursor. `workspace history --limit 10` preserves earlier checkpoints as visits, not claims that a passage was understood. `resume REVISION` revisits a historical checkpoint as a new saved revision; it does not erase later history.
+A workspace restores its saved passage and reading scope when reopened. Bare `sol` reuses the last selected actor and that actor's last workspace for the selected corpus/source; `sol --actor NAME` switches actors, and `--workspace NAME` chooses a workspace explicitly. If the remembered workspace is absent, SOL asks instead of recreating it silently. Actor labels are remembered separately in `$XDG_DATA_HOME/sol/profiles.sqlite3`, or `~/.local/share/sol/profiles.sqlite3`. Accepting a new name during setup records that label locally. This is not authentication; existing notes retain their original author names. In `sol --shell`, browsing with `cd` does not erase the saved scope or cursor. `workspace history --limit 10` preserves earlier checkpoints as visits, not claims that a passage was understood. `resume REVISION` revisits a historical checkpoint as a new saved revision; it does not erase later history.
+
+The following commands belong to the optional `sol --shell` interface:
 
 ~~~text
 first /being
@@ -408,6 +408,20 @@ Export defaults to JSON. `--export-format markdown` produces a readable inquiry 
 
 Each workspace is a separate local SQLite database under `$XDG_DATA_HOME/sol/workspaces`, or `~/.local/share/sol/workspaces`; `--workspace-dir DIRECTORY` selects another location. It is bound to the corpus UUID and source fingerprint, not merely the PDF filename or directory. A mismatched corpus is refused. The workspace does not edit or automatically synchronize the book. See [the workspace plan](WORKSPACE_PLAN.md) for implemented boundaries and next steps.
 
+### List or remove a workspace
+
+These commands manage local databases without opening a reader, asking for an actor, or loading a corpus:
+
+~~~sh
+sol --workspace-list
+sol --workspace-delete NAME
+sol --workspace-list --workspace-dir /absolute/path/to/workspaces --json
+~~~
+
+Replace `NAME` with the exact name shown by the list. Close the workspace in every SOL window and other database tool first. An explicit delete command acts immediately, without a second confirmation. It removes the workspace from normal use and clears launch preferences that point to it, while retaining the unchanged database in a private directory beneath `workspaces/.trash/`. The command prints its exact recovery path. Nothing is overwritten; actor profiles and the canonical corpus remain intact. Missing, open, linked, unrecognized, or unsafe databases are refused rather than forcefully removed.
+
+`--workspace-dir DIRECTORY` selects a nondefault storage directory for either command. `--json` supplies machine-readable results; deletion includes `recovery_path`. Listing does not show archived workspaces. To restore an archive, close SOL and move the database from its printed recovery path back to its original workspace directory only if the original filename is free. Automatic restore and permanent archive deletion are not implemented.
+
 ## Work through a source-review queue
 
 Inspect pending canonical records without opening a workspace:
@@ -457,21 +471,22 @@ Copy the displayed identifier into `sol --passage ID --context 1`, replacing `ID
 ## Read in kitty and inspect the source
 
 This is an optional integration, not the normal BEING reader architecture.
-`sol --reader` runs directly in Alacritty and other capable terminals without any
+`sol` runs directly in Alacritty and other capable terminals without any
 of these facilities. With kitty installed, `sol-kitty` opens SOL in its own reading
-profile. It uses the same workspace picker, actors, commands, and annotations as `sol`:
+profile. It uses the same actor/workspace choices and reader as `sol`:
 
 ~~~sh
 sol-kitty
 sol-kitty -n
 sol-kitty --reader
+sol-kitty --shell
 sol-kitty --workspace study --actor "Your name"
-sol-kitty --source-pdf /absolute/path/to/Hegel-SOL.pdf
+sol-kitty --shell --source-pdf /absolute/path/to/Hegel-SOL.pdf
 ~~~
 
 The profile belongs to this launch; it does not change your general kitty configuration. Ctrl-Shift-Left and Ctrl-Shift-Right move between reader and source panes; Ctrl-Shift-Plus and Ctrl-Shift-Minus change the font size. Ctrl-S save and Ctrl-C cancel remain available in annotation drafts. Newly displayed output adapts to the pane width unless `--width` is supplied.
 
-After opening a passage, inspect its source:
+In `sol-kitty --shell`, after opening a passage, inspect its source:
 
 ~~~text
 first /being
@@ -495,7 +510,7 @@ Verified PDF snapshots and rendered pages are disposable local cache files under
 
 ## Open a comparison desk
 
-Open `sol-kitty` and choose two files using their paths. For example:
+Open `sol-kitty --shell` and choose two files using their paths. For example:
 
 ~~~text
 cd /BEING/i-determinateness-quality/1-being
@@ -550,12 +565,12 @@ comparison requires neither a saved name nor a new workspace record.
 
 ## Development checks
 
-Use a separate environment in the project directory. Editable installation exposes the current package and includes both optional extras for testing:
+Use a separate environment in the project directory. Editable installation exposes the current package and installs the normal reader dependencies for testing:
 
 ~~~sh
 python3 -m venv .venv
 . .venv/bin/activate
-python3 -m pip install -e '.[corpus,shell]'
+python3 -m pip install -e .
 python3 -m sol guide
 python3 -m unittest discover -s tests -v
 ~~~
@@ -573,7 +588,7 @@ SOL_TEST_LIVE_KITTY=1 python3 -B -m unittest discover -s tests -p test_kitty_han
 This requires Kitty, its standalone `kitten` command, Zsh, and desktop access.
 Ordinary test runs skip the GUI check.
 
-The [workspace plan](WORKSPACE_PLAN.md) separates implemented behavior from selected-span annotations and future imports. [Interface research](research/INTERFACE_RESEARCH.md) explains the optional prompt adapter and evaluates alternatives without making them dependencies.
+The [workspace plan](WORKSPACE_PLAN.md) separates implemented behavior from selected-span annotations and future imports. [Interface research](research/INTERFACE_RESEARCH.md) explains the prompt adapter and evaluates alternative interfaces without adopting them.
 
 ### Code responsibilities
 

@@ -45,42 +45,55 @@ class GuideTests(unittest.TestCase):
         self.assertIn("01-synthetic-division", deep)
         self.assertIn("01-synthetic-passage.txt", deep)
         selected = sol.render_guide(book, depth=2, node=book.root.children[1])
-        tree = selected.split("BOOK TREE\n", 1)[1].split("START IN YOUR TERMINAL", 1)[0]
+        tree = selected.split("BOOK TREE\n", 1)[1]
         self.assertIn("ESSENCE/", tree)
         self.assertIn("01-synthetic-passage.txt", tree)
         self.assertNotIn("BEING/", tree)
         self.assertNotIn("CONCEPT/", tree)
 
-    def test_default_starts_with_terminal_invocations_and_separate_shell_examples(self):
+    def test_default_starts_with_reader_and_keeps_command_interface_optional(self):
         text = sol.render_guide(synthetic_book())
-        self.assertIn("sol       start the reader", text)
+        self.assertIn("sol       open the reader", text)
         self.assertIn("sol -n", text)
         self.assertIn("sol -r", text)
-        examples = ("cd /being", "ls", "first", "next", "where",
-                    'search "ground" --word --limit 3', "open 1", "context 1")
-        positions = [text.index("  " + command + "\n") for command in examples]
-        self.assertEqual(positions, sorted(positions))
-        self.assertIn("enter these commands one at a time", text)
-        self.assertNotIn("; search", text)
+        self.assertIn("sol --shell", text)
+        self.assertLess(text.index("START READING"), text.index("BOOK TREE"))
+        self.assertLess(text.index("IN THE READER"), text.index("sol --shell"))
+        self.assertNotIn("PROJECT ROADMAP", text)
+        self.assertNotIn("cd /being", text)
 
-    def test_workspace_notes_and_guide_controls_are_discoverable(self):
+    def test_workspace_resume_and_recoverable_removal_are_discoverable(self):
         text = sol.render_guide(synthetic_book())
-        for command in ("bookmark add beginning", "note add", "note draft",
-                        "guide --depth 2", "help", "tree --depth 3", "exit"):
+        for command in ("sol --actor NAME --workspace NAME", "sol --workspace-list",
+                        "sol --workspace-delete NAME", "sol guide --depth 2", "sol --help"):
             self.assertIn(command, text)
-        self.assertIn("Personal notes require an actor", text)
-        self.assertIn("name recorded on your personal notes", text)
+        self.assertIn("last actor", text)
+        self.assertIn("that actor's last workspace", text)
+        self.assertIn("asks to create one", text)
+        self.assertIn("archive a workspace (recoverable)", text)
+        self.assertIn("name on your personal notes", text)
         self.assertNotIn("visual-help", text)
 
-    def test_search_and_privacy_boundaries_are_clear(self):
+    def test_reader_navigation_search_selection_and_return_are_described(self):
+        text = sol.render_guide(synthetic_book())
+        for key in ("j / k", "h / l", "Ctrl-D / Ctrl-U", "b / n", "gg / G",
+                    "v, then motion", "c / f / ?", "Ctrl-Q", "/ground, Enter",
+                    "Ctrl-P / Ctrl-N", "Alt-Left/Right"):
+            self.assertIn(key, text)
+        self.assertIn("not printed page", text)
+        self.assertIn("within this passage; Escape clears it", text)
+        self.assertIn("beginning / end of reading scope", text)
+        self.assertIn("save your position and quit", text)
+        self.assertNotIn("q quits", text)
+
+    def test_search_privacy_and_terminal_boundaries_are_clear(self):
         text = sol.render_guide(synthetic_book())
         self.assertIn("literal and case-insensitive", text)
-        self.assertIn("not concepts", " ".join(text.split()))
-        self.assertIn("Book paths are virtual", text)
-        self.assertIn("never runs your host shell or edits canonical text", text)
-        self.assertIn("Optional essence opens real Zsh", text)
-        self.assertIn("accept returns explicitly in BEING", text)
-        self.assertIn("checkpoints stay local", text)
+        self.assertIn("not conceptual", " ".join(text.split()))
+        self.assertIn("Canonical text is read-only", " ".join(text.split()))
+        self.assertIn("personal notes stay local", text)
+        self.assertIn("Alacritty", text)
+        self.assertIn("Kitty is optional", text)
 
     def test_source_free_guide_explains_configuration_without_loading_or_conversion(self):
         with patch("sol.reader.app.load_corpus_book", side_effect=AssertionError("No corpus load")), \

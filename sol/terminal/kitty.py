@@ -795,8 +795,8 @@ def main(argv=None) -> int:
             print("Usage: sol-kitty [SOL options]\n"
                   "       sol-kitty --zsh [--corpus DIRECTORY] [--directory DIRECTORY]\n\n"
                   "Use --zsh for normal shell commands and pipelines.\n"
-                  "Open SOL in its private kitty profile. "
-                  "Use source show in the reader to open the verified source pane.\n"
+                  "Open the same SOL reader in an optional private Kitty host.\n"
+                  "For source show and auxiliary panes, use sol-kitty --shell.\n"
                   "Ctrl+Alt+Left/Right switches panes; add Shift to resize.\n"
                   "The profile leaves SOL's Ctrl+S and Ctrl+C editing keys unchanged.\n")
             print(build_parser().format_help())

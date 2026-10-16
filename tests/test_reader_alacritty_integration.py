@@ -20,7 +20,7 @@ from test_packaging import write_runtime_corpus
 
 
 PROGRAM = r'''
-import asyncio, json, os, sys
+import asyncio, builtins, json, os, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 root, phase = Path(sys.argv[2]), sys.argv[3]
@@ -151,8 +151,22 @@ class ObservedView(reader.ReaderView):
         return asyncio.run(scenario())
 
 reader.ReaderView = ObservedView
-raise SystemExit(app.main(["--reader", "--corpus", str(root / "corpus"),
-    "--workspace", "acceptance", "--workspace-dir", str(root), "--actor", "Invented reader"]))
+prompts = []
+answers = iter(["Invented reader", "acceptance"])
+def onboarding(prompt):
+    prompts.append(prompt)
+    assert phase == "first", "Remembered launch must not prompt on reopen"
+    return next(answers)
+builtins.input = onboarding
+status = app.main([])
+assert len(prompts) == (2 if phase == "first" else 0), prompts
+if prompts:
+    assert prompts[0].startswith("Actor") and prompts[1].startswith("Create workspace"), prompts
+from sol.workspace.launch import read_launch_preferences
+preferences = read_launch_preferences()
+assert preferences["last_actor"] == "Invented reader"
+assert preferences["selections"][0]["workspace"] == str(root / "data/sol/workspaces/acceptance.sqlite3")
+raise SystemExit(status)
 '''
 
 
@@ -192,6 +206,7 @@ class AlacrittyReaderIntegrationTests(unittest.TestCase):
                 if name.startswith(("KITTY_", "SOL_ACTOR", "SOL_WORKSPACE")) or name in {
                         "SOL_CORPUS", "SOL_KITTY_SESSION", "ALACRITTY_SOCKET", "ALACRITTY_WINDOW_ID"}:
                     environment.pop(name)
+            environment["SOL_CORPUS"] = str(corpus)
             results = []
             for phase, columns in (("first", 100), ("reopen", 40)):
                 configuration = root / (phase + ".toml")
@@ -225,7 +240,8 @@ class AlacrittyReaderIntegrationTests(unittest.TestCase):
             self.assertGreater(results[0]["measure"], results[1]["measure"])
             self.assertEqual(before, {path.name: path.read_bytes() for path in corpus.iterdir()})
             self.assertFalse((root / "config" / "sol").exists())
-            self.assertTrue((root / "acceptance.sqlite3").exists())
+            self.assertTrue((root / "data/sol/workspaces/acceptance.sqlite3").exists())
+            self.assertTrue((root / "data/sol/launch.sqlite3").exists())
 
 
 if __name__ == "__main__":

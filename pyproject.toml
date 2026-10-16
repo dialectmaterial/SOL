@@ -16,7 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: Text Processing",
 ]
-dependencies = []
+dependencies = ["prompt-toolkit>=3.0.52,<4", "markdown-it-py>=3,<4"]
 
 [project.optional-dependencies]
 corpus = ["markdown-it-py>=3,<4"]

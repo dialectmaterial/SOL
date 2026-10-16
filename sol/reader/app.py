@@ -270,7 +270,7 @@ def render_tree(node: Node = ROOT, prefix: str = "", include_self: bool = True,
 
 def render_guide(book: Book | None = None, width: int = 80, depth: int = 1,
                  node: Node | None = None) -> str:
-    """A compact, source-independent starting point for the virtual reader.
+    """A compact, source-independent introduction to reading in BEING.
 
     The default reveals the three doctrines, not an overwhelming full outline.
     Explicit depth and node arguments use the loaded tree without reading files.
@@ -280,56 +280,46 @@ def render_guide(book: Book | None = None, width: int = 80, depth: int = 1,
 / __| / _ \ | |
 \__ \| (_) || |__
 |___/ \___/ |____|
-SOL: SOL Organizes Logic
-
-PROJECT ROADMAP
-+-- BEING    CLI, reader, virtual shell [current]
-+-- ESSENCE  applications, terminal emulator, classifiers
-`-- CONCEPT  operating system, NixOS, Hyprland
-
-BOOK TREE"""
+SOL: SOL Organizes Logic"""
     selected = node or (book.root if book is not None else ROOT)
     outline = render_tree(selected, depth=depth, ascii_only=True)
-    starting = """START IN YOUR TERMINAL
-  sol       start the reader; choose a workspace and actor
-  sol -n    temporary reader, without a saved workspace
+    starting = """START READING
+  sol       open the reader and resume your saved position
+  sol -n    read temporarily, without a workspace or actor
   sol -r    print one random quotation and leave
+SOL remembers the last actor and that actor's last workspace. If none exists,
+it asks to create one. Choose explicitly: sol --actor NAME --workspace NAME.
+An actor is the name on your personal notes, not the book's author.
 
-INSIDE SOL: enter these commands one at a time
-  cd /being
-  ls
-  first
-  next
-  where
-  search "ground" --word --limit 3
-  open 1
-  context 1
+IN THE READER
+  j / k           read down / up through wrapped lines
+  h / l           move by source character
+  Ctrl-D / Ctrl-U move half a visible page down / up
+  b / n           previous / next passage, not printed page
+  gg / G          beginning / end of reading scope (c shows scope)
+  v, then motion  select text within this passage; Escape clears it
+  c / f / ?       context / quiet focus mode / keyboard help
+  Ctrl-Q          save your position and quit
 
-WITH A WORKSPACE
-  bookmark add beginning
-  note add "A personal interpretation, not Hegel's text."
-  note draft
-Personal notes require an actor. Passage IDs preserve references across sessions.
-Actor means the name recorded on your personal notes, not the book's author.
-note draft uses the enhanced prompt: Ctrl-S saves, Ctrl-C cancels.
-Use note show NOTE_ID for its revision; note edit NOTE_ID edits your own note.
-note history NOTE_ID shows earlier versions (replace NOTE_ID with a printed ID).
+FIND AND RETURN
+  /ground, Enter  search; choose a result with j/k, then Enter
+  Ctrl-P / Ctrl-N previous / next matching passage
+  Alt-Left/Right  back / forward through your reading trail
+Search is literal and case-insensitive, not conceptual. Escape closes panels.
 
-KEEP EXPLORING
-  guide --depth 2   reveal more of the tree (or guide PATH --depth N)
-  help             see command syntax
-  neofetch         ASCII Hegel and SOL's concept preview
-  tree --depth 3   explore divisions without the guide
-  essence          open a real zsh pane in sol-kitty (optional)
-  exit             leave SOL
+YOUR LOCAL WORKSPACE
+  sol --workspace-list         list saved workspaces
+  sol --workspace-delete NAME  archive a workspace (recoverable)
+Your reading position and personal notes stay local. Canonical text is read-only.
 
-Book paths are virtual; directories are divisions and files contain passages.
-Search is literal and case-insensitive; --word matches whole words, not concepts.
-Reading never runs your host shell or edits canonical text.
-Optional essence opens real Zsh; accept returns explicitly in BEING.
-Workspace notes and checkpoints stay local; backups and exports are your choice."""
+MORE WHEN YOU NEED IT
+  sol guide --depth 2  reveal more of the book's structure
+  sol --help          see options and one-shot reading commands
+  sol --shell         open the optional command interface
+In that interface: guide PATH --depth N; help shows its command syntax.
+BEING runs in Alacritty and other capable terminals; Kitty is optional."""
     if book is None:
-        starting += """\n\nCORPUS SETUP (the tree above is an abbreviated fallback)
+        starting += """\n\nCORPUS SETUP (the book tree is an abbreviated fallback)
   sol --set-corpus DIRECTORY
 Use an existing converted corpus. For explicit conversion: sol-corpus --help.
 Reading never performs PDF conversion automatically."""
@@ -344,7 +334,7 @@ Reading never performs PDF conversion automatically."""
                       for line in title.splitlines())
     outline = "\n".join(textwrap.fill(line, width=width, subsequent_indent="    ",
                                       break_on_hyphens=False) for line in outline.splitlines())
-    return "\n".join((title, outline, "", folded))
+    return "\n".join((title, "", folded, "", "BOOK TREE", outline))
 
 
 # Hand-drawn ASCII bust: swept-back hair, high forehead, and cravat.
@@ -961,36 +951,55 @@ def run_shell(book: Book, width: int, plain: bool = False, color: bool = False,
 
 
 def run_reader(book: Book, workspace_reader=None, *, width=DEFAULT_READER_WIDTH, emphasis="auto") -> int:
-    """Keep the optional reading view out of normal command/interface imports."""
+    """Load the terminal adapter only for interactive reading."""
     from sol.terminal.reader import run_reader as run_view
 
     return run_view(book, workspace_reader, width=width, emphasis=emphasis)
 
 
 def validate_options(args: argparse.Namespace) -> None:
+    management = bool(getattr(args, "workspace_list", False) or
+                      getattr(args, "workspace_delete", None) is not None)
     if args.command:
         actions = (args.structure, args.guide, args.shell, args.none, args.random, args.read is not None,
                    args.first is not None, args.cat is not None, args.search is not None,
                    args.passage is not None, args.info is not None, args.set_corpus is not None,
                    args.resume, args.workspace_export, args.workspace_check, args.workspace_backup is not None,
                    args.workspace_upgrade is not None,
-                   args.review_queue)
+                   args.review_queue, management)
         if any(actions):
             raise ValueError("guide cannot be combined with another action")
         args.guide = True
+    if management:
+        # Management has no book, terminal adapter or interactive identity.
+        # Its own validator checks its deliberately smaller option surface.
+        return
     actions = (args.structure, args.guide, args.shell, args.none, args.random, args.read is not None,
                args.first is not None, args.cat is not None, args.search is not None,
                args.passage is not None, args.info is not None, args.set_corpus is not None,
                args.resume, args.workspace_export, args.workspace_check, args.workspace_backup is not None,
                args.workspace_upgrade is not None,
                args.review_queue)
+    if args.none and any((args.structure, args.guide, args.random, args.read is not None,
+                         args.first is not None, args.cat is not None, args.search is not None,
+                         args.passage is not None, args.info is not None, args.set_corpus is not None,
+                         args.resume, args.workspace_export, args.workspace_check,
+                         args.workspace_backup is not None, args.workspace_upgrade is not None,
+                         args.review_queue)):
+        raise ValueError("-n/--none is a temporary interactive session; omit one-shot/guide actions")
     if not any(actions) or args.none:
+        # ``shell`` remains the internal interactive-session marker. Only an
+        # explicit --shell chooses the command interface; ordinary SOL is the
+        # full-screen reader, including its temporary -n form.
+        if not args.shell:
+            args.reader = True
         args.shell = True
     if args.reader:
         if not args.shell:
             raise ValueError("--reader is an interactive reading view; omit one-shot/guide actions")
         if args.pdf is not None:
-            raise ValueError("--reader requires the indexed canonical corpus, not --pdf")
+            raise ValueError("--reader requires the indexed canonical corpus, not --pdf. "
+                             "Use sol -r --pdf PATH for a legacy random passage.")
         if args.plain or args.json:
             raise ValueError("--reader is interactive; omit --plain and --json")
         if args.ui is not None or args.editing_mode is not None or args.source_pdf is not None:
@@ -999,8 +1008,7 @@ def validate_options(args: argparse.Namespace) -> None:
         raise ValueError("--emphasis requires --reader")
     if args.shell and not args.none and args.pdf is not None:
         raise ValueError("the persistent shell requires an indexed Markdown corpus, not --pdf. "
-                         "Use sol -n --pdf PATH for a temporary legacy shell or sol -r --pdf PATH "
-                         "for a legacy random passage.")
+                         "Use sol -r --pdf PATH for a legacy random passage.")
     if args.none and (args.workspace is not None or args.actor is not None or args.workspace_dir is not None):
         raise ValueError("-n/--none does not use a workspace or actor; omit workspace options")
     if not args.shell and (args.ui is not None or args.editing_mode is not None):
@@ -1063,58 +1071,87 @@ def interactive_input_available() -> bool:
 
 
 def shell_identity(book: Book, args) -> None:
-    """Ask only for missing labels; accepting a name explicitly creates it later."""
+    """Resolve explicit launch choices, then ask only when no remembered choice exists.
+
+    The actor registry is not a recency service. Workspace activity dates may
+    order a chooser, but never identify the next author or silently select a
+    workspace. Only a previously validated interactive launch supplies defaults.
+    """
+    from sol.workspace.launch import read_launch_preferences
     from sol.workspace.profiles import actor_name, list_actors
     from sol.workspace.reader import workspace_path
+    from sol.workspace.store import Workspace
 
     if not book.corpus_manifest.get('corpus_id'):
-        raise ValueError("a persistent shell needs an identified Markdown corpus. "
+        raise ValueError("a persistent reader needs an identified Markdown corpus. "
                          "Run sol-corpus-check DIRECTORY --initialize-identity, or use sol -n.")
     known = list_actors()
-    if (args.workspace is None or args.actor is None) and not interactive_input_available():
-        raise ValueError("workspace and actor prompts need interactive input. "
-                         "Supply --workspace NAME --actor NAME, use sol -n for a temporary shell, "
-                         "or sol -r for a random passage.")
-    if args.workspace is None:
-        from sol.workspace.catalog import discover_workspaces
-        source_digest = book.corpus_manifest.get('source', {}).get('sha256')
-        recent = discover_workspaces(book.corpus_manifest['corpus_id'], source_digest, args.workspace_dir)
-        default_workspace = recent[0]['name'] if recent else 'reading'
-        if recent:
-            print('Recent workspaces for this corpus:')
-            for number, entry in enumerate(recent, 1):
-                print(f"  {number}. {entry['name']} | {entry['last_activity'][:10]} | {entry['scope'] or '[no reading yet]'}")
-            print('Choose a displayed number, type a workspace name, or enter a new name.')
-        while True:
-            response = input(f'Workspace [{default_workspace}]: ').strip()
-            name = response or default_workspace
-            if recent and response.isdecimal():
-                number = int(response) if len(response) <= 2 else 0
-                if not 1 <= number <= len(recent):
-                    print('sol: choose a displayed workspace number or a name (use --workspace for a numeric name)')
-                    continue
-                name = recent[number - 1]['name']
-            try:
-                workspace_path(name, args.workspace_dir)
-            except ValueError as error:
-                print(f'sol: {error}')
-                continue
-            args.workspace = name
-            break
+    preferences = read_launch_preferences()
+    registered_names = {profile['name'] for profile in known}
+    if args.actor is None and preferences['last_actor'] in registered_names:
+        args.actor = preferences['last_actor']
     if args.actor is None:
+        if not interactive_input_available():
+            raise ValueError("actor setup needs interactive input. Supply --actor NAME --workspace NAME, "
+                             "use sol -n for a temporary reader, or sol -r for a random passage.")
         if known:
             print('Known actors: ' + ', '.join(profile['name'] for profile in known[-10:]))
-        default = known[-1]['name'] if known else None
         while True:
-            value = input(f'Actor [{default}]: ' if default else 'Actor (name for your own notes): ')
+            value = input('Actor (name for your own notes): ')
             try:
-                args.actor = actor_name(value or default or '')
+                args.actor = actor_name(value)
             except ValueError as error:
                 print(f'sol: {error}')
                 continue
             break
     else:
         args.actor = actor_name(args.actor)
+    if args.workspace is not None:
+        return
+    source_digest = book.corpus_manifest.get('source', {}).get('sha256')
+    for choice in preferences['selections']:
+        if (choice['actor'] != args.actor or choice['corpus_id'] != book.corpus_manifest['corpus_id'] or
+                choice['source_sha256'] != source_digest):
+            continue
+        location = Path(choice['workspace'])
+        if args.workspace_dir is not None and workspace_path(location.stem, args.workspace_dir) != location:
+            continue
+        if location.is_file() and not location.is_symlink():
+            # Validate the remembered file read-only before adopting it. Never
+            # recreate an absent remembered workspace without asking.
+            with Workspace(location, book.corpus_manifest['corpus_id'],
+                           {'source_sha256': source_digest}, read_only=True):
+                pass
+            args.workspace, args.workspace_dir = location.stem, location.parent
+            return
+    if not interactive_input_available():
+        raise ValueError("workspace setup needs interactive input. Supply --workspace NAME --actor NAME, "
+                         "use sol -n for a temporary reader, or sol -r for a random passage.")
+    from sol.workspace.catalog import discover_workspaces
+    recent = discover_workspaces(book.corpus_manifest['corpus_id'], source_digest, args.workspace_dir)
+    if recent:
+        print('Available workspaces for this corpus (not actor identities):')
+        for number, entry in enumerate(recent, 1):
+            print(f"  {number}. {entry['name']} | {entry['last_activity'][:10]} | {entry['scope'] or '[no reading yet]'}")
+        print('Choose a displayed number or workspace name; enter a new name to create one.')
+    while True:
+        prompt = (f'Workspace for {args.actor} [reading]: ' if recent else
+                  f'Create workspace for {args.actor} [reading]: ')
+        response = input(prompt).strip()
+        name = response or 'reading'
+        if recent and response.isdecimal():
+            number = int(response) if len(response) <= 2 else 0
+            if not 1 <= number <= len(recent):
+                print('sol: choose a displayed workspace number or a name (use --workspace for a numeric name)')
+                continue
+            name = recent[number - 1]['name']
+        try:
+            workspace_path(name, args.workspace_dir)
+        except ValueError as error:
+            print(f'sol: {error}')
+            continue
+        args.workspace = name
+        return
 
 
 def tree_data(node: Node, depth: int | None = None) -> dict:
@@ -1126,6 +1163,54 @@ def tree_data(node: Node, depth: int | None = None) -> dict:
             tree_data(child, None if depth is None else depth - 1) for child in node.children
         ],
     }
+
+
+def validate_workspace_management(args) -> None:
+    """Keep local-data management independent of book and reader setup."""
+    if not (args.workspace_list or args.workspace_delete is not None):
+        return
+    allowed = {"workspace_list", "workspace_delete", "workspace_dir", "json"}
+    incompatible = ["--" + key.replace("_", "-") for key, value in vars(args).items()
+                    if key not in allowed and value is not None and value is not False]
+    if incompatible:
+        raise ValueError("workspace listing/removal accepts only --workspace-dir and --json; omit "
+                         + ", ".join(incompatible))
+
+
+def run_workspace_management(args) -> int:
+    """An exact delete request archives personal data; it never opens a book."""
+    from sol.workspace.lifecycle import delete_workspace, list_workspaces
+    from sol.workspace.reader import safe_output
+
+    if args.workspace_list:
+        rows = list_workspaces(args.workspace_dir)
+        if args.json:
+            emit_json(rows)
+        elif rows:
+            print("Local workspaces:")
+            for row in rows:
+                print(f"  {row['name']}  (schema {row['schema_version']})")
+            print("\nRemove one recoverably: sol --workspace-delete NAME")
+        else:
+            print("No recognized local workspaces.")
+        return 0
+    result = delete_workspace(args.workspace_delete, args.workspace_dir)
+    from sol.workspace.launch import forget_workspace
+    try:
+        forget_workspace(Path(result["path"]))
+    except ValueError as error:
+        # Removal has already succeeded. Report its recovery location even if
+        # an unrelated damaged preferences file could not be cleaned up.
+        result["preferences_warning"] = str(error)
+        print("sol: workspace removed, but its launch preference could not be cleared: "
+              + safe_output(str(error)), file=sys.stderr)
+    if args.json:
+        emit_json(result)
+    else:
+        print(f"Removed workspace: {result['name']}")
+        print("Recoverable database: " + safe_output(result["recovery_path"]))
+        print("Actor profiles and the canonical corpus were not changed.")
+    return 0
 
 
 def terminal_color() -> bool:
@@ -1155,9 +1240,6 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
         raise ValueError(f"workspace does not exist: {args.workspace}; start with --workspace NAME --shell")
     provenance = {"edition": book.corpus_manifest["edition"], "source": book.corpus_manifest["source"]}
     with Workspace(location, identity, provenance, actor=args.actor or "Reader") as store:
-        if args.shell:
-            from sol.workspace.profiles import register_actor
-            register_actor(args.actor)
         reader = WorkspaceReader(book, store, args.actor, resolve_path, display_path,
                                  render_passage, width, args.plain, color)
         if args.workspace_export:
@@ -1202,6 +1284,13 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
                       f"--workspace-dir {shlex.quote(str(destination.parent))}")
             return 0
         if args.shell:
+            # Personal launch preferences are separate from the workspace
+            # schema and are saved only after the selected store/service have
+            # validated. One-shot inspection never changes the next author.
+            from sol.workspace.launch import remember_launch
+            from sol.workspace.profiles import register_actor
+            register_actor(args.actor)
+            remember_launch(args.actor, store.path, identity, book.corpus_manifest['source']['sha256'])
             if args.reader:
                 return run_reader(book, reader, width=args.width or DEFAULT_READER_WIDTH, emphasis=args.emphasis or "auto")
             return run_shell(book, width, args.plain, color, reader,
@@ -1246,6 +1335,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         validate_options(args)
+        validate_workspace_management(args)
+        if getattr(args, "workspace_list", False) or getattr(args, "workspace_delete", None) is not None:
+            return run_workspace_management(args)
         if args.reader:
             # Refuse an unavailable view before corpus discovery, onboarding,
             # actor registration or opening/creating a personal workspace.

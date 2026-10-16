@@ -87,7 +87,7 @@ class SourceShellTests(unittest.TestCase):
 
     def test_source_flag_requires_canonical_shell(self):
         for flags in [['-r', '--source-pdf', 'a.pdf'],
-                      ['-n', '--pdf', 'a.pdf', '--source-pdf', 'a.pdf']]:
+                      ['--shell', '-n', '--pdf', 'a.pdf', '--source-pdf', 'a.pdf']]:
             with self.subTest(flags=flags):
                 args = sol.build_parser().parse_args(flags)
                 with self.assertRaisesRegex(ValueError, '--source-pdf'):

@@ -73,14 +73,15 @@ def validate_reader_environment() -> None:
     if (not getattr(sys.stdin, "isatty", lambda: False)()
             or not getattr(sys.stdout, "isatty", lambda: False)()
             or os.environ.get("TERM") == "dumb"):
-        raise ValueError("--reader needs an interactive terminal for both input and output "
-                         "with TERM other than dumb; use the ordinary SOL command view instead")
+        raise ValueError("the SOL reader needs an interactive terminal for both input and output "
+                         "with TERM other than dumb; use sol -r for one-shot output "
+                         "or sol --shell for the command interface")
     try:
         _load_toolkit()
     except ImportError as error:
-        raise ValueError("--reader needs the optional prompt_toolkit and CommonMark dependencies; "
-                         "from the SOL project run pipx install --force '.[shell]' "
-                         "to install or refresh SOL with its shell extra") from error
+        raise ValueError("the SOL reader needs prompt_toolkit and CommonMark; "
+                         "from the SOL project run pipx install --force . "
+                         "to install or refresh its reader dependencies") from error
 
 
 def _source_processor(toolkit):

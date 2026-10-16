@@ -31,6 +31,7 @@ PACKAGE_FILES = {
     "sol/corpus/backends/__init__.py", "sol/corpus/backends/opendataloader.py",
     "sol/workspace/__init__.py", "sol/workspace/store.py", "sol/workspace/reader.py",
     "sol/workspace/diagnostics.py", "sol/workspace/catalog.py", "sol/workspace/export.py",
+    "sol/workspace/launch.py", "sol/workspace/lifecycle.py",
     "sol/workspace/profiles.py", "sol/workspace/comparison.py", "sol/terminal/__init__.py", "sol/terminal/prompt.py",
     "sol/terminal/source.py", "sol/terminal/kitty.py", "sol/terminal/comparison.py", "sol/terminal/commands.py",
     "sol/terminal/reference.py", "sol/terminal/handoff.py", "sol/terminal/essence.py", "sol/terminal/reader.py",
@@ -188,13 +189,15 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(dict(entry_points["console_scripts"]), ENTRY_POINTS)
         requirements = metadata.get_all("Requires-Dist") or []
         self.assertEqual(set(metadata.get_all("Provides-Extra") or []), {"corpus", "shell", "extraction"})
-        self.assertEqual(len(requirements), 4)
+        self.assertEqual(len(requirements), 6)
+        base = [requirement for requirement in requirements if ";" not in requirement]
         corpus = [requirement for requirement in requirements if 'extra == "corpus"' in requirement]
         shell = [requirement for requirement in requirements if 'extra == "shell"' in requirement]
         extraction = [requirement for requirement in requirements if 'extra == "extraction"' in requirement]
         self.assertEqual(len(corpus), 1)
         self.assertEqual(len(shell), 2)
         self.assertEqual(len(extraction), 1)
+        self.assertEqual(set(base), {"prompt-toolkit<4,>=3.0.52", "markdown-it-py<4,>=3"})
         self.assertTrue(corpus[0].startswith("markdown-it-py<4,>=3;"))
         self.assertEqual({requirement.split(";")[0] for requirement in shell},
                          {"prompt-toolkit<4,>=3.0.52", "markdown-it-py<4,>=3"})
@@ -232,6 +235,128 @@ class PackagingTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("usage:", result.stdout)
+
+    def test_installed_reader_help_and_guide_do_not_import_presentation_dependencies(self):
+        installed = Path(self.temporary.name) / "reader-help-wheel"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        program = """
+import builtins, importlib, sys
+sys.path.insert(0, sys.argv[1])
+original_import = builtins.__import__
+def guard(name, *args, **kwargs):
+    if (name.split('.')[0] in {'prompt_toolkit', 'markdown_it', 'opendataloader_pdf'}
+            or name in {'sol.terminal.reader', 'sol.workspace.launch', 'sol.workspace.profiles'}):
+        raise AssertionError('Help imported a runtime reader component ' + name)
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = guard
+app = importlib.import_module('sol.reader.app')
+app.discover_corpus = lambda *args, **kwargs: None
+raise SystemExit(app.cli(sys.argv[2:]))
+"""
+        for arguments in (["--help"], ["--guide"], ["guide"]):
+            with self.subTest(arguments=arguments):
+                result = subprocess.run(
+                    [sys.executable, "-I", "-B", "-c", program, str(installed), *arguments],
+                    cwd=self.temporary.name, capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("reader", result.stdout.lower())
+
+    def test_installed_default_reader_and_temporary_reader_route_without_a_tui(self):
+        """Exercise the built artifact's routing, not an interactive display."""
+        installed = Path(self.temporary.name) / "reader-routing-wheel"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        corpus = Path(self.temporary.name) / "reader-routing-corpus"
+        passage_id, _ = write_runtime_corpus(corpus)
+        from sol.corpus.contract import initialize_corpus_identity
+        initialize_corpus_identity(corpus)
+        program = """
+import builtins, importlib, json, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+original_import = builtins.__import__
+def guard(name, *args, **kwargs):
+    if name.split('.')[0] in {'prompt_toolkit', 'markdown_it', 'opendataloader_pdf'}:
+        raise AssertionError('Routing fixture imported a live presentation dependency ' + name)
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = guard
+app = importlib.import_module('sol.reader.app')
+view = importlib.import_module('sol.terminal.reader')
+events = []
+def validate():
+    events.append('terminal')
+view.validate_reader_environment = validate
+def identity(book, args):
+    assert events == ['terminal']
+    events.append('identity')
+    args.workspace = 'installed-reading'
+    args.actor = 'Installed reader'
+    args.workspace_dir = Path(sys.argv[3])
+app.shell_identity = identity
+def read(book, workspace_reader=None, **options):
+    events.append('reader')
+    assert book.find_passage(sys.argv[4]).identifier == sys.argv[4]
+    assert bool(workspace_reader) == ('-n' not in sys.argv[5:])
+    return 0
+app.run_reader = read
+def reject_shell(*args, **kwargs):
+    raise AssertionError('Normal launch must not open the command interface')
+app.run_shell = reject_shell
+assert app.cli(['--corpus', sys.argv[2], *sys.argv[5:]]) == 0
+assert events == (['terminal', 'reader'] if '-n' in sys.argv[5:]
+                  else ['terminal', 'identity', 'reader'])
+print(json.dumps(events))
+"""
+        for number, arguments in enumerate(([], ["-n"], ["--reader"])):
+            with self.subTest(arguments=arguments):
+                private = Path(self.temporary.name) / f"reader-routing-private-{number}"
+                environment = os.environ.copy()
+                environment.pop("SOL_CORPUS", None)
+                environment["XDG_CONFIG_HOME"] = str(private / "config")
+                environment["XDG_DATA_HOME"] = str(private / "data")
+                result = subprocess.run(
+                    [sys.executable, "-I", "-B", "-c", program, str(installed), str(corpus),
+                     str(private / "workspaces"), passage_id, *arguments],
+                    cwd=self.temporary.name, env=environment, capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                if "-n" in arguments:
+                    self.assertFalse(private.exists(), "Temporary reading must create no private storage")
+                else:
+                    self.assertTrue((private / "workspaces" / "installed-reading.sqlite3").is_file())
+
+    def test_installed_default_reader_checks_terminal_before_source_or_storage(self):
+        installed = Path(self.temporary.name) / "reader-preflight-wheel"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        private = Path(self.temporary.name) / "reader-preflight-private"
+        environment = os.environ.copy()
+        environment["XDG_CONFIG_HOME"] = str(private / "config")
+        environment["XDG_DATA_HOME"] = str(private / "data")
+        program = """
+import importlib, sys
+sys.path.insert(0, sys.argv[1])
+app = importlib.import_module('sol.reader.app')
+view = importlib.import_module('sol.terminal.reader')
+def unavailable():
+    raise ValueError('Invented unavailable terminal')
+def forbidden(*args, **kwargs):
+    raise AssertionError('Rejected terminal must not discover a source or onboard')
+view.validate_reader_environment = unavailable
+app.discover_corpus = app.load_corpus_book = app.shell_identity = forbidden
+assert app.cli(sys.argv[2:]) == 2
+"""
+        for arguments in ([], ["-n"], ["--reader"]):
+            with self.subTest(arguments=arguments):
+                result = subprocess.run(
+                    [sys.executable, "-I", "-B", "-c", program, str(installed), *arguments],
+                    cwd=self.temporary.name, env=environment, capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("Invented unavailable terminal", result.stderr)
+                self.assertFalse(private.exists())
 
     def test_installed_extraction_help_does_not_require_extraction_or_corpus_extras(self):
         installed = Path(self.temporary.name) / "extraction-help-wheel"
@@ -505,7 +630,7 @@ if sys.argv[2:] == ['guide']:
 raise SystemExit(sol.cli(sys.argv[2:]))
 """
         cases = [
-            (["--corpus", str(corpus), "-n", "--ui", "prompt"], "first /being\nexit\n"),
+            (["--corpus", str(corpus), "--shell", "-n", "--ui", "prompt"], "first /being\nexit\n"),
             (["--corpus", str(corpus), "-r", "--json"], ""),
             (["guide"], ""),
         ]
@@ -526,11 +651,11 @@ raise SystemExit(sol.cli(sys.argv[2:]))
                 elif "-n" in arguments:
                     self.assertIn(body, " ".join(result.stdout.split()))
                 else:
-                    self.assertIn("START IN YOUR TERMINAL", result.stdout)
+                    self.assertIn("START READING", result.stdout)
                     self.assertIn("sol -n", result.stdout)
                     self.assertIn("sol -r", result.stdout)
 
-    def test_installed_default_shell_requires_both_labels_and_resumes_attributed_work(self):
+    def test_installed_explicit_shell_requires_initial_labels_and_resumes_attributed_work(self):
         installed = Path(self.temporary.name) / "installed-shell-onboarding"
         with zipfile.ZipFile(self.wheel) as archive:
             archive.extractall(installed)
@@ -580,12 +705,16 @@ raise SystemExit(status)
         base = ["--corpus", str(corpus)]
         for supplied in ([], ["--workspace", "installed-reading"], ["--actor", "Installed author"]):
             with self.subTest(supplied=supplied):
-                result = run("sol.reader.app", [*base, *supplied], commands="first /being\nexit\n", expected_status=2)
-                self.assertIn("--workspace NAME --actor NAME", result.stderr)
+                result = run("sol.reader.app", [*base, "--shell", *supplied], commands="first /being\nexit\n", expected_status=2)
+                self.assertIn("interactive input", result.stderr)
+                if "--workspace" not in supplied:
+                    self.assertIn("--workspace NAME", result.stderr)
+                if "--actor" not in supplied:
+                    self.assertIn("--actor NAME", result.stderr)
                 self.assertIn("sol -n", result.stderr)
                 self.assertIn("sol -r", result.stderr)
                 self.assertFalse(data.exists(), "Rejected onboarding must not create private storage")
-        selected = [*base, "--workspace", "installed-reading", "--actor", "Installed author"]
+        selected = [*base, "--shell", "--workspace", "installed-reading", "--actor", "Installed author"]
         opened = run("sol.reader.app", selected,
                      commands='first /being\nnote add "A private installed-reader question."\nexit\n')
         self.assertIn("Actor: Installed author", opened.stdout)
@@ -723,7 +852,7 @@ with closing(sqlite3.connect(sys.argv[2])) as connection, connection:
         published_digest = hashlib.sha256(upgraded.read_bytes()).hexdigest()
         run("sol.reader.app", [*arguments, "--workspace-upgrade", str(upgraded)], expected_status=2)
         self.assertEqual(hashlib.sha256(upgraded.read_bytes()).hexdigest(), published_digest)
-        edited = run("sol.reader.app", [*copy_arguments, "--actor", "Installed legacy author"], commands=(
+        edited = run("sol.reader.app", [*copy_arguments, "--shell", "--actor", "Installed legacy author"], commands=(
             f'note edit {note_id} "An explicitly audited revision." --expect-revision 1\nexit\n'))
         self.assertIn("revision 2", edited.stdout)
         after = json.loads(run("sol.reader.app", [*copy_arguments, "--workspace-export"]).stdout)

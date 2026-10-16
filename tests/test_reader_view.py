@@ -67,13 +67,13 @@ print(json.dumps(sorted(sys.modules)))
                     validate_reader_environment()
                 loader.assert_not_called()
 
-    def test_missing_optional_dependency_has_actionable_error(self):
+    def test_missing_reader_dependency_has_actionable_error(self):
         tty = SimpleNamespace(isatty=lambda: True)
         with patch("sol.terminal.reader.sys.stdin", tty), \
                 patch("sol.terminal.reader.sys.stdout", tty), \
                 patch.dict("os.environ", {"TERM": "xterm"}), \
                 patch("sol.terminal.reader._load_toolkit", side_effect=ImportError("absent")):
-            with self.assertRaisesRegex(ValueError, "shell.*extra"):
+            with self.assertRaisesRegex(ValueError, r"pipx install --force \."):
                 validate_reader_environment()
 
     def test_metadata_controls_bidi_and_invisible_characters_are_literal(self):

@@ -125,7 +125,7 @@ class TerminalTests(unittest.TestCase):
                 self.assertEqual(sol.default_pdf(), source)
 
     def test_missing_pdf_diagnostic_uses_short_name(self):
-        status, _, stderr = self.run_main([], allow_source=False)
+        status, _, stderr = self.run_main(['-r'], allow_source=False)
         self.assertEqual(status, 2)
         self.assertIn('Hegel-SOL.pdf', stderr)
 
@@ -473,11 +473,11 @@ class TerminalTests(unittest.TestCase):
         self.assertNotIn('SOL@Idea', output)
         self.assertTrue(output.endswith('/BEING\n'))
 
-    def test_shell_help_and_visual_guide_explain_neofetch(self):
+    def test_shell_help_explains_neofetch_and_reader_guide_points_to_shell(self):
         status, output = self.run_shell(['help', 'exit'])
         self.assertEqual(status, 0)
         self.assertIn("neofetch                          ASCII Hegel and SOL's concept-preview identity", output)
-        self.assertIn('neofetch', sol.render_guide(self.book))
+        self.assertIn('sol --shell', sol.render_guide(self.book))
 
     def test_shell_plain_retains_neofetch_art_without_color(self):
         status, output = self.run_shell(['neofetch', 'exit'], plain=True, color=True)
@@ -491,7 +491,7 @@ class TerminalTests(unittest.TestCase):
         with patch('builtins.input', side_effect=['neofetch', 'exit']), \
                 patch('sol.reader.app.install_completion', return_value=lambda: None), \
                 patch('sol.reader.app.terminal_color', return_value=True):
-            status, output, error = self.run_main(['--corpus', 'synthetic', '-n', '--plain'])
+            status, output, error = self.run_main(['--corpus', 'synthetic', '--shell', '-n', '--plain'])
         self.assertEqual(status, 0, error)
         self.assertNotIn('\x1b', output)
         self.assertIn(sol.HEGEL_ASCII.splitlines()[0], output)

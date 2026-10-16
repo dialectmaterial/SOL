@@ -1,5 +1,12 @@
 # SOL’s virtual interface: an investigation
 
+Historical research, not current reader architecture. As of 15 October 2026,
+BEING has a full-screen, generic-terminal reader with schema-3 source positions;
+Alacritty is a normal host and Kitty integration is optional. The input-only and
+Kitty-first descriptions below record an earlier stage. For the current contract
+see [READER_VIEW.md](../READER_VIEW.md); for the bounded next comparison see
+[READER_SURFACES.md](READER_SURFACES.md).
+
 Research checked against primary documentation on 11 October 2026, with the
 implemented input-only stage recorded below on 12 October. The broader tools are
 possibilities, not adopted SOL interfaces.

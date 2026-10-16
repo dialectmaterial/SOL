@@ -1,41 +1,48 @@
 # BEING reader view
 
-`sol --reader` opens a quiet, keyboard-driven reading screen. It keeps the current
+`sol` opens a quiet, keyboard-driven reading screen. It keeps the current
 passage visible while you move, select words, search, and
 return through a reading trail. It runs directly in an ordinary capable terminal;
-Alacritty is a first-class host. BEING is not a Kitty application. The ordinary
-`sol` command interface remains the default while this prototype is evaluated.
-Existing shell commands, workspace
+Alacritty is a first-class host. BEING is not a Kitty application. The explicit
+`sol --reader` spelling remains available; `sol --shell` opens the optional
+command interface. Existing shell commands, workspace
 operations, comparison desks, source panes, and reference handoff remain available
 through their existing interfaces.
 
 ## Open the reader
 
 ```sh
-sol --reader
-sol --reader --workspace reading --actor "Your name"
-sol --reader -n
-sol --reader --width 72 --emphasis underline
+sol
+sol --workspace reading --actor "Your name"
+sol -n
+sol --width 72 --emphasis underline
 ```
 
-Install or refresh the optional `shell` extra from the project checkout:
+Install or refresh SOL from the project checkout:
 
 ```sh
-pipx install --force '.[shell]'
+pipx install --force .
 ```
 
-The extra supplies prompt_toolkit and the CommonMark parser for typography.
+The normal installation includes prompt_toolkit and the CommonMark parser for
+typography. The existing `.[shell]` extra remains compatible.
 The reader requires interactive input and output on a real terminal, not Kitty,
 remote control, graphics support, or `KITTY_WINDOW_ID`. Terminal
 and dependency checks happen before workspace/actor
-onboarding or creating their files. A missing extra or redirected stream produces
+onboarding or creating their files. A missing dependency or redirected stream produces
 an actionable error. The adapter does not install packages or change pipx or
 general terminal configuration.
 
-Normal corpus discovery and `--corpus` selection apply. Persistent reading uses
-the existing workspace picker and actor onboarding; supplied labels skip the
-corresponding questions. `-n` makes the session temporary and bypasses workspace
-and actor storage.
+Normal corpus discovery and `--corpus` selection apply. SOL remembers the last
+actor and that actor's last workspace, then restores its reading position. If no
+workspace exists for the chosen actor, it asks to create one. Explicit `--actor`
+and `--workspace` select a different reading context. An actor attributes personal
+activity; it does not replace Hegel's authorship. `-n` makes the session temporary
+and bypasses workspace and actor storage.
+
+Use `sol --workspace-list` to inspect local workspaces and
+`sol --workspace-delete NAME` to remove one from normal use by archiving it
+recoverably. These management operations do not require a corpus or actor.
 
 Kitty is an optional host, not the reader's architecture. `sol-kitty --reader`
 opens the same adapter in a private launch profile. Kitty-specific panes,
@@ -43,7 +50,7 @@ source/facsimile viewing, and ESSENCE integration remain separate optional
 workflows; they are not required for ordinary reading in Alacritty or another
 capable terminal.
 
-The prototype does not combine `--reader` with one-shot actions, `--plain`,
+The fullscreen reader does not combine `--reader` with one-shot actions, `--plain`,
 `--json`, legacy PDF reading, `--ui`, `--editing-mode`, or `--source-pdf`.
 Use the ordinary interfaces for those workflows. `--width` is supported: it sets
 a maximum reading measure of 20–240 columns, default 72, centered when space

@@ -19,6 +19,11 @@ from typing import Any, Iterator
 import unicodedata
 from uuid import UUID, uuid4
 
+try:
+    import fcntl
+except ImportError:  # Normal reading remains available on non-POSIX hosts.
+    fcntl = None
+
 
 SCHEMA_VERSION = 3
 APPLICATION_ID = 0x534F4C57  # SOLW
@@ -327,6 +332,7 @@ class Workspace:
         encoded_provenance = _encode(provenance)
         self._requested_source_sha256 = _source_fingerprint(provenance)
         self._connection: sqlite3.Connection | None = None
+        self._lease_descriptor: int | None = None
         try:
             if not read_only:
                 self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -356,6 +362,14 @@ class Workspace:
                             os.fchmod(descriptor, 0o600)
                     finally:
                         os.close(descriptor)
+            # A shared lifetime lease distinguishes an idle open SOL reader
+            # from a closed workspace. SQLite transaction locks alone cannot
+            # do that. Lifecycle deletion upgrades this same inode lease;
+            # normal concurrent readers/writers continue to share it.
+            if fcntl is not None:
+                self._lease_descriptor = os.open(
+                    self.path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+                fcntl.flock(self._lease_descriptor, fcntl.LOCK_SH | fcntl.LOCK_NB)
             connection = sqlite3.connect(
                 self.path.as_uri() + ("?mode=ro" if read_only else "?mode=rw"),
                 uri=True, timeout=5, isolation_level=None)
@@ -387,9 +401,14 @@ class Workspace:
         self.close()
 
     def close(self) -> None:
-        if self._connection is not None:
-            self._connection.close()
-            self._connection = None
+        try:
+            if self._connection is not None:
+                self._connection.close()
+                self._connection = None
+        finally:
+            if self._lease_descriptor is not None:
+                os.close(self._lease_descriptor)
+                self._lease_descriptor = None
 
     def _db(self) -> sqlite3.Connection:
         if self._connection is None:

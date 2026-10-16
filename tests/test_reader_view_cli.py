@@ -34,8 +34,10 @@ class ReaderViewCLITests(unittest.TestCase):
             status = app.main(arguments)
         return status, output.getvalue(), error.getvalue()
 
-    def test_reader_is_a_view_modifier_not_a_change_to_the_default(self):
-        for arguments, selected, temporary in (([], False, False), (["--reader"], True, False),
+    def test_reader_is_default_and_explicit_shell_keeps_command_interface(self):
+        for arguments, selected, temporary in (([], True, False), (["--reader"], True, False),
+                                               (["-n"], True, True), (["--shell"], False, False),
+                                               (["--shell", "-n"], False, True),
                                                (["--reader", "-n"], True, True),
                                                (["--reader", "--shell"], True, False)):
             args = build_parser().parse_args(arguments)
@@ -64,7 +66,7 @@ class ReaderViewCLITests(unittest.TestCase):
                 patch.object(app, "discover_corpus", side_effect=AssertionError("No corpus I/O")), \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")), \
                 patch("sol.workspace.profiles.register_actor", side_effect=AssertionError("No profile write")):
-            status, _, error = self.call(["--reader"])
+            status, _, error = self.call([])
         self.assertNotEqual(status, 0)
         self.assertIn("Invented unavailable view", error)
         self.assertFalse((self.root / "config").exists())
@@ -76,7 +78,7 @@ class ReaderViewCLITests(unittest.TestCase):
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")), \
                 patch("sol.workspace.store.Workspace", side_effect=AssertionError("No workspace")), \
                 patch("sol.workspace.profiles.register_actor", side_effect=AssertionError("No profile")):
-            status, _, error = self.call(["--reader", "-n"])
+            status, _, error = self.call(["-n"])
         self.assertEqual(status, 0, error)
         view.assert_called_once()
         self.assertEqual(len(view.call_args.args), 1)
@@ -92,7 +94,7 @@ class ReaderViewCLITests(unittest.TestCase):
         with patch("sol.terminal.reader.validate_reader_environment"), \
                 patch.object(app, "shell_identity", side_effect=choose) as onboarding, \
                 patch.object(app, "run_reader", return_value=0) as view:
-            status, _, error = self.call(["--reader"])
+            status, _, error = self.call([])
         self.assertEqual(status, 0, error)
         onboarding.assert_called_once()
         view.assert_called_once()

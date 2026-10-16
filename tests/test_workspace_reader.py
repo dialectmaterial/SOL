@@ -270,7 +270,7 @@ class WorkspaceReaderTests(unittest.TestCase):
         with patch('sol.workspace.store.Workspace', side_effect=AssertionError('No database for ordinary shell')), \
                 patch('builtins.input', side_effect=['first /being', 'exit']), \
                 patch('sol.reader.app.install_completion', return_value=lambda: None):
-            status, _, stderr = self.main(['-n'])
+            status, _, stderr = self.main(['--shell', '-n'])
         self.assertEqual(status, 0, stderr)
 
     def test_workspace_names_and_environment_do_not_allow_path_traversal(self):
