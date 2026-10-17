@@ -1,11 +1,22 @@
 """Display policies for terminal text; canonical strings are never modified."""
 from __future__ import annotations
 
+import os
 import sys
 import unicodedata
 
 
 _BIDI = {"LRE", "RLE", "LRO", "RLO", "PDF", "LRI", "RLI", "FSI", "PDI"}
+
+
+def emphasis_style(mode="auto"):
+    """Standard terminal styles, with visible fallback for unknown terminals."""
+    if mode not in {"auto", "italic", "underline"}:
+        raise ValueError("reader emphasis must be auto, italic or underline")
+    if mode != "auto":
+        return mode
+    term = os.environ.get("TERM", "").lower()
+    return "italic" if term.startswith(("alacritty", "xterm", "screen", "tmux", "foot", "wezterm")) else "underline"
 
 
 def safe_output(value: object) -> str:

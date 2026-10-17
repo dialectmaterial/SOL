@@ -18,18 +18,27 @@ terminal checks; passing unit tests is not evidence of manual reading quality.
 The Python 3.14 CI job also installs Zsh and ripgrep to exercise the native shell
 pipeline. That external-tool check skips explicitly when those programs are absent.
 
+## Commit and push workflow
+
+For agent-assisted work in this repository, commit and push completed, verified
+changes by default unless the user explicitly asks otherwise. Review the diff
+and stage only task-related files. Never include the private corpus, source PDF,
+personal workspaces or unrelated local changes. If pushing requires resolving
+divergent history or additional access, report that rather than force-pushing.
+
 ## Where behavior belongs
 
 | Area | Owner |
 | --- | --- |
 | Command syntax and execution mode | `sol/reader/options.py` |
 | Startup and dispatch | `sol/reader/app.py` |
-| Interactive actor/workspace selection | `sol/reader/launch.py` |
+| First-run PDF import and actor/workspace selection | `sol/reader/onboarding.py`, `sol/reader/launch.py` |
 | Optional book command interface | `sol/reader/shell.py` |
 | One-shot and book-shell text rendering | `sol/reader/render.py` |
 | Semantic reading cursor, selection and history | `sol/reader/actions.py` |
-| Fullscreen presentation | `sol/terminal/reader.py` |
-| Optional native continuous reader | `sol/terminal/neovim_reader.py`, `sol/terminal/neovim.py`, `sol/terminal/neovim.lua` |
+| Single fullscreen reader | `sol/terminal/neovim_reader.py`, `sol/terminal/neovim.py`, `sol/terminal/neovim.lua` |
+| Reader outline | `sol/reader/structure.py`, `sol/terminal/neovim_tree.lua` |
+| Complete checkout installation | `scripts/install.py` |
 | Checked read-only surface projections | `sol/reader/surface.py` |
 | Generic terminal escaping and POSIX utilities | `sol/terminal/text.py`, `sol/terminal/tty.py` |
 | Workspace operations and persistence guards | `sol/workspace/reader.py`, `sol/workspace/store.py` |
@@ -57,16 +66,17 @@ unpacked source archive. They do not copy the local book or personal databases.
 Research adapters remain opt-in, checkout/source-archive tools. Their presence in
 the source archive does not install them as reader commands. Keep engine adoption
 dependent on the existing reading trials rather than adding more frontends.
-The original Neovim experiment now reuses the installed optional backend;
-`sol --engine neovim` is available without the experiments package. Its Lua
-asset is included in the wheel. This does not change the default reader or
-install Neovim. See [the backend contract](docs/NEOVIM_READER.md) for the native
-keys, workspace boundary, bounded section transitions and live acceptance test.
+The original Neovim experiment reuses the installed reader backend. Its Lua
+assets are included in the wheel; the historical prompt_toolkit fullscreen
+baseline and wrapping code remain research-only, outside the installed package.
+Bare `sol` opens the Neovim-backed reader. See [the reader contract](docs/NEOVIM_READER.md)
+for workspace boundaries and bounded section transitions, and
+[the reader guide](docs/READER_VIEW.md) for controls and acceptance checks.
 
 ## Scope of the cleanup
 
 This pass preserves canonical identifiers, the reference protocol, workspace
-schemas and installed commands. The redundant `shell` and `corpus` extras remain
+schemas and installed commands. The redundant `shell`, `corpus` and `extraction` extras remain
 compatibility aliases; the PDF compatibility reader remains explicit.
 
 The deeper state-model work still needs a deliberate compatibility design:
@@ -76,7 +86,7 @@ lookup indexes over those collections without addressing invalidation. Bounded
 batch reference operations avoid repeated verification while keeping strict
 generation checks; they do not make snapshots immutable.
 
-Likewise, the reader engine decision remains subject to actual reading trials.
-That decision and changes to persistent selected-span work are separate from
-mechanical cleanup. No workspace migration or automatic annotation ingestion is
-part of this pass.
+The single reader still needs actual human reading trials; automated terminal
+checks alone do not establish usability. Persistent selected-span work requires
+its own compatibility design. This consolidation does not migrate workspaces or
+automatically ingest annotations.

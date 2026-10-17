@@ -90,7 +90,7 @@ class ReaderSurfaceCLITests(unittest.TestCase):
         self.assertEqual(self.invoke("validate", str(packet))[0], 2)
 
     def test_tui_checks_terminal_before_loading_or_opening_a_view(self):
-        with patch("sol.terminal.reader.validate_reader_environment", side_effect=ValueError("interactive terminal required")), \
+        with patch("experiments.reader_surfaces.baseline.validate_reader_environment", side_effect=ValueError("interactive terminal required")), \
                 patch("sol.core.corpus.load_corpus_book", side_effect=AssertionError("must fail before loading")):
             status, out, err = self.invoke("tui")
         self.assertEqual(status, 2)

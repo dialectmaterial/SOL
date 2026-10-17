@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from sol.reader.actions import ReaderActions
-from sol.terminal.reader import ReaderView, emphasis_style
+from experiments.reader_surfaces.baseline import ReaderView, emphasis_style
 from test_reader_view import IDS, reader_book
 
 

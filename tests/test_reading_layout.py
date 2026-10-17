@@ -7,7 +7,7 @@ import unicodedata
 import unittest
 
 from sol.reader.navigation import vertical_offset
-from sol.terminal.reading_layout import line_layout
+from experiments.reader_surfaces.reading_layout import line_layout
 
 
 def cell_width(character):

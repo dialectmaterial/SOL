@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 from sol.core.paths import display_path, resolve_path
 from sol.reader.actions import ReaderActions
-from sol.terminal.reader import ReaderView
+from experiments.reader_surfaces.baseline import ReaderView
 from sol.workspace.reader import WorkspaceReader
 from sol.workspace.store import Workspace
 from test_workspace_reader import CORPUS_ID, IDS, invented_book

@@ -108,8 +108,8 @@ class ReaderSurfaceTrialCLITests(unittest.TestCase):
                     stack.enter_context(patch("sol.core.corpus.load_corpus_book", return_value=book))
                     select = stack.enter_context(patch("experiments.reader_surfaces.trials.select_trial", return_value=trial))
                     default_sample = stack.enter_context(patch("experiments.reader_surfaces.common.sample_from_book"))
-                    environment = stack.enter_context(patch("sol.terminal.reader.validate_reader_environment"))
-                    baseline = stack.enter_context(patch("sol.terminal.reader.ReaderView"))
+                    environment = stack.enter_context(patch("experiments.reader_surfaces.baseline.validate_reader_environment"))
+                    baseline = stack.enter_context(patch("experiments.reader_surfaces.baseline.ReaderView"))
                     baseline.return_value.run.return_value = 0
                     tui = stack.enter_context(patch("experiments.reader_surfaces.tui.run", return_value=0))
                     html = stack.enter_context(patch("experiments.reader_surfaces.html.write_html"))
@@ -153,8 +153,8 @@ class ReaderSurfaceTrialCLITests(unittest.TestCase):
                 del book.canonical_records[named["b"]["id"]]
                 before = deepcopy(book.canonical_records)
                 stack.enter_context(patch("sol.core.corpus.load_corpus_book", return_value=book))
-                stack.enter_context(patch("sol.terminal.reader.validate_reader_environment"))
-                baseline = stack.enter_context(patch("sol.terminal.reader.ReaderView"))
+                stack.enter_context(patch("experiments.reader_surfaces.baseline.validate_reader_environment"))
+                baseline = stack.enter_context(patch("experiments.reader_surfaces.baseline.ReaderView"))
                 tui = stack.enter_context(patch("experiments.reader_surfaces.tui.run"))
                 html = stack.enter_context(patch("experiments.reader_surfaces.html.write_html"))
                 fallback = stack.enter_context(patch("experiments.reader_surfaces.common.sample_from_book"))

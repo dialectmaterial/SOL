@@ -433,7 +433,7 @@ end
 ''', integrated=True)
         self.assertEqual(report["clipboard"], "thought")
 
-    def test_tree_layout_scope_depth_resize_and_return_do_not_navigate_text(self):
+    def test_outline_keeps_selection_across_resize_and_returns_without_navigation(self):
         from sol.reader.structure import structure_payload
         from unittest.mock import patch
         from sol.terminal import neovim
@@ -446,12 +446,15 @@ end
             report = self.run_lua(r'''
   local before = reader.capture()
   local tree = reader.tree()
-  assert(tree.state().layout == 'vertical' and tree.state().depth == 2)
-  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Tab>jlhb+r', true, false, true), 'xt', false)
-  assert(tree.state().layout == 'horizontal')
+  assert(tree.state().layout == 'vertical')
+  local selected = tree.state().selected
+  vim.api.nvim_feedkeys('hl', 'xt', false)
+  assert(tree.state().layout == 'vertical')
+  selected = tree.state().selected
   vim.o.columns = 42
   vim.api.nvim_exec_autocmds('VimResized', {})
   assert(vim.api.nvim_get_current_win() == tree.window)
+  assert(tree.state().selected == selected)
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'xt', false)
   assert(vim.deep_equal(reader.capture(), before))
   report.restored = true
@@ -467,6 +470,34 @@ end
   report.register = true
 ''', integrated=True)
         self.assertTrue(report["register"])
+
+    def test_simple_paragraph_keys_and_focus_retain_semantic_positions(self):
+        report = self.run_lua(r'''
+  local first, second = data.records[1].id, data.records[2].id
+  vim.api.nvim_feedkeys('n', 'xt', false)
+  assert(reader.capture().reference.reference.target_id == second)
+  assert(reader.capture().cursor_offset == 0)
+  vim.api.nvim_feedkeys('b', 'xt', false)
+  assert(reader.capture().reference.reference.target_id == first)
+  local packet = reader.capture('v', reader.source_point(first, 7), reader.source_point(first, 13))
+  reader.restore(packet)
+  -- Focus is presentation: styled source selections retain their exact identity.
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>f', true, false, true), 'xt', false)
+  reader = SOLNvimReader
+  local current = reader.capture()
+  local position = current.cursor_offset
+  vim.api.nvim_feedkeys('p', 'xt', false)
+  reader = SOLNvimReader
+  assert(reader.mode == 'paragraph')
+  vim.api.nvim_feedkeys('99j99k', 'xt', false)
+  assert(reader.capture().reference.reference.target_id == first)
+  vim.api.nvim_feedkeys('n', 'xt', false)
+  reader = SOLNvimReader
+  assert(reader.capture().reference.reference.target_id == second)
+  assert(reader.capture().cursor_offset == 0)
+  report.simple_keys = true
+''', integrated=True)
+        self.assertTrue(report["simple_keys"])
 
 
 if __name__ == "__main__":

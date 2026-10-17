@@ -3,7 +3,7 @@ import importlib.util
 import unittest
 
 from sol.reader.typography import Typography, TypographySpan
-from sol.terminal.reader import _typography_lexer
+from experiments.reader_surfaces.baseline import _typography_lexer
 
 
 @unittest.skipUnless(importlib.util.find_spec('prompt_toolkit'),

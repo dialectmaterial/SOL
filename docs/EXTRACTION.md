@@ -17,25 +17,24 @@ The historical, edition-specific `convert` command remains available unchanged.
 Canonical corrections should normally be made in Markdown and followed by
 `sol-corpus index`.
 
-## Optional dependencies
+## Included dependencies
 
-From a SOL source checkout, a fresh maintenance installation can use:
-
-```sh
-pipx install '.[corpus,extraction]'
-```
-
-For an existing pipx installation, add only the tools you need:
+The complete checkout installation includes the extraction SDK and CommonMark:
 
 ```sh
-pipx inject sol-organizes-logic 'opendataloader-pdf==2.5.13'
-pipx inject sol-organizes-logic 'markdown-it-py>=3,<4'
+python3 scripts/install.py
 ```
 
-`extract` requires the extraction extra and Java 11 or newer on `PATH`.
+With the native tools already available, refresh an existing installation with:
+
+```sh
+pipx install --force .
+```
+
+`extract` requires the included SDK and Java 11 or newer on `PATH`.
 `normalize` accepts already extracted JSON without the SDK or Java. `ingest`
-requires the corpus extra for CommonMark parsing and reindexing; it does not run
-the extraction engine. No optional dependency is installed automatically by these
+uses the included CommonMark parser for reindexing; it does not run
+the extraction engine. No dependency is installed automatically by these
 commands. [OpenDataLoader Python setup](https://opendataloader.org/docs/quick-start-python).
 
 ## 1. Create a review candidate

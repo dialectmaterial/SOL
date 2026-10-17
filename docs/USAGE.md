@@ -22,15 +22,30 @@ This manual covers the reader, virtual shell, personal workspaces, corpus mainte
 
 ## Install with pipx
 
-The [README](../README.md#install) gives the initial installation. The normal package includes prompt_toolkit for the full-screen reader and enhanced command input, plus a CommonMark parser for semantic typography:
+The [README](../README.md#install) gives the complete checkout installation:
 
 ~~~sh
-pipx install .
+python3 scripts/install.py
 ~~~
 
-The previous `shell` and `corpus` extras remain accepted for compatibility, but neither is required for ordinary reading. Use `pipx reinstall sol-organizes-logic` after updating an existing source checkout. If replacing an older installation, `pipx install --force .` refreshes SOL's environment; it does not authorize overwriting an unrelated `sol` executable.
+This installs the Python application through pipx and checks native dependencies.
+On Debian/Ubuntu it offers to install missing native packages, including PDF and
+clipboard tools, Java and the legacy Kitty/zsh integrations. A missing/old Neovim
+is supplied privately from a pinned verified upstream archive. Use `--check` to
+inspect the plan without changing anything; installation asks for consent.
+Other systems must supply the reported native tools with their package manager.
+The reader itself is terminal-emulator-independent.
 
-The package supplies `sol`, `sol-kitty`, `sol-corpus`, and `sol-corpus-check`. For a fresh GitHub installation without a local checkout, `pipx install git+https://github.com/dialectmaterial/SOL.git` is also supported; configure a local corpus separately.
+All Python feature dependencies are included. Previous extras remain accepted
+only for compatibility. With native tools already available, `pipx install .`
+or `pipx install git+https://github.com/dialectmaterial/SOL.git` is also valid.
+After updating a checkout, rerun the installer or use `pipx install --force .`.
+Do not overwrite an unrelated `sol` executable.
+
+The package supplies `sol`, `sol-kitty`, `sol-corpus`, and `sol-corpus-check`.
+On first interactive launch without a corpus, `sol` asks for the supported PDF,
+imports and validates it once, and remembers its user-data location. An existing
+corpus can instead be selected with `--set-corpus DIRECTORY`.
 
 If you previously created a `~/.local/bin/sol` symlink, inspect it before installing:
 
@@ -49,7 +64,7 @@ The rename preserves the old link and does not overwrite an existing backup. If 
 
 ## Choose the text
 
-The book is supplied locally; installing SOL does not download it or copy the private corpus into the package. A local pipx installation remembers the source checkout through installer metadata, so its `local-corpus` can be found from another directory. From a project containing the corpus, open the reader:
+The book is supplied locally; installing SOL does not download it or copy the private corpus into the package. Without an existing corpus, interactive `sol` asks for the supported PDF and imports it once. A local pipx installation can also discover a checkout's prepared `local-corpus`. Open the reader:
 
 ~~~sh
 sol
@@ -128,10 +143,10 @@ sol -n
 sol --width 72 --emphasis underline
 ~~~
 
-Run this directly in Alacritty or another capable terminal. BEING is not a Kitty
+Run this directly in any capable terminal emulator. BEING is not a Kitty
 application: the reader needs no Kitty executable, remote control, graphics, or
-window ID. It needs interactive input/output and the normal package dependencies,
-including the CommonMark parser for canonical typography. Checks happen before onboarding.
+window ID. It needs interactive input/output, Neovim 0.11+ and the normal package
+dependencies, including CommonMark for typography. Checks happen before onboarding.
 `sol-kitty --reader` remains an optional host for exactly the same view.
 
 `--width` limits a centered reading measure (default 72, configurable from 20 to
@@ -150,33 +165,21 @@ these styles, never ANSI-decorated canonical text. A projection disagreement is
 reported rather than styled at guessed offsets. Underline remains the explicit
 compatibility choice when the terminal or font does not show italics.
 
-Begin with `j`/`k` for displayed rows, `h`/`l` for characters, `b`/`n` for previous/next passages,
-and `/` for whole-book search. Reading-row motions continue from a passage edge
-to its neighbor within the current scope: forward to its beginning, backward to
-its end. Selection remains passage-local and blocks automatic crossing.
-Ctrl-D/U first reach the current edge rather than skipping unread rows;
-another outward motion continues. `{`/`}` remain passage aliases. Ctrl-P/Ctrl-N
-repeat previous/next search-result navigation, not paragraph
-movement or the next occurrence within one passage. `gg`/`G` go to the beginning
-or end of the current reading scope, identified by `c`. `f` reduces chrome, and
-`?` shows the compact key guide; focus mode still shows source-review, error, and
-typography-fallback notices. Opening a search result lands at its first verified
-source occurrence;
-matches are marked without replacing source emphasis. Escape hides those marks
-without discarding the query, and Ctrl-P/Ctrl-N reveal them again. Alt-Left restores
-the originating selection/location even for a search jump in the same paragraph.
-An explicit warning reports Unicode matches that cannot map safely to a source
-span. Ctrl-Q saves changed cursor/viewport state before leaving; Ctrl-C skips this
-extra save without undoing passage checkpoints. Durable offsets require
-workspace schema 3; selections and the bounded reading trail remain session-local.
-Resize or reopen in another terminal without changing the canonical corpus, and
-the same semantic cursor remains valid; wrapped rows are never persisted as its
-identity. The source-bound selection already supplies canonical UUIDs, exact
-codepoint span, text, and digests for future workspace operations.
-This is the default `sol` view; `--reader` remains an explicit alias. See the [reader guide](READER_VIEW.md)
-for exact keys, upgrade steps, the manual acceptance checklist, and the current
-implementation boundary. Tree navigation and new ESSENCE analysis remain outside
-this reader refinement.
+SOL has one reader with two presentation modes. Use `j/k` for wrapped rows and
+`b/n` for previous/next paragraphs. `p` switches continuous/paragraph reading;
+in paragraph mode row motion cannot leave the paragraph. `gg/G` are scoped to
+the loaded section. `/` searches the whole book literally, displaying up to 20
+passages; choose one with Enter, cycle matches with Ctrl-N/P and return through
+the semantic reading trail with Alt-Left/Right. Search opens at the first verified
+source occurrence, without per-occurrence highlighting; unmappable normalized
+matches produce a warning. `f` hides ordinary headings.
+
+`m1`–`m3` place three immediately saved paragraph markers; see them under `c` or
+return with `'1`–`'3`. `y` copies the selection, otherwise the current paragraph.
+`t` opens the single vertical outline; `h/l` navigates branches, Enter reads and
+Escape returns unchanged. `q` or Ctrl-Q saves the semantic cursor and leaves.
+Resize/reopen restores source-codepoint positions, never terminal rows.
+See [Reading in SOL](READER_VIEW.md) for precise controls and current limits.
 
 ## Use normal zsh commands
 

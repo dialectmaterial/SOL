@@ -34,16 +34,16 @@ class ReaderSurfaceBaselineTests(unittest.TestCase):
         return status, out.getvalue(), err.getvalue()
 
     def test_preflight_refuses_nonterminal_before_loading_corpus_or_view(self):
-        with patch("sol.terminal.reader.validate_reader_environment", side_effect=ValueError("interactive terminal required")), \
+        with patch("experiments.reader_surfaces.baseline.validate_reader_environment", side_effect=ValueError("interactive terminal required")), \
                 patch("sol.core.corpus.load_corpus_book", side_effect=AssertionError("must not load")), \
-                patch("sol.terminal.reader.ReaderView", side_effect=AssertionError("must not open")):
+                patch("experiments.reader_surfaces.baseline.ReaderView", side_effect=AssertionError("must not open")):
             status, out, err = self.invoke("baseline")
         self.assertEqual(status, 2)
         self.assertFalse(out)
         self.assertIn("interactive terminal", err)
 
     def test_preflight_refuses_missing_optional_dependencies_before_loading(self):
-        with patch("sol.terminal.reader.validate_reader_environment", side_effect=ImportError("optional toolkit absent")), \
+        with patch("experiments.reader_surfaces.baseline.validate_reader_environment", side_effect=ImportError("optional toolkit absent")), \
                 patch("sol.core.corpus.load_corpus_book", side_effect=AssertionError("must not load")):
             status, out, err = self.invoke("baseline")
         self.assertEqual(status, 2)
@@ -51,8 +51,8 @@ class ReaderSurfaceBaselineTests(unittest.TestCase):
         self.assertIn("optional toolkit", err)
 
     def test_default_launch_uses_existing_reader_actions_and_never_prompts(self):
-        with patch("sol.terminal.reader.validate_reader_environment") as preflight, \
-                patch("sol.terminal.reader.ReaderView") as view, \
+        with patch("experiments.reader_surfaces.baseline.validate_reader_environment") as preflight, \
+                patch("experiments.reader_surfaces.baseline.ReaderView") as view, \
                 patch("builtins.input", side_effect=AssertionError("no workspace prompt")):
             view.return_value.run.return_value = 0
             status, out, err = self.invoke("baseline")
@@ -70,9 +70,9 @@ class ReaderSurfaceBaselineTests(unittest.TestCase):
 
     def test_requested_existing_id_selects_same_start_and_preserves_width(self):
         book = invented_book()
-        with patch("sol.terminal.reader.validate_reader_environment"), \
+        with patch("experiments.reader_surfaces.baseline.validate_reader_environment"), \
                 patch("sol.core.corpus.load_corpus_book", return_value=book), \
-                patch("sol.terminal.reader.ReaderView") as view:
+                patch("experiments.reader_surfaces.baseline.ReaderView") as view:
             view.return_value.run.return_value = 0
             status, out, err = self.invoke("--start", IDS[1], "--count", "1", "baseline", "--width", "88")
         self.assertEqual((status, out, err), (0, "", ""))
@@ -83,8 +83,8 @@ class ReaderSurfaceBaselineTests(unittest.TestCase):
         self.assertEqual(view.call_args.kwargs, {"width": 88})
 
     def test_unambiguous_prefix_reuses_existing_resolution(self):
-        with patch("sol.terminal.reader.validate_reader_environment"), \
-                patch("sol.terminal.reader.ReaderView") as view:
+        with patch("experiments.reader_surfaces.baseline.validate_reader_environment"), \
+                patch("experiments.reader_surfaces.baseline.ReaderView") as view:
             view.return_value.run.return_value = 0
             status, out, err = self.invoke("--start", self.identifier[:8], "baseline")
         self.assertEqual((status, out, err), (0, "", ""))
@@ -92,9 +92,9 @@ class ReaderSurfaceBaselineTests(unittest.TestCase):
 
     def test_count_does_not_fence_the_original_readers_ordinary_scope(self):
         book = invented_book()
-        with patch("sol.terminal.reader.validate_reader_environment"), \
+        with patch("experiments.reader_surfaces.baseline.validate_reader_environment"), \
                 patch("sol.core.corpus.load_corpus_book", return_value=book), \
-                patch("sol.terminal.reader.ReaderView") as view:
+                patch("experiments.reader_surfaces.baseline.ReaderView") as view:
             view.return_value.run.return_value = 0
             status, _, err = self.invoke("--count", "1", "baseline")
         self.assertEqual((status, err), (0, ""))
@@ -106,9 +106,9 @@ class ReaderSurfaceBaselineTests(unittest.TestCase):
     def test_same_start_retains_normal_whole_work_scope_across_section_boundaries(self):
         book = invented_book()
         self.assertNotEqual(book.passages[1].path, book.passages[2].path)
-        with patch("sol.terminal.reader.validate_reader_environment"), \
+        with patch("experiments.reader_surfaces.baseline.validate_reader_environment"), \
                 patch("sol.core.corpus.load_corpus_book", return_value=book), \
-                patch("sol.terminal.reader.ReaderView") as view:
+                patch("experiments.reader_surfaces.baseline.ReaderView") as view:
             view.return_value.run.return_value = 0
             status, out, err = self.invoke("--start", IDS[1], "--count", "2", "baseline")
         self.assertEqual((status, out, err), (0, "", ""))
@@ -123,8 +123,8 @@ class ReaderSurfaceBaselineTests(unittest.TestCase):
 
     def test_invalid_start_or_count_does_not_open_reader(self):
         for args in (("--start", "missing"), ("--count", "0"), ("--count", "65")):
-            with self.subTest(args=args), patch("sol.terminal.reader.validate_reader_environment"), \
-                    patch("sol.terminal.reader.ReaderView") as view:
+            with self.subTest(args=args), patch("experiments.reader_surfaces.baseline.validate_reader_environment"), \
+                    patch("experiments.reader_surfaces.baseline.ReaderView") as view:
                 status, out, err = self.invoke(*args, "baseline")
             self.assertEqual(status, 2)
             self.assertFalse(out)
@@ -133,16 +133,16 @@ class ReaderSurfaceBaselineTests(unittest.TestCase):
 
     def test_invalid_width_uses_existing_reader_validation_without_loading_toolkit(self):
         for width in ("19", "241"):
-            with self.subTest(width=width), patch("sol.terminal.reader.validate_reader_environment"), \
-                    patch("sol.terminal.reader._load_toolkit", side_effect=AssertionError("must not load toolkit")):
+            with self.subTest(width=width), patch("experiments.reader_surfaces.baseline.validate_reader_environment"), \
+                    patch("experiments.reader_surfaces.baseline._load_toolkit", side_effect=AssertionError("must not load toolkit")):
                 status, out, err = self.invoke("baseline", "--width", width)
             self.assertEqual(status, 2)
             self.assertFalse(out)
             self.assertIn("20 and 240", err)
 
     def test_original_reader_return_status_and_errors_are_not_hidden(self):
-        with patch("sol.terminal.reader.validate_reader_environment"), \
-                patch("sol.terminal.reader.ReaderView") as view:
+        with patch("experiments.reader_surfaces.baseline.validate_reader_environment"), \
+                patch("experiments.reader_surfaces.baseline.ReaderView") as view:
             view.return_value.run.return_value = 1
             self.assertEqual(self.invoke("baseline"), (1, "", ""))
             view.return_value.run.side_effect = OSError("terminal unavailable")

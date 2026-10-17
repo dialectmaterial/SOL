@@ -28,7 +28,7 @@ sys.stderr = (root / (phase + "-errors.txt")).open("w")
 from prompt_toolkit.key_binding.key_processor import KeyPress
 from prompt_toolkit.keys import Keys
 from sol.reader import app
-from sol.terminal import reader
+from experiments.reader_surfaces import baseline as reader
 
 class ObservedView(reader.ReaderView):
     def run(self):

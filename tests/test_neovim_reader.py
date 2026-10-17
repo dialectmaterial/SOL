@@ -361,6 +361,39 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         with patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(), 0)
 
+    def test_search_crosses_loaded_sections_and_history_restores_exact_selection(self):
+        self.extend(3)
+        service = self.service()
+        self.position(service, 4)
+        def native(payload, _, on_request):
+            packet = self.packet(3, 14)
+            result = on_request({"op": "search", "query": "paragraph 2", "packet": packet, "mode": "paragraph"})
+            self.assertEqual(len(result["search"]["rows"]), 1)
+            shown = on_request({"op": "search_open", "result": 1, "packet": packet, "mode": "paragraph"})["payload"]
+            self.assertEqual(shown["records"][0]["id"], self.book.passages[2].identifier)
+            returned = on_request({"op": "history_back", "packet": shown["restore"], "mode": "paragraph"})["payload"]
+            self.assertEqual(returned["restore"]["cursor_offset"], packet["cursor_offset"])
+            self.assertEqual(returned["restore"]["selection"], packet["selection"])
+            return 0, {"action": "quit", "packet": returned["restore"]}
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+
+    def test_cross_section_paragraph_previous_lands_at_beginning_and_keeps_focus(self):
+        self.extend(3)
+        def native(payload, _, on_request):
+            shown = on_request({"op": "passage_next", "packet": payload["restore"],
+                                "mode": "paragraph", "focus": True})["payload"]
+            self.assertTrue(shown["focus"])
+            returned = on_request({"op": "passage_previous", "packet": shown["restore"],
+                                   "mode": "paragraph", "focus": True})["payload"]
+            self.assertEqual(returned["restore"]["cursor_offset"], 0)
+            self.assertEqual(returned["restore"]["reference"]["reference"]["target_id"], self.identifier)
+            return 0, {"action": "quit", "packet": returned["restore"]}
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

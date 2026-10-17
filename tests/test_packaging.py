@@ -28,7 +28,7 @@ ENTRY_POINTS = {
 }
 PUBLIC_FILES = {"pyproject.toml", "MANIFEST.in", "README.md", "CONTRIBUTING.md", "CHANGELOG.md"} | PACKAGE_FILES | PACKAGE_ASSETS
 for directory, suffixes in (("docs", {".md"}), ("tests", {".py"}),
-                            ("experiments", {".py", ".lua", ".js", ".cjs"})):
+                            ("experiments", {".py", ".lua", ".js", ".cjs"}), ("scripts", {".py"})):
     PUBLIC_FILES.update(path.relative_to(ROOT).as_posix()
                         for path in (ROOT / directory).rglob("*")
                         if path.is_file() and path.suffix in suffixes)
@@ -106,19 +106,15 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(dict(entry_points["console_scripts"]), ENTRY_POINTS)
         requirements = metadata.get_all("Requires-Dist") or []
         self.assertEqual(set(metadata.get_all("Provides-Extra") or []), {"corpus", "shell", "extraction"})
-        self.assertEqual(len(requirements), 6)
+        self.assertEqual(len(requirements), 3)
         base = [requirement for requirement in requirements if ";" not in requirement]
         corpus = [requirement for requirement in requirements if 'extra == "corpus"' in requirement]
         shell = [requirement for requirement in requirements if 'extra == "shell"' in requirement]
         extraction = [requirement for requirement in requirements if 'extra == "extraction"' in requirement]
-        self.assertEqual(len(corpus), 1)
-        self.assertEqual(len(shell), 2)
-        self.assertEqual(len(extraction), 1)
-        self.assertEqual(set(base), {"prompt-toolkit<4,>=3.0.52", "markdown-it-py<4,>=3"})
-        self.assertTrue(corpus[0].startswith("markdown-it-py<4,>=3;"))
-        self.assertEqual({requirement.split(";")[0] for requirement in shell},
-                         {"prompt-toolkit<4,>=3.0.52", "markdown-it-py<4,>=3"})
-        self.assertTrue(extraction[0].startswith("opendataloader-pdf==2.5.13;"))
+        self.assertEqual(len(corpus), 0)
+        self.assertEqual(len(shell), 0)
+        self.assertEqual(len(extraction), 0)
+        self.assertEqual(set(base), {"prompt-toolkit<4,>=3.0.52", "markdown-it-py<4,>=3", "opendataloader-pdf==2.5.13"})
 
     def test_sdist_contains_sources_and_docs_without_local_material(self):
         with tarfile.open(self.sdist) as archive:
@@ -133,6 +129,14 @@ class PackagingTests(unittest.TestCase):
                                            ".sol-analysis.json")), name)
             self.assertFalse(Path(name).name.endswith(".sqlite3")
                              or ".sqlite3-" in Path(name).name, name)
+
+    def test_wheel_contains_one_reader_and_no_historical_fullscreen_engine(self):
+        with zipfile.ZipFile(self.wheel) as archive:
+            names = set(archive.namelist())
+        self.assertIn("sol/terminal/neovim_reader.py", names)
+        self.assertNotIn("sol/terminal/reader.py", names)
+        self.assertNotIn("sol/terminal/reading_layout.py", names)
+        self.assertFalse(any(name.startswith("experiments/") for name in names))
 
     def test_source_archive_runs_its_research_contract_checks(self):
         destination = Path(self.temporary.name) / "source-archive-check"
@@ -180,7 +184,7 @@ sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def guard(name, *args, **kwargs):
     if (name.split('.')[0] in {'prompt_toolkit', 'markdown_it', 'opendataloader_pdf'}
-            or name in {'sol.terminal.reader', 'sol.workspace.launch', 'sol.workspace.profiles'}):
+            or name in {'experiments.reader_surfaces.baseline', 'sol.workspace.launch', 'sol.workspace.profiles'}):
         raise AssertionError('Help imported a runtime reader component ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
@@ -250,11 +254,11 @@ def guard(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
 app = importlib.import_module('sol.reader.app')
-view = importlib.import_module('sol.terminal.reader')
+view = importlib.import_module('sol.terminal.neovim')
 events = []
-def validate():
+def validate(*args):
     events.append('terminal')
-view.validate_reader_environment = validate
+view.validate_environment = validate
 def identity(book, args):
     assert events == ['terminal']
     events.append('identity')
@@ -306,12 +310,12 @@ print(json.dumps(events))
 import importlib, sys
 sys.path.insert(0, sys.argv[1])
 app = importlib.import_module('sol.reader.app')
-view = importlib.import_module('sol.terminal.reader')
-def unavailable():
+view = importlib.import_module('sol.terminal.neovim')
+def unavailable(*args):
     raise ValueError('Invented unavailable terminal')
 def forbidden(*args, **kwargs):
     raise AssertionError('Rejected terminal must not discover a source or onboard')
-view.validate_reader_environment = unavailable
+view.validate_environment = unavailable
 app.discover_corpus = app.load_corpus_book = app.shell_identity = forbidden
 assert app.cli(sys.argv[2:]) == 2
 """

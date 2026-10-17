@@ -1,4 +1,4 @@
-"""Optional native Neovim host over exact, verified SOL records.
+"""Native Neovim host over exact, verified SOL records.
 
 This deliberately does not embed Neovim's screen, load a user's configuration,
 or open a personal workspace. Buffer bytes are presentation; packets leaving
@@ -19,7 +19,8 @@ import tempfile
 import unicodedata
 
 from sol.reader.typography import map_typography
-from sol.terminal.reader import emphasis_style
+from sol.terminal.text import emphasis_style
+from sol.terminal.runtime import managed_neovim
 
 from sol.reader.surface import CaptureExport, Sample, record_payload, validate_packet
 
@@ -42,9 +43,11 @@ def validate_environment(width=72):
             or not getattr(sys.stdout, "isatty", lambda: False)()
             or os.environ.get("TERM", "").strip() in {"", "dumb"}):
         raise ValueError("the Neovim reader needs interactive terminal input and output with TERM other than dumb")
-    executable = shutil.which("nvim")
+    private = managed_neovim()
+    executable = str(private) if private.is_file() else shutil.which("nvim")
     if executable is None:
-        raise ValueError("the optional Neovim reader needs Neovim 0.11 or newer; SOL did not install it. Use sol --engine builtin instead.")
+        raise ValueError("SOL needs Neovim 0.11 or newer. From the checkout run python3 scripts/install.py "
+                         "to complete installation, or install Neovim using your system package manager.")
     try:
         # Even a version probe must not acquire a user's log or state path.
         with tempfile.TemporaryDirectory(prefix="sol-neovim-version-") as temporary:
@@ -56,7 +59,7 @@ def validate_environment(width=72):
         raise RuntimeError("Neovim version check timed out; the reader was not launched") from error
     match = re.match(r"NVIM v(\d+)\.(\d+)(?:\.|\b)", result.stdout)
     if result.returncode or match is None or tuple(map(int, match.groups())) < (0, 11):
-        raise ValueError("the optional Neovim reader requires Neovim 0.11 or newer; use sol --engine builtin instead")
+        raise ValueError("SOL requires Neovim 0.11 or newer. Run python3 scripts/install.py from the checkout.")
     return executable
 
 
@@ -65,10 +68,11 @@ def _safe_source(text):
         raise ValueError("Neovim presentation requires exact source strings")
     # Neovim visibly escapes C1 characters with display=uhex. Keep their exact
     # bytes/codepoints in the buffer; do not replace a scalar with four source
-    # characters. Other unsafe controls/bidi still require the builtin view.
+    # characters. Unsafe controls/bidi are refused, never silently normalized.
     if any((unicodedata.category(char) in {"Cc", "Cf", "Cs", "Zl", "Zp"}
             and char not in {"\n", "\t"} and not 0x80 <= ord(char) <= 0x9f) for char in text):
-        raise ValueError("Neovim refuses control/bidi source characters; canonical text was not altered. Use sol --engine builtin instead.")
+        raise ValueError("The reader refuses unsafe control/bidi source characters; canonical text was not altered. "
+                         "Use sol -r --json to inspect the source and its review status.")
 
 
 def _safe_metadata(value):

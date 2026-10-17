@@ -1,308 +1,128 @@
-# BEING reader view
+# Reading in SOL
 
-`sol` opens a quiet, keyboard-driven reading screen. It keeps the current
-passage visible while you move, select words, search, and
-return through a reading trail. It runs directly in an ordinary capable terminal;
-Alacritty is a first-class host. BEING is not a Kitty application. The explicit
-`sol --reader` spelling remains available; `sol --shell` opens the optional
-command interface. Existing shell commands, workspace
-operations, comparison desks, source panes, and reference handoff remain available
-through their existing interfaces.
+`sol` opens one terminal-native reader, powered by Neovim 0.11 or newer with an
+isolated SOL configuration. There is no engine to choose. Your Neovim/LazyVim
+settings are not loaded or modified. `sol --reader` remains an explicit alias.
 
-## Open the reader
+Install or update a checkout with `python3 scripts/install.py`. The installer
+includes all current Python feature dependencies, checks native tools, and asks
+before installing missing system packages. Debian/Ubuntu native setup is automated;
+other systems should supply the reported tools through their package manager.
+If necessary, the installer supplies a pinned, checksum-verified private Neovim.
 
-The optional installed `sol --engine neovim` backend presents adjacent paragraphs
-as continuous prose and uses the same workspace positions. It does not change
-the default reader described here. See [Continuous reading with Neovim](NEOVIM_READER.md)
-for its native keys, section boundaries and current limitations.
+## First launch and returning
 
-```sh
-sol
-sol --workspace reading --actor "Your name"
-sol -n
-sol --width 72 --emphasis underline
-```
+Without a configured corpus, interactive `sol` asks for your local PDF, converts
+the supported source once, validates it and remembers the corpus location.
+The current importer accepts the exact audited Cambridge / George di Giovanni
+PDF, not arbitrary editions, scans or re-encoded copies. The source is unchanged.
+Converted text lives under `$XDG_DATA_HOME/sol/corpora/` (normally
+`~/.local/share/sol/corpora/`), outside the application installation.
 
-Install or refresh SOL from the project checkout:
+An existing corpus can instead be selected with `sol --set-corpus DIRECTORY`.
+It is never regenerated. A broken selected corpus produces an error rather than
+silently replacing your source or allocating new passage identifiers. Scripts
+and piped commands never answer interactive setup questions.
 
-```sh
-pipx install --force .
-```
+SOL remembers the last actor and that actor's workspace. Missing choices are
+requested after corpus setup. `sol --actor NAME --workspace NAME` selects them
+explicitly. `sol -n` uses the same reader without actor/workspace storage; its
+markers are temporary. `sol -r` prints one random passage without opening the UI.
 
-The normal installation includes prompt_toolkit and the CommonMark parser for
-typography. The existing `.[shell]` extra remains compatible.
-The reader requires interactive input and output on a real terminal, not Kitty,
-remote control, graphics support, or `KITTY_WINDOW_ID`. Terminal
-and dependency checks happen before workspace/actor
-onboarding or creating their files. A missing dependency or redirected stream produces
-an actionable error. The adapter does not install packages or change pipx or
-general terminal configuration.
-
-Normal corpus discovery and `--corpus` selection apply. SOL remembers the last
-actor and that actor's last workspace, then restores its reading position. If no
-workspace exists for the chosen actor, it asks to create one. Explicit `--actor`
-and `--workspace` select a different reading context. An actor attributes personal
-activity; it does not replace Hegel's authorship. `-n` makes the session temporary
-and bypasses workspace and actor storage.
-
-Use `sol --workspace-list` to inspect local workspaces and
-`sol --workspace-delete NAME` to remove one from normal use by archiving it
-recoverably. These management operations do not require a corpus or actor.
-
-Kitty is an optional host, not the reader's architecture. `sol-kitty --reader`
-opens the same adapter in a private launch profile. Kitty-specific panes,
-source/facsimile viewing, and ESSENCE integration remain separate optional
-workflows; they are not required for ordinary reading in Alacritty or another
-capable terminal.
-
-The fullscreen reader does not combine `--reader` with one-shot actions, `--plain`,
-`--json`, legacy PDF reading, `--ui`, `--editing-mode`, or `--source-pdf`.
-Use the ordinary interfaces for those workflows. `--width` is supported: it sets
-a maximum reading measure of 20–240 columns, default 72, centered when space
-permits and narrowed to fit a smaller terminal.
-
-## Read, select, search, and return
-
-The body displays one active canonical record's exact `plain_text` in a continuous,
-read-only view. Its title and printed page align with the prose column. A quiet
-footer keeps passage position, selection count, and essential keys secondary.
-Responsive space above the column separates the title from the terminal's window
-bar, with a small blank lead before prose. This is a stable reading margin, not
-paragraph-by-paragraph vertical centering. It shrinks first when the terminal is
-short or contextual panels/warnings need room. Focus mode retains a quiet top
-margin without reserving space for a hidden title.
-Press `c` for the full structural path, PDF pages, workspace, current reading
-scope, and any typography fallback explanation. Press `f` to hide ordinary
-metadata. Source-review warnings, operational errors, and typography fallback
-notices remain visible; focus mode does not conceal them.
-
-Canonical CommonMark emphasis is mapped to source-codepoint ranges only when its
-visible projection matches the indexed text exactly. Semantic emphasis maps to
-italics or underline, strong emphasis to bold, and inline code to underline;
-quotation records or spans receive a document-context label. These are generic
-terminal styles, not Kitty graphics or ANSI-decorated canonical text.
-`--emphasis auto` uses italics for recognized terminal families
-and underlining for unknown ones. This is a heuristic based on `TERM`, not a
-capability test;
-choose `--emphasis italic` or `--emphasis underline` explicitly when needed. A
-projection disagreement gives unstyled text with an explicit fallback notice,
-never guessed alignment.
-
-| Normal terminal host | Expected emphasis with `--emphasis auto` |
-| --- | --- |
-| Alacritty (`alacritty` or its common `xterm-256color` setting) | Standard terminal italics |
-| Kitty (`xterm-kitty`) | The same standard terminal italics |
-| Unknown/basic terminal | Visible underline instead of assumed italics |
-
-The terminal and selected font ultimately determine glyph appearance. Override
-the heuristic when needed; no emulator-specific identity is required.
-
-Prose wraps at word boundaries where possible. Only a sequence too long to fit
-the measure falls back to character wrapping. Resizing reflows presentation:
-it does not insert newlines, change canonical whitespace, or alter the underlying
-text. The renderer and visual-motion geometry share one layout plan. Presentation
-padding and visually suppressed spaces at wrap boundaries map back to the same
-original source codepoints; styles and selections retain that mapping. Source
-offsets are semantic, while wrapped rows and terminal cells are presentation.
-
-Terminal control, bidirectional formatting, and unsafe invisible characters
-appear as visible escapes, retaining a mapping to
-the original offsets. A `[source review]` marker remains visible for passages
-whose canonical transcription is flagged for review; the new view does not certify
-or conceal their uncertainty.
+## Read, mark, copy and orient yourself
 
 | Key | Action |
 | --- | --- |
-| `j` / `k`, Up / Down | Move through wrapped rows; continue at passage edges |
-| `h` / `l`, Left / Right | Move by source character |
-| Ctrl-D / Ctrl-U | Move about half a visible page |
-| `gg` / `G` | Beginning / end of the current reading scope (`c` identifies it) |
-| `b` / `n` | Previous / next semantic passage (at its beginning) |
-| `{` / `}` | Previous / next passage aliases |
-| Page Down / Page Up; `p` | Compatibility passage navigation; `p` goes backward |
-| Alt-Left / Alt-Right | Back / forward through the session's reading trail |
-| `v`, then movement | Begin a local selection; press `v` again to stop selecting |
-| Shift-arrow keys | Extend or reduce a text selection |
-| `/` | Focus the query field while the passage remains visible |
-| Enter in the query field | Search and focus the results |
-| Up / Down or `j` / `k` in results, then Enter | Choose and open a result without typing a UUID |
-| Ctrl-P / Ctrl-N in the body | Previous / next search-result passage, wrapping |
-| Tab / Shift-Tab | Switch focus between body and results |
-| Escape | Cancel query, clear selection, dismiss match marks, or close help |
-| `c` / `f` / `?` | Context / focus mode / keyboard help |
-| Ctrl-Q | Save changed reading position and quit |
-| Ctrl-C | Quit without an extra cursor-position save |
+| `j/k`, `h/l`, `w` | Wrapped rows, source characters, next word |
+| `b/n` | Previous/next paragraph, at its beginning |
+| `p` | Switch continuous / one-paragraph reading, retaining the source cursor |
+| Ctrl-D / Ctrl-U | Half-window scrolling |
+| `gg/G` | Start/end of the loaded section, not the whole book |
+| `/`, then Enter | Literal, case-insensitive search across the whole book |
+| Ctrl-P / Ctrl-N | Previous/next search-result passage |
+| Alt-Left / Alt-Right | Back/forward through the session's semantic reading trail |
+| `v`, then movement | Select within one canonical paragraph; Escape clears |
+| `y` | Copy the exact selected span, otherwise the current paragraph |
+| `m1`, `m2`, `m3` | Place/move one of three immediately saved paragraph markers |
+| `'1`, `'2`, `'3` | Return to a marker; `dm1` / `dm2` / `dm3` clears it |
+| `c` | Context, path, source pages, attributed notes and marker slots |
+| `t` | Book outline: `j/k` move, `h/l` parent/collapse or expand/child |
+| `f`, `?` | Quiet focus mode / help |
+| `q`, Ctrl-Q | Validate/save the semantic position and quit |
+| `:qa!` | Quit without saving the current cursor; earlier successful saves remain |
 
-Ordinary reading no longer stops at each passage boundary. From the last wrapped
-row, another `j`, Down, or Ctrl-D enters the next passage at its beginning. From
-the first row, `k`, Up, or Ctrl-U returns to the previous passage's end. A large
-half-page motion first reaches the current passage's edge; it does not skip the
-tail or carry its row budget across several passages. Flow stays inside the
-current reading scope and does not wrap at its ends. `b/n` (and the retained
-`{`/`}` aliases) deliberately jump to the beginning of the previous/next passage,
-regardless of the cursor's visual row. These units are canonical passages, not
-fixed printed/PDF pages; page numbers remain provenance.
+In paragraph mode, `j/k` cannot move into another paragraph. Use `b/n` explicitly.
+In continuous mode, adjacent paragraphs share a scrollable view; at a section
+edge another outward `j/k` loads the neighboring section. Selections stay local
+to their paragraph. Clear a selection before ordinary paragraph/section changes.
 
-Automatic crossing is disabled while selecting, including an empty `v` or
-Shift-arrow anchor. Finish or clear selection before continuing. Selected spans
-never acquire offsets from another passage. Each actual crossing records one
-ordinary guarded passage visit, with the backward end offset captured before
-the checkpoint. Row motion within a passage remains transient.
+Search displays up to 20 matching passages. Choose one with `j/k` and Enter;
+Escape returns without changing the reading position. Ctrl-N/P cycles those
+result passages. Search does not alter canonical strings. Native regex searching
+is not the primary SOL search, and `n` always means next paragraph.
 
-For example, search `/ground`, open a result, read with `j`/`k`, move between
-matching passages with Ctrl-N/Ctrl-P, and return with Alt-Left. `n` always means
-the next passage in the reading scope, even when a search exists. Ctrl-N means
-the next matching passage, not an occurrence within the current paragraph.
-`gg`/`G` act on the current scope, not just the
-currently displayed paragraph. Vertical movement follows visual rows; horizontal
-movement follows source characters. A layout change resets the preferred visual
-column without changing the semantic cursor or selected span.
+Markers reuse ordinary workspace bookmarks, not a second identity system.
+Press `c` to see source locations and excerpts, then `1`, `2` or `3` to return.
+They attach to paragraphs and survive quit/reopen independently of cursor saves.
 
-Search covers the whole reader book and shows up to 20 matches in a bounded result
-pane. A browsing directory retained from the compatibility command interface
-does not silently restrict the new view's search. Results preserve passage
-identity internally; their display numbers and highlights are reading aids.
-Opening a result lands at its first verified source occurrence, rather than the
-paragraph beginning. Current-passage matches receive a generic terminal underline
-and a color accent when supported, retaining the source's italics/bold/code styles.
-Escape dismisses the marks without deleting the query; Ctrl-N/Ctrl-P or a new
-search reveal them again. Marks are presentation, not a text selection.
+The outline highlights the current branch and reveals its ancestry. It starts
+at a readable depth, with one vertical layout. `h` can move above the initial
+doctrine root to the whole book. Enter reads a selected branch; Escape leaves
+the reading cursor unchanged. `sol --dynamic-structure` opens this same outline
+in a temporary reader. `sol --structure` prints the static hierarchy.
 
-Search uses the existing literal NFC/casefold semantics, including whole-word mode
-for callers that request it. A verified mapping connects these normalized matches
-to original source-codepoint spans. If a match cannot be represented exactly
-(for example one `s` inside the casefold expansion of `ß`), only verified peers
-are marked. An explicit fallback notice remains visible in focus mode; `c` gives
-the reason. With no verified span the matching passage opens at its beginning,
-without guessing an offset or altering canonical text.
+## Terminals and presentation
 
-Opening a result is one ordinary guarded navigation action, setting the source
-position before its checkpoint. Even a jump within the current paragraph retains
-the originating cursor, viewport, and selection for Alt-Left return. Returning
-to an unchanged match preserves its viewport and adds no duplicate trail entry.
-Typing a query and inspecting
-results do not save a visit. Cursor movement and text selection also create no
-checkpoint or authored workspace record.
-Opening a passage or returning through history dismisses the result pane without
-discarding the query and matching passages. It does not resurrect the pane on
-ordinary navigation; press `/` and Enter to inspect the cached query again.
+BEING is not an Alacritty or Kitty application. It uses Neovim's ordinary terminal
+interface and requires interactive input/output and a usable `TERM` description.
+Alacritty, Kitty, xterm, GNOME Terminal, WezTerm and other capable terminals are
+hosts, not different SOL editions. A dumb terminal or redirected stream cannot
+host fullscreen interaction; one-shot output such as `sol -r` remains available.
 
-The reading trail retains at most 100 contexts in this session, including reading
-scope, browsing location, requested alias, source cursor, viewport anchor,
-selected span, query, and results. Back and forward restore that context.
-New navigation after going back replaces the
-forward branch. This trail is separate from the workspace's durable checkpoint
-history and disappears when the reader exits.
+Prose uses a centered maximum measure of 72 terminal columns, narrowing on small
+windows. Change it with `--width 64` (20–240). Native word-aware soft wrapping
+reflows presentation without inserting canonical newlines or changing source
+codepoint offsets. Titles align with prose, a top margin separates reading from
+the window bar, and context stays behind `c`. Focus mode hides ordinary headings;
+important source and typography warnings remain visible.
 
-Reopening the same context preserves its selection and creates no duplicate trail
-entry. Explicit reading visits still use the existing workspace checkpoint and
-conflict rules, even when they revisit the same passage.
+CommonMark semantics produce emphasis, bold and inline-code styles; ANSI is never
+stored in the corpus. `--emphasis auto` uses standard italics for recognized
+terminal descriptions, including Alacritty and Kitty, and visible underline for
+unknown/basic descriptions. This is a heuristic, not a guarantee about fonts.
+`--emphasis underline` explicitly selects the fallback. Projection mismatches
+are reported instead of guessing styled offsets. Unsafe source controls are
+refused rather than changing canonical text; C1 characters use native visible escapes.
 
-## Continuity and source binding
+Clipboard copying uses Neovim's standard providers: desktop helpers such as
+`wl-clipboard` or `xclip`, macOS's clipboard tools, or detected OSC 52 support.
+Availability depends on the host/session, especially over SSH or a multiplexer.
+A missing provider is reported honestly; the text remains in the editor register.
+The complete Debian/Ubuntu installer includes both desktop helpers.
 
-The semantic cursor and optional viewport anchor use raw Unicode codepoints,
-not bytes, terminal cells, wrapped rows, or display escapes. New workspaces use
-schema 3: optional positions bind target UUID, canonical content digest, exact
-plain-text digest/length, cursor, and viewport to the same checkpoint revision.
-Changing terminal, width, or emphasis does not invalidate those positions.
-Reopening returns to the same source location with newly wrapped rows; the
-viewport anchor is approximate, and keeping the source cursor visible takes
-priority over reproducing a former screen arrangement.
-Cursor keys never write per-key database checkpoints. Ctrl-Q saves a changed
-position once, guarded by corpus freshness and expected checkpoint revision. A
-failed save leaves the reader open with the error rather than overwriting a
-competing update. Ctrl-C skips this extra save but does not undo passage
-checkpoints already made. Temporary `-n` sessions save neither passage nor cursor.
+`sol-kitty` remains a compatibility host launcher. Its source-image, comparison
+and ESSENCE panes are separate integrations; none is required to read in another
+terminal. `--shell` is a compatibility command interface, not the reader.
 
-Opening a persistent reader restores a valid saved position without recording an
-extra visit. If no position has ever been saved, it opens the first passage with
-one ordinary guarded checkpoint. An invalid saved reference is reported rather
-than silently replaced by that first passage. Ordinary successful navigation uses
-the existing corpus-freshness and checkpoint revision checks; failures restore
-the entire local reader context. If only the saved text-bound offset is stale,
-the identified passage opens at its beginning with an explanation instead of
-reusing that offset.
+## Durable identity and current limits
 
-Existing versions 1 and 2 remain unchanged and retain passage-level continuity.
-To gain durable offsets, explicitly make and reopen a separate upgraded copy:
+The workspace stores passage identity, source digests and Unicode-codepoint
+positions, never buffer numbers, byte columns or screen coordinates. Resizing
+or reopening in another terminal restores the same meaningful textual location
+when the corpus is unchanged. Width changes only reflow presentation.
+CORE verification and guarded workspace saves remain in Python. Selections are
+transient source-bound spans suitable for future workspace operations; they do
+not automatically create annotations. Old schemas warn if only a paragraph can
+be saved. No corpus or workspace migration is required for this reader change.
 
-```sh
-sol --workspace reading --workspace-upgrade reading-v3.sqlite3
-sol --reader --workspace reading-v3 --workspace-dir . --actor "Your name"
-```
+Continuous loading is still bounded to source chapters, split at 64 paragraphs;
+it is not yet a seamless whole-book buffer. `gg/G` are section-local. Search
+results open at the first verified occurrence, without per-occurrence highlighting.
+An unmappable normalized match produces an explicit warning and opens its paragraph.
+Reading mode and focus are session choices, while markers and position persist.
+Horizontal tree navigation is withdrawn until a simple outline is dependable.
 
-The original remains intact; no in-place migration or invented old offsets occur.
-
-Selections bind the requested UUID, resolved target UUID, a nonempty half-open
-`[start, end)` span in raw Python Unicode codepoints, exact selected text, canonical
-content digest, and plain-text digest. Offsets do not refer to Markdown, UTF-8
-bytes, wrapped columns, or display escapes. The action layer checks the canonical
-record and reader projection before accepting the selection. Rendering and cursor
-selection use the loaded state without reading source files or opening storage.
-See the [reader action contract](READER_ACTIONS.md).
-
-This existing selection is the future bridge from reading to annotation,
-comparison, relations, copy/export, and a BEING → CORE → ESSENCE investigation.
-Those operations should consume the same canonical UUIDs, codepoint span, and
-source bindings, not introduce a second selection-identity scheme. The current
-view does not yet save selected-span notes or export selections.
-
-This staged update covers reader presentation, semantic navigation, and
-source-bound reading-position continuity. It does not implement durable
-selected-span annotations, an active-investigation database, tree navigation,
-an integrated comparison/source-review desk, or all phases of the handoff.
-It does not rewrite the corpus or implement a full terminal emulator.
-The immediate next test is sustained reading by the user, recording friction
-that makes a book or PDF preferable. Durable spans, comparisons, relations, and a
-contextual ESSENCE loop should follow demonstrated reading needs; investigation
-remains a hypothesis, not a mandate to add another layer. See the
-[acceptance record and reading log](READER_ACCEPTANCE.md) and
-[modularity contract](MODULARITY.md#handoff-priorities-and-acceptance-gates).
-
-The adapter uses prompt_toolkit's existing full-screen application, layout, focus,
-and key-binding facilities. [Official full-screen application documentation](https://python-prompt-toolkit.readthedocs.io/en/stable/pages/full_screen_apps.html).
-
-## Check the actual terminal experience
-
-Automated toolkit tests use invented text and isolated workspaces. They test
-wrapping, source offsets, selection, resizing, and persistence; naming a terminal
-in a test environment is not a manual check of that emulator's rendering.
-
-For a manual acceptance pass, open `sol --reader` directly in Alacritty:
-
-1. Inspect a long prose paragraph and one containing several italic spans.
-2. Try measures of 40, 72, and 100 columns, then make the terminal narrower than
-   the selected measure. Ordinary words should remain intact where they fit.
-3. Check `j`/`k`, `h`/`l`, Ctrl-D/U, `gg`/`G`, and `b`/`n` with context revealed.
-4. Select across styled words with `v`; resize and verify that the selected source
-   words remain the same.
-5. Search, open a match, use Ctrl-N/Ctrl-P, and return through Alt-Left.
-6. Quit with Ctrl-Q, reopen the same schema-3 workspace at another terminal width,
-   and check the meaningful text location rather than the former screen row.
-7. Compare ordinary, `c` context, and `f` focus views; genuine warnings must remain
-   visible. If available, do a smaller comparison pass in Kitty and test the
-   explicit underline fallback.
-
-The existing opt-in integration check uses a private Kitty window and invented text;
-it checks optional hosting, not a requirement for BEING:
-
-```sh
-SOL_TEST_LIVE_KITTY=1 python3 -B -m unittest discover -s tests -p test_reader_view_integration.py
-```
-
-It checks visible page labels, source selection, search, and return to the original
-selected context, without creating a personal workspace or changing terminal settings.
-
-The separate opt-in Alacritty check launches two private real-terminal readers
-with different column counts and a temporary schema-3 workspace:
-
-```sh
-SOL_TEST_LIVE_ALACRITTY=1 python3 -B -m unittest discover -s tests -p test_reader_alacritty_integration.py
-```
-
-It drives bindings programmatically and verifies selection, search/history, and
-quit/reopen position. Neither live test proves physical-keyboard ergonomics or
-that sustained philosophical reading is better than a book/PDF. A known toolkit
-edge case can visually drop a decomposed combining mark at a full-width row edge;
-source identity remains unchanged. See the acceptance record for limitations and
-the distinction between visual inspection and automated checks.
+Headless editor tests and programmatic terminal checks do not establish sustained
+human reading comfort. Acceptance should include long prose, styled selection,
+`b/n` in both modes, markers, search and history return, outline navigation,
+resize, clipboard sharing and workspace reopen in the user's normal terminal.

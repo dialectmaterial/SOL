@@ -10,10 +10,10 @@ from dataclasses import dataclass
 
 from sol.reader.navigation import character_cells
 from sol.reader.typography import map_typography
-from sol.terminal.reader import (
+from experiments.reader_surfaces.baseline import (
     _character_display, _load_toolkit, emphasis_style, safe_reader_text,
 )
-from sol.terminal.reading_layout import line_layout
+from experiments.reader_surfaces.reading_layout import line_layout
 
 
 @dataclass(frozen=True)

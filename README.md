@@ -15,26 +15,39 @@ Readable Markdown is the canonical text, with a generated JSONL index for the re
 
 ## Install
 
-Python 3.10 or newer and [pipx](https://pipx.pypa.io/) are required.
+Python 3.10 or newer is required. From a checkout, the complete installer checks
+native tools, installs missing Debian/Ubuntu packages after asking permission,
+and installs SOL and all its Python feature dependencies through pipx:
 
 ~~~sh
 git clone https://github.com/dialectmaterial/SOL.git
 cd SOL
-pipx install .
-pipx ensurepath
+python3 scripts/install.py
 ~~~
 
-Open a new terminal if `sol` is not yet on your path. This installs the reader, enhanced command prompt, and corpus maintenance commands. The book corpus is local data and is not bundled with the application. See the [usage manual](docs/USAGE.md#install-with-pipx) for installation and update details.
+Open a new terminal if `sol` is not yet on your path, then run `sol`. The installer
+reuses a suitable Neovim or installs a checksum-verified private copy without
+changing personal editor settings. Kitty tools are included in the complete
+setup, but reading never requires using Kitty. On other operating systems,
+provide the reported native tools with your package manager first. Use
+`python3 scripts/install.py --check` to inspect requirements without changes.
+The reader works in ordinary capable terminal emulators, not one preferred host.
 
 After updating a local checkout, refresh an existing installation with:
 
 ~~~sh
-pipx reinstall sol-organizes-logic
+python3 scripts/install.py
 ~~~
 
 ## Choose a local corpus
 
-SOL needs an indexed corpus directory containing `corpus.json`, `index.jsonl`, and the canonical Markdown. A PDF by itself is not a corpus, and `--set-corpus` expects the corpus directory rather than the PDF path.
+On first launch, if no corpus is configured, SOL welcomes you and asks for the
+PDF's location. It imports the supported Cambridge / George di Giovanni source
+once, validates the resulting Markdown and index, and remembers their location.
+The current importer supports the exact audited source PDF, not arbitrary
+editions, scans or re-encoded copies; unsupported files receive an explanation
+without creating a corpus. The converted book stays in your SOL user-data
+directory, separately from the installation. Importing is not full proofreading.
 
 If you already have a prepared corpus, select it once:
 
@@ -42,7 +55,11 @@ If you already have a prepared corpus, select it once:
 sol --set-corpus /absolute/path/to/local-corpus
 ~~~
 
-The setting stores the corpus location in your user configuration and works from any working directory. It does not copy the corpus. If you only have the supported source PDF, follow the [corpus conversion instructions](docs/CORPUS.md#create-inspect-and-index) to build and review a local corpus first. SOL does not extract the PDF each time you read.
+The setting stores the corpus location in your user configuration and works from
+any working directory. It does not copy or regenerate an existing corpus.
+`--set-corpus` accepts an indexed directory, not a PDF. Manual conversion and
+review remain documented in the [corpus guide](docs/CORPUS.md#create-inspect-and-index).
+Normal reading never extracts the PDF again.
 
 ## Start reading
 
@@ -56,7 +73,12 @@ sol guide                 # Show the beginner's guide
 
 On first use, SOL asks for an actor and a workspace if none has been selected. An actor is a local attribution label, not a login account. A workspace remembers reading position and supports bookmarks, annotations, comparisons, source review, and relations between passages.
 
-The BEING reader runs directly in capable terminal emulators, including Alacritty and Kitty. Kitty is an optional integration; the reader does not require it. The usual keys are `j` and `k` to move through displayed lines, `b` and `n` to move between passages, `/` to search, `v` to select text, `c` to inspect context, and `?` to show reader keys. Ctrl-Q saves and leaves the reader. See the [reader guide](docs/READER_VIEW.md) for details.
+SOL has one reader, powered by Neovim with a private configuration. Use `j/k` for
+displayed lines, `b/n` for previous/next paragraphs, and `p` to switch between
+continuous and one-paragraph reading. `/` searches the whole book, `m1`–`m3` place
+three book markers, `y` copies text, `t` opens the outline, and `c` shows context
+and markers. `?` shows the keys; `q` saves and leaves. The same reader runs in
+Alacritty, Kitty and other capable terminals. See the [reader guide](docs/READER_VIEW.md).
 
 One-shot commands work without opening the reader:
 

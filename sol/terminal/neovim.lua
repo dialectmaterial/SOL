@@ -157,7 +157,7 @@ for _, record in ipairs(records) do
   boundaries(record.heading)
   by_id[record.id] = record
   if mode ~= "paragraph" or record.id == focused_id then
-    if record.heading ~= previous_heading then
+    if not data.focus and record.heading ~= previous_heading then
       if previous_heading then append("") end
       append_lines(record.heading, function(_, row) heading_rows[#heading_rows + 1] = row end)
       append("")
@@ -193,7 +193,7 @@ vim.o.showmode, vim.o.showcmd, vim.o.ruler, vim.o.hidden = false, false, false, 
 vim.o.mouse, vim.o.clipboard = "", ""
 vim.o.statusline = " j/k lines   [p/]p passages   / search   v select   c source/notes   ? help   q return"
 if integrated then
-  vim.o.statusline = " SOL " .. mode .. " | p mode  m1-3 mark  y copy  t tree  c context  ? help  q quit"
+  vim.o.statusline = " SOL " .. mode .. " | b/n paragraphs  p mode  m1-3 mark  y copy  t tree  ? help  q quit"
 end
 vim.o.selection = "inclusive"
 vim.o.hlsearch = true
@@ -431,6 +431,13 @@ local function toggle_mode()
   payload.restore, payload.mode, payload.tree_only = packet, mode == 'paragraph' and 'continuous' or 'paragraph', false
   reload(payload)
 end
+local function toggle_focus()
+  local active_channel = rawget(_G, 'SOLReaderChannel')
+  if active_channel and active_channel.navigation_pending then fail('wait for the reading action to finish') end
+  local payload = vim.deepcopy(data)
+  payload.restore, payload.focus = current_packet(), not data.focus
+  reload(payload)
+end
 
 -- Inherited pipes carry bounded data requests to the existing Python owner.
 -- They survive view reloads, unlike buffers; no listener or user config exists.
@@ -463,13 +470,15 @@ if not channel and vim.env.SOL_NVIM_REQUEST_FD and vim.env.SOL_NVIM_RESPONSE_FD 
   end))
   _G.SOLReaderChannel = channel
 end
+local show_search
 local function request(operation, fields, callback)
   if not channel then fail('this action needs the installed SOL reader, not a research export') end
   if channel.navigation_pending then return end
   local message = vim.deepcopy(fields or {})
   channel.serial = channel.serial + 1
   message.id, message.op, message.packet, message.mode = channel.serial, operation, current_packet(), mode
-  if operation == 'next' or operation == 'previous' or operation == 'marker_open' or operation == 'node_open' then
+  message.focus = data.focus == true
+  if operation ~= 'marker_set' and operation ~= 'marker_clear' then
     channel.navigation_pending = message.id
   end
   channel.pending[message.id] = function(result, problem)
@@ -477,6 +486,7 @@ local function request(operation, fields, callback)
     if not result then vim.notify(tostring(problem), vim.log.levels.ERROR); return end
     local ok, error = pcall(function()
       if result.payload then reload(result.payload)
+      elseif result.search then show_search(result.search)
       elseif result.markers then
         _G.SOLNvimReader.update_markers(result.markers)
         vim.api.nvim_echo({{'Markers updated' .. (result.markers.persistent and '' or ' for this temporary session'), 'None'}}, false, {})
@@ -492,6 +502,33 @@ local function request(operation, fields, callback)
       if callback then callback(nil, tostring(problem)) end
     end
   end))
+end
+show_search = function(result)
+  local lines = {'Search: ' .. result.query, 'Whole book, literal and case-insensitive. Up to ' .. result.limit .. ' passages.', ''}
+  local rows = {}
+  for _, item in ipairs(result.rows) do
+    lines[#lines + 1] = item.number .. '. ' .. item.label
+    rows[#lines] = item.number
+    lines[#lines + 1] = '   ' .. item.snippet
+    rows[#lines] = item.number
+    lines[#lines + 1] = ''
+  end
+  if #result.rows == 0 then lines[#lines + 1] = 'No matching passages.' end
+  lines[#lines + 1] = 'Enter reads a result; Esc returns unchanged. Ctrl-N/P visits matches.'
+  show_lines(lines)
+  local panel = api.nvim_get_current_buf()
+  if #result.rows > 0 then api.nvim_win_set_cursor(popup, {4, 0}) end
+  vim.keymap.set('n', '<CR>', function()
+    local number = rows[api.nvim_win_get_cursor(popup)[1]]
+    if not number then return end
+    close_popup(); request('search_open', {result = number})
+  end, {buffer = panel, silent = true})
+end
+local function search()
+  -- Standard command-line input works in any Neovim-capable terminal. A cancelled
+  -- query never visits a result or modifies canonical text/selection.
+  local query = vim.fn.input('Search book: ')
+  if query:match('%S') then request('search', {query = query}) end
 end
 local function marker(slot, operation)
   request(operation or 'marker_set', {slot = slot})
@@ -536,6 +573,7 @@ local function context()
     for _, line in ipairs(vim.split(tostring(text), "\n", { plain = true })) do lines[#lines + 1] = line end
   end
   add(record.context.path)
+  add('Reading scope: loaded section (' .. #records .. ' paragraphs); gg/G stay here.')
   add("Printed pages: " .. vim.json.encode(record.context.printed_pages))
   add("PDF pages: " .. vim.json.encode(record.context.pdf_pages))
   add("Attribution: " .. vim.json.encode(record.context.attribution))
@@ -566,23 +604,25 @@ local function context()
 end
 local function help()
   if integrated then
-    show_lines({ "SOL reader — Neovim (" .. mode .. ")", "",
+    show_lines({ "SOL reader (" .. mode .. ")", "",
       "j/k, Ctrl-d/u    wrapped reading lines / half-window scroll",
-      "h/l, w/b         native character / word motions",
+      "h/l, w           character / forward word motions",
       "gg/G             start / end of this loaded reading section",
-      "[p / ]p          previous / next source passage",
-      "[c / ]c          previous / next reading section",
+      "b / n            previous / next paragraph",
       "p                toggle continuous / one-paragraph reading",
       "m1, m2, m3       attach/move one of three paragraph markers",
       "'1, '2, '3       jump to a marker; dm1/dm2/dm3 clear it",
       "y                copy the selection or current paragraph to clipboard",
-      "t                interactive tree; Tab changes its layout",
-      "/, n, N          native search within this reading section",
+      "t                book outline: h/l branches, Enter read, Esc return",
+      "/                literal search across the whole book",
+      "Ctrl-P / Ctrl-N  previous / next search-result passage",
+      "Alt-Left/Right   return / forward through reading history",
       "v                characterwise selection inside one passage",
       "c                source pages, attribution and linked notes",
+      "f                toggle quiet focus mode",
       "q / Ctrl-q       save the semantic position and quit",
       ":qa!             quit without saving the current cursor", "",
-      "In paragraph mode, j/k stay here. Use [p/]p to change paragraph.",
+      "In paragraph mode, j/k stay here. Use b/n to change paragraph.",
       "In continuous mode, j/k can continue across reading sections.",
       "Selections are transient; no annotation is created automatically.",
       "Canonical text is read-only. Personal Neovim configuration is not loaded.",
@@ -654,7 +694,7 @@ local function passage(delta)
       payload.mode, payload.tree_only = mode, false
       reload(payload)
     else set_exact_cursor(source_point(selected.id, 0)); vim.cmd('normal! zt') end
-  elseif integrated then reading_request(delta > 0 and 'next' or 'previous') end
+  elseif integrated then request(delta > 0 and 'passage_next' or 'passage_previous') end
 end
 for _, key in ipairs({ "q", "<C-q>" }) do
   vim.keymap.set({ "n", "x" }, key, guarded(function() reading_request("quit") end), { buffer = buffer, silent = true })
@@ -684,6 +724,14 @@ if integrated then
   vim.keymap.set({'n', 'x'}, 'p', guarded(toggle_mode), {buffer = buffer, silent = true})
   vim.keymap.set({'n', 'x'}, 'y', guarded(yank), {buffer = buffer, silent = true})
   vim.keymap.set('n', 't', guarded(tree), {buffer = buffer, silent = true})
+  vim.keymap.set('n', 'f', guarded(toggle_focus), {buffer = buffer, silent = true})
+  vim.keymap.set('n', 'b', guarded(function() passage(-1) end), {buffer = buffer, silent = true})
+  vim.keymap.set('n', 'n', guarded(function() passage(1) end), {buffer = buffer, silent = true})
+  vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
+  vim.keymap.set('n', '<C-n>', guarded(function() request('search_next') end), {buffer = buffer, silent = true})
+  vim.keymap.set('n', '<C-p>', guarded(function() request('search_previous') end), {buffer = buffer, silent = true})
+  vim.keymap.set('n', '<M-Left>', guarded(function() request('history_back') end), {buffer = buffer, silent = true})
+  vim.keymap.set('n', '<M-Right>', guarded(function() request('history_forward') end), {buffer = buffer, silent = true})
   for slot = 1, 3 do
     local number = slot
     vim.keymap.set('n', 'm' .. number, guarded(function() marker(number) end), {buffer = buffer, silent = true})

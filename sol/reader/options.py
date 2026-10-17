@@ -19,27 +19,26 @@ def build_parser() -> argparse.ArgumentParser:
         description="SOL Organizes Logic\n\n"
                     "Read Hegel's Science of Logic directly in your terminal.\n"
                     "sol opens the reader at the last actor's saved workspace and position.\n"
-                    "First use asks for an actor and offers to create a workspace.",
+                    "First use imports your supported PDF, then sets up your reading workspace.",
         epilog="Start here:\n"
                "  sol                         resume reading\n"
                "  sol -n                      read without a workspace or actor\n"
-               "  sol --engine neovim         continuous reading with native Neovim\n"
                "  sol --dynamic-structure     explore the book tree interactively\n"
                "  sol --actor NAME            use that actor's last workspace\n"
                "  sol --workspace NAME        choose a different workspace\n"
                "  sol guide                   reader keys, examples, and book structure\n"
                "  sol -r                      print one random passage and leave\n\n"
-               "Built-in reader keys: j/k lines, b/n passages, / search, v select, c context,\n"
-               "f focus, ? keys, Ctrl-Q save and quit. Alacritty is a normal host;\n"
-               "Kitty is optional. Use --shell for the separate book command interface.\n"
-               "Neovim keeps native search/word keys; press ? inside it for help.\n"
+               "Reader keys: j/k lines, b/n paragraphs, p reading mode, / search,\n"
+               "m1-3 markers, y copy, t tree, c context, f focus, ? help, q save and quit.\n"
+               "Runs in ordinary capable terminals; no particular emulator is required.\n"
+               "Use --shell for the compatibility book command interface.\n"
                "Native read, compare, reference, and analyze commands have their own --help.")
     parser.add_argument("command", nargs="?", choices=("guide",), help="reader guide and a small source-derived book tree")
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     reader = parser.add_argument_group("Reader (the default)")
     reader.add_argument("--reader", action="store_true", help="open the full-screen reader (also what bare sol does)")
-    reader.add_argument("--engine", choices=("builtin", "neovim"),
-                        help="reader backend (default builtin); neovim is opt-in and requires Neovim 0.11+")
+    # Accept the previous explicit spelling without advertising a second reader.
+    reader.add_argument("--engine", choices=("neovim", "builtin"), help=argparse.SUPPRESS)
     reader.add_argument("-n", "--none", action="store_true", help="read without saving; no workspace or actor")
     reader.add_argument("--workspace", metavar="NAME", help="open this workspace instead of the actor's last one")
     reader.add_argument("--actor", metavar="NAME", help="name attributed to your personal notes; remembers that actor's workspace")
@@ -50,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode = modes.add_mutually_exclusive_group()
     mode.add_argument("--structure", action="store_true", help="show the outline (prefer the indexed local corpus)")
     mode.add_argument("--dynamic-structure", action="store_true",
-                      help="open the interactive vertical/horizontal book tree (Neovim 0.11+)")
+                      help="open the reader's book outline directly (temporary session)")
     mode.add_argument("--guide", action="store_true", help="reader keys, examples, and book structure; same as sol guide")
     mode.add_argument("--shell", action="store_true", help="open the optional book command interface instead of the reader")
     mode.add_argument("-r", "--random", action="store_true", help="print a random passage and leave")
@@ -145,6 +144,8 @@ def select_execution_mode(args: argparse.Namespace) -> ExecutionMode:
 
 
 def validate_options(args: argparse.Namespace) -> ExecutionMode:
+    if args.engine == "builtin":
+        raise ValueError("SOL now has one reader. Omit --engine; run python3 scripts/install.py if Neovim is missing.")
     management = bool(getattr(args, "workspace_list", False) or
                       getattr(args, "workspace_delete", None) is not None)
     if args.command:
@@ -162,7 +163,7 @@ def validate_options(args: argparse.Namespace) -> ExecutionMode:
         raise ValueError("--engine selects the interactive reader, not a shell or one-shot action")
     if mode is ExecutionMode.DYNAMIC_STRUCTURE:
         if (args.pdf is not None or args.workspace is not None or args.actor is not None
-                or args.plain or args.json or args.engine == "builtin"):
+                or args.plain or args.json):
             raise ValueError("--dynamic-structure uses a temporary Neovim tree over the canonical corpus; omit PDF/workspace/output options")
         if args.depth is not None and not 1 <= args.depth <= 6:
             raise ValueError("dynamic tree depth must be between 1 and 6")

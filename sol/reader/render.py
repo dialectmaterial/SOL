@@ -253,37 +253,42 @@ IN THE READER
   h / l           move by source character
   Ctrl-D / Ctrl-U move half a visible page down / up
   b / n           previous / next passage, not printed page
-  gg / G          beginning / end of reading scope (c shows scope)
+  p               switch continuous / one-paragraph reading
+  gg / G          beginning / end of the loaded reading section
   v, then motion  select text within this passage; Escape clears it
   c / f / ?       context / quiet focus mode / keyboard help
-  Ctrl-Q          save your position and quit
+  m1 / m2 / m3    place one of three paragraph markers
+  '1 / '2 / '3    return to a marker (also visible under c)
+  y               copy the selection, otherwise this paragraph
+  t               outline: j/k move, h/l branches, Enter read, Esc return
+  q / Ctrl-Q      save your position and quit
 
 FIND AND RETURN
   /ground, Enter  search; choose a result with j/k, then Enter
   Ctrl-P / Ctrl-N previous / next matching passage
   Alt-Left/Right  back / forward through your reading trail
-Search is literal and case-insensitive, not conceptual. Escape closes panels.
+Search is literal, case-insensitive, not conceptual; up to 20 passages.
+In paragraph mode j/k stay in that paragraph; b/n explicitly change paragraphs.
+Escape closes panels. gg/G apply to the loaded section, not the whole book.
 
 YOUR LOCAL WORKSPACE
   sol --workspace-list         list saved workspaces
   sol --workspace-delete NAME  archive a workspace (recoverable)
-Your reading position and personal notes stay local. Canonical text is read-only.
+Position and notes stay local. Canonical text is read-only.
 
 MORE WHEN YOU NEED IT
-  sol --engine neovim  try continuous reading (requires Neovim 0.11+)
-  sol --dynamic-structure  explore the interactive vertical/horizontal tree
+  sol --dynamic-structure  open the same outline directly
   sol guide --depth 2  reveal more of the book's structure
   sol --help          see options and one-shot reading commands
   sol --shell         open the optional command interface
 In that interface: guide PATH --depth N; help shows its command syntax.
-Neovim: p toggles paragraph/continuous mode; m1-3 mark; y copies; t opens tree.
-It keeps native search/word keys: ? shows its separate reader bindings.
-BEING runs in Alacritty and other capable terminals; Kitty is optional."""
+SOL has one Neovim-backed reader, with its own configuration and simple keys.
+It runs in capable terminals, including Alacritty; Kitty is not required."""
     if book is None:
         starting += """\n\nCORPUS SETUP (the book tree is an abbreviated fallback)
   sol --set-corpus DIRECTORY
-Use an existing converted corpus. For explicit conversion: sol-corpus --help.
-Reading never performs PDF conversion automatically."""
+Or run sol: first launch asks for the supported PDF and imports it once.
+Normal reading reuses that corpus; it never reconverts the PDF."""
     # Preserve command indentation and avoid filling source tree lines as prose.
     folded = "\n".join(
         textwrap.fill(line, width=width, subsequent_indent="  " if line.startswith("  ") else "",

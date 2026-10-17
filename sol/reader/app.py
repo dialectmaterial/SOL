@@ -56,14 +56,9 @@ def resolve_path(value: str | None, cwd: tuple[str, ...], root: Node = ROOT) -> 
 
 
 def run_reader(book: Book, workspace_reader=None, *, width=DEFAULT_READER_WIDTH,
-               emphasis="auto", engine="builtin") -> int:
+               emphasis="auto") -> int:
     """Load the terminal adapter only for interactive reading."""
-    if engine == "neovim":
-        from sol.terminal.neovim_reader import run_reader as run_view
-    elif engine == "builtin":
-        from sol.terminal.reader import run_reader as run_view
-    else:
-        raise ValueError("unknown reader engine; choose builtin or neovim")
+    from sol.terminal.neovim_reader import run_reader as run_view
 
     return run_view(book, workspace_reader, width=width, emphasis=emphasis)
 
@@ -194,8 +189,8 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
             register_actor(args.actor)
             remember_launch(args.actor, store.path, identity, book.corpus_manifest['source']['sha256'])
             if args.reader:
-                return run_reader(book, reader, width=args.width or DEFAULT_READER_WIDTH, emphasis=args.emphasis or "auto",
-                                  engine=args.engine or "builtin")
+                return run_reader(book, reader, width=args.width or DEFAULT_READER_WIDTH,
+                                  emphasis=args.emphasis or "auto")
             return run_shell(book, width, args.plain, color, reader,
                              ui_mode=args.ui or 'auto', editing_mode=args.editing_mode or 'emacs',
                              source_pdf=args.source_pdf, auto_width=args.width is None)
@@ -244,12 +239,8 @@ def main(argv: list[str] | None = None) -> int:
         if mode in (ExecutionMode.READER, ExecutionMode.DYNAMIC_STRUCTURE):
             # Refuse an unavailable view before corpus discovery, onboarding,
             # actor registration or opening/creating a personal workspace.
-            if args.engine == "neovim" or mode is ExecutionMode.DYNAMIC_STRUCTURE:
-                from sol.terminal.neovim import validate_environment
-                validate_environment(args.width or DEFAULT_READER_WIDTH)
-            else:
-                from sol.terminal.reader import validate_reader_environment
-                validate_reader_environment()
+            from sol.terminal.neovim import validate_environment
+            validate_environment(args.width or DEFAULT_READER_WIDTH)
         if mode is ExecutionMode.SET_CORPUS:
             corpus, configuration = save_corpus(args.set_corpus)
             if args.json:
@@ -292,13 +283,12 @@ def main(argv: list[str] | None = None) -> int:
                     print(render_tree(depth=args.depth))
                     print("\nAbbreviated outline. Select a corpus with --set-corpus DIRECTORY for subdivisions.")
                 return 0
-            raise ValueError(
-                "No local Markdown corpus found.\n"
-                "Select an existing corpus once with sol --set-corpus DIRECTORY, "
-                "or use --corpus DIRECTORY / SOL_CORPUS.\n"
-                f"For an initial import: sol-corpus convert --pdf {PDF_FILENAME}\n"
-                "PDF extraction is never automatic; --pdf PATH explicitly selects the slow legacy reader."
-            )
+            if mode.interactive:
+                from sol.reader.onboarding import prepare_first_corpus
+                book = prepare_first_corpus()
+            else:
+                raise ValueError(f"No local corpus found. Run sol in a terminal to import the supported {PDF_FILENAME}, "
+                                 "or select an existing corpus with sol --set-corpus DIRECTORY.")
         if mode.interactive and not args.none:
             shell_identity(book, args)
         if args.workspace is not None:
@@ -327,8 +317,7 @@ def main(argv: list[str] | None = None) -> int:
         elif mode is ExecutionMode.GUIDE:
             print(render_guide(book, width, 1 if args.depth is None else args.depth))
         elif mode is ExecutionMode.READER:
-            return run_reader(book, width=args.width or DEFAULT_READER_WIDTH, emphasis=args.emphasis or "auto",
-                              engine=args.engine or "builtin")
+            return run_reader(book, width=args.width or DEFAULT_READER_WIDTH, emphasis=args.emphasis or "auto")
         elif mode is ExecutionMode.SHELL:
             return run_shell(book, width, args.plain, color, ui_mode=args.ui or 'auto',
                              editing_mode=args.editing_mode or 'emacs', source_pdf=args.source_pdf,

@@ -14,7 +14,7 @@ import importlib.util
 import unittest
 
 from sol.reader.actions import ReaderActions
-from sol.terminal.reader import ReaderView
+from experiments.reader_surfaces.baseline import ReaderView
 from test_reader_view import IDS, reader_book
 
 

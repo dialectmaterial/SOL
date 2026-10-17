@@ -26,7 +26,7 @@ root = Path(sys.argv[2])
 sys.stderr = (root / "errors.txt").open("w")
 from prompt_toolkit.key_binding.key_processor import KeyPress
 from prompt_toolkit.keys import Keys
-from sol.terminal import reader
+from experiments.reader_surfaces import baseline as reader
 from sol.reader import app
 
 class CheckedView(reader.ReaderView):
@@ -94,7 +94,7 @@ class CheckedView(reader.ReaderView):
         return asyncio.run(scenario())
 
 reader.ReaderView = CheckedView
-assert app.main(["--reader", "-n", "--corpus", str(root / "corpus")]) == 0
+assert reader.run_reader(app.load_corpus_book(root / "corpus")) == 0
 '''
 
 

@@ -62,7 +62,7 @@ class ReaderViewCLITests(unittest.TestCase):
         self.assertFalse((self.root / "data").exists())
 
     def test_unavailable_view_fails_before_any_data_or_profile_access(self):
-        with patch("sol.terminal.reader.validate_reader_environment", side_effect=ValueError("Invented unavailable view")), \
+        with patch("sol.terminal.neovim.validate_environment", side_effect=ValueError("Invented unavailable view")), \
                 patch.object(app, "discover_corpus", side_effect=AssertionError("No corpus I/O")), \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")), \
                 patch("sol.workspace.profiles.register_actor", side_effect=AssertionError("No profile write")):
@@ -73,7 +73,7 @@ class ReaderViewCLITests(unittest.TestCase):
         self.assertFalse((self.root / "data").exists())
 
     def test_nonpersistent_view_bypasses_actor_and_workspace_storage(self):
-        with patch("sol.terminal.reader.validate_reader_environment"), \
+        with patch("sol.terminal.neovim.validate_environment"), \
                 patch.object(app, "run_reader", return_value=0) as view, \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")), \
                 patch("sol.workspace.store.Workspace", side_effect=AssertionError("No workspace")), \
@@ -91,7 +91,7 @@ class ReaderViewCLITests(unittest.TestCase):
             args.workspace, args.actor = "reading", "Invented reader"
             args.workspace_dir = self.root / "workspaces"
 
-        with patch("sol.terminal.reader.validate_reader_environment"), \
+        with patch("sol.terminal.neovim.validate_environment"), \
                 patch.object(app, "shell_identity", side_effect=choose) as onboarding, \
                 patch.object(app, "run_reader", return_value=0) as view:
             status, _, error = self.call([])
@@ -106,23 +106,23 @@ class ReaderViewCLITests(unittest.TestCase):
         self.assertEqual(reader.store.schema_version, SCHEMA_VERSION)
 
     def test_width_and_emphasis_are_forwarded_to_the_reader(self):
-        with patch("sol.terminal.reader.validate_reader_environment"), \
+        with patch("sol.terminal.neovim.validate_environment"), \
                 patch.object(app, "run_reader", return_value=0) as view:
             status, _, error = self.call(["--reader", "-n", "--width", "64", "--emphasis", "underline"])
         self.assertEqual(status, 0, error)
-        self.assertEqual(view.call_args.kwargs, {"width": 64, "emphasis": "underline", "engine": "builtin"})
+        self.assertEqual(view.call_args.kwargs, {"width": 64, "emphasis": "underline"})
 
     def test_emphasis_is_reader_only_and_width_validation_precedes_data_access(self):
         for arguments in (["-r", "--emphasis", "italic"], ["--reader", "--width", "19"],
                           ["--reader", "--width", "241"]):
             with self.subTest(arguments=arguments), \
                     patch.object(app, "discover_corpus", side_effect=AssertionError("No source access")), \
-                    patch("sol.terminal.reader.validate_reader_environment"):
+                    patch("sol.terminal.neovim.validate_environment"):
                 status, _, _ = self.call(arguments)
             self.assertNotEqual(status, 0)
 
     def test_explicit_workspace_injects_existing_service_without_prompting(self):
-        with patch("sol.terminal.reader.validate_reader_environment"), \
+        with patch("sol.terminal.neovim.validate_environment"), \
                 patch("builtins.input", side_effect=AssertionError("No prompt needed")), \
                 patch.object(app, "run_reader", return_value=0) as view:
             status, _, error = self.call(["--reader", "--workspace", "reading", "--actor", "Invented reader",
@@ -132,11 +132,30 @@ class ReaderViewCLITests(unittest.TestCase):
 
     def test_help_remains_source_and_optional_dependency_free(self):
         with patch.object(app, "discover_corpus", side_effect=AssertionError("No source")), \
-                patch("sol.terminal.reader.validate_reader_environment", side_effect=AssertionError("No TTY needed")), \
+                patch("sol.terminal.neovim.validate_environment", side_effect=AssertionError("No TTY needed")), \
                 redirect_stdout(StringIO()) as output, self.assertRaises(SystemExit) as caught:
             app.main(["--help"])
         self.assertEqual(caught.exception.code, 0)
         self.assertIn("--reader", output.getvalue())
+        self.assertNotIn("--engine", output.getvalue())
+
+    def test_first_interactive_launch_uses_guided_import_then_the_same_reader(self):
+        book = app.load_corpus_book(self.corpus)
+        with patch("sol.terminal.neovim.validate_environment"), \
+                patch.object(app, "discover_corpus", return_value=None), \
+                patch("sol.reader.onboarding.prepare_first_corpus", return_value=book) as setup, \
+                patch.object(app, "run_reader", return_value=0) as reader:
+            status, _, error = self.call(["-n"])
+        self.assertEqual(status, 0, error)
+        setup.assert_called_once_with()
+        self.assertIs(reader.call_args.args[0], book)
+
+    def test_missing_corpus_in_one_shot_output_never_starts_import(self):
+        with patch.object(app, "discover_corpus", return_value=None), \
+                patch("sol.reader.onboarding.prepare_first_corpus", side_effect=AssertionError("No import")):
+            status, _, error = self.call(["-r"])
+        self.assertEqual(status, 2)
+        self.assertIn("import the supported Hegel-SOL.pdf", error)
 
     def test_neovim_preflight_precedes_corpus_and_actor_access(self):
         with patch("sol.terminal.neovim.validate_environment", side_effect=ValueError("Neovim unavailable")), \
@@ -150,7 +169,7 @@ class ReaderViewCLITests(unittest.TestCase):
 
     def test_neovim_temporary_reader_does_not_require_builtin_frontend(self):
         with patch("sol.terminal.neovim.validate_environment"), \
-                patch("sol.terminal.reader.validate_reader_environment", side_effect=AssertionError("Wrong frontend")), \
+                patch("experiments.reader_surfaces.baseline.validate_reader_environment", side_effect=AssertionError("Wrong frontend")), \
                 patch("sol.terminal.neovim_reader.run_reader", return_value=0) as reader, \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")):
             status, _, error = self.call(["-n", "--engine", "neovim", "--width", "64", "--emphasis", "underline"])
@@ -190,7 +209,7 @@ class ReaderViewCLITests(unittest.TestCase):
 import builtins, sys
 original = builtins.__import__
 def guard(name, *args, **kwargs):
-    if name == 'sol.terminal.reader' or name.startswith('prompt_toolkit'):
+    if name == 'experiments.reader_surfaces.baseline' or name.startswith('prompt_toolkit'):
         raise AssertionError('Ordinary reading imported optional reader ' + name)
     return original(name, *args, **kwargs)
 builtins.__import__ = guard

@@ -335,7 +335,7 @@ class ToolkitSourceGeometryTests(unittest.IsolatedAsyncioTestCase):
     async def assert_live_geometry(self, text):
         from prompt_toolkit.input import create_pipe_input
         from prompt_toolkit.output import DummyOutput
-        from sol.terminal.reader import ReaderView, _character_display
+        from experiments.reader_surfaces.baseline import ReaderView, _character_display
         book = invented_book()
         book.passages[0] = replace(book.passages[0], text=text)
         book.canonical_records[IDS[0]].update(

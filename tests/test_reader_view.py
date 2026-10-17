@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 from sol.core.models import Book, Node, Passage
 from sol.reader.actions import ReaderActions
-from sol.terminal.reader import ReaderView, run_reader, safe_reader_text, validate_reader_environment
+from experiments.reader_surfaces.baseline import ReaderView, run_reader, safe_reader_text, validate_reader_environment
 
 
 OPTIONAL = importlib.util.find_spec("prompt_toolkit") is not None
@@ -47,7 +47,7 @@ class ReaderEnvironmentTests(unittest.TestCase):
         result = subprocess.run([sys.executable, "-B", "-c", """
 import json, sys
 import sol.core
-import sol.terminal.reader
+import experiments.reader_surfaces.baseline
 print(json.dumps(sorted(sys.modules)))
 """], cwd=Path(__file__).resolve().parents[1], text=True, capture_output=True, check=True)
         modules = json.loads(result.stdout)
@@ -59,20 +59,20 @@ print(json.dumps(sorted(sys.modules)))
         pipe = SimpleNamespace(isatty=lambda: False)
         for stdin, stdout, term in ((pipe, tty, "xterm"), (tty, pipe, "xterm"), (tty, tty, "dumb")):
             with self.subTest(term=term, stdin=stdin, stdout=stdout), \
-                    patch("sol.terminal.reader.sys.stdin", stdin), \
-                    patch("sol.terminal.reader.sys.stdout", stdout), \
+                    patch("experiments.reader_surfaces.baseline.sys.stdin", stdin), \
+                    patch("experiments.reader_surfaces.baseline.sys.stdout", stdout), \
                     patch.dict("os.environ", {"TERM": term}), \
-                    patch("sol.terminal.reader._load_toolkit") as loader:
+                    patch("experiments.reader_surfaces.baseline._load_toolkit") as loader:
                 with self.assertRaisesRegex(ValueError, "interactive terminal"):
                     validate_reader_environment()
                 loader.assert_not_called()
 
     def test_missing_reader_dependency_has_actionable_error(self):
         tty = SimpleNamespace(isatty=lambda: True)
-        with patch("sol.terminal.reader.sys.stdin", tty), \
-                patch("sol.terminal.reader.sys.stdout", tty), \
+        with patch("experiments.reader_surfaces.baseline.sys.stdin", tty), \
+                patch("experiments.reader_surfaces.baseline.sys.stdout", tty), \
                 patch.dict("os.environ", {"TERM": "xterm"}), \
-                patch("sol.terminal.reader._load_toolkit", side_effect=ImportError("absent")):
+                patch("experiments.reader_surfaces.baseline._load_toolkit", side_effect=ImportError("absent")):
             with self.assertRaisesRegex(ValueError, r"pipx install --force \."):
                 validate_reader_environment()
 
@@ -99,8 +99,8 @@ print(json.dumps(sorted(sys.modules)))
                 captured.append(self)
             def run(self):
                 return 0
-        with patch("sol.terminal.reader.validate_reader_environment"), \
-                patch("sol.terminal.reader.ReaderView", CapturedView), \
+        with patch("experiments.reader_surfaces.baseline.validate_reader_environment"), \
+                patch("experiments.reader_surfaces.baseline.ReaderView", CapturedView), \
                 patch.object(ReaderActions, "read", side_effect=AssertionError("No new visit")):
             self.assertEqual(run_reader(book, reader), 0)
         self.assertIsNone(captured[0].actions.snapshot().current)
@@ -120,8 +120,8 @@ print(json.dumps(sorted(sys.modules)))
                 captured.append(self)
             def run(self):
                 return 0
-        with patch("sol.terminal.reader.validate_reader_environment"), \
-                patch("sol.terminal.reader.ReaderView", CapturedView):
+        with patch("experiments.reader_surfaces.baseline.validate_reader_environment"), \
+                patch("experiments.reader_surfaces.baseline.ReaderView", CapturedView):
             self.assertEqual(run_reader(book, reader), 0)
         self.assertEqual(checkpoints, [book.passages[0]])
         self.assertIs(captured[0].actions.snapshot().current, book.passages[0])

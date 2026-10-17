@@ -82,18 +82,18 @@ class GuideTests(unittest.TestCase):
             self.assertIn(key, text)
         self.assertIn("not printed page", text)
         self.assertIn("within this passage; Escape clears it", text)
-        self.assertIn("beginning / end of reading scope", text)
+        self.assertIn("beginning / end of the loaded reading section", text)
         self.assertIn("save your position and quit", text)
         self.assertNotIn("q quits", text)
 
     def test_search_privacy_and_terminal_boundaries_are_clear(self):
         text = sol.render_guide(synthetic_book())
-        self.assertIn("literal and case-insensitive", text)
+        self.assertIn("literal, case-insensitive", text)
         self.assertIn("not conceptual", " ".join(text.split()))
         self.assertIn("Canonical text is read-only", " ".join(text.split()))
-        self.assertIn("personal notes stay local", text)
+        self.assertIn("Position and notes stay local", text)
         self.assertIn("Alacritty", text)
-        self.assertIn("Kitty is optional", text)
+        self.assertIn("Kitty is not required", text)
 
     def test_source_free_guide_explains_configuration_without_loading_or_conversion(self):
         with patch("sol.reader.app.load_corpus_book", side_effect=AssertionError("No corpus load")), \
@@ -102,8 +102,8 @@ class GuideTests(unittest.TestCase):
             text = sol.render_guide()
         self.assertIn("abbreviated fallback", text)
         self.assertIn("sol --set-corpus DIRECTORY", text)
-        self.assertIn("sol-corpus --help", text)
-        self.assertIn("never performs PDF conversion automatically", text)
+        self.assertIn("first launch asks for the supported PDF", text)
+        self.assertIn("never reconverts the PDF", text)
 
     def test_narrow_output_folds_prose_and_tree_without_terminal_styles(self):
         for width in (20, 40, 80):

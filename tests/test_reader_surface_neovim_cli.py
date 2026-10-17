@@ -35,7 +35,7 @@ class NeovimReaderCLITests(unittest.TestCase):
     def test_neovim_has_its_own_preflight_before_corpus_access(self):
         with patch("experiments.reader_surfaces.neovim.validate_environment", side_effect=ValueError("Neovim TTY unavailable")), \
                 patch("sol.core.corpus.load_corpus_book", side_effect=AssertionError("No corpus I/O")), \
-                patch("sol.terminal.reader.validate_reader_environment", side_effect=AssertionError("No Python view")):
+                patch("experiments.reader_surfaces.baseline.validate_reader_environment", side_effect=AssertionError("No Python view")):
             status, output, error = self.call("nvim")
         self.assertEqual(status, 2)
         self.assertFalse(output)
@@ -45,7 +45,7 @@ class NeovimReaderCLITests(unittest.TestCase):
         target, source = self.root / "out.json", self.root / "in.json"
         with patch("experiments.reader_surfaces.neovim.validate_environment") as preflight, \
                 patch("experiments.reader_surfaces.neovim.run", return_value=0) as run, \
-                patch("sol.terminal.reader.validate_reader_environment", side_effect=AssertionError("No Python view")):
+                patch("experiments.reader_surfaces.baseline.validate_reader_environment", side_effect=AssertionError("No Python view")):
             status, output, error = self.call("--count", "1", "nvim", "--width", "64",
                                                "--export", str(target), "--restore", str(source))
         self.assertEqual((status, output, error), (0, "", ""))

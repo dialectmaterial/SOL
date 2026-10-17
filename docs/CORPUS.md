@@ -20,6 +20,14 @@ material.
 
 ## Create, inspect, and index
 
+For normal first-time setup, run `python3 scripts/install.py` from the checkout,
+then `sol`. If no corpus is configured, SOL asks for the supported PDF, imports
+it once into the SOL user-data directory, validates it and saves the location.
+This uses the same audited converter described below. Unsupported fingerprints
+are explained rather than converted with guessed edition rules. Existing corpora
+are never regenerated. The following is the explicit maintenance workflow, not
+a prerequisite for beginning to read.
+
 Python 3.10 or newer is required. The converter needs Poppler's PDF tools and the
 CommonMark parser included in the normal installation (`corpus` remains a compatibility extra). Dependency requirements are
 defined once in `pyproject.toml`. On Debian/Ubuntu:

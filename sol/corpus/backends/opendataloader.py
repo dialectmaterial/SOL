@@ -132,14 +132,14 @@ def extract_pdf(pdf: Path, output_dir: Path, *, pages: str | None = None) -> dic
     try:
         sdk_version = metadata.version("opendataloader-pdf")
     except metadata.PackageNotFoundError as error:
-        raise ExtractionError("OpenDataLoader is optional; install SOL's extraction extra") from error
+        raise ExtractionError("OpenDataLoader is missing; refresh the full SOL installation with pipx install --force .") from error
     if sdk_version != SUPPORTED_VERSION:
         raise ExtractionError(f"Supported OpenDataLoader version is {SUPPORTED_VERSION}; "
                               f"found {sdk_version}")
     try:
         sdk = import_module("opendataloader_pdf")
     except ImportError as error:
-        raise ExtractionError("OpenDataLoader is optional; install SOL's extraction extra") from error
+        raise ExtractionError("OpenDataLoader is missing; refresh the full SOL installation with pipx install --force .") from error
     if shutil.which("java") is None:
         raise ExtractionError("OpenDataLoader requires Java 11 or newer on PATH")
     options = {"format": "json", "hybrid": "off", "image_output": "off", "quiet": True}

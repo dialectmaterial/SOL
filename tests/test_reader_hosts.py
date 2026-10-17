@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from sol.terminal.reader import emphasis_style, validate_reader_environment
+from experiments.reader_surfaces.baseline import emphasis_style, validate_reader_environment
 
 
 class OrdinaryTerminalTests(unittest.TestCase):
@@ -24,9 +24,9 @@ class OrdinaryTerminalTests(unittest.TestCase):
         for term in ("alacritty", "xterm-256color", "xterm-kitty", "unknown-terminal"):
             with self.subTest(term=term), \
                     patch.dict(os.environ, {"TERM": term, "PATH": ""}, clear=True), \
-                    patch("sol.terminal.reader.sys.stdin", tty), \
-                    patch("sol.terminal.reader.sys.stdout", tty), \
-                    patch("sol.terminal.reader._load_toolkit") as toolkit:
+                    patch("experiments.reader_surfaces.baseline.sys.stdin", tty), \
+                    patch("experiments.reader_surfaces.baseline.sys.stdout", tty), \
+                    patch("experiments.reader_surfaces.baseline._load_toolkit") as toolkit:
                 validate_reader_environment()
                 toolkit.assert_called_once_with()
                 self.assertNotIn("KITTY_WINDOW_ID", os.environ)
@@ -60,7 +60,7 @@ subprocess.Popen = no_child_process
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.output import DummyOutput
 from sol.reader.actions import ReaderActions
-from sol.terminal.reader import ReaderView
+from experiments.reader_surfaces.baseline import ReaderView
 from test_reader_view import reader_book
 
 async def check():

@@ -1,4 +1,7 @@
-"""Optional full-screen reading view over the ordinary ReaderActions boundary.
+"""Historical prompt_toolkit baseline, retained only for research comparisons.
+
+The installed package does not include this view. It exists only as a checkout
+research baseline; new reader work belongs in sol/terminal/neovim_reader.py.
 
 Importing this module uses only the standard library. The source buffer retains
 exact source characters; rendering alone escapes controls and invisible marks.
@@ -15,14 +18,7 @@ import unicodedata
 from sol.reader.options import DEFAULT_READER_WIDTH
 
 
-def emphasis_style(mode="auto"):
-    """Unknown terminals use visible underlining; capabilities aren't assumed."""
-    if mode not in {"auto", "italic", "underline"}:
-        raise ValueError("reader emphasis must be auto, italic or underline")
-    if mode != "auto":
-        return mode
-    term = os.environ.get("TERM", "").lower()
-    return "italic" if term.startswith(("alacritty", "xterm", "screen", "tmux", "foot", "wezterm")) else "underline"
+from sol.terminal.text import emphasis_style
 
 
 def _character_display(character: str) -> str:
@@ -464,7 +460,7 @@ class ReaderView:
         return self._geometry_cache[1]
 
     def _plan_line(self, source, width):
-        from sol.terminal.reading_layout import line_layout
+        from experiments.reader_surfaces.reading_layout import line_layout
         key = (source, width)
         if key not in self._line_plans:
             if len(self._line_plans) >= 64:

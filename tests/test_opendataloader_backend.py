@@ -65,15 +65,15 @@ class OpenDataLoaderBackendTests(unittest.TestCase):
     def extract_options_without_pages(self):
         return backend.extract_pdf(self.pdf, self.directory / "other")["backend"]["options"]
 
-    def test_missing_optional_sdk_does_not_create_output(self):
+    def test_missing_sdk_does_not_create_output(self):
         with patch.object(backend.metadata, "version", side_effect=metadata.PackageNotFoundError):
-            with self.assertRaisesRegex(backend.ExtractionError, "optional"):
+            with self.assertRaisesRegex(backend.ExtractionError, "refresh the full SOL installation"):
                 self.extract()
         self.assertFalse(self.output.exists())
 
     def test_missing_sdk_import_does_not_create_output(self):
         with patch.object(backend, "import_module", side_effect=ModuleNotFoundError):
-            with self.assertRaisesRegex(backend.ExtractionError, "optional"):
+            with self.assertRaisesRegex(backend.ExtractionError, "refresh the full SOL installation"):
                 self.extract()
         self.assertFalse(self.output.exists())
 

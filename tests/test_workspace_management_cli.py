@@ -34,7 +34,7 @@ class WorkspaceManagementCLITests(unittest.TestCase):
         with redirect_stdout(output), redirect_stderr(error), \
                 patch.object(app, "discover_corpus", side_effect=AssertionError("No corpus discovery")), \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")), \
-                patch("sol.terminal.reader.validate_reader_environment", side_effect=AssertionError("No terminal needed")):
+                patch("sol.terminal.neovim.validate_environment", side_effect=AssertionError("No terminal needed")):
             status = app.main(list(arguments))
         return status, output.getvalue(), error.getvalue()
 

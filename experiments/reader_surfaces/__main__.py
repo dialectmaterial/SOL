@@ -39,7 +39,7 @@ def main(argv=None):
             from .neovim import validate_environment
             validate_environment(args.width)
         elif args.mode in {"baseline", "tui"}:
-            from sol.terminal.reader import validate_reader_environment
+            from experiments.reader_surfaces.baseline import validate_reader_environment
             validate_reader_environment()
         from sol.core.corpus import load_corpus_book
         from .common import sample_from_book, validate_packet
@@ -84,7 +84,7 @@ def main(argv=None):
                               "span": None if selected is None else [selected.start, selected.end],
                               "workspace_written": False}))
         elif args.mode == "baseline":
-            from sol.terminal.reader import ReaderView
+            from experiments.reader_surfaces.baseline import ReaderView
             return ReaderView(sample.actions, width=args.width).run()
         elif args.mode == "nvim":
             from .neovim import run

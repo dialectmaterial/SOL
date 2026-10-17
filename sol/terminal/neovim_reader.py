@@ -13,7 +13,7 @@ from sol.reader.actions import ReaderActions
 from sol.reader.surface import Sample
 from sol.reader.structure import structure_payload
 from sol.terminal import neovim
-from sol.terminal.text import safe_output
+from sol.terminal.text import safe_label, safe_output
 
 
 SECTION_BUDGET = 64
@@ -77,6 +77,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         actions.read((), first=True)
     transient_markers = {}
     mode = "continuous"
+    focused = False
 
     def marker_name(slot):
         return f"sol:reader-marker:{slot}"
@@ -113,7 +114,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         structure["depth"] = tree_depth
         if start_tree:
             structure["root"] = "/"
-        payload.update(integrated=True, navigation=navigation, notice=notice or "", mode=mode,
+        payload.update(integrated=True, navigation=navigation, notice=notice or "", mode=mode, focus=focused,
                        markers=markers(), structure=structure, tree_only=start_tree)
         neovim._safe_metadata({"notice": payload["notice"], "markers": payload["markers"], "structure": structure})
         return payload, sample, extent
@@ -121,21 +122,41 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     payload, sample, extent = prepare()
 
     def handle(request):
-        nonlocal payload, sample, extent, mode, start_tree, notice
+        nonlocal payload, sample, extent, mode, start_tree, notice, focused
         operation = request.get("op")
         fields = {"op", "packet", "mode"}
+        if "focus" in request:
+            fields.add("focus")
+            if type(request["focus"]) is not bool:
+                raise ValueError("reader focus must be a boolean")
         if operation in ("marker_set", "marker_clear", "marker_open"):
             fields.add("slot")
             if type(request.get("slot")) is not int or request["slot"] not in (1, 2, 3):
                 raise ValueError("reader markers have slots 1, 2 and 3")
         elif operation == "node_open":
             fields.add("node")
-        elif operation not in ("next", "previous"):
+        elif operation == "search":
+            fields.add("query")
+            if not isinstance(request.get("query"), str) or not 1 <= len(request["query"].strip()) <= 256:
+                raise ValueError("search needs 1–256 characters")
+        elif operation == "search_open":
+            fields.add("result")
+            if type(request.get("result")) is not int or not 1 <= request["result"] <= len(actions.results):
+                raise ValueError("choose a displayed search result")
+        elif operation not in ("next", "previous", "passage_next", "passage_previous",
+                               "search_next", "search_previous", "history_back", "history_forward"):
             raise ValueError("unknown reader action")
         if set(request) != fields or request.get("mode") not in ("continuous", "paragraph"):
             raise ValueError("invalid reader action fields or reading mode")
         selected = neovim._check_sample_packet(sample, request["packet"], payload["records"])
         identifier = request["packet"]["reference"]["reference"]["requested_id"]
+        if operation == "search":
+            # Searching does not move the cursor, save a visit or erase a selection.
+            rows = actions.search(request["query"], path=(), limit=20)
+            return {"search": {"query": safe_label(request["query"]), "limit": 20, "rows": [
+                {"number": i, "label": safe_label(f"{row.heading or row.node.title} | p. {row.printed_page}"),
+                 "snippet": safe_label(" ".join(row.text.split())[:150])}
+                for i, row in enumerate(rows, 1)]}}
         if operation in ("marker_set", "marker_clear"):
             slot = request["slot"]
             if workspace_reader is None:
@@ -148,8 +169,11 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             else:
                 workspace_reader.remove_bookmark(marker_name(slot))
             return {"markers": markers()}
-        if selected is not None:
+        if selected is not None and operation not in ("search_open", "search_next", "search_previous",
+                                                      "history_back", "history_forward"):
             raise ValueError("clear the selection before changing reading locations")
+        if operation in ("search_next", "search_previous") and not actions.results:
+            raise ValueError("search the book first with /")
         if operation == "marker_open":
             row = markers()["slots"][request["slot"] - 1]
             if row["target"] is None:
@@ -162,6 +186,24 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             if row is None or row["target"] is None:
                 raise ValueError("this tree branch has no readable passage")
             target, offset = row["target"], 0
+        elif operation.startswith("passage_"):
+            at = next(i for i, row in enumerate(book.passages) if row.identifier ==
+                      request["packet"]["reference"]["reference"]["target_id"])
+            at += 1 if operation == "passage_next" else -1
+            if not 0 <= at < len(book.passages):
+                raise ValueError("no adjacent paragraph")
+            target, offset = book.passages[at].identifier, 0
+        elif operation in ("search_open", "search_next", "search_previous", "history_back", "history_forward"):
+            # First retain the actual outgoing semantic location, not Python's
+            # last loaded cursor or Neovim's disposable buffer jumplist.
+            actions.accept_return_position(request["packet"]["reference"], request["packet"]["cursor_offset"], selected)
+            if operation == "search_open":
+                actions.open_result(request["result"])
+            elif operation.startswith("search_"):
+                actions.search_next(reverse=operation == "search_previous")
+            else:
+                getattr(actions, operation)()
+            target, offset = actions.current_reference_id(), actions.cursor_offset
         else:
             if not payload["navigation"][operation]:
                 raise ValueError("no adjacent reading section")
@@ -169,8 +211,13 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             target, offset = passage.identifier, 0 if operation == "next" else len(passage.text)
         from sol.core.protocol import capture_reference
         reference = capture_reference(book.corpus_snapshot, target)
-        actions.accept_return_position(reference, offset)
+        if operation not in ("search_open", "search_next", "search_previous", "history_back", "history_forward"):
+            actions.accept_return_position(request["packet"]["reference"], request["packet"]["cursor_offset"])
+            actions.accept_return_position(reference, offset)
         mode, start_tree, notice = request["mode"], False, ""
+        if operation in ("search_open", "search_next", "search_previous"):
+            notice = actions.search_highlights().reason or ""
+        focused = request.get("focus", focused)
         payload, sample, extent = prepare()
         return {"payload": payload}
 

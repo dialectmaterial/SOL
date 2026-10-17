@@ -32,7 +32,7 @@ def native(command, **options):
         command = [*command, '-c', 'lua dofile(vim.env.SOL_NVIM_TEST_SCENARIO)']
     return original(command, **options)
 reader_channel.subprocess.Popen = native
-raise SystemExit(app.main(['--engine', 'neovim', '--actor', 'Invented acceptance reader',
+raise SystemExit(app.main(['--actor', 'Invented acceptance reader',
     '--workspace', 'reading', '--workspace-dir', sys.argv[2], '--width', sys.argv[3]]))
 '''
 
@@ -93,9 +93,25 @@ vim.defer_fn(function()
     api.nvim_feedkeys('99j99k', 'xt', false)
     assert(reader.capture().reference.reference.target_id == data.records[2].id)
     reader.restore(saved)
+    -- The installed / mapping goes through the live Python search boundary;
+    -- returning restores the outgoing source location, not a native jumplist.
+    local original_input, prior_reader = vim.fn.input, reader
+    vim.fn.input = function() return 'thought' end
+    api.nvim_feedkeys('/', 'xt', false)
+    vim.fn.input = original_input
+    assert(vim.wait(3000, function() return api.nvim_get_current_win() ~= reader.window end, 10), 'search panel did not open')
+    api.nvim_feedkeys(api.nvim_replace_termcodes('<CR>', true, false, true), 'xt', false)
+    assert(vim.wait(3000, function() return SOLNvimReader ~= prior_reader end, 10), 'search result did not open')
+    reader = SOLNvimReader
+    assert(reader.capture().reference.reference.target_id == data.records[1].id)
+    prior_reader = reader
+    api.nvim_feedkeys(api.nvim_replace_termcodes('<M-Left>', true, false, true), 'xt', false)
+    assert(vim.wait(3000, function() return SOLNvimReader ~= prior_reader end, 10), 'history did not return')
+    reader = SOLNvimReader
+    assert(vim.deep_equal(reader.capture(), saved), 'search return changed the semantic position')
     local tree = reader.tree()
-    api.nvim_feedkeys(api.nvim_replace_termcodes('<Tab>', true, false, true), 'xt', false)
-    assert(tree.state().layout == 'horizontal')
+    api.nvim_feedkeys('hl', 'xt', false)
+    assert(tree.state().layout == 'vertical')
     api.nvim_feedkeys(api.nvim_replace_termcodes('<Esc>', true, false, true), 'xt', false)
     assert(vim.deep_equal(reader.capture(), saved))
     report({status = 'wide', xid = assert(vim.env.ALACRITTY_WINDOW_ID), columns = vim.o.columns})
