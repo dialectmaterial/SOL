@@ -7,6 +7,7 @@ the interface. No database, actor profile, or PDF is opened implicitly.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from hashlib import sha256
 import random
@@ -177,6 +178,8 @@ class ReaderActions:
         self._preferred_layout: tuple | None = None
         self._trail = (self._context(),)
         self._history_index = 0
+        # Inside staged(): None, or True once a move asked to be saved.
+        self._staged_checkpoint = None
 
     def _current(self):
         return None if self.session.cursor is None else self.session.current()
@@ -230,6 +233,29 @@ class ReaderActions:
         if self.workspace_reader is not None:
             self.workspace_reader.resumed_reference = state.resumed_reference
 
+    @contextmanager
+    def staged(self):
+        """Move locally now; save once, when the caller's block completes.
+
+        An interface prepares the destination's view inside the block. If that
+        or the guarded save fails, local state returns to where it was and
+        nothing is saved, so a refused move never becomes the saved position.
+        """
+        if self._staged_checkpoint is not None:
+            raise RuntimeError("reader moves cannot be staged twice")
+        before = self._capture()
+        self._staged_checkpoint = False
+        try:
+            yield
+            if self._staged_checkpoint and self.workspace_reader is not None:
+                self._staged_checkpoint = None
+                self.workspace_reader.checkpoint(self.session, self.cwd, self.previous_cwd)
+        except BaseException:
+            self._rollback(before)
+            raise
+        finally:
+            self._staged_checkpoint = None
+
     def _transition(self, operation, *, checkpoint=True, history=True, history_locations=False):
         before = self._capture()
         origin = self._context()
@@ -250,7 +276,10 @@ class ReaderActions:
             if origin.current_id != destination.current_id:
                 self._preferred_column = None
             if checkpoint and self.workspace_reader is not None:
-                self.workspace_reader.checkpoint(self.session, self.cwd, self.previous_cwd)
+                if self._staged_checkpoint is None:
+                    self.workspace_reader.checkpoint(self.session, self.cwd, self.previous_cwd)
+                else:
+                    self._staged_checkpoint = True
             if history and changed:
                 self._append_context(destination)
             elif history:
@@ -746,12 +775,14 @@ class ReaderActions:
         reference = self.check_return_reference(packet)
         return self.open(reference.requested_id)
 
-    def accept_return_position(self, packet, cursor_offset, selection=None):
+    def accept_return_position(self, packet, cursor_offset, selection=None, *, history_locations=False):
         """Accept one frontend location as a single guarded workspace visit.
 
         A backend supplies a CORE reference and semantic codepoint boundary,
         never buffer rows/bytes. Selection remains the existing transient type.
         Validation and CAS failure leave both session and saved state untouched.
+        With history_locations, a jump within the same passage is its own
+        history entry, so that going back returns to the earlier cursor.
         """
         reference = self.check_return_reference(packet)
         text = reference.record["plain_text"]
@@ -776,4 +807,4 @@ class ReaderActions:
             self._selection = selection
             return passage
 
-        return self._transition(change)
+        return self._transition(change, history_locations=history_locations)

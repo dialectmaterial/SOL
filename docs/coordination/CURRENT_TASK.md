@@ -14,7 +14,7 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ## Claude Code: Preserve reading state when navigation is refused
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `claude/navigation-failure-recovery`
 **Requested:** 18 October 2026, by the maintainer
 

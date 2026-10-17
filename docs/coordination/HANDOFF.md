@@ -71,6 +71,36 @@ Write "None." rather than deleting a heading.
 - **Error tolerance:** propose at least 98% boundary precision and recall overall, and at least 95% of both per doctrine. These are proposed descriptive pilot targets, not certified population bounds or an acceptance gate applied by the tool.
 - **Gold review:** approve the sentence-end/closing-punctuation convention, explicit exclusions and independent adjudication of doubtful marks. Any later segmentation-rule, artifact or dependency change needs its own approval and versioning; none is proposed as implemented here.
 
+## Preserve reading state when navigation is refused — 18 October 2026
+
+**Task:** [CURRENT_TASK](CURRENT_TASK.md), "Claude Code: Preserve reading state when navigation is refused" ([proposal stage 1](proposals/CODEX_READER_WORKSPACE_PLAN.md#1-fix-navigation-failure-recovery-first))
+**Branch / PR:** `claude/navigation-failure-recovery`, stacked on `claude/two-agent-board` (merge that first) · PR link in the maintainer's session
+**Last implementation commit:** `faf7292a640f2ccace52510c6d12abf8d425160f`
+
+### Changed files
+- `sol/reader/actions.py` — `ReaderActions.staged()`: moves made inside the block are saved once, when it completes; any failure (including the save's own conflict or stale-corpus refusal) restores local state, history included. `accept_return_position(..., history_locations=True)` makes a same-passage jump its own history entry.
+- `sol/terminal/neovim_reader.py` — every live route accepts the shown position, then stages the destination and prepares its view inside `staged()`; mode, focus, theme, notice and search marks are restored if that fails. The view in use changes only after success.
+- `tests/test_neovim_reader.py` — injected view failure on all seven routes (`next`, `passage_next`, `marker_open`, `search_open`, `search_next`, `history_back`, `study_open`): saved position stays the shown one, retry succeeds, history returns exactly once, reopen resumes correctly; mode/focus/theme survive a refused move; competing save and changed corpus refuse without saving.
+- `tests/test_reader_actions.py` — `staged()` saves once, refuses nesting, rolls back on failure and on a conflicting save.
+- `docs/BEING.md` (§2 "Refused moves", §7 limit), `CHANGELOG.md`.
+
+### Tests performed
+- Reproduced first: before the fix, the route test failed on all seven routes (the destination was saved although its view failed), and the mode test failed (a refused move's mode leaked into the next view).
+- `.venv/bin/python -B scripts/check_docs.py` — OK.
+- `.venv/bin/python -B -m unittest discover -s tests` — 1544 tests, OK (11 skipped).
+- Real terminal: none. No manual Alacritty/Kitty session was run; refused moves are hard to trigger by hand without fault injection.
+
+### Outstanding issues
+- Editor-side failure after Python accepted a view (Neovim crash, or a response over the channel's 16 MiB budget) still leaves the destination saved; the reader exits and resumes there. Recorded in BEING §7; fixing it needs an acknowledgement from Neovim before saving.
+- After another session's newer save, every move is refused until SOL is reopened. That is the existing compare-and-swap rule, not new, but the refusal message could say "reopen SOL".
+- The competing-save and changed-corpus tests passed before the fix as well; they lock in existing refusals on the live routes.
+- `node_open` shares the staged path but has no injected-failure case: the synthetic corpus's tree offers no second readable node.
+- The study's origin still comes from Python's last accepted cursor rather than the live paragraph (proposal stage 7); left untouched, since `sol/essence/` work is Codex's lane.
+
+### Decisions requiring approval
+- **Saving the outgoing position on a refused move.** The position the screen shows is saved even when the move to the destination is refused. Alternative: save nothing on refusal. Assumed: save it, because the editor displayed it.
+- **Same-passage jumps in history.** Opening a sentence, marker or tree node in the paragraph already shown now adds a history entry. Assumed acceptable; it only affects explicit jumps, not cursor motion.
+
 ## Codex reader and workspace proposal — 17 October 2026
 
 **Task:** maintainer's request to preserve the [complete implementation proposal](proposals/CODEX_READER_WORKSPACE_PLAN.md) for shared review; no application implementation.
