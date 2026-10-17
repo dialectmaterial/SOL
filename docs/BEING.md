@@ -37,6 +37,7 @@ The current implementation also includes literal book search, source-positioned 
 | `m1`–`m3`; `'1`–`'3`; `dm1`–`dm3` | Set, open, clear one of three paragraph markers |
 | `t` | Dynamic structure tree (Vim-style navigation) |
 | `c` | Passage source context, notes, markers |
+| `s` | Printed source of this passage (formulas), cropped from the verified PDF, in a separate image viewer |
 | `f` | Quiet focus mode; keep important warnings |
 | `T` | Cycle Terminal / Dark / Paper theme for this session |
 | `?`, `q` | Help / save position and quit |
@@ -56,6 +57,7 @@ sol --actor "Researcher" --workspace logic-study
 sol --width 64                       # Adjust prose measure
 sol --theme paper                    # Theme for this session: terminal, dark or paper
 sol --set-theme dark                 # Remember a theme in ~/.config/sol/config.json
+sol --set-source-pdf PATH            # Verify and remember the original PDF for s (first import does this)
 sol --structure --depth 2            # Printable book structure
 sol --dynamic-structure              # Standalone dynamic tree
 sol --search "ground" --within /essence --word --limit 8
@@ -127,6 +129,8 @@ Checkout-only proofs include continuous terminal and offline self-contained HTML
 This corpus includes separate `formula` records and prose passages with `contains_math: true`. Some formula transcriptions require review and may have source-image facsimiles. **Implemented:** mathematical passages remain addressable and navigable; PDF/source evidence is retained; optional Kitty source viewing exists. **Not implemented:** faithful native Neovim rendering of arbitrary 2-D mathematical notation or a verified general LaTeX conversion pipeline.
 
 **Near-term decision:** prioritize a **source-faithful formula preview**. From the current formula or mixed passage, offer a single action that displays the correct original crop/page (or a reviewed typed formula where available) and returns without losing passage and cursor position. For Alacritty, a separate local image/PDF/browser viewer is legitimate. Kitty can optionally offer enhanced panes, but formula access must not depend on Kitty. Avoid OCR hallucination: generated LaTeX is an unreviewed candidate, not authoritative source. Preserve exponent/fraction placement, printed/PDF page labels, transcription status, attribution, image provenance, and warning flags. Never replace ambiguous formula content with a guessed linear string.
+
+**Implemented (17 October):** `s` in the reader shows the printed source of the current passage. Python captures the record against the verified corpus generation and a private, fingerprint-checked PDF snapshot, then renders the record's recorded bounding box on each source page at 144 dpi with a 6-point margin; a page entry without a box is rendered whole and labelled as such. A separate image viewer shows it (`xdg-open` or `open`, or the command in `SOL_IMAGE_VIEWER`), detached from the terminal, so it works in Alacritty and does not depend on Kitty. Without a graphical display, SOL shows the file path instead of guessing a viewer. The popup names PDF and printed pages and the transcription status, and says plainly that the printed source is authoritative for records flagged `needs_visual_review` or `needs_review`; number keys show further pages. Nothing moves the cursor, clears a selection or writes to the workspace. The converter's own `assets/*.png` facsimiles are not used, because the corpus manifest does not fingerprint them. The first-run import now remembers the verified PDF; existing setups use `sol --set-source-pdf PATH`. **Not yet done:** the acceptance demonstration below on the real corpus (crop geometry has been checked against one real page only), and reviewed typed formulas, which the corpus does not yet contain.
 
 Acceptance: demonstrate one reviewed simple formula, one complex or unreviewed Newton-related formula, a mixed prose/math passage, a missing source image, a corrected formula, and a stale reference; compare actual rendering against original PDF evidence.
 

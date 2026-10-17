@@ -75,5 +75,14 @@ def prepare_first_corpus():
     if book.corpus_manifest["source"]["sha256"] != AUDITED_SOURCE_SHA256:
         raise ValueError("The existing import destination belongs to another source; it was not replaced.")
     save_corpus(destination)
-    print(f"Corpus ready: {destination}\n")
+    print(f"Corpus ready: {destination}")
+    # Source previews render from this same verified PDF; remembering it is a
+    # convenience, so a failure here never undoes the finished import.
+    from sol.terminal.source import SourceError, SourceService
+    try:
+        SourceService(book).set_pdf(source)
+        print("Source PDF remembered for printed-source previews (s in the reader).\n")
+    except SourceError as error:
+        print(f"Source previews need the PDF later: {error}\n"
+              "Use sol --set-source-pdf PATH when it is available.\n")
     return book

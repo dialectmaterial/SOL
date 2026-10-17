@@ -25,7 +25,8 @@ class FirstRunTests(unittest.TestCase):
         self.digest = hashlib.sha256(self.source.read_bytes()).hexdigest()
         self.output = self.root / "data" / "sol" / "corpora" / self.digest
         for mock in (patch.dict(os.environ, XDG_DATA_HOME=str(self.root / "data"),
-                                XDG_CONFIG_HOME=str(self.root / "config")),
+                                XDG_CONFIG_HOME=str(self.root / "config"),
+                                XDG_CACHE_HOME=str(self.root / "cache")),
                      patch("sol.corpus.convert.AUDITED_SOURCE_SHA256", self.digest),
                      patch.object(onboarding.sys, "stdin", SimpleNamespace(isatty=lambda: True)),
                      patch.object(onboarding.sys, "stdout", StringIO()),
@@ -56,8 +57,20 @@ class FirstRunTests(unittest.TestCase):
             second = onboarding.prepare_first_corpus()
         convert.assert_called_once()
         self.assertEqual(configured_corpus(), self.output)
+        # The verified PDF is remembered for source previews.
+        sources = json.loads((self.root / "config" / "sol" / "sources.json").read_text())
+        self.assertEqual(sources["sources"], {self.digest: str(self.source.resolve())})
         self.assertEqual(first.corpus_manifest["corpus_id"], second.corpus_manifest["corpus_id"])
         self.assertEqual(before, {file.name: file.read_bytes() for file in self.output.iterdir()})
+
+    def test_failure_to_remember_the_pdf_keeps_the_finished_import(self):
+        from sol.terminal.source import SourceError
+        with patch("builtins.input", return_value=str(self.source)), \
+                patch("sol.corpus.convert.convert", side_effect=self.converted_fixture), \
+                patch("sol.terminal.source.SourceService.set_pdf", side_effect=SourceError("Invented cache failure")):
+            onboarding.prepare_first_corpus()
+        self.assertEqual(configured_corpus(), self.output)
+        self.assertIn("sol --set-source-pdf PATH", onboarding.sys.stdout.getvalue())
 
     def test_unsupported_pdf_creates_no_data_or_configuration(self):
         wrong = self.root / "different.pdf"

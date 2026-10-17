@@ -44,6 +44,7 @@ divergent history or additional access, report that rather than force-pushing.
 | Semantic reading cursor, selection and history | `sol/reader/actions.py` |
 | Single fullscreen reader | `sol/terminal/neovim_reader.py`, `sol/terminal/neovim.py`, `sol/terminal/neovim.lua` |
 | Reader outline | `sol/reader/structure.py`, `sol/terminal/neovim_tree.lua` |
+| Verified source pages and formula crops | `sol/terminal/source.py` |
 | Reader theme presets (presentation only) | `sol/terminal/theme.py`; names in `sol/reader/options.py` |
 | Complete checkout installation | `scripts/install.py` |
 | Checked read-only surface projections | `sol/reader/surface.py` |

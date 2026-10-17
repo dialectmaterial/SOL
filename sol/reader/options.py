@@ -66,6 +66,8 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--info", metavar="PATH", help="show location, source range, and passage counts")
     mode.add_argument("--set-corpus", type=Path, metavar="DIRECTORY",
                       help="validate and remember the default corpus for reading from any directory")
+    mode.add_argument("--set-source-pdf", type=Path, metavar="PATH",
+                      help="verify and remember the corpus's original PDF for source previews (s in the reader)")
     mode.add_argument("--set-theme", choices=READER_THEMES, metavar="{" + ",".join(READER_THEMES) + "}",
                       help="remember the reader's theme: terminal inherits your colors; dark or paper")
     mode.add_argument("--resume", action="store_true", help="resume the named workspace's saved passage")
@@ -121,6 +123,7 @@ class ExecutionMode(str, Enum):
     INFO = "info"
     SET_CORPUS = "set_corpus"
     SET_THEME = "set_theme"
+    SET_SOURCE_PDF = "set_source_pdf"
     RESUME = "resume"
     WORKSPACE_EXPORT = "workspace_export"
     WORKSPACE_CHECK = "workspace_check"
@@ -218,6 +221,8 @@ def validate_options(args: argparse.Namespace) -> ExecutionMode:
         raise ValueError("--json is not a shell/guide mode; use sol -r --json for a random passage")
     if args.set_corpus is not None and (args.corpus is not None or args.pdf is not None):
         raise ValueError("--set-corpus cannot be combined with --corpus or --pdf")
+    if args.set_source_pdf is not None and args.pdf is not None:
+        raise ValueError("--set-source-pdf belongs to the canonical corpus; omit --pdf")
     if args.workspace is None and not mode.interactive and (args.workspace_dir is not None or args.actor is not None or args.resume
                                    or args.workspace_export or args.workspace_check or args.workspace_backup is not None
                                    or args.workspace_upgrade is not None):
@@ -231,7 +236,8 @@ def validate_options(args: argparse.Namespace) -> ExecutionMode:
             raise ValueError("workspace name must contain 1–64 letters, numbers, underscores or hyphens")
         if args.actor is not None and not args.actor.strip():
             raise ValueError("--actor requires a nonempty name")
-        if args.pdf is not None or args.set_corpus is not None or args.guide or args.structure:
+        if (args.pdf is not None or args.set_corpus is not None or args.set_source_pdf is not None
+                or args.guide or args.structure):
             raise ValueError("--workspace requires the indexed corpus and cannot accompany --pdf, --set-corpus, or an outline action")
         if args.search is not None or args.info is not None or args.cat is not None:
             raise ValueError("--workspace is available for reading, --shell, --resume, and --workspace-export")

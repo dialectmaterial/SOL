@@ -519,7 +519,7 @@ if not channel and vim.env.SOL_NVIM_REQUEST_FD and vim.env.SOL_NVIM_RESPONSE_FD 
   end))
   _G.SOLReaderChannel = channel
 end
-local show_search
+local show_search, show_source
 local function request(operation, fields, callback)
   if not channel then fail('this action needs the installed SOL reader, not a research export') end
   if channel.navigation_pending then return end
@@ -537,6 +537,7 @@ local function request(operation, fields, callback)
     local ok, error = pcall(function()
       if result.payload then reload(result.payload)
       elseif result.search then show_search(result.search)
+      elseif result.source then show_source(result.source)
       elseif result.markers then
         _G.SOLNvimReader.update_markers(result.markers)
         vim.api.nvim_echo({{'Markers updated' .. (result.markers.persistent and '' or ' for this temporary session'), 'None'}}, false, {})
@@ -573,6 +574,47 @@ show_search = function(result)
     if not number then return end
     close_popup(); request('search_open', {result = number})
   end, {buffer = panel, silent = true})
+end
+-- The printed page is the authority for formulas the typed text cannot carry.
+-- Python renders it from the verified PDF; a separate viewer shows it, so this
+-- works in any terminal and the reading position never moves.
+show_source = function(result)
+  local page = result.pages[result.shown]
+  local lines = { 'Source: ' .. result.title, '',
+    (result.cropped and 'Recorded region of PDF page ' or 'Whole PDF page ') .. page.pdf_page ..
+      ' (printed page ' .. page.printed_page .. '), ' .. result.shown .. ' of ' .. #result.pages ..
+      (result.cropped and '' or '; no region was recorded'),
+    'Transcription: ' .. result.status }
+  if result.note ~= '' then lines[#lines + 1] = result.note end
+  lines[#lines + 1] = ''
+  if result.viewer ~= vim.NIL then
+    lines[#lines + 1] = 'Opened in ' .. result.viewer .. '. Rendered from the verified source PDF.'
+  else
+    lines[#lines + 1] = 'No graphical image viewer is available. Open this file yourself,'
+    lines[#lines + 1] = 'or set SOL_IMAGE_VIEWER to a viewer command:'
+  end
+  lines[#lines + 1] = result.image
+  if #result.pages > 1 then
+    lines[#lines + 1] = ''
+    for _, row in ipairs(result.pages) do
+      lines[#lines + 1] = row.number .. '. PDF page ' .. row.pdf_page .. ', printed page ' .. row.printed_page ..
+        (row.region and '' or ' (whole page)') .. (row.number == result.shown and '  [shown]' or '')
+    end
+  end
+  lines[#lines + 1] = ''
+  lines[#lines + 1] = (#result.pages > 1 and 'A page number shows that page. ' or '') .. 'Esc returns to reading.'
+  show_lines(lines)
+  local panel = api.nvim_get_current_buf()
+  for _, row in ipairs(result.pages) do
+    if row.number <= 9 then
+      local number = row.number
+      vim.keymap.set('n', tostring(number), function() request('source_preview', {page = number}) end,
+        {buffer = panel, silent = true})
+    end
+  end
+end
+local function source()
+  request('source_preview', {page = 1})
 end
 local function search()
   -- Standard command-line input works in any Neovim-capable terminal. A cancelled
@@ -681,6 +723,7 @@ local function help()
       "Alt-Left/Right   return / forward through reading history",
       "v                characterwise selection inside one passage",
       "c                source pages, attribution and linked notes",
+      "s                show the printed source of this passage (formulas)",
       "f                toggle quiet focus mode",
       "T                cycle Terminal / Dark / Paper theme for this session",
       "q / Ctrl-q       save the semantic position and quit",
@@ -791,6 +834,7 @@ if integrated then
   vim.keymap.set('n', 'b', guarded(function() passage(-1) end), {buffer = buffer, silent = true})
   vim.keymap.set('n', 'n', guarded(function() passage(1) end), {buffer = buffer, silent = true})
   vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
+  vim.keymap.set('n', 's', guarded(source), {buffer = buffer, silent = true})
   vim.keymap.set('n', '<C-n>', guarded(function() request('search_next') end), {buffer = buffer, silent = true})
   vim.keymap.set('n', '<C-p>', guarded(function() request('search_previous') end), {buffer = buffer, silent = true})
   vim.keymap.set('n', '<M-Left>', guarded(function() request('history_back') end), {buffer = buffer, silent = true})
@@ -825,7 +869,7 @@ _G.SOLNvimReader = { records = records, buffer = buffer, window = window, positi
   restore = restore, export = export, validate_packet = validate_packet,
   byte_to_codepoint = byte_to_codepoint, codepoint_to_byte = codepoint_to_byte,
   verified_projection = verified_projection, context = context, help = help,
-  toggle_mode = toggle_mode, mode = mode, yank = yank, tree = tree, marker = marker,
+  toggle_mode = toggle_mode, mode = mode, yank = yank, tree = tree, marker = marker, source = source,
   cycle_theme = cycle_theme, theme = function() return data.theme and data.theme.active end,
   quit = function() reading_request('quit') end,
   marker_slots = function() return vim.deepcopy(data.markers) end,

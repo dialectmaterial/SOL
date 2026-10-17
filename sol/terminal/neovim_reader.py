@@ -18,6 +18,11 @@ from sol.terminal.theme import DEFAULT_THEME, THEMES
 
 
 SECTION_BUDGET = 64
+REVIEW_NOTES = {
+    "needs_visual_review": "The typed text is an unreviewed transcription and may be wrong. "
+                           "The printed source is authoritative.",
+    "needs_review": "The typed text needs review. Compare it with the printed source.",
+}
 
 
 @dataclass(frozen=True)
@@ -62,6 +67,29 @@ def reading_section(book, identifier):
     return ReadingSection(first, min(last, first + SECTION_BUDGET - 1))
 
 
+def source_preview(request, page):
+    """Render one source page of a captured record and offer it to a viewer.
+
+    The crop comes from the verified PDF snapshot, never from a corpus image
+    or a generated transcription. No reading position or workspace changes.
+    """
+    from sol.terminal.source import open_viewer, render_region
+
+    if not 1 <= page <= len(request["sources"]):
+        raise ValueError(f"this passage has {len(request['sources'])} source page(s)")
+    image, cropped = render_region(request, page - 1)
+    status = request.get("transcription_status") or ""
+    return {"title": safe_label(request["title"]), "record": request["target_id"],
+            "status": safe_label(status.replace("_", " ") or "not flagged for review"),
+            "note": REVIEW_NOTES.get(status, ""),
+            "pages": [{"number": i, "pdf_page": row["pdf_page"],
+                       "printed_page": safe_label(row.get("printed_page") or "unnumbered"),
+                       "region": "bbox" in row}
+                      for i, row in enumerate(request["sources"], 1)],
+            "shown": page, "cropped": cropped, "image": safe_label(image),
+            "viewer": open_viewer(image)}
+
+
 def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_tree=False, tree_depth=2,
                theme=DEFAULT_THEME):
     """Resume, read continuously, and accept one verified semantic position.
@@ -79,6 +107,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     else:
         actions.read((), first=True)
     transient_markers = {}
+    source_service, source_requests = None, {}
     mode = "continuous"
     focused = False
     if theme not in THEMES:
@@ -128,7 +157,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     payload, sample, extent = prepare()
 
     def handle(request):
-        nonlocal payload, sample, extent, mode, start_tree, notice, focused, theme
+        nonlocal payload, sample, extent, mode, start_tree, notice, focused, theme, source_service
         operation = request.get("op")
         fields = {"op", "packet", "mode"}
         if "focus" in request:
@@ -145,6 +174,10 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                 raise ValueError("reader markers have slots 1, 2 and 3")
         elif operation == "node_open":
             fields.add("node")
+        elif operation == "source_preview":
+            fields.add("page")
+            if type(request.get("page")) is not int:
+                raise ValueError("choose a source page by number")
         elif operation == "search":
             fields.add("query")
             if not isinstance(request.get("query"), str) or not 1 <= len(request["query"].strip()) <= 256:
@@ -167,6 +200,20 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                 {"number": i, "label": safe_label(f"{row.heading or row.node.title} | p. {row.printed_page}"),
                  "snippet": safe_label(" ".join(row.text.split())[:150])}
                 for i, row in enumerate(rows, 1)]}}
+        if operation == "source_preview":
+            # Viewing evidence keeps the cursor, selection and saved position.
+            from sol.terminal.source import SourceError, SourceService
+            target = request["packet"]["reference"]["reference"]["target_id"]
+            if source_service is None:
+                source_service = SourceService(book)
+            if target not in source_requests:
+                source_requests[target] = source_service.capture(target)
+            try:
+                return {"source": source_preview(source_requests[target], request["page"])}
+            except SourceError:
+                # A changed corpus or PDF snapshot needs a fresh capture next time.
+                source_requests.pop(target, None)
+                raise
         if operation in ("marker_set", "marker_clear"):
             slot = request["slot"]
             if workspace_reader is None:

@@ -302,6 +302,15 @@ def main(argv: list[str] | None = None) -> int:
             shell_identity(book, args)
         if args.workspace is not None:
             return run_workspace_cli(book, args, width, color)
+        if mode is ExecutionMode.SET_SOURCE_PDF:
+            from sol.terminal.source import SourceService
+            location = SourceService(book).set_pdf(args.set_source_pdf)
+            if args.json:
+                emit_json({"source_pdf": str(location)})
+            else:
+                print(display_text(f"Source PDF verified and remembered: {location}\n"
+                                   "Press s in the reader to see a passage's printed source."))
+            return 0
         if mode is ExecutionMode.REVIEW_QUEUE:
             if not book.canonical_records:
                 raise ValueError("--review-queue requires the canonical Markdown corpus, not the legacy PDF reader")

@@ -367,6 +367,81 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         after.pop("exported_at")
         self.assertEqual(after, before)
 
+    def test_source_preview_shows_evidence_without_moving_or_saving(self):
+        service = self.service()
+        self.position(service, 4)
+        before = service.store.export()
+        captured = {"version": 1, "title": "Synthetic section", "target_id": self.identifier,
+                    "transcription_status": "needs_visual_review",
+                    "sources": [{"pdf_page": 7, "printed_page": "5", "bbox": [1, 2, 3, 4]},
+                                {"pdf_page": 8, "printed_page": None}]}
+        captures, rendered = [], []
+        class Service:
+            def __init__(self, book):
+                pass
+            def capture(self, identifier):
+                captures.append(identifier)
+                return captured
+        def render(request, index):
+            rendered.append(index)
+            return f"/cache/{index}.png", "bbox" in request["sources"][index]
+        def native(payload, _, on_request):
+            # A selection may stay active: viewing evidence is not navigation.
+            packet = self.packet(3, 14)
+            first = on_request({"op": "source_preview", "page": 1, "packet": packet, "mode": "continuous"})["source"]
+            self.assertEqual((first["shown"], first["cropped"], first["image"], first["viewer"]),
+                             (1, True, "/cache/0.png", "invented-viewer"))
+            self.assertEqual(first["status"], "needs visual review")
+            self.assertIn("printed source is authoritative", first["note"])
+            self.assertEqual([row["printed_page"] for row in first["pages"]], ["5", "unnumbered"])
+            second = on_request({"op": "source_preview", "page": 2, "packet": packet, "mode": "continuous"})["source"]
+            self.assertFalse(second["cropped"])
+            for bad in (0, 3, True, "1"):
+                with self.subTest(page=bad), self.assertRaises(ValueError):
+                    on_request({"op": "source_preview", "page": bad, "packet": packet, "mode": "continuous"})
+            return 0, None
+        with patch("sol.terminal.source.SourceService", Service), \
+                patch("sol.terminal.source.render_region", side_effect=render), \
+                patch("sol.terminal.source.open_viewer", return_value="invented-viewer"), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+        self.assertEqual(rendered, [0, 1])
+        # One verified capture per passage; page changes and refusals reuse it.
+        self.assertEqual(captures, [self.identifier])
+        after = service.store.export()
+        before.pop("exported_at")
+        after.pop("exported_at")
+        self.assertEqual(after, before)
+
+    def test_stale_source_capture_is_replaced_on_the_next_request(self):
+        from sol.terminal.source import SourceError
+        captures = []
+        class Service:
+            def __init__(self, book):
+                pass
+            def capture(self, identifier):
+                captures.append(identifier)
+                return {"title": "Synthetic", "target_id": identifier, "sources": [{"pdf_page": 1}]}
+        outcomes = [SourceError("Verified PDF snapshot changed"), ("/cache/0.png", False)]
+        def render(request, index):
+            outcome = outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+        def native(payload, _, on_request):
+            packet = self.reply(payload)["packet"]
+            request = {"op": "source_preview", "page": 1, "packet": packet, "mode": "continuous"}
+            with self.assertRaisesRegex(ValueError, "snapshot changed"):
+                on_request(dict(request))
+            self.assertEqual(on_request(dict(request))["source"]["image"], "/cache/0.png")
+            return 0, None
+        with patch("sol.terminal.source.SourceService", Service), \
+                patch("sol.terminal.source.render_region", side_effect=render), \
+                patch("sol.terminal.source.open_viewer", return_value=None), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(), 0)
+        self.assertEqual(len(captures), 2)
+
     def test_tree_selection_resolves_display_path_to_existing_source_identity(self):
         self.extend(3)
         def native(payload, _, on_request):

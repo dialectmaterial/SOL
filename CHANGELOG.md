@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Printed-source preview — 17 October 2026
+
+Press `s` in the reader to see the printed source of the current passage: the
+record's recorded region, cropped from the verified PDF snapshot, opens in a
+separate image viewer (`SOL_IMAGE_VIEWER` overrides the desktop default), so
+formulas whose typed transcription is unreviewed can be read as printed in any
+terminal. The popup shows pages and transcription status; the reading position,
+selection and workspace are untouched. The first-run import remembers the PDF;
+existing setups use `sol --set-source-pdf PATH`.
+
 ### Reader themes — 17 October 2026
 
 The reader has three presentation presets: **Terminal** (inherits the host's

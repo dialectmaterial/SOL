@@ -538,6 +538,43 @@ end
 ''', theme="paper")
         self.assertEqual(report["order"], ["terminal", "dark", "paper"])
 
+    def test_source_preview_popup_requests_pages_and_returns_to_the_same_position(self):
+        report = self.run_lua(r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local resting = reader.capture('n', nil, reader.source_point(data.records[1].id, 7))
+  reader.restore(resting)
+  vim.api.nvim_feedkeys('s', 'xt', false)
+  assert(#sent == 1 and sent[1].op == 'source_preview' and sent[1].page == 1)
+  local pages = {{number = 1, pdf_page = 7, printed_page = '5', region = true},
+                 {number = 2, pdf_page = 8, printed_page = 'unnumbered', region = false}}
+  local function reply(message, fields)
+    _G.SOLReaderChannel.pending[message.id]({source = vim.tbl_extend('force', {title = 'Synthetic section',
+      record = data.records[1].id, status = 'needs visual review', pages = pages,
+      note = 'The printed source is authoritative.'}, fields)})
+    return vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  end
+  report.opened = reply(sent[1], {shown = 1, cropped = true, image = '/cache/0.png', viewer = 'xdg-open'})
+  vim.api.nvim_feedkeys('2', 'xt', false)
+  assert(#sent == 2 and sent[2].page == 2)
+  report.fallback = reply(sent[2], {shown = 2, cropped = false, image = '/cache/1.png', viewer = vim.NIL})
+  vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  assert(vim.api.nvim_get_current_win() == reader.window)
+  assert(vim.deep_equal(SOLNvimReader.capture(), resting), 'source preview moved the reading position')
+''', integrated=True)
+        opened, fallback = "\n".join(report["opened"]), "\n".join(report["fallback"])
+        self.assertIn("Recorded region of PDF page 7 (printed page 5), 1 of 2", opened)
+        self.assertIn("Transcription: needs visual review", opened)
+        self.assertIn("The printed source is authoritative.", opened)
+        self.assertIn("Opened in xdg-open", opened)
+        self.assertIn("2. PDF page 8, printed page unnumbered (whole page)", opened)
+        self.assertIn("Whole PDF page 8 (printed page unnumbered), 2 of 2; no region was recorded", fallback)
+        self.assertIn("No graphical image viewer", fallback)
+        self.assertIn("/cache/1.png", fallback)
+
     def test_theme_survives_mode_reload_and_invalid_presets_are_refused(self):
         report = self.run_lua(r'''
   reader.cycle_theme()

@@ -16,7 +16,7 @@ from unittest.mock import patch
 import zlib
 
 from sol.corpus.contract import load_snapshot, render_record
-from sol.terminal.source import SourceError, SourceService, render_page
+from sol.terminal.source import SourceError, SourceService, open_viewer, render_page, render_region
 
 
 ROOT = "aaaaaaaa-0000-4000-8000-000000000001"
@@ -297,6 +297,54 @@ class SourceViewerTests(unittest.TestCase):
         self.assertGreater(width, 200)
         self.assertGreater(height, 240)
         self.assertEqual(render_page(request, 1, cache_dir=self.cache), result)
+
+    def test_region_crops_recorded_box_and_falls_back_to_the_whole_page(self):
+        request = self.service.capture(PASSAGE)
+        self.rendered = []
+        with patch("sol.terminal.source.shutil.which", return_value="/invented/pdftoppm"), \
+                patch("sol.terminal.source.subprocess.run", side_effect=self.renderer):
+            crop, cropped = render_region(request, 0, cache_dir=self.cache)
+            page, whole = render_region(request, 1, cache_dir=self.cache)
+            full = render_page(request, 0, cache_dir=self.cache)
+            self.assertEqual(page, render_page(request, 1, cache_dir=self.cache))
+        self.assertTrue(cropped)
+        self.assertFalse(whole)
+        # 144 dpi doubles PDF points; a 6-point margin surrounds the 120-point box.
+        arguments = self.rendered[0]
+        self.assertEqual(arguments[arguments.index("-r") + 1], "144")
+        self.assertEqual(arguments[arguments.index("-x"):arguments.index("-x") + 8],
+                         ["-x", "28", "-y", "28", "-W", "264", "-H", "264"])
+        self.assertNotIn("-x", self.rendered[1])
+        self.assertEqual(self.rendered[1][self.rendered[1].index("-r") + 1], "120")
+        self.assertNotEqual(crop, full)
+
+    @unittest.skipUnless(shutil.which("pdftoppm"), "Poppler not installed")
+    def test_poppler_crops_the_recorded_region(self):
+        request = self.service.capture(PASSAGE)
+        crop, cropped = render_region(request, 0, cache_dir=self.cache)
+        self.assertTrue(cropped)
+        self.assertEqual(struct.unpack(">II", crop.read_bytes()[16:24]), (264, 264))
+        self.assertEqual(render_region(request, 0, cache_dir=self.cache), (crop, True))
+
+    def test_viewer_is_detached_and_configurable(self):
+        with patch.dict(os.environ, {"SOL_IMAGE_VIEWER": "invented-viewer --fit"}), \
+                patch("sol.terminal.source.shutil.which", return_value="/bin/invented-viewer"), \
+                patch("sol.terminal.source.subprocess.Popen") as popen:
+            self.assertEqual(open_viewer(Path("/cache/crop.png")), "invented-viewer")
+        self.assertEqual(popen.call_args.args[0], ["/bin/invented-viewer", "--fit", "/cache/crop.png"])
+        options = popen.call_args.kwargs
+        self.assertTrue(options["start_new_session"])
+        self.assertTrue(all(options[name] is subprocess.DEVNULL for name in ("stdin", "stdout", "stderr")))
+
+    def test_viewer_is_not_guessed_without_a_display_or_program(self):
+        with patch("sol.terminal.source.sys.platform", "linux"), \
+                patch("sol.terminal.source.subprocess.Popen") as popen:
+            # setUp cleared DISPLAY and WAYLAND_DISPLAY: no text-mode fallback.
+            self.assertIsNone(open_viewer(Path("/cache/crop.png")))
+            with patch.dict(os.environ, {"DISPLAY": ":0"}), \
+                    patch("sol.terminal.source.shutil.which", return_value=None):
+                self.assertIsNone(open_viewer(Path("/cache/crop.png")))
+        popen.assert_not_called()
 
 
 if __name__ == "__main__":

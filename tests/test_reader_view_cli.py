@@ -46,6 +46,31 @@ class ReaderViewCLITests(unittest.TestCase):
             self.assertEqual(args.reader, selected)
             self.assertEqual(args.none, temporary)
 
+    def test_set_source_pdf_verifies_through_the_source_service(self):
+        with patch("sol.terminal.source.SourceService.set_pdf", return_value=Path("/invented/book.pdf")) as remember:
+            status, output, error = self.call(["--set-source-pdf", "~/book.pdf"])
+            self.assertEqual((status, error), (0, ""))
+            self.assertIn("Source PDF verified and remembered: /invented/book.pdf", output)
+            status, output, _ = self.call(["--set-source-pdf", "~/book.pdf", "--json"])
+            self.assertEqual(json.loads(output), {"source_pdf": "/invented/book.pdf"})
+        self.assertEqual(remember.call_args.args, (Path("~/book.pdf"),))
+        for arguments in (["--set-source-pdf", "a.pdf", "--pdf", "b.pdf"],
+                          ["--set-source-pdf", "a.pdf", "--workspace", "study"]):
+            with self.subTest(arguments=arguments):
+                status, _, error = self.call(arguments)
+                self.assertNotEqual(status, 0)
+        with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
+            build_parser().parse_args(["--set-source-pdf", "a.pdf", "--set-theme", "dark"])
+
+    def test_wrong_source_pdf_is_refused_and_not_remembered(self):
+        wrong = self.root / "other.pdf"
+        wrong.write_bytes(b"%PDF-1.4 a different book")
+        with patch.dict(os.environ, {"XDG_CACHE_HOME": str(self.root / "cache")}):
+            status, _, error = self.call(["--set-source-pdf", str(wrong)])
+        self.assertEqual(status, 2)
+        self.assertIn("fingerprint mismatch", error)
+        self.assertFalse((self.root / "config" / "sol" / "sources.json").exists())
+
     def test_unsupported_prototype_options_are_refused_before_loading_or_onboarding(self):
         for arguments in (["--reader", "--shell"], ["--reader", "-r"], ["--reader", "--search", "ground"],
                           ["--reader", "--json"], ["--reader", "--plain"], ["--reader", "--pdf", "absent.pdf"],

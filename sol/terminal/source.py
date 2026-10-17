@@ -10,12 +10,15 @@ from contextlib import contextmanager
 from copy import deepcopy
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import struct
 import subprocess
+import sys
 import tempfile
 import zlib
 
@@ -29,6 +32,9 @@ class SourceError(ValueError):
 
 _SHA = re.compile(r"[0-9a-f]{64}")
 _SETTINGS = {"format": "png", "dpi": 120, "full_page": True}
+# Formulas need more resolution than a page overview; the margin keeps
+# accents, primes and fraction bars that sit on the box edge.
+_CROP = {"format": "png", "dpi": 144, "padding": 6}
 
 
 def _json(value):
@@ -240,7 +246,8 @@ class SourceService:
         for candidate in candidates:
             if candidate.is_file():
                 return candidate.resolve()
-        raise SourceError("Source PDF not found. Supply --source-pdf PATH or remember it with source set-pdf PATH.")
+        raise SourceError("Source PDF not found. Remember it once with sol --set-source-pdf PATH "
+                          "(in the shell: source set-pdf PATH).")
 
     def _snapshot_pdf(self, path):
         digest = self._source()["sha256"]
@@ -336,6 +343,17 @@ def _request_current(request):
         raise SourceError(f"Cannot validate source-view request: {error}; reopen SOL and capture again") from error
 
 
+def _crop_arguments(settings):
+    if "region" not in settings:
+        return []
+    scale, pad = settings["dpi"] / 72, settings["padding"]
+    x0, y0, x1, y1 = settings["region"]
+    left, top = max(0, math.floor((x0 - pad) * scale)), max(0, math.floor((y0 - pad) * scale))
+    width = math.ceil((x1 + pad) * scale) - left
+    height = math.ceil((y1 + pad) * scale) - top
+    return ["-x", str(left), "-y", str(top), "-W", str(width), "-H", str(height)]
+
+
 def _png_digest(path):
     data = path.read_bytes()
     if not data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -368,6 +386,25 @@ def _png_digest(path):
 
 def render_page(request, page_index, cache_dir=None):
     """Render one exact source-list entry; PNG cache never determines provenance."""
+    return _render(request, page_index, cache_dir, _SETTINGS)
+
+
+def render_region(request, page_index, cache_dir=None):
+    """Render the record's recorded rectangle on one source page, or the page.
+
+    Boxes are PDF points from the top-left corner, as the converter records
+    them. A page entry without a box falls back to the whole page; the second
+    value says which was rendered so callers never present a page as a crop.
+    """
+    if type(page_index) is not int or not 0 <= page_index < len(request["sources"]):
+        raise SourceError("Choose a source page index within this record's captured page list")
+    box = request["sources"][page_index].get("bbox")
+    if box is None:
+        return _render(request, page_index, cache_dir, _SETTINGS), False
+    return _render(request, page_index, cache_dir, {**_CROP, "region": list(box)}), True
+
+
+def _render(request, page_index, cache_dir, settings):
     snapshot = _request_current(request)
     if type(page_index) is not int or not 0 <= page_index < len(request["sources"]):
         raise SourceError("Choose a source page index within this record's captured page list")
@@ -385,7 +422,7 @@ def render_page(request, page_index, cache_dir=None):
         version = subprocess.run([program, "-v"], capture_output=True, check=True, timeout=10)
         renderer = (version.stdout + version.stderr).decode("utf-8", errors="replace").strip()
         expected = {"version": 1, "source_sha256": digest, "pdf_page": page,
-                    "renderer": renderer, "settings": _SETTINGS}
+                    "renderer": renderer, "settings": settings}
         key = _digest(expected)
         target = directory / (key + ".png")
         metadata = directory / (key + ".json")
@@ -403,8 +440,8 @@ def render_page(request, page_index, cache_dir=None):
             stable_pdf, prefix = temporary / "source.pdf", temporary / "page"
             _verified_copy(pdf, stable_pdf, digest)
             result = subprocess.run([program, "-f", str(page), "-l", str(page),
-                                     "-singlefile", "-png", "-r", str(_SETTINGS["dpi"]),
-                                     str(stable_pdf), str(prefix)],
+                                     "-singlefile", "-png", "-r", str(settings["dpi"]),
+                                     *_crop_arguments(settings), str(stable_pdf), str(prefix)],
                                     capture_output=True, timeout=60)
             if result.returncode:
                 detail = result.stderr.decode("utf-8", errors="replace").strip()[-1000:]
@@ -420,3 +457,32 @@ def render_page(request, page_index, cache_dir=None):
         raise SourceError(f"Source-page renderer timed out for physical PDF page {page}") from error
     except (OSError, subprocess.CalledProcessError) as error:
         raise SourceError(f"Cannot render physical PDF page {page}: {error}") from error
+
+
+def open_viewer(path):
+    """Hand one rendered PNG to a separate image viewer and return its name.
+
+    The reader keeps the terminal: the viewer inherits no standard streams and
+    runs in its own session. SOL_IMAGE_VIEWER names another command, to which
+    the image path is appended. Without a graphical display, xdg-open may pick
+    a text-mode browser that would draw over Neovim, so None is returned and
+    the caller shows the file path instead.
+    """
+    configured = os.environ.get("SOL_IMAGE_VIEWER", "").strip()
+    if configured:
+        command = shlex.split(configured)
+    elif sys.platform == "darwin":
+        command = ["open"]
+    elif os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
+        command = ["xdg-open"]
+    else:
+        return None
+    program = shutil.which(command[0])
+    if not program:
+        return None
+    try:
+        subprocess.Popen([program, *command[1:], str(path)], stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    except OSError as error:
+        raise SourceError(f"Cannot start image viewer {command[0]}: {error}") from error
+    return Path(command[0]).name
