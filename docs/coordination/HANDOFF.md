@@ -32,6 +32,38 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Codex reader and workspace proposal — 17 October 2026
+
+**Task:** maintainer's request to preserve the [complete implementation proposal](proposals/CODEX_READER_WORKSPACE_PLAN.md) for shared review; no application implementation.
+
+**Branch / PR:** `codex/reader-workspace-proposal` · not opened at this report's first commit: branch publication and PR creation follow the final checks; the review link will be recorded after creation.
+
+**Last implementation commit:** `26840f58d3a344a013bd0b09f053b253190bc098` (proposal document only; this report is committed afterward).
+
+### Changed files
+
+- `docs/coordination/proposals/CODEX_READER_WORKSPACE_PLAN.md` — preserves all seven original stages, technical choices, dependencies, acceptance gates, outstanding decisions and a proposed first task; reconciles the already shipped sentence study and reader round trip.
+- `docs/coordination/HANDOFF.md` — this entry makes the proposal discoverable from the shared coordination workflow. Earlier reports are retained unchanged.
+
+### Tests performed
+
+- `scripts/check_docs.py` — OK: four authorities, local links/anchors and lossless legacy inventory; external URLs were not network-checked.
+- `python -B -m unittest discover -s tests` — 1,538 tests run; OK (11 skipped). Commands used the live checkout's existing virtual environment from the isolated proposal worktree, with temporary XDG config/data/cache/state and Neovim log locations.
+- Synthetic probes on baseline `dfe075a` reproduced navigation saving a destination before failed view preparation, dismissed search marks returning after a mode switch, missing reader note-staleness metadata, and the sentence study using Python's earlier passage instead of the live native-cursor paragraph as its origin. No fixes or regression-test files were added.
+- No manual Alacritty/Kitty session, sustained reading trial or independent proofreading of private mathematical transcriptions was performed.
+
+### Outstanding issues
+
+- This is a proposal for review, not approval or implementation of its stages. `CURRENT_TASK.md` and agent-role instructions remain unchanged; the maintainer chooses the next task and implementer.
+- The plan now treats the sentence method (`d43e09b`) and in-process reader round trip (`04dcebc`) as implemented foundations needing validation, rather than proposed new features.
+- Claude's coordination introduction was merged in PR #1 while the repository was being inspected. Its subsequent policy clarification `59602dd` was still separate at this proposal's base; this branch neither copies nor overwrites it.
+- The original live worktree, untracked `AGENTS.md`, synced sources, canonical corpus, workspaces and four authorities were untouched. Only the two documentation files above are intended changes.
+
+### Decisions requiring approval
+
+- Review the proposal and select one bounded task before any stage is implemented. Stage 1, navigation failure recovery, is recommended first.
+- The proposal's decision table preserves the unresolved issues: Codex's standing role/task assignment, note retraction and durable drafts/spans, segmentation validation and scope, pending mathematical review, general investigation transport and comparison endpoint binding. No new public contract, schema, dependency or authority decision is approved by this PR.
+
 ## Coordination workflow between Claude Code and ChatGPT — 17 October 2026
 
 **Task:** [CURRENT_TASK](CURRENT_TASK.md), "Coordination workflow between Claude Code and ChatGPT"
