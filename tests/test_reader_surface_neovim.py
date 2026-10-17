@@ -666,6 +666,29 @@ end
         self.assertEqual(sorted(report["marks"]), expected)
         self.assertTrue(report["refused"])
 
+    def test_search_marks_highlight_matches_until_escape(self):
+        report = self.run_lua(r'''
+  local payload = vim.deepcopy(data)
+  payload.search_marks = {id = data.records[1].id, spans = {{0, 3}}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(payload)
+  reader = SOLNvimReader
+  local function count()
+    local found = 0
+    for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(reader.buffer, -1, 0, -1, {details = true})) do
+      if mark[4].hl_group == 'Search' then found = found + 1 end
+    end
+    return found
+  end
+  report.before = count()
+  vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  report.after = count()
+  local broken = vim.deepcopy(data)
+  broken.search_marks = {id = data.records[1].id, spans = {{2, 1}}}
+  report.refused = not pcall(loadfile(os.getenv('SOL_NVIM_ADAPTER')), broken)
+''', integrated=True)
+        self.assertEqual((report["before"], report["after"]), (1, 0))
+        self.assertTrue(report["refused"])
+
     def test_theme_survives_mode_reload_and_invalid_presets_are_refused(self):
         report = self.run_lua(r'''
   reader.cycle_theme()

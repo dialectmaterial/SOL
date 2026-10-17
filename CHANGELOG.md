@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Search matches marked in the passage — 17 October 2026
+
+Opening a search result, or moving with Ctrl-N/Ctrl-P, marks every verified
+match of the query in that passage with the theme's search colour; Esc hides
+the marks. This restores what the earlier prompt_toolkit reader did. The
+ranges come from the existing source-exact search projection, so a match that
+cannot be mapped is reported, never guessed.
+
 ### Footnotes in the reader — 17 October 2026
 
 `c` now shows each footnote's text, numbered as in the book. Before, it showed

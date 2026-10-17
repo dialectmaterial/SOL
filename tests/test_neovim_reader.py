@@ -529,7 +529,12 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             self.assertEqual(len(result["search"]["rows"]), 1)
             shown = on_request({"op": "search_open", "result": 1, "packet": packet, "mode": "paragraph"})["payload"]
             self.assertEqual(shown["records"][0]["id"], self.book.passages[2].identifier)
+            marks = shown["search_marks"]
+            self.assertEqual(marks["id"], self.book.passages[2].identifier)
+            text = shown["records"][0]["plain_text"]
+            self.assertEqual([text[start:end].lower() for start, end in marks["spans"]], ["paragraph 2"])
             returned = on_request({"op": "history_back", "packet": shown["restore"], "mode": "paragraph"})["payload"]
+            self.assertIsNone(returned["search_marks"])
             self.assertEqual(returned["restore"]["cursor_offset"], packet["cursor_offset"])
             self.assertEqual(returned["restore"]["selection"], packet["selection"])
             return 0, {"action": "quit", "packet": returned["restore"]}

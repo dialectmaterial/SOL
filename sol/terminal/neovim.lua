@@ -441,6 +441,27 @@ for _, record in ipairs(records) do
     end
   end
 end
+-- After a search jump, the opened passage's verified matches are marked;
+-- Esc hides them. Marks are display only, like the search itself.
+local search_namespace = api.nvim_create_namespace("sol-search-marks")
+if data.search_marks ~= nil and data.search_marks ~= vim.NIL then
+  local marks = data.search_marks
+  if type(marks) ~= "table" or type(marks.id) ~= "string" or type(marks.spans) ~= "table" then
+    fail("invalid search marks")
+  end
+  local record = by_id[marks.id]
+  for _, span in ipairs(marks.spans) do
+    if not record or type(span) ~= "table" or not integer(span[1]) or not integer(span[2])
+      or span[1] < 0 or span[1] >= span[2] or span[2] > record._length then fail("invalid search mark") end
+  end
+  if record and positions[record.id] then
+    for _, span in ipairs(marks.spans) do
+      local first, last = source_point(record.id, span[1]), source_point(record.id, span[2])
+      api.nvim_buf_set_extmark(buffer, search_namespace, first.row - 1, first.byte,
+        { end_row = last.row - 1, end_col = last.byte, hl_group = "Search", priority = 150 })
+    end
+  end
+end
 -- Footnote callouts are hidden from the source text; each is shown where
 -- the canonical Markdown places it, as inline display text only.
 local superscript = { ["0"] = "⁰", ["1"] = "¹", ["2"] = "²", ["3"] = "³", ["4"] = "⁴",
@@ -853,6 +874,7 @@ local function help()
       "t                book outline: h/l branches, Enter read, Esc return",
       "/                literal search across the whole book",
       "Ctrl-P / Ctrl-N  previous / next search-result passage",
+      "Esc              hide the search-match marks",
       "Alt-Left/Right   return / forward through reading history",
       "v                characterwise selection inside one passage",
       "c                source pages, attribution and linked notes",
@@ -968,6 +990,8 @@ if integrated then
   vim.keymap.set('n', 'b', guarded(function() passage(-1) end), {buffer = buffer, silent = true})
   vim.keymap.set('n', 'n', guarded(function() passage(1) end), {buffer = buffer, silent = true})
   vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
+  vim.keymap.set('n', '<Esc>', function() api.nvim_buf_clear_namespace(buffer, search_namespace, 0, -1) end,
+    {buffer = buffer, silent = true})
   vim.keymap.set('n', 's', guarded(source), {buffer = buffer, silent = true})
   vim.keymap.set({'n', 'x'}, 'a', guarded(note), {buffer = buffer, silent = true})
   vim.keymap.set('n', '<C-n>', guarded(function() request('search_next') end), {buffer = buffer, silent = true})

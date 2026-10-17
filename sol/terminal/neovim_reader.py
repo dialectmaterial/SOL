@@ -110,6 +110,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     executable = neovim.validate_environment(width)
     actions = ReaderActions(book, workspace_reader)
     notice = ""
+    # Match spans for the passage a search action just opened; other actions clear them.
+    search_marks = None
     if workspace_reader is not None and workspace_reader.store.get_state() is not None:
         _, notice = actions.restore()
     else:
@@ -176,7 +178,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             structure["root"] = "/"
         payload.update(integrated=True, navigation=navigation, notice=notice or "", mode=mode, focus=focused,
                        markers=markers(), structure=structure, tree_only=start_tree,
-                       personal=personal_notes(sample))
+                       personal=personal_notes(sample), search_marks=search_marks)
         neovim._safe_metadata({"notice": payload["notice"], "markers": payload["markers"], "structure": structure,
                                "theme": payload["theme"], "personal": payload["personal"]})
         return payload, sample, extent
@@ -251,7 +253,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
               "marker_clear": marker_panel, "note_add": note_panel}
 
     def handle(request):
-        nonlocal payload, sample, extent, mode, start_tree, notice, focused, theme
+        nonlocal payload, sample, extent, mode, start_tree, notice, focused, theme, search_marks
         operation = request.get("op")
         fields = {"op", "packet", "mode"}
         if "focus" in request:
@@ -320,9 +322,12 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         if operation not in ("search_open", "search_next", "search_previous", "history_back", "history_forward"):
             actions.accept_return_position(request["packet"]["reference"], request["packet"]["cursor_offset"])
             actions.accept_return_position(reference, offset)
-        mode, start_tree, notice = request["mode"], False, ""
+        mode, start_tree, notice, search_marks = request["mode"], False, "", None
         if operation in ("search_open", "search_next", "search_previous"):
-            notice = actions.search_highlights().reason or ""
+            projection = actions.search_highlights()
+            notice = projection.reason or ""
+            search_marks = {"id": actions.snapshot().current.identifier,
+                            "spans": [[start, end] for start, end in projection.spans]}
         focused = request.get("focus", focused)
         theme = request.get("theme", theme)
         payload, sample, extent = prepare()
