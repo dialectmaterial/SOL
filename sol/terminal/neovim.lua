@@ -565,7 +565,7 @@ if not channel and vim.env.SOL_NVIM_REQUEST_FD and vim.env.SOL_NVIM_RESPONSE_FD 
   end))
   _G.SOLReaderChannel = channel
 end
-local show_search, show_source
+local show_search, show_source, show_study
 local function request(operation, fields, callback)
   if not channel then fail('this action needs the installed SOL reader, not a research export') end
   if channel.navigation_pending then return end
@@ -584,6 +584,7 @@ local function request(operation, fields, callback)
       if result.payload then reload(result.payload)
       elseif result.search then show_search(result.search)
       elseif result.source then show_source(result.source)
+      elseif result.study then show_study(result.study)
       elseif result.personal then _G.SOLNvimReader.update_personal(result.personal)
       elseif result.markers then
         _G.SOLNvimReader.update_markers(result.markers)
@@ -621,6 +622,55 @@ show_search = function(result)
     if not number then return end
     close_popup(); request('search_open', {result = number})
   end, {buffer = panel, silent = true})
+end
+-- ESSENCE measured the loaded section; Enter reads a sentence where it stands,
+-- and Alt-Left returns to where the study was started.
+show_study = function(result)
+  local summary = result.summary
+  local lines = { 'Sentence lengths in this section (English translation)', '' }
+  if summary.sentences == 0 then
+    lines[#lines + 1] = 'No eligible sentences here.'
+  else
+    lines[#lines + 1] = summary.sentences .. ' sentences in ' .. result.passages .. ' passages; mean '
+      .. string.format('%.1f', summary.mean) .. ', median ' .. summary.median .. ', longest ' .. summary.max .. ' words.'
+    local peak = 1
+    for _, bin in ipairs(result.histogram) do peak = math.max(peak, bin.sentences) end
+    for _, bin in ipairs(result.histogram) do
+      local span = bin.to ~= vim.NIL and (bin.from .. '–' .. bin.to) or (bin.from .. '+')
+      lines[#lines + 1] = string.format('%8s %5d  ', span, bin.sentences) .. string.rep('█', math.floor(20 * bin.sentences / peak + 0.5))
+    end
+    local means = {}
+    for _, name in ipairs({ 'first', 'middle', 'last', 'only' }) do
+      local value = result.positions[name]
+      if value ~= vim.NIL then means[#means + 1] = name .. ' ' .. string.format('%.1f', value) end
+    end
+    lines[#lines + 1] = 'Mean by place in paragraph: ' .. table.concat(means, ', ')
+  end
+  if result.excluded_review > 0 then
+    lines[#lines + 1] = result.excluded_review .. ' passage(s) awaiting source review were left out.'
+  end
+  lines[#lines + 1] = result.saved ~= vim.NIL and ('Saved: ' .. result.saved) or 'Not saved: temporary session.'
+  lines[#lines + 1] = ''
+  local rows = {}
+  if #result.rows > 0 then lines[#lines + 1] = 'Longest sentences:' end
+  local first_row
+  for _, item in ipairs(result.rows) do
+    lines[#lines + 1] = item.number .. '. ' .. item.tokens .. ' words | ' .. item.label
+    rows[#lines] = item.number
+    first_row = first_row or #lines
+    lines[#lines + 1] = '   ' .. item.snippet
+    rows[#lines] = item.number
+  end
+  lines[#lines + 1] = ''
+  lines[#lines + 1] = 'Enter reads that sentence; Alt-Left then returns here. Esc closes.'
+  show_lines(lines)
+  local panel = api.nvim_get_current_buf()
+  if first_row then api.nvim_win_set_cursor(popup, { first_row, 0 }) end
+  vim.keymap.set('n', '<CR>', function()
+    local number = rows[api.nvim_win_get_cursor(popup)[1]]
+    if not number then return end
+    close_popup(); request('study_open', { row = number })
+  end, { buffer = panel, silent = true })
 end
 -- The printed page is the authority for formulas the typed text cannot carry.
 -- Python renders it from the verified PDF; a separate viewer shows it, so this
@@ -875,6 +925,7 @@ local function help()
       "/                literal search across the whole book",
       "Ctrl-P / Ctrl-N  previous / next search-result passage",
       "Esc              hide the search-match marks",
+      "S                sentence lengths in this section (ESSENCE study)",
       "Alt-Left/Right   return / forward through reading history",
       "v                characterwise selection inside one passage",
       "c                source pages, attribution and linked notes",
@@ -990,6 +1041,7 @@ if integrated then
   vim.keymap.set('n', 'b', guarded(function() passage(-1) end), {buffer = buffer, silent = true})
   vim.keymap.set('n', 'n', guarded(function() passage(1) end), {buffer = buffer, silent = true})
   vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
+  vim.keymap.set('n', 'S', guarded(function() request('sentence_study') end), {buffer = buffer, silent = true})
   vim.keymap.set('n', '<Esc>', function() api.nvim_buf_clear_namespace(buffer, search_namespace, 0, -1) end,
     {buffer = buffer, silent = true})
   vim.keymap.set('n', 's', guarded(source), {buffer = buffer, silent = true})

@@ -352,3 +352,25 @@ def decode_sentence_result(data):
 def encode_sentence_result(result):
     """Inert ASCII JSON; no book text is stored, only IDs, offsets and digests."""
     return json.dumps(_validate(result), ensure_ascii=True, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
+def save_sentence_result(result, directory=None):
+    """Publish a new owner-only artifact under SOL's data directory; never overwrite."""
+    import datetime
+    import os
+    from pathlib import Path
+
+    if directory is None:
+        configured = os.environ.get("XDG_DATA_HOME")
+        base = Path(configured).expanduser() if configured else Path.home() / ".local" / "share"
+        if not base.is_absolute():
+            raise SentenceStudyError("XDG_DATA_HOME must be an absolute directory", code="invalid_location")
+        directory = base / "sol" / "studies"
+    directory = Path(directory)
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    path = directory / f"sentences-{stamp}.sol-analysis.json"
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    with os.fdopen(descriptor, "w", encoding="ascii") as stream:
+        stream.write(encode_sentence_result(result) + "\n")
+    return path

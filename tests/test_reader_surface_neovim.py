@@ -666,6 +666,31 @@ end
         self.assertEqual(sorted(report["marks"]), expected)
         self.assertTrue(report["refused"])
 
+    def test_sentence_study_panel_lists_rows_and_enter_opens_one(self):
+        report = self.run_lua(r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  vim.api.nvim_feedkeys('S', 'xt', false)
+  report.request = sent[1].op
+  _G.SOLReaderChannel.pending[sent[1].id]({study = {saved = '/invented/sentences.sol-analysis.json',
+    summary = {sentences = 3, tokens = 30, mean = 10.0, median = 9, p10 = 5, p90 = 16, max = 16},
+    histogram = {{from = 1, to = 10, sentences = 2}, {from = 101, to = vim.NIL, sentences = 1}},
+    positions = {first = 9.0, middle = vim.NIL, last = 16.0, only = vim.NIL}, passages = 2, excluded_review = 1,
+    rows = {{number = 1, tokens = 16, label = 'Invented | p. 7', snippet = 'A long invented sentence.'}}}})
+  report.lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  vim.api.nvim_feedkeys(vim.keycode('<CR>'), 'xt', false)
+  report.opened = {sent[2].op, sent[2].row}
+''', integrated=True)
+        self.assertEqual(report["request"], "sentence_study")
+        text = "\n".join(report["lines"])
+        self.assertIn("3 sentences in 2 passages; mean 10.0, median 9, longest 16 words.", text)
+        self.assertIn("Mean by place in paragraph: first 9.0, last 16.0", text)
+        self.assertIn("1 passage(s) awaiting source review were left out.", text)
+        self.assertIn("1. 16 words | Invented | p. 7", text)
+        self.assertEqual(report["opened"], ["study_open", 1])
+
     def test_search_marks_highlight_matches_until_escape(self):
         report = self.run_lua(r'''
   local payload = vim.deepcopy(data)

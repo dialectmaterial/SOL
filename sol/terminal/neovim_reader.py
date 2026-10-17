@@ -117,6 +117,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     else:
         actions.read((), first=True)
     transient_markers = {}
+    # The latest sentence study shown in this session, for opening its rows.
+    study = None
     source_service, source_requests = None, {}
     mode = "continuous"
     focused = False
@@ -196,12 +198,35 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                    "search needs 1–256 characters"),
         "search_open": ("result", lambda result: type(result) is int and 1 <= result <= len(actions.results),
                         "choose a displayed search result"),
+        "study_open": ("row", lambda row: study is not None and type(row) is int and 1 <= row <= len(study["longest"]),
+                       "choose a displayed sentence"),
         "note_add": ("body", lambda body: isinstance(body, str) and 1 <= len(body.strip()) and len(body) <= NOTE_LIMIT,
                      f"a note needs 1–{NOTE_LIMIT} characters"),
     }
     extra_fields["marker_clear"] = extra_fields["marker_open"] = extra_fields["marker_set"]
     navigation_actions = {"next", "previous", "passage_next", "passage_previous", "node_open", "marker_open",
-                          "search_open", "search_next", "search_previous", "history_back", "history_forward"}
+                          "search_open", "search_next", "search_previous", "history_back", "history_forward",
+                          "study_open"}
+
+    def study_panel(request, identifier):
+        # ESSENCE measures the loaded section; BEING only shows the result and
+        # keeps the origin. Nothing here moves the cursor or writes the workspace.
+        nonlocal study
+        from sol.essence.sentences import analyze_sentences, save_sentence_result
+        scope = {"kind": "passages", "ids": [passage.identifier for passage in sample.passages]}
+        study = analyze_sentences(book.corpus_snapshot, scope=scope, origin=actions.capture_active_reference())
+        saved = None if workspace_reader is None else str(save_sentence_result(study))
+        summary, rows = study["summary"], []
+        for number, index in enumerate(study["longest"], 1):
+            passage_index, start, end, tokens = study["sentences"][index]
+            passage = book.find_passage(study["passages"][passage_index]["id"])
+            rows.append({"number": number, "tokens": tokens,
+                         "label": safe_label(f"{passage.heading or passage.node.title} | p. {passage.printed_page}"),
+                         "snippet": safe_label(" ".join(passage.text[start:end].split())[:150])})
+        excluded = study["exclusions"]["by_reason"]["review"]
+        return {"study": {"saved": saved, "summary": summary, "rows": rows, "histogram": study["histogram"],
+                          "positions": {name: values["mean"] for name, values in study["by_position"].items()},
+                          "passages": len(study["passages"]), "excluded_review": excluded}}
 
     def search_panel(request, identifier):
         # Searching does not move the cursor, save a visit or erase a selection.
@@ -250,7 +275,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         return {"personal": personal_notes(sample)}
 
     panels = {"search": search_panel, "source_preview": source_panel, "marker_set": marker_panel,
-              "marker_clear": marker_panel, "note_add": note_panel}
+              "marker_clear": marker_panel, "note_add": note_panel, "sentence_study": study_panel}
 
     def handle(request):
         nonlocal payload, sample, extent, mode, start_tree, notice, focused, theme, search_marks
@@ -301,6 +326,9 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             if not 0 <= at < len(book.passages):
                 raise ValueError("no adjacent paragraph")
             target, offset = book.passages[at].identifier, 0
+        elif operation == "study_open":
+            passage_index, offset = study["sentences"][study["longest"][request["row"] - 1]][:2]
+            target = study["passages"][passage_index]["id"]
         elif operation in ("search_open", "search_next", "search_previous", "history_back", "history_forward"):
             # First retain the actual outgoing semantic location, not Python's
             # last loaded cursor or Neovim's disposable buffer jumplist.

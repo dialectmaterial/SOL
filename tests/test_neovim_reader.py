@@ -2,6 +2,8 @@
 from copy import deepcopy
 from dataclasses import replace
 import json
+import os
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 from uuid import UUID
@@ -539,6 +541,40 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             self.assertEqual(returned["restore"]["selection"], packet["selection"])
             return 0, {"action": "quit", "packet": returned["restore"]}
         with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+
+    def test_sentence_study_opens_its_longest_sentence_and_returns_to_the_origin(self):
+        self.extend(3)
+        records = self.rows()
+        text = ("Short one. This second sentence is clearly the longest one in the whole invented section, "
+                "because it keeps going well past every other sentence here.")
+        records[-1].update(markdown=text, plain_text=text)
+        self.write_records(records)
+        service = self.service()
+        self.position(service, 4)
+        data_home = self.root / "data"
+        def native(payload, _, on_request):
+            origin = payload["restore"]
+            study = on_request({"op": "sentence_study", "packet": origin, "mode": "continuous"})["study"]
+            self.assertEqual(study["rows"][0]["tokens"], 23)
+            self.assertTrue(study["rows"][0]["snippet"].startswith("This second sentence"))
+            saved = Path(study["saved"])
+            self.assertEqual(saved.parent, data_home / "sol" / "studies")
+            self.assertEqual(saved.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(json.loads(saved.read_text())["origin"]["reference"]["target_id"],
+                             origin["reference"]["reference"]["target_id"])
+            opened = on_request({"op": "study_open", "row": 1, "packet": origin, "mode": "continuous"})["payload"]
+            self.assertEqual(opened["restore"]["reference"]["reference"]["target_id"], records[-1]["id"])
+            self.assertEqual(opened["restore"]["cursor_offset"], text.index("This"))
+            back = on_request({"op": "history_back", "packet": opened["restore"], "mode": "continuous"})["payload"]
+            self.assertEqual(back["restore"]["reference"]["reference"]["target_id"],
+                             origin["reference"]["reference"]["target_id"])
+            self.assertEqual(back["restore"]["cursor_offset"], origin["cursor_offset"])
+            with self.assertRaisesRegex(ValueError, "choose a displayed sentence"):
+                on_request({"op": "study_open", "row": 99, "packet": back["restore"], "mode": "continuous"})
+            return 0, {"action": "quit", "packet": back["restore"]}
+        with patch.dict(os.environ, XDG_DATA_HOME=str(data_home)), \
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 0)
 
