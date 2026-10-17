@@ -12,72 +12,77 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: Preserve reading state when navigation is refused
+## Claude Code: Keep dismissed marks dismissed and study the live paragraph
 
-**Status:** In review
-**Branch:** `claude/navigation-failure-recovery`
+**Status:** Ready
+**Branch:** `claude/transient-reader-state`
 **Requested:** 18 October 2026, by the maintainer
 
 ### Goal
 
-An unsuccessful destination preparation or guarded save leaves a coherent
-current screen, saved reading position and return history.
+What the reader dismisses stays dismissed until a deliberate new result, and
+selections copy exact source text in every layout. `S` measures from the
+paragraph the cursor is actually in.
 
 ### Scope
 
-[Proposal stage 1](proposals/CODEX_READER_WORKSPACE_PLAN.md#1-fix-navigation-failure-recovery-first):
-`sol/terminal/neovim_reader.py`, `sol/reader/actions.py` where the action
-boundary needs support, their tests, and the BEING/CHANGELOG updates describing
-verified outcomes. Include `study_open` among the navigation routes. Authority:
-BEING §§2–3, 8; CORE §§5–7.
+[Proposal stage 2](proposals/CODEX_READER_WORKSPACE_PLAN.md#2-stabilize-transient-reader-state)
+and the live-origin defect of [stage 7](proposals/CODEX_READER_WORKSPACE_PLAN.md#7-build-the-first-terminal-independent-essence-round-trip):
+`sol/terminal/neovim.lua`, `sol/terminal/neovim.py`, `sol/terminal/neovim_reader.py`,
+`sol/reader/` where needed, their tests, BEING and CHANGELOG. Authority: BEING
+§§2, 4, 8; CORE §5.
 
 ### Constraints
 
-Canonical text, source offsets, UUIDs, CORE/reference v1, workspace schemas,
-actor/revision guards, 64-record loading and the single Neovim frontend stay
-unchanged. No force-saving, automatic reconversion or rollback of another
-session's work. Do not touch `sol/essence/` (Codex's task).
+Dismissal state stays transient (no workspace fields); canonical strings,
+offsets and the sentence-study artifact format are unchanged. Running `S` saves
+no visit. Do not touch `sol/essence/` (Codex's task).
 
 ### Acceptance
 
-Reproduce the injected next-payload failure before fixing it; then cover
-preparation failure, stale generation, competing workspace save, successful
-retry, history return and reopen. Focused tests and the normal checks pass. The
-handoff states which real-terminal checks ran and which remain outstanding.
+Esc, then `p`, `f`, a resize or `T` cannot bring dismissed marks back; opening a
+new search result shows them again. Forward and reverse selection and `y` return
+exact source slices around footnote callouts, multibyte and combining
+characters and wrapped emphasis, in both reading modes and after reopening at
+another width. After moving natively to another paragraph, `S` names that
+paragraph as its origin, and Alt-Left from a result returns there. Focused tests
+and the normal checks pass; the handoff says which terminal checks ran.
 
-## Codex: Measure sentence-segmentation error
+## Codex: Make sentence marking practical by hand
 
-**Status:** In review
-**Branch:** `codex/sentence-segmentation-check`
+**Status:** Ready
+**Branch:** `codex/segmentation-marking-form`
 **Requested:** 18 October 2026, by the maintainer
 
 ### Goal
 
-Know how often `punctuation-rules-v1` splits sentences wrongly, before anyone
-decides whether to change the method or adopt an external segmenter.
+The maintainer can mark a segmentation sample in an ordinary text editor by
+pressing Enter after each sentence, instead of editing JSON, and turn the result
+back into a review file that `sol analyze segmentation-check` scores.
 
 ### Scope
 
-[Proposal stage 7](proposals/CODEX_READER_WORKSPACE_PLAN.md#7-build-the-first-terminal-independent-essence-round-trip),
-validation only, within `sol/essence/`, `tests/` and ESSENCE/CHANGELOG: a way to
-compare the segmenter's boundaries with a hand-marked sample and report misses
-and false splits; synthetic test fixtures covering known hard cases, including
-the sentence inside a parenthesis opened mid-sentence; and a procedure for the
-maintainer to mark a real sample privately. Authority: ESSENCE §§3–5, 8.
+`sol/essence/` (`segmentation_check.py`, `cli.py`), its tests, ESSENCE and
+CHANGELOG: an export of an unmarked sample to a plain-text marking form (one
+block per passage, clearly separated, its text unsplit, a place to write an
+exclusion reason) and an import that fills `gold_sentences` or
+`exclude_reason`. Authority: ESSENCE §§3–5, 8.
 
 ### Constraints
 
-Do not change `punctuation-rules-v1`'s output, its artifacts or the protocol; a
-method change is a decision for approval. No new dependency. Real-book samples
-and their markings stay outside Git. Do not touch `sol/terminal/` or
-`sol/reader/` (Claude Code's task).
+Blind: the form never shows the segmenter's boundaries. The import refuses any
+change other than added line breaks (and exclusion lines), names the passage and
+place of a mismatch, and writes a new owner-only file outside Git without
+overwriting. Sample size, seed and targets stay the maintainer's decision.
+`punctuation-rules-v1`, its artifacts, the protocol and dependencies are
+unchanged. Do not touch `sol/terminal/` or `sol/reader/` (Claude Code's task).
 
 ### Acceptance
 
-The comparison is tested on synthetic fixtures; the known misses are recorded
-as expected failures, not fixed silently. The documentation check and the full
-suite pass. The handoff proposes a sample size and an error tolerance for the
-maintainer to approve.
+Synthetic round trips (export, add line breaks, import, check) give the expected
+scores; edited words, a dropped passage, a changed sample or an existing output
+file are refused. The documentation check and the full suite pass. ESSENCE
+describes the procedure in a few steps a non-programmer can follow.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
