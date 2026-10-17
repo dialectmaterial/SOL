@@ -36,7 +36,7 @@ Write "None." rather than deleting a heading.
 
 **Task:** [Codex: Measure sentence-segmentation error](https://github.com/dialectmaterial/SOL/blob/b07fdffacaf9ac812d947b351bb7a309d6e4b966/docs/coordination/CURRENT_TASK.md#codex-measure-sentence-segmentation-error).
 
-**Branch / PR:** `codex/sentence-segmentation-check`; [open the review PR](https://github.com/dialectmaterial/SOL/pull/new/codex/sentence-segmentation-check) after branch publication.
+**Branch / PR:** `codex/sentence-segmentation-check` is pushed; [open the review PR](https://github.com/dialectmaterial/SOL/pull/new/codex/sentence-segmentation-check). PR creation through the GitHub integration returned HTTP 403, `Resource not accessible by integration`; `gh` is not installed. Task status is `In review`.
 
 **Last implementation commit:** `ce0135ef69ead149013bbb4d730d6b502e216a6a` (code and documentation complete; this report is committed last).
 
@@ -45,7 +45,7 @@ Write "None." rather than deleting a heading.
 - `sol/essence/segmentation_check.py` — blind, reproducible equal-per-doctrine samples; complete source-bound marks or explicit exclusions; exact internal-boundary scores, error offsets and per-doctrine summaries. Samples are owner-only, non-overwriting and outside Git.
 - `sol/essence/cli.py` — `sol analyze segmentation-sample` and `segmentation-check`; no change to existing sentence-study commands or formats.
 - `tests/test_segmentation_check.py` — invented gold examples, malformed/stale input and privacy checks; four known rule limitations are expected failures rather than silent method fixes.
-- `docs/ESSENCE.md`, `CHANGELOG.md` — private human-marking procedure, metric definitions, known limits and proposed pilot criteria. This handoff is the only other intended documentation change until the shared task board is available on main.
+- `docs/ESSENCE.md`, `CHANGELOG.md` — private human-marking procedure, metric definitions, known limits and proposed pilot criteria. `docs/coordination/CURRENT_TASK.md` changes only Codex's status to `In review`; earlier handoff reports are preserved.
 
 ### Tests performed
 
@@ -58,8 +58,12 @@ Write "None." rather than deleting a heading.
 ### Outstanding issues
 
 - The unchanged rules retain misses inside mid-sentence parentheses, suppression after abbreviations that really end sentences, lower-case sentence starts, and false splits at physical line breaks. Their frequency in the book remains unmeasured.
-- The assigned two-agent board is still only on `origin/claude/two-agent-board` at this report's preparation. The maintainer was asked to merge it before finalization; its Codex status cannot be changed on main without copying or replacing the unmerged board. The implementation is ready for review; the board status update remains pending that merge.
-- The unpublished task branch was checked/rebased against current `origin/main` (`3ef6528`) before this report. Earlier handoff entries remain intact. No `sol/terminal/`, `sol/reader/`, `punctuation-rules-v1` code, protocol, schema or dependency changes are included. Private source/corpus/workspaces and untracked `AGENTS.md` are excluded.
+- The task branch was checked/rebased against `origin/main` (`3ef6528`) before initial publication. Main then advanced to `1f9660c` (the two-agent board); that update was merged into this already-pushed branch rather than rewriting published commits. Its Codex task is now `In review`, and Claude's slot and report changes are preserved. No `sol/terminal/`, `sol/reader/`, `punctuation-rules-v1` code, protocol, schema or dependency changes are included. Private source/corpus/workspaces and untracked `AGENTS.md` are excluded.
+- PR creation remains a maintainer step because of the integration's permission limit; no account permissions were changed. Use the link above, or run from an authenticated GitHub CLI installation:
+
+  ```sh
+  gh pr create --repo dialectmaterial/SOL --base main --head codex/sentence-segmentation-check --title "Measure sentence segmentation against private human annotations" --body "Validation-only tooling, tests and proposed private pilot; see docs/coordination/HANDOFF.md#sentence-segmentation-error-measurement--18-october-2026. Frozen punctuation-rules-v1 and existing artifacts/protocol/dependencies are unchanged."
+  ```
 
 ### Decisions requiring approval
 
