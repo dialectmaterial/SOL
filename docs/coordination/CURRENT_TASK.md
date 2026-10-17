@@ -12,81 +12,78 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: Keep dismissed marks dismissed and study the live paragraph
+## Claude Code: Edit and review personal notes in the reader
 
-**Status:** In review
-**Branch:** `claude/transient-reader-state`
+**Status:** Ready
+**Branch:** `claude/reader-note-editing`
 **Requested:** 18 October 2026, by the maintainer
 
 ### Goal
 
-What the reader dismisses stays dismissed until a deliberate new result, and
-selections copy exact source text in every layout. `S` measures from the
-paragraph the cursor is actually in.
+From `c`, the reader picks one of their notes on the passage, edits it in the
+same editor as `a`, and sees its earlier versions, without the compatibility
+shell.
 
 ### Scope
 
-[Proposal stage 2](proposals/CODEX_READER_WORKSPACE_PLAN.md#2-stabilize-transient-reader-state)
-and the live-origin defect of [stage 7](proposals/CODEX_READER_WORKSPACE_PLAN.md#7-build-the-first-terminal-independent-essence-round-trip):
-`sol/terminal/neovim.lua`, `sol/terminal/neovim.py`, `sol/terminal/neovim_reader.py`,
-`sol/reader/` where needed, their tests, BEING and CHANGELOG. Authority: BEING
-§§2, 4, 8; CORE §5.
+[Proposal stage 3](proposals/CODEX_READER_WORKSPACE_PLAN.md#3-complete-the-personal-note-workflow-inside-the-reader):
+`sol/terminal/neovim.lua`, `sol/terminal/neovim_reader.py`, `sol/terminal/neovim.py`
+where needed, their tests, BEING and CHANGELOG, using the existing
+`WorkspaceReader.prepare_annotation_edit` / `save_annotation_edit` and
+`list_annotation_history`. Authority: BEING §§3, 7–8; CORE §7.
 
 ### Constraints
 
-Dismissal state stays transient (no workspace fields); canonical strings,
-offsets and the sentence-study artifact format are unchanged. Running `S` saves
-no visit. Do not touch `sol/essence/` (Codex's task).
+`a` still adds a note; edits keep the note's ID, target and original source
+digest. Only the original author may edit; a competing revision or changed
+source is refused; a save that changes nothing adds no revision. Deleting,
+hiding or retracting notes is a reserved decision and out of scope. No
+workspace schema change. Temporary sessions refuse durable notes. Do not touch
+`sol/essence/` or Codex's measurement files.
 
 ### Acceptance
 
-Esc, then `p`, `f`, a resize or `T` cannot bring dismissed marks back; opening a
-new search result shows them again. Forward and reverse selection and `y` return
-exact source slices around footnote callouts, multibyte and combining
-characters and wrapped emphasis, in both reading modes and after reopening at
-another width. After moving natively to another paragraph, `S` names that
-paragraph as its origin, and Alt-Left from a result returns there. Focused tests
-and the normal checks pass; the handoff says which terminal checks ran.
+Edit, history and refusals are covered by controller and headless Neovim
+tests: another actor, a competing revision, a changed source, a no-op save and
+a failed save that keeps the draft. Each note in `c` shows its author, revision
+and whether its passage changed since it was written. The handoff lists the
+key bindings chosen, as defaults the maintainer may overrule.
 
-## Codex: Make sentence marking practical by hand
+## Codex: Measure reader speed before optimising
 
-**Status:** In review
-**Branch:** `codex/marking-form-trailing-space`
+**Status:** Ready
+**Branch:** `codex/reader-timings`
 **Requested:** 18 October 2026, by the maintainer
 
 ### Goal
 
-The maintainer can mark a segmentation sample in an ordinary text editor by
-pressing Enter after each sentence, instead of editing JSON, and turn the result
-back into a review file that `sol analyze segmentation-check` scores.
-Follow-up requested after PR #8: tolerate an editor trimming the `EXCLUDE:` line
-and source whitespace immediately before added sentence breaks or passage ends;
-an every-line-`rstrip()` round trip must preserve marks and source identity.
+Know how long the reader's main operations take, so that any later
+optimisation is chosen from evidence ([CONTRIBUTING, scope of the cleanup](../../CONTRIBUTING.md#scope-of-the-cleanup);
+[proposal cleanup](proposals/CODEX_READER_WORKSPACE_PLAN.md#cleanup-alongside-the-stages)).
 
 ### Scope
 
-`sol/essence/` (`segmentation_check.py`, `cli.py`), its tests, ESSENCE and
-CHANGELOG: an export of an unmarked sample to a plain-text marking form (one
-block per passage, clearly separated, its text unsplit, a place to write an
-exclusion reason) and an import that fills `gold_sentences` or
-`exclude_reason`. Authority: ESSENCE §§3–5, 8.
+A measurement script under `scripts/` (or `experiments/`) and its tests:
+corpus load and verification, building a view (`build_payload`) for an
+ordinary and a footnote-heavy section, a section transition through the
+controller, search, and `S` on a section. It reports medians and spread over
+repeated runs, on a synthetic corpus by default and on a corpus given
+explicitly by path. Results from the real book stay out of Git; the handoff
+may quote the numbers.
 
 ### Constraints
 
-Blind: the form never shows the segmenter's boundaries. The import refuses any
-change other than added line breaks, whitespace trimmed at those breaks or
-passage ends, and exclusion lines; it names the passage and
-place of a mismatch, and writes a new owner-only file outside Git without
-overwriting. Sample size, seed and targets stay the maintainer's decision.
-`punctuation-rules-v1`, its artifacts, the protocol and dependencies are
-unchanged. Do not touch `sol/terminal/` or `sol/reader/` (Claude Code's task).
+Read and call the reader code; do not change `sol/terminal/`, `sol/reader/`,
+`sol/core/` or `sol/workspace/` (Claude Code's lane and shared contracts). No
+new dependency; use `time.perf_counter`. No personal workspace is opened;
+temporary ones only.
 
 ### Acceptance
 
-Synthetic round trips (export, add line breaks, import, check) give the expected
-scores; edited words, a dropped passage, a changed sample or an existing output
-file are refused. The documentation check and the full suite pass. ESSENCE
-describes the procedure in a few steps a non-programmer can follow.
+The script runs in the normal suite on the synthetic corpus within a few
+seconds, with a test that it reports every operation. The handoff quotes
+real-book timings on this machine and names the slowest operation, without
+proposing a cache as decided.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
