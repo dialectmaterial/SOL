@@ -151,6 +151,16 @@ class SegmentationSampleTests(CorpusFixture, unittest.TestCase):
             self.assertNotIn("transcription_status", row)
         self.assertEqual(self.files(), before)
 
+    def test_sampling_reports_an_unexpected_doctrine_path_clearly(self):
+        study = analyze_sentences(self.snapshot)
+        for path in ("/OTHER/invented.txt", "/", "BEING/invented.txt", "", None):
+            with self.subTest(path=path):
+                unexpected = deepcopy(study)
+                unexpected["passages"][0]["reader_path"] = path
+                with patch("sol.essence.segmentation_check.analyze_sentences", return_value=unexpected):
+                    with self.assertRaisesRegex(ValueError, "/BEING, /ESSENCE or /CONCEPT"):
+                        prepare_sample(self.snapshot, per_doctrine=1, seed=7)
+
     def test_metrics_account_for_misses_false_splits_and_doctrines(self):
         result = compare_sample(self.snapshot, self.marked())
         counts = result["summary"]

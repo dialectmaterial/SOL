@@ -41,7 +41,12 @@ def _population(snapshot):
     for row in study["passages"]:
         record = records[row["id"]]
         if record["plain_text"].strip():
-            doctrine = row["reader_path"].split("/")[1].upper()
+            path = row.get("reader_path")
+            parts = path.split("/") if isinstance(path, str) else []
+            doctrine = parts[1].upper() if len(parts) > 1 and not parts[0] else None
+            if doctrine not in groups:
+                raise ValueError("sentence-segmentation sampling requires reader_path under "
+                                 "/BEING, /ESSENCE or /CONCEPT")
             groups[doctrine].append(record)
     return study, groups
 

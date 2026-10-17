@@ -12,6 +12,7 @@ exclusions, and are written owner-only outside Git without overwriting files.
 Synthetic expected-failure cases record known rule limitations. The segmenter,
 sentence-study artifacts, CORE protocol and dependencies are unchanged; a human
 real-book error estimate and approval of sample size/quality targets remain open.
+An unexpected doctrine path in a sampled study is refused with a clear error.
 
 ### A refused move no longer loses your place — 18 October 2026
 
