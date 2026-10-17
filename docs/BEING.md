@@ -1,6 +1,6 @@
 # SOL BEING — Reading, Presentation, and Scholarly Workspace
 
-**Status:** current implementation + explicitly marked decisions; 17 October 2026.  
+**Status:** current implementation + explicitly marked decisions; 18 October 2026.  
 **Repository baseline:** `main` at `1d200e4fcbff1ca69f48b5dc96c55765f215f303`.  
 **Companions:** [Architecture](ARCHITECTURE.md) · [CORE](CORE.md) · [ESSENCE](ESSENCE.md).
 
@@ -51,6 +51,8 @@ The current implementation also includes literal book search, source-positioned 
 **Adoption clarification:** use `j/k` for wrapped rows. Up/Down retain native Neovim buffer-line motion; they are not currently mapped to the same visual-row actions. The single vertical outline has no shipped horizontal-layout switch. No control behavior was changed by the documentation migration.
 
 **Draft lifetime:** unsaved note drafts are process-local recovery state. Closing the note editor (including `:q!`) or a failed save keeps the draft available under `a` during that SOL session; quitting/restarting SOL does not durably save an unpublished draft. Save through `Ctrl-S` or `:w` before leaving SOL. Clipboard, viewer and Ctrl-S behavior still need the manual terminal checks described below.
+
+**Refused moves (18 October):** every move in the reader (sections, `b/n` across sections, tree, markers, search results, history, study sentences) first accepts the position the screen shows, then prepares the destination's view, and saves the destination only once that view is ready. If preparation, a changed corpus or another session's newer save refuses the move, the screen, the saved position and the history stay where they were; the same key can be tried again. Another session's save is never overwritten: until SOL is reopened, moves keep being refused. A study sentence in the current paragraph is its own history entry, so Alt-Left returns to the earlier cursor. Tested with injected failures on every route; not yet exercised by hand in a terminal.
 
 ### Basic operations
 
@@ -161,6 +163,7 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 - Notes cannot yet anchor to a selected span; that needs a new workspace schema version.
 - Comparison presentation is not yet a mature integrated side-by-side desk; authoring/version-binding details matter.
 - The current Kitty exchange is host-bound; the terminal-independent research workflow remains proposed.
+- A view that Neovim fails to display after Python accepted it (a crash, or a response over the 16 MiB channel budget) leaves the destination saved; the reader then exits, and reopening resumes there.
 - Human reading acceptance is **not** established by headless tests, mock terminal checks, or a 24-passage HTML rendering benchmark.
 
 ## 8. Acceptance checklist for agents

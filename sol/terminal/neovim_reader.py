@@ -330,35 +330,45 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             passage_index, offset = study["sentences"][study["longest"][request["row"] - 1]][:2]
             target = study["passages"][passage_index]["id"]
         elif operation in ("search_open", "search_next", "search_previous", "history_back", "history_forward"):
-            # First retain the actual outgoing semantic location, not Python's
-            # last loaded cursor or Neovim's disposable buffer jumplist.
-            actions.accept_return_position(request["packet"]["reference"], request["packet"]["cursor_offset"], selected)
-            if operation == "search_open":
-                actions.open_result(request["result"])
-            elif operation.startswith("search_"):
-                actions.search_next(reverse=operation == "search_previous")
-            else:
-                getattr(actions, operation)()
-            target, offset = actions.current_reference_id(), actions.cursor_offset
+            target = None
         else:
             if not payload["navigation"][operation]:
                 raise ValueError("no adjacent reading section")
             passage = book.passages[extent.last + 1 if operation == "next" else extent.first - 1]
             target, offset = passage.identifier, 0 if operation == "next" else len(passage.text)
-        from sol.core.protocol import capture_reference
-        reference = capture_reference(book.corpus_snapshot, target)
-        if operation not in ("search_open", "search_next", "search_previous", "history_back", "history_forward"):
-            actions.accept_return_position(request["packet"]["reference"], request["packet"]["cursor_offset"])
-            actions.accept_return_position(reference, offset)
-        mode, start_tree, notice, search_marks = request["mode"], False, "", None
-        if operation in ("search_open", "search_next", "search_previous"):
-            projection = actions.search_highlights()
-            notice = projection.reason or ""
-            search_marks = {"id": actions.snapshot().current.identifier,
-                            "spans": [[start, end] for start, end in projection.spans]}
-        focused = request.get("focus", focused)
-        theme = request.get("theme", theme)
-        payload, sample, extent = prepare()
+        if target is not None:
+            from sol.core.protocol import capture_reference
+            reference = capture_reference(book.corpus_snapshot, target)
+        # Retain the actual outgoing semantic location first, not Python's last
+        # loaded cursor or Neovim's disposable buffer jumplist. The editor shows
+        # it, so it may be saved even if the move below is refused.
+        actions.accept_return_position(request["packet"]["reference"], request["packet"]["cursor_offset"], selected)
+        shown = mode, start_tree, notice, search_marks, focused, theme
+        try:
+            # The destination is saved only once its view is ready; a failure
+            # leaves the shown view, the saved position and history as they were.
+            with actions.staged():
+                if operation == "search_open":
+                    actions.open_result(request["result"])
+                elif operation.startswith("search_"):
+                    actions.search_next(reverse=operation == "search_previous")
+                elif operation.startswith("history_"):
+                    getattr(actions, operation)()
+                else:
+                    actions.accept_return_position(reference, offset, history_locations=True)
+                mode, start_tree, notice, search_marks = request["mode"], False, "", None
+                if operation in ("search_open", "search_next", "search_previous"):
+                    projection = actions.search_highlights()
+                    notice = projection.reason or ""
+                    search_marks = {"id": actions.snapshot().current.identifier,
+                                    "spans": [[start, end] for start, end in projection.spans]}
+                focused = request.get("focus", focused)
+                theme = request.get("theme", theme)
+                prepared = prepare()
+        except BaseException:
+            mode, start_tree, notice, search_marks, focused, theme = shown
+            raise
+        payload, sample, extent = prepared
         return {"payload": payload}
 
     while True:
