@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Sentence-segmentation validation — 18 October 2026
+
+`sol analyze segmentation-sample` prepares a reproducible blind private form
+for marking sentences, and `sol analyze segmentation-check` reports exact
+boundary misses, false splits, precision/recall and per-doctrine counts.
+Samples retain source/generation bindings, require complete marks or explicit
+exclusions, and are written owner-only outside Git without overwriting files.
+Synthetic expected-failure cases record known rule limitations. The segmenter,
+sentence-study artifacts, CORE protocol and dependencies are unchanged; a human
+real-book error estimate and approval of sample size/quality targets remain open.
+
 ### First inquiry from the reader: sentence lengths — 17 October 2026
 
 `S` in the reader measures the sentences of the loaded section through a new
