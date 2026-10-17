@@ -47,7 +47,7 @@ handoff states which real-terminal checks ran and which remain outstanding.
 
 ## Codex: Measure sentence-segmentation error
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/sentence-segmentation-check`
 **Requested:** 18 October 2026, by the maintainer
 

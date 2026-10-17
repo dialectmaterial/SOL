@@ -105,6 +105,99 @@ A sentence-length comparison can be deterministic, cheap, and independently vali
 
 **Implemented (17 October): the sentence-length half.** `sol.essence.sentences` selects eligible Hegel main text exactly as the term study does (pending-review records are excluded and counted), masks converter facsimile labels, and segments with declared rules (`punctuation-rules-v1`): a sentence ends at `.`, `!`, `?` or an ellipsis (with closing quotes/brackets) followed by whitespace and a capital, digit, opening quote/bracket or dash; never inside a bracket opened within the sentence (citations such as *(Princ. Math. Phil. Natu. Lib. II, …)*), after a listed abbreviation (single letters only in lower case, so a logical term like *S-U-P.* still ends a sentence) or within a chain of initials; a newline always ends one. Length is counted in the term study's word tokens. The artifact (`sol.sentence-study` v1) stores record IDs, digests, codepoint offsets and token counts — **no book text** — plus the distribution, percentiles, means by place in the paragraph (first/middle/last/only) and the longest sentences; `check` recomputes it exactly against the current generation. Rules were tuned on the local corpus: of 9,127 sentences (median 31 words), the three longest (150, 148, 146 words) were read and are genuine Hegel sentences, a random sample of boundaries was correct, and the 40 held-back periods followed by capitals were almost all citation abbreviations; one known miss is a full sentence inside a parenthesis opened mid-sentence. **Not yet done:** a formal hand-checked sample with a reported error rate, part-of-speech/dependency statistics, and sentence-level scopes smaller than a loaded section from the reader. POS tagging and parsing will be probabilistic/error-prone, so present them as **model annotations**, not source facts. The linguistic conclusions describe the chosen translator's text; contrast with Hegel's German only if a distinct German source is actually available and audited in a future research cycle.
 
+#### Measuring segmentation error against private marks
+
+**Implemented (18 October): validation tools, with the method unchanged.**
+`sol analyze segmentation-sample` prepares a blind local annotation form;
+`sol analyze segmentation-check` compares completed marks with the existing
+`punctuation-rules-v1`. These are review commands, not a replacement segmenter
+or a change to `sol.sentence-study` v1 or CORE. No dependency was added.
+**No real-book error rate has been established:** human marking is still required.
+
+The sample uses complete, eligible nonempty passages from each doctrine, with
+the existing sentence study's attribution/type/review filters. A declared seed
+and SHA-256 ranking of `seed:UUID` select equal counts per doctrine; records
+are then presented in canonical order. The form retains source text, IDs,
+digests, pages, generation and method, but reveals no predicted boundaries or
+counts. This balanced passage sample is a descriptive pilot, not a book-wide
+weighted error estimate. It measures `segment` boundaries in exact canonical
+`plain_text`, not the accuracy of token counts or subsequent facsimile masking.
+
+The maintainer can perform a private review as follows, after approving a size:
+
+```sh
+# Choose an existing private directory outside Git and outside the corpus.
+sol analyze segmentation-sample --corpus /absolute/path/to/local-corpus \
+  --per-doctrine 30 --seed 20261018 --output /absolute/private/path/review.json
+# Mark the JSON locally before inspecting predictions.
+sol analyze segmentation-check /absolute/private/path/review.json \
+  --corpus /absolute/path/to/local-corpus
+sol analyze segmentation-check /absolute/private/path/review.json \
+  --corpus /absolute/path/to/local-corpus --json > /absolute/private/path/report.json
+```
+
+The example's size and seed are explicit, not approved defaults. Preparation
+creates an owner-only file, refuses existing targets/symlinks and refuses Git
+checkouts. Raw samples, marked forms and reports must stay private and outside
+Git. Keep the source corpus unchanged while marking; comparison refuses a
+different source generation, method, selection, order, digest or source text.
+
+Set the form's `reviewer` to a declared label. For every passage, replace
+`gold_sentences: null` with a JSON array of its sentences, copied exactly from
+`text` in order. Split at actual sentence boundaries, not merely a newline,
+semicolon or abbreviation; include sentence-final punctuation and closing
+quotes/brackets. Preserve spaces and Unicode inside sentences. Inter-sentence
+whitespace remains in the source but can be omitted between array entries.
+Do not correct spelling or normalization in the form. For example, this is
+synthetic material, not book content:
+
+```json
+{
+  "text": "A first invented statement. A second one follows.",
+  "gold_sentences": ["A first invented statement.", "A second one follows."],
+  "exclude_reason": null,
+  "comment": ""
+}
+```
+
+If a passage cannot be adjudicated, retain `gold_sentences: null` and give a
+nonempty `exclude_reason`; use `comment` for other observations. Unmarked rows
+and reviews with no scored passages are refused. Explicit exclusions are
+reported, not hidden. Mark a random pilot before inspecting the predicted
+splits, and have a second reader independently check doubtful cases. A reviewer
+label and completed form are declarations, not proof of human review.
+
+Scoring compares exact **internal sentence-end codepoint offsets**. The final
+passage end is obligatory and excluded. A false split is a predicted boundary
+absent from the marks; a miss is a marked boundary absent from the prediction.
+A shifted boundary counts as both; no fuzzy matching is used. With `TP` matching
+boundaries, `FP` false splits and `FN` misses, precision is `TP/(TP+FP)`, recall
+is `TP/(TP+FN)`, and F1 is `2TP/(2TP+FP+FN)`. Zero denominators are `null`, not
+perfect scores. Reports retain counts, affected-passage counts, per-doctrine
+metrics, explicit exclusions and exact error offsets without copying book text.
+A successful command means the review was compared, not that a quality target
+was met. Retain the private form alongside the report to reproduce it.
+
+Synthetic tests preserve four known limitations as **expected failures**:
+a sentence inside a parenthesis opened mid-sentence, an artificial line break
+inside a sentence, an abbreviation that also ends a sentence, and a deliberately
+lowercase sentence start. The latter three are test challenges, not claims about
+their frequency in this edition. They are not silently corrected or grounds
+for inferring a real-book error percentage. A later rule change must trigger
+review of those expected failures and use a separately approved method version.
+
+**Proposed for maintainer approval:** begin with 90 complete passages (30 per
+doctrine), seed `20261018`, and report the actual number of internal gold
+boundaries. Seek at least 300 marked internal boundaries before treating the
+quality targets as useful evidence; if necessary, approve expansion by ten
+passages per doctrine using the same ranking. Proposed pilot targets are at
+least 98% precision and recall overall, and at least 95% of both in each
+doctrine. These are discussion targets, not statistical population guarantees
+or an acceptance rule enabled in code. Adjudicate disagreements and report
+exclusions before deciding whether to retain the rules or compare an established
+external segmenter on the same held-out sample. No method/dependency change or
+real-book acceptance is approved by this validation step.
+
 ### Experiment B — embeddings and TensorFlow Embedding Projector
 
 **Research question:** what textual neighborhoods does a selected *embedding method* place near a given passage, and how stable are these neighborhoods under model, granularity and projection choices?

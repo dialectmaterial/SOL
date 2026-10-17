@@ -32,6 +32,46 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Sentence-segmentation error measurement — 18 October 2026
+
+**Task:** [Codex: Measure sentence-segmentation error](https://github.com/dialectmaterial/SOL/blob/b07fdffacaf9ac812d947b351bb7a309d6e4b966/docs/coordination/CURRENT_TASK.md#codex-measure-sentence-segmentation-error).
+
+**Branch / PR:** `codex/sentence-segmentation-check` is pushed; [open the review PR](https://github.com/dialectmaterial/SOL/pull/new/codex/sentence-segmentation-check). PR creation through the GitHub integration returned HTTP 403, `Resource not accessible by integration`; `gh` is not installed. Task status is `In review`.
+
+**Last implementation commit:** `722e68cf4734bff71c841e940a552e934a1c7d32` (review follow-up: clear doctrine-path refusal and regression test; this report is committed last).
+
+### Changed files
+
+- `sol/essence/segmentation_check.py` — blind, reproducible equal-per-doctrine samples; complete source-bound marks or explicit exclusions; exact internal-boundary scores, error offsets and per-doctrine summaries. Samples are owner-only, non-overwriting and outside Git. Unexpected doctrine paths now raise a clear `ValueError` rather than leaking a lookup error.
+- `sol/essence/cli.py` — `sol analyze segmentation-sample` and `segmentation-check`; no change to existing sentence-study commands or formats.
+- `tests/test_segmentation_check.py` — invented gold examples, malformed/stale input and privacy checks; four known rule limitations are expected failures rather than silent method fixes.
+- `docs/ESSENCE.md`, `CHANGELOG.md` — private human-marking procedure, metric definitions, known limits and proposed pilot criteria. `docs/coordination/CURRENT_TASK.md` changes only Codex's status to `In review`; earlier handoff reports are preserved.
+
+### Tests performed
+
+- Focused segmentation comparison: 21 tests, including 4 expected failures — OK. The unchanged sentence study (9 tests) and existing analysis CLI (24 tests) passed in the original implementation pass and remain covered by the full suite.
+- `.venv/bin/python -B scripts/check_docs.py` — OK; external URLs were not network-checked.
+- `.venv/bin/python -B -m unittest discover -s tests` — 1,565 tests run after merging PR #5 and adding the doctrine-path guard; OK (11 skipped, 4 expected failures). XDG config/data/cache/state and Neovim log locations were isolated. Packaging checks are included.
+- Both commands' help works through `python -m sol analyze`. Synthetic end-to-end sample/mark/compare gives 4 matching boundaries, 1 false split and 1 miss (80% precision/recall); this is test data, not a book estimate. Existing sentence artifacts and canonical fixture bytes remain unchanged.
+- No real-book sample or markings were generated, no human error rate is claimed, and no terminal UI/manual reading check was required or performed.
+
+### Outstanding issues
+
+- The unchanged rules retain misses inside mid-sentence parentheses, suppression after abbreviations that really end sentences, lower-case sentence starts, and false splits at physical line breaks. Their frequency in the book remains unmeasured.
+- The task branch was checked/rebased against `origin/main` (`3ef6528`) before initial publication. The two-agent board (`1f9660c`) and then PR #5 (`449fb02`) were merged without rewriting published commits. Both CHANGELOG entries and both handoff reports are preserved, with this work first. Codex's task remains `In review`; Claude's task status is unchanged from main. Relative to current main, no `sol/terminal/`, `sol/reader/`, `punctuation-rules-v1` code, protocol, schema or dependency changes are included. Private source/corpus/workspaces and untracked `AGENTS.md` are excluded.
+- The merge's index-wide whitespace check flagged main's existing Markdown hard break in `docs/BEING.md:3`; it was retained unchanged. The feature-branch diff whitespace check passes.
+- PR creation remains a maintainer step because of the integration's permission limit; no account permissions were changed. Use the link above, or run from an authenticated GitHub CLI installation:
+
+  ```sh
+  gh pr create --repo dialectmaterial/SOL --base main --head codex/sentence-segmentation-check --title "Measure sentence segmentation against private human annotations" --body "Validation-only tooling, tests and proposed private pilot; see docs/coordination/HANDOFF.md#sentence-segmentation-error-measurement--18-october-2026. Frozen punctuation-rules-v1 and existing artifacts/protocol/dependencies are unchanged."
+  ```
+
+### Decisions requiring approval
+
+- **Pilot size:** propose 90 complete passages, 30 per doctrine, seed `20261018`; seek at least 300 human-marked internal boundaries before using quality targets, expanding by 10 passages per doctrine with the same ranking if approved. No automatic size default or real-book sampling run was adopted.
+- **Error tolerance:** propose at least 98% boundary precision and recall overall, and at least 95% of both per doctrine. These are proposed descriptive pilot targets, not certified population bounds or an acceptance gate applied by the tool.
+- **Gold review:** approve the sentence-end/closing-punctuation convention, explicit exclusions and independent adjudication of doubtful marks. Any later segmentation-rule, artifact or dependency change needs its own approval and versioning; none is proposed as implemented here.
+
 ## Preserve reading state when navigation is refused — 18 October 2026
 
 **Task:** [CURRENT_TASK](CURRENT_TASK.md), "Claude Code: Preserve reading state when navigation is refused" ([proposal stage 1](proposals/CODEX_READER_WORKSPACE_PLAN.md#1-fix-navigation-failure-recovery-first))
