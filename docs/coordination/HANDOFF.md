@@ -32,6 +32,38 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Sentence marking in an ordinary text editor — 18 October 2026
+
+**Task:** [Codex: Make sentence marking practical by hand](CURRENT_TASK.md#codex-make-sentence-marking-practical-by-hand).
+**Branch / PR:** `codex/segmentation-marking-form`; PR to be opened with `gh pr create --base main` after pushing. Task status: `In review`.
+**Last implementation commit:** `6e27ed1c58d6439e6b7ec46603a0884d39074f25` (implementation and documentation; the task-board merge and this report follow).
+
+### Changed files
+
+- `sol/essence/segmentation_marking.py` — blind, sample-fingerprinted plain-text blocks; import accepts only added LF breaks and designated exclusion reasons, names the passage/source codepoint/form location on a text mismatch, and fills the existing review fields without editing source text.
+- `sol/essence/segmentation_check.py` — shares the existing outside-Git, owner-only, non-overwriting writer with text forms; JSON serialization and the scorer remain unchanged.
+- `sol/essence/cli.py` — `segmentation-export` and `segmentation-import`, with explicit reviewer attribution and bounded UTF-8 input; no sample text or predictions in their receipts.
+- `tests/test_segmentation_marking.py` — 14 synthetic tests: blind export independent of predictions, exact mark/import/check round trips, Unicode and original-newline handling, edits/omissions/order/sample/generation failures, exclusions, privacy and overwrite refusal.
+- `docs/ESSENCE.md`, `CHANGELOG.md` — four-step editor workflow and its limits. Only Codex's status changes in `CURRENT_TASK.md`; all earlier handoff reports are preserved below.
+
+### Tests performed
+
+- `.venv/bin/python -B -m unittest discover -s tests -p 'test_segmentation*.py'` — 35 tests; OK (4 existing expected failures).
+- `.venv/bin/python -B scripts/check_docs.py` — OK; external URLs were not network-checked.
+- `.venv/bin/python -B -m unittest discover -s tests` — 1,579 tests; OK (11 skipped, 4 existing expected failures). XDG config/data/cache/state and Neovim log locations were isolated; packaging checks are included.
+- Both command help pages work through `python -m sol analyze`. The synthetic end-to-end CLI review retains 4 matching boundaries, 1 false split and 1 miss (80% precision/recall/F1), not a book accuracy estimate. Existing sentence artifacts and source fixture bytes remain unchanged.
+- No real-book sample or human markings were made, and no manual graphical-editor or terminal-reader trial was performed.
+
+### Outstanding issues
+
+- Source newlines are preserved but are not marks; adding another Enter there marks a boundary. An unsplit block declares one sentence, so a blank exclusion line cannot prove a passage was actually reviewed. The form and ESSENCE explain this; unreviewed blocks should be excluded explicitly.
+- Editors must preserve spaces, Unicode and LF line endings. Auto-indent, trailing-space trimming, hard reflow, BOM/CRLF conversion or normalization cause refusal rather than silent repair.
+- The branch started at `origin/main` (`e203a6d`), then merged PR #7 (`2e21734`) as requested. Claude's task slot, reader/terminal files and previous reports were not edited. No segmenter, sentence-study artifact, CORE protocol, dependency, canonical corpus or workspace changes are included; private source material and `AGENTS.md` stay outside Git.
+
+### Decisions requiring approval
+
+- The earlier proposed pilot size, seed, annotation adjudication and quality targets remain maintainer decisions (90 passages/30 per doctrine, seed `20261018`, seek 300 internal gold boundaries; proposed precision/recall targets 98% overall and 95% per doctrine). This task neither adopts defaults nor runs or approves that pilot.
+
 ## Sentence-segmentation error measurement — 18 October 2026
 
 **Task:** [Codex: Measure sentence-segmentation error](https://github.com/dialectmaterial/SOL/blob/b07fdffacaf9ac812d947b351bb7a309d6e4b966/docs/coordination/CURRENT_TASK.md#codex-measure-sentence-segmentation-error).
