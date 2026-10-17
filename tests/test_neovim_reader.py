@@ -442,6 +442,70 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             self.assertEqual(self.run_view(), 0)
         self.assertEqual(len(captures), 2)
 
+    def test_note_binds_the_passage_and_keeps_position_and_selection(self):
+        service = self.service()
+        self.position(service, 4)
+        state = service.store.get_state()
+        def native(payload, _, on_request):
+            self.assertEqual(payload["personal"], {"persistent": True, "notes": {}})
+            # A selection is context: it may stay active and is not stored.
+            packet = self.packet(3, 14)
+            result = on_request({"op": "note_add", "body": "First line\n\tindented", "packet": packet,
+                                 "mode": "continuous"})
+            shown = result["personal"]["notes"][self.identifier]
+            self.assertEqual(shown[0]["lines"], ["First line", "    indented"])
+            self.assertEqual(shown[0]["author"], "Invented reader")
+            for body in ("", "   ", None, 7, "x" * (neovim_reader.NOTE_LIMIT + 1)):
+                with self.subTest(body=body), self.assertRaises(ValueError):
+                    on_request({"op": "note_add", "body": body, "packet": packet, "mode": "continuous"})
+            with self.assertRaisesRegex(ValueError, "unsafe control"):
+                on_request({"op": "note_add", "body": "hidden \u202e reversal", "packet": packet,
+                            "mode": "continuous"})
+            return 0, None
+        with patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+        [note] = service.store.list_annotations()
+        self.assertEqual((note["target_id"], note["body"], note["actor"]),
+                         (self.identifier, "First line\n\tindented", "Invented reader"))
+        self.assertEqual(note["content_sha256"], self.book.canonical_records[self.identifier]["content_sha256"])
+        self.assertEqual(service.store.get_state(), state)
+        # Reopening shows the saved note with the passage.
+        def reopened(payload, _, on_request):
+            self.assertEqual(len(payload["personal"]["notes"][self.identifier]), 1)
+            return 0, None
+        with patch.object(neovim, "launch_payload", side_effect=reopened):
+            self.assertEqual(self.run_view(service), 0)
+
+    def test_temporary_session_refuses_notes_and_writes_nothing(self):
+        before = self.files()
+        def native(payload, _, on_request):
+            self.assertEqual(payload["personal"], {"persistent": False, "notes": {}})
+            with self.assertRaisesRegex(ValueError, "notes need a workspace"):
+                on_request({"op": "note_add", "body": "Kept nowhere", "packet": self.reply(payload)["packet"],
+                            "mode": "continuous"})
+            return 0, None
+        with patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(), 0)
+        self.assertEqual(self.files(), before)
+
+    def test_notes_on_a_retired_identity_and_unsafe_display_text_are_shown_safely(self):
+        rows = self.rows()
+        retired = deepcopy(rows[1])
+        retired.update(id=RETIRED, type="retired_record", redirect_id=self.identifier, order=2,
+                       markdown="An invented retired record.", plain_text="An invented retired record.")
+        rows.append(retired)
+        self.write_records(rows)
+        service = self.service()
+        self.position(service, 0)
+        digest = self.book.canonical_records[self.identifier]["content_sha256"]
+        service.store.add_annotation(RETIRED, "Older note\u200don the retired ID", digest)
+        def native(payload, _, on_request):
+            [shown] = payload["personal"]["notes"][self.identifier]
+            self.assertEqual(shown["lines"], ["Older note\\u200don the retired ID"])
+            return 0, None
+        with patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+
     def test_tree_selection_resolves_display_path_to_existing_source_identity(self):
         self.extend(3)
         def native(payload, _, on_request):

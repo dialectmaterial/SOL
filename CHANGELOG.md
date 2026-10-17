@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Personal notes in the reader — 17 October 2026
+
+Press `a` to write a note on the current passage without leaving the reader.
+It is saved through the same workspace service as the shell's `note add`, with
+your actor name, the passage's content digest and revision history; `c` lists
+the passage's notes. A selection is shown as context but not stored. Drafts
+survive closing the editor or a failed save. Temporary `-n` sessions refuse
+notes. The reader's request handling now declares each action's field in one
+table instead of a chain of special cases.
+
 ### Printed-source preview — 17 October 2026
 
 Press `s` in the reader to see the printed source of the current passage: the

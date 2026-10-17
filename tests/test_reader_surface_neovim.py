@@ -575,6 +575,70 @@ end
         self.assertIn("No graphical image viewer", fallback)
         self.assertIn("/cache/1.png", fallback)
 
+    def test_note_editor_saves_restores_selection_and_protects_drafts(self):
+        report = self.run_lua(r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  local payload = vim.deepcopy(data)
+  payload.personal = {persistent = true, notes = vim.empty_dict()}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(payload)
+  reader = SOLNvimReader
+  local id = data.records[1].id
+  local selected = reader.capture('v', reader.source_point(id, 5), reader.source_point(id, 12))
+  reader.restore(selected)
+  vim.api.nvim_feedkeys('a', 'xt', false)
+  local editor = vim.api.nvim_get_current_buf()
+  assert(vim.api.nvim_buf_get_name(editor):find('sol://note/', 1, true), 'note editor did not open')
+  local marks = vim.api.nvim_buf_get_extmarks(editor, -1, 0, -1, {details = true})
+  report.quote = marks[1][4].virt_lines[1][1][1]
+  report.title = vim.api.nvim_win_get_config(0).title[1][1]
+  vim.api.nvim_buf_set_lines(editor, 0, -1, false, {'A thought', 'on two lines'})
+  vim.api.nvim_feedkeys(vim.keycode('<C-s>'), 'xt', false)
+  assert(#sent == 1 and sent[1].op == 'note_add', 'save did not request note_add')
+  report.body = sent[1].body
+  assert(vim.api.nvim_get_current_win() == reader.window)
+  assert(vim.deep_equal(SOLNvimReader.capture(), selected), 'saving moved the position or selection')
+  -- An unacknowledged save keeps the draft.
+  _G.SOLReaderChannel.pending[sent[1].id](nil, 'invented failure')
+  vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  reader.note()
+  report.after_failure = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  vim.api.nvim_feedkeys(vim.keycode('<C-s>'), 'xt', false)
+  _G.SOLReaderChannel.pending[sent[2].id]({personal = {persistent = true, notes = {[id] = {
+    {id = 'n1', author = 'Invented reader', created_at = '2026-10-17T12:00:00Z', lines = {'A thought', 'on two lines'}}}}}})
+  vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  reader.note()
+  report.after_save = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  -- :q! keeps a draft; Ctrl-C discards it.
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, {'Half a thought'})
+  vim.cmd('stopinsert'); vim.cmd('q!')
+  reader.note()
+  report.after_quit = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  vim.api.nvim_feedkeys(vim.keycode('<C-c>'), 'xt', false)
+  reader.note()
+  report.after_discard = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  vim.api.nvim_feedkeys(vim.keycode('<C-c>'), 'xt', false)
+  reader.context()
+  report.context = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  -- A temporary session explains instead of opening an editor.
+  SOLNvimReader.update_personal({persistent = false, notes = vim.empty_dict()})
+  report.temporary = select(2, pcall(SOLNvimReader.note))
+''', integrated=True)
+        text = self.sample.passages[0].text
+        self.assertEqual(report["quote"], text[5:13])
+        self.assertTrue(report["title"].startswith(" Note on: "))
+        self.assertEqual(report["body"], "A thought\non two lines")
+        self.assertEqual(report["after_failure"], ["A thought", "on two lines"])
+        self.assertEqual(report["after_save"], [""])
+        self.assertEqual(report["after_quit"], ["Half a thought"])
+        self.assertEqual(report["after_discard"], [""])
+        context = "\n".join(report["context"])
+        self.assertIn("Your workspace notes on this passage (1); a adds one", context)
+        self.assertIn("— Invented reader, 2026-10-17T12:00:00Z\nA thought\non two lines", context)
+        self.assertIn("notes need a workspace", report["temporary"])
+
     def test_theme_survives_mode_reload_and_invalid_presets_are_refused(self):
         report = self.run_lua(r'''
   reader.cycle_theme()

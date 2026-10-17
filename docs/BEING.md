@@ -37,12 +37,13 @@ The current implementation also includes literal book search, source-positioned 
 | `m1`–`m3`; `'1`–`'3`; `dm1`–`dm3` | Set, open, clear one of three paragraph markers |
 | `t` | Dynamic structure tree (Vim-style navigation) |
 | `c` | Passage source context, notes, markers |
+| `a` | Write a personal note on this passage, saved in the workspace (`Ctrl-S` or `:w` saves, `Ctrl-C` discards) |
 | `s` | Printed source of this passage (formulas), cropped from the verified PDF, in a separate image viewer |
 | `f` | Quiet focus mode; keep important warnings |
 | `T` | Cycle Terminal / Dark / Paper theme for this session |
 | `?`, `q` | Help / save position and quit |
 
-`n` means *next paragraph*, **not** Neovim's default next regex match. `gg/G` operate only within the loaded section. Selections remain inside a single canonical passage and are not automatically saved as annotations. Search and passage navigation preserve source offsets as far as the verified projection allows.
+`n` means *next paragraph*, **not** Neovim's default next regex match. `gg/G` operate only within the loaded section. Selections remain inside a single canonical passage and are not automatically saved as annotations. A note written with `a` attaches to the whole passage through the same workspace service as the shell's `note add` (actor, content digest, revision history); a selection is shown above the editor as context but is not stored, because no workspace schema records spans. Drafts survive closing the editor or a failed save, until saved or discarded with `Ctrl-C`. The `c` popup lists the workspace's notes on the passage; temporary `-n` sessions refuse notes. Search and passage navigation preserve source offsets as far as the verified projection allows.
 
 **Adoption clarification:** use `j/k` for wrapped rows. Up/Down retain native Neovim buffer-line motion; they are not currently mapped to the same visual-row actions. The single vertical outline has no shipped horizontal-layout switch. No control behavior was changed by the documentation migration.
 
@@ -148,7 +149,8 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 - No native cross-paragraph span selection; normal visual selection is transient and passage-local.
 - Rich mathematical and source facsimile rendering is incomplete.
 - The outline/search/marker UI is functional but readability, styling, and mode transitions require actual use testing.
-- Some scholarly actions are still most accessible through the optional compatibility shell.
+- Some scholarly actions are still most accessible through the optional compatibility shell: editing notes and their history, comparisons, reviews and relations. Writing and viewing notes is in the reader.
+- Notes cannot yet anchor to a selected span; that needs a new workspace schema version.
 - Comparison presentation is not yet a mature integrated side-by-side desk; authoring/version-binding details matter.
 - The current Kitty exchange is host-bound; the terminal-independent research workflow remains proposed.
 - Human reading acceptance is **not** established by headless tests, mock terminal checks, or a 24-passage HTML rendering benchmark.

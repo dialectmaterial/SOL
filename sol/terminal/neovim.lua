@@ -96,6 +96,8 @@ local focused_id = data.restore and data.restore ~= vim.NIL and data.restore.ref
 if integrated and (not exact_keys(data.navigation, { "previous", "next" })
   or type(data.navigation.previous) ~= "boolean" or type(data.navigation.next) ~= "boolean"
   or type(data.notice) ~= "string") then fail("invalid reading navigation") end
+if data.personal ~= nil and (type(data.personal) ~= "table" or type(data.personal.persistent) ~= "boolean"
+  or type(data.personal.notes) ~= "table") then fail("invalid personal notes") end
 -- Presentation presets are inert highlight data from Python, never sourced files.
 local theme_groups = {}
 for _, name in ipairs({ "Normal", "SOLPanel", "SOLPanelBorder", "SOLSourceHeading", "SOLSourceWarning",
@@ -538,6 +540,7 @@ local function request(operation, fields, callback)
       if result.payload then reload(result.payload)
       elseif result.search then show_search(result.search)
       elseif result.source then show_source(result.source)
+      elseif result.personal then _G.SOLNvimReader.update_personal(result.personal)
       elseif result.markers then
         _G.SOLNvimReader.update_markers(result.markers)
         vim.api.nvim_echo({{'Markers updated' .. (result.markers.persistent and '' or ' for this temporary session'), 'None'}}, false, {})
@@ -616,6 +619,97 @@ end
 local function source()
   request('source_preview', {page = 1})
 end
+-- A personal note binds the whole passage through the workspace service. A
+-- selection is shown as context above the editor and is not stored. Drafts
+-- survive any close except an explicit discard, and an unacknowledged save.
+local note_namespace = api.nvim_create_namespace('sol-note')
+local function note()
+  if not data.personal then fail('notes need the installed SOL reader') end
+  if not data.personal.persistent then fail('notes need a workspace; this temporary -n session saves nothing') end
+  local packet = current_packet()
+  local record = by_id[packet.reference.reference.target_id]
+  if vim.fn.mode(1) ~= 'n' then normal_escape() end
+  close_popup()
+  local channel_state = rawget(_G, 'SOLReaderChannel')
+  local drafts = channel_state and channel_state.drafts or {}
+  if channel_state then channel_state.drafts = drafts end
+  local editor = api.nvim_create_buf(false, true)
+  vim.bo[editor].buftype, vim.bo[editor].bufhidden = 'acwrite', 'wipe'
+  api.nvim_buf_set_name(editor, 'sol://note/' .. record.id .. '/' .. editor)
+  if drafts[record.id] then
+    api.nvim_buf_set_lines(editor, 0, -1, false, vim.split(drafts[record.id], '\n', { plain = true }))
+  end
+  vim.bo[editor].modified = false
+  local width = math.max(20, math.min(data.width, vim.o.columns - 6))
+  local quote = {}
+  if packet.selection ~= vim.NIL then
+    local text, line = packet.selection.text:gsub('%s+', ' '), ''
+    for _, char in ipairs(vim.fn.split(text, '\zs')) do
+      if vim.fn.strdisplaywidth(line .. char) > width - 2 then
+        quote[#quote + 1] = line; line = ''
+        if #quote == 3 then quote[3] = vim.fn.strcharpart(quote[3], 0, vim.fn.strchars(quote[3]) - 1) .. '…'; break end
+      end
+      line = line .. char
+    end
+    if #quote < 3 and line ~= '' then quote[#quote + 1] = line end
+  end
+  popup = api.nvim_open_win(editor, true, { relative = 'editor', row = 3,
+    col = math.max(0, math.floor((vim.o.columns - width) / 2)), width = width,
+    height = math.max(3, math.min(12 + #quote, vim.o.lines - 10)), style = 'minimal', border = 'single', zindex = 50,
+    title = ' Note on: ' .. vim.fn.strcharpart(record.heading, 0, width - 14) .. ' ', title_pos = 'left',
+    footer = ' Ctrl-S or :w saves · Ctrl-C discards ', footer_pos = 'right' })
+  vim.wo[popup].wrap, vim.wo[popup].linebreak = true, true
+  vim.wo[popup].winhighlight = 'NormalFloat:SOLPanel,FloatBorder:SOLPanelBorder'
+  if #quote > 0 then
+    local lines = {}
+    for _, row in ipairs(quote) do lines[#lines + 1] = { { row, 'Comment' } } end
+    lines[#lines + 1] = { { '(selection shown for context; the note attaches to the passage)', 'Comment' } }
+    api.nvim_buf_set_extmark(editor, note_namespace, 0, 0, { virt_lines = lines, virt_lines_above = true })
+    vim.fn.winrestview({ topfill = #lines })
+  end
+  local finished = false
+  local function body()
+    return table.concat(api.nvim_buf_get_lines(editor, 0, -1, false), '\n')
+  end
+  api.nvim_create_autocmd('BufWipeout', { buffer = editor, once = true, callback = function()
+    if not finished and body():match('%S') then
+      drafts[record.id] = body()
+      vim.schedule(function() api.nvim_echo({ { 'Note draft kept; press a on this passage to continue it', 'WarningMsg' } }, false, {}) end)
+    end
+  end })
+  local function save()
+    local text = body()
+    if not text:match('%S') then fail('empty note; nothing saved') end
+    -- Keep the draft until Python acknowledges the save.
+    drafts[record.id], finished = text, true
+    vim.cmd('stopinsert')
+    close_popup()
+    restore(packet)
+    request('note_add', { body = text }, function()
+      drafts[record.id] = nil
+      api.nvim_echo({ { 'Note saved in your workspace', 'None' } }, false, {})
+    end)
+  end
+  local function discard()
+    drafts[record.id], finished = nil, true
+    vim.cmd('stopinsert')
+    close_popup()
+    restore(packet)
+  end
+  api.nvim_create_autocmd('BufWriteCmd', { buffer = editor, callback = function()
+    local ok, problem = pcall(save)
+    if not ok then vim.notify(tostring(problem), vim.log.levels.ERROR) end
+  end })
+  for _, key_mode in ipairs({ 'n', 'i' }) do
+    vim.keymap.set(key_mode, '<C-s>', function()
+      local ok, problem = pcall(save)
+      if not ok then vim.notify(tostring(problem), vim.log.levels.ERROR) end
+    end, { buffer = editor, silent = true })
+    vim.keymap.set(key_mode, '<C-c>', discard, { buffer = editor, silent = true })
+  end
+  vim.cmd('startinsert')
+  return editor
+end
 local function search()
   -- Standard command-line input works in any Neovim-capable terminal. A cancelled
   -- query never visits a result or modifies canonical text/selection.
@@ -683,6 +777,19 @@ local function context()
     for _, warning in ipairs(note.warnings) do add("Warning: " .. warning) end
     add(note.plain_text)
   end
+  if data.personal then
+    add("")
+    if not data.personal.persistent then
+      add("Personal notes need a workspace; this temporary session saves nothing.")
+    else
+      local mine = data.personal.notes[record.id] or {}
+      add("Your workspace notes on this passage (" .. #mine .. "); a adds one")
+      for _, item in ipairs(mine) do
+        add("— " .. item.author .. ", " .. item.created_at)
+        for _, line in ipairs(item.lines) do add(line) end
+      end
+    end
+  end
   add(""); add("Esc returns to reading. Notes and context have no passage-selection identity.")
   show_lines(lines)
   popup_context = true
@@ -724,6 +831,7 @@ local function help()
       "v                characterwise selection inside one passage",
       "c                source pages, attribution and linked notes",
       "s                show the printed source of this passage (formulas)",
+      "a                write a personal note on this passage (workspace)",
       "f                toggle quiet focus mode",
       "T                cycle Terminal / Dark / Paper theme for this session",
       "q / Ctrl-q       save the semantic position and quit",
@@ -835,6 +943,7 @@ if integrated then
   vim.keymap.set('n', 'n', guarded(function() passage(1) end), {buffer = buffer, silent = true})
   vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
   vim.keymap.set('n', 's', guarded(source), {buffer = buffer, silent = true})
+  vim.keymap.set({'n', 'x'}, 'a', guarded(note), {buffer = buffer, silent = true})
   vim.keymap.set('n', '<C-n>', guarded(function() request('search_next') end), {buffer = buffer, silent = true})
   vim.keymap.set('n', '<C-p>', guarded(function() request('search_previous') end), {buffer = buffer, silent = true})
   vim.keymap.set('n', '<M-Left>', guarded(function() request('history_back') end), {buffer = buffer, silent = true})
@@ -877,6 +986,11 @@ _G.SOLNvimReader = { records = records, buffer = buffer, window = window, positi
     data.markers = markers
     if popup_context then context() end
   end,
+  update_personal = function(personal)
+    data.personal = personal
+    if popup_context then context() end
+  end,
+  note = note,
   dispose = function()
     close_popup()
     if tree_view then tree_view.dispose() end

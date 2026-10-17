@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import sys
+import unicodedata
 
 from sol.reader.actions import ReaderActions
 from sol.reader.surface import Sample
@@ -18,6 +19,7 @@ from sol.terminal.theme import DEFAULT_THEME, THEMES
 
 
 SECTION_BUDGET = 64
+NOTE_LIMIT = 20000
 REVIEW_NOTES = {
     "needs_visual_review": "The typed text is an unreviewed transcription and may be wrong. "
                            "The printed source is authoritative.",
@@ -65,6 +67,12 @@ def reading_section(book, identifier):
         last += 1
     first += (index - first) // SECTION_BUDGET * SECTION_BUDGET
     return ReadingSection(first, min(last, first + SECTION_BUDGET - 1))
+
+
+def display_line(text):
+    """Escape what the Neovim payload refuses; a note is the reader's words, not source."""
+    return "".join(f"\\u{ord(c):04x}" if unicodedata.category(c) in {"Cc", "Cf", "Cs", "Zl", "Zp"} else c
+                   for c in text.replace("\t", "    "))
 
 
 def source_preview(request, page):
@@ -133,6 +141,24 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             rows.append(row)
         return {"persistent": workspace_reader is not None, "slots": rows}
 
+    def personal_notes(shown):
+        """The workspace's notes on the shown passages, following retired IDs."""
+        if workspace_reader is None:
+            return {"persistent": False, "notes": {}}
+        shown_ids = {passage.identifier for passage in shown.passages}
+        notes = {}
+        for record in workspace_reader.store.list_annotations():
+            target, seen = record["target_id"], set()
+            while target in book.redirects and target not in seen:
+                seen.add(target)
+                target = book.redirects[target]
+            if target in shown_ids:
+                notes.setdefault(target, []).append({
+                    "id": record["id"], "author": display_line(record["actor"]),
+                    "created_at": display_line(record["created_at"]),
+                    "lines": [display_line(line) for line in record["body"].split("\n")]})
+        return {"persistent": True, "notes": notes}
+
     def prepare():
         state = actions.snapshot()
         extent = reading_section(book, state.current.identifier)
@@ -149,15 +175,83 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         if start_tree:
             structure["root"] = "/"
         payload.update(integrated=True, navigation=navigation, notice=notice or "", mode=mode, focus=focused,
-                       markers=markers(), structure=structure, tree_only=start_tree)
+                       markers=markers(), structure=structure, tree_only=start_tree,
+                       personal=personal_notes(sample))
         neovim._safe_metadata({"notice": payload["notice"], "markers": payload["markers"], "structure": structure,
-                               "theme": payload["theme"]})
+                               "theme": payload["theme"], "personal": payload["personal"]})
         return payload, sample, extent
 
     payload, sample, extent = prepare()
 
+    # Each action's one extra field, its check and the refusal shown in Neovim.
+    # Actions without an entry take no extra field.
+    extra_fields = {
+        "marker_set": ("slot", lambda slot: type(slot) is int and slot in (1, 2, 3),
+                       "reader markers have slots 1, 2 and 3"),
+        "node_open": ("node", lambda node: True, ""),
+        "source_preview": ("page", lambda page: type(page) is int, "choose a source page by number"),
+        "search": ("query", lambda query: isinstance(query, str) and 1 <= len(query.strip()) <= 256,
+                   "search needs 1–256 characters"),
+        "search_open": ("result", lambda result: type(result) is int and 1 <= result <= len(actions.results),
+                        "choose a displayed search result"),
+        "note_add": ("body", lambda body: isinstance(body, str) and 1 <= len(body.strip()) and len(body) <= NOTE_LIMIT,
+                     f"a note needs 1–{NOTE_LIMIT} characters"),
+    }
+    extra_fields["marker_clear"] = extra_fields["marker_open"] = extra_fields["marker_set"]
+    navigation_actions = {"next", "previous", "passage_next", "passage_previous", "node_open", "marker_open",
+                          "search_open", "search_next", "search_previous", "history_back", "history_forward"}
+
+    def search_panel(request, identifier):
+        # Searching does not move the cursor, save a visit or erase a selection.
+        rows = actions.search(request["query"], path=(), limit=20)
+        return {"search": {"query": safe_label(request["query"]), "limit": 20, "rows": [
+            {"number": i, "label": safe_label(f"{row.heading or row.node.title} | p. {row.printed_page}"),
+             "snippet": safe_label(" ".join(row.text.split())[:150])}
+            for i, row in enumerate(rows, 1)]}}
+
+    def source_panel(request, identifier):
+        # Viewing evidence keeps the cursor, selection and saved position.
+        nonlocal source_service
+        from sol.terminal.source import SourceError, SourceService
+        target = request["packet"]["reference"]["reference"]["target_id"]
+        if source_service is None:
+            source_service = SourceService(book)
+        if target not in source_requests:
+            source_requests[target] = source_service.capture(target)
+        try:
+            return {"source": source_preview(source_requests[target], request["page"])}
+        except SourceError:
+            # A changed corpus or PDF snapshot needs a fresh capture next time.
+            source_requests.pop(target, None)
+            raise
+
+    def marker_panel(request, identifier):
+        slot = request["slot"]
+        if workspace_reader is None:
+            if request["op"] == "marker_set":
+                transient_markers[slot] = {"target_id": identifier}
+            else:
+                transient_markers.pop(slot, None)
+        elif request["op"] == "marker_set":
+            workspace_reader.save_bookmark(marker_name(slot), actions.session, identifier, replace=True)
+        else:
+            workspace_reader.remove_bookmark(marker_name(slot))
+        return {"markers": markers()}
+
+    def note_panel(request, identifier):
+        # The note binds the requested passage and its content digest through
+        # the shell's own service; a selection is context only, never stored.
+        if workspace_reader is None:
+            raise ValueError("notes need a workspace; this temporary -n session saves nothing")
+        workspace_reader.ensure_corpus_current()
+        workspace_reader.add_annotation(request["body"], actions.session, identifier)
+        return {"personal": personal_notes(sample)}
+
+    panels = {"search": search_panel, "source_preview": source_panel, "marker_set": marker_panel,
+              "marker_clear": marker_panel, "note_add": note_panel}
+
     def handle(request):
-        nonlocal payload, sample, extent, mode, start_tree, notice, focused, theme, source_service
+        nonlocal payload, sample, extent, mode, start_tree, notice, focused, theme
         operation = request.get("op")
         fields = {"op", "packet", "mode"}
         if "focus" in request:
@@ -168,64 +262,19 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             fields.add("theme")
             if request["theme"] not in THEMES:
                 raise ValueError("unknown reader theme")
-        if operation in ("marker_set", "marker_clear", "marker_open"):
-            fields.add("slot")
-            if type(request.get("slot")) is not int or request["slot"] not in (1, 2, 3):
-                raise ValueError("reader markers have slots 1, 2 and 3")
-        elif operation == "node_open":
-            fields.add("node")
-        elif operation == "source_preview":
-            fields.add("page")
-            if type(request.get("page")) is not int:
-                raise ValueError("choose a source page by number")
-        elif operation == "search":
-            fields.add("query")
-            if not isinstance(request.get("query"), str) or not 1 <= len(request["query"].strip()) <= 256:
-                raise ValueError("search needs 1–256 characters")
-        elif operation == "search_open":
-            fields.add("result")
-            if type(request.get("result")) is not int or not 1 <= request["result"] <= len(actions.results):
-                raise ValueError("choose a displayed search result")
-        elif operation not in ("next", "previous", "passage_next", "passage_previous",
-                               "search_next", "search_previous", "history_back", "history_forward"):
+        if operation not in panels and operation not in navigation_actions:
             raise ValueError("unknown reader action")
+        if operation in extra_fields:
+            name, valid, refusal = extra_fields[operation]
+            fields.add(name)
+            if not valid(request.get(name)):
+                raise ValueError(refusal)
         if set(request) != fields or request.get("mode") not in ("continuous", "paragraph"):
             raise ValueError("invalid reader action fields or reading mode")
         selected = neovim._check_sample_packet(sample, request["packet"], payload["records"])
         identifier = request["packet"]["reference"]["reference"]["requested_id"]
-        if operation == "search":
-            # Searching does not move the cursor, save a visit or erase a selection.
-            rows = actions.search(request["query"], path=(), limit=20)
-            return {"search": {"query": safe_label(request["query"]), "limit": 20, "rows": [
-                {"number": i, "label": safe_label(f"{row.heading or row.node.title} | p. {row.printed_page}"),
-                 "snippet": safe_label(" ".join(row.text.split())[:150])}
-                for i, row in enumerate(rows, 1)]}}
-        if operation == "source_preview":
-            # Viewing evidence keeps the cursor, selection and saved position.
-            from sol.terminal.source import SourceError, SourceService
-            target = request["packet"]["reference"]["reference"]["target_id"]
-            if source_service is None:
-                source_service = SourceService(book)
-            if target not in source_requests:
-                source_requests[target] = source_service.capture(target)
-            try:
-                return {"source": source_preview(source_requests[target], request["page"])}
-            except SourceError:
-                # A changed corpus or PDF snapshot needs a fresh capture next time.
-                source_requests.pop(target, None)
-                raise
-        if operation in ("marker_set", "marker_clear"):
-            slot = request["slot"]
-            if workspace_reader is None:
-                if operation == "marker_set":
-                    transient_markers[slot] = {"target_id": identifier}
-                else:
-                    transient_markers.pop(slot, None)
-            elif operation == "marker_set":
-                workspace_reader.save_bookmark(marker_name(slot), actions.session, identifier, replace=True)
-            else:
-                workspace_reader.remove_bookmark(marker_name(slot))
-            return {"markers": markers()}
+        if operation in panels:
+            return panels[operation](request, identifier)
         if selected is not None and operation not in ("search_open", "search_next", "search_previous",
                                                       "history_back", "history_forward"):
             raise ValueError("clear the selection before changing reading locations")
