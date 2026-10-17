@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### First inquiry from the reader: sentence lengths — 17 October 2026
+
+`S` in the reader measures the sentences of the loaded section through a new
+ESSENCE study and lists the distribution, the means by place in the paragraph
+and the longest sentences. Enter reads one of them; Alt-Left returns to where
+you were. `sol analyze sentences [--within PATH]` runs the same study from a
+shell, and `sol analyze check` verifies a saved one by recomputation. The
+segmentation rules are declared in the artifact and were tuned on the book's
+own citations, abbreviations and initials. Artifacts hold IDs, offsets and
+digests, never book text, and are saved only for workspace sessions.
+
 ### Search matches marked in the passage — 17 October 2026
 
 Opening a search result, or moving with Ctrl-N/Ctrl-P, marks every verified
