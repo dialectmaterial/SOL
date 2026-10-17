@@ -32,6 +32,53 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Reader speed baseline — 18 October 2026
+
+**Task:** [Codex: Measure reader speed before optimising](CURRENT_TASK.md#codex-measure-reader-speed-before-optimising).
+**Branch / PR:** `codex/reader-timings`; PR to be opened after pushing. Status: `In review`.
+**Last implementation commit:** `fbba797fe4a9e22807712e060d86d207ba8e8923` (script/tests and documentation; this report follows).
+
+### Changed files
+
+- `scripts/reader_timings.py` — developer diagnostic, not an installed interface: synthetic by default, explicit `--corpus`, `perf_counter`, repeated medians/min–max/quartiles/raw samples, real controller callbacks and temporary workspaces. Only the Neovim boundary is replaced; source checks and persistence remain enabled. No new dependencies, caches or runtime edits.
+- `tests/test_reader_timings.py` — four tests cover every operation/repetition, JSON CLI, invalid input, environment restoration and explicit-corpus nonmutation. No exact timing threshold is asserted.
+- `docs/ARCHITECTURE.md`, `CHANGELOG.md` — short dated usage/limits; only Codex's status changes in `CURRENT_TASK.md`. All earlier reports remain below.
+
+### Tests performed
+
+- Reviewed corrected PR #12 (`71f3ce3`) in a separate worktree: docs and full suite passed (1,585 tests, 11 skipped, 4 expected failures); `gh pr checks 12 --watch` passed every check. Merged it and [commented the review](https://github.com/dialectmaterial/SOL/pull/12#issuecomment-6243009382). A detached-worktree cleanup error occurred after the remote merge; the merged remote branch was then removed explicitly, with its commits preserved on main.
+- Focused benchmark tests: 4 tests, OK in 0.83 s. Synthetic human-readable CLI also ran successfully. Documentation check OK; full suite: 1,589 tests, OK (11 skipped, 4 existing expected failures), with isolated XDG state/logs and packaging checks included.
+- Real corpus: `.venv/bin/python -B scripts/reader_timings.py --corpus /absolute/path/to/local-corpus --repeats 5 --warmups 1 --json`. Runtime base `189b1c6`; Core Ultra 7 255H, 16 logical CPUs, Linux x86-64, Python 3.14.4, width 72. Source: 4,629 records / 1,803 readable passages. Ordinary sample: 2 passages, no notes; heavy: 64 passages / 52 linked notes. Controller moves between the first two 10-passage sections; study runs on the second. Raw corpus/report data were not added to Git; rounded aggregate milliseconds follow.
+
+| Operation | Median ms | Min–max ms |
+| --- | ---: | ---: |
+| Snapshot load | 124.5 | 118.8–136.7 |
+| Reader book load | 136.6 | 135.4–143.5 |
+| CORE verify | 14.4 | 14.3–14.8 |
+| Ordinary payload | 412.7 | 391.1–428.5 |
+| Note-heavy payload | 699.2 | 669.3–714.7 |
+| Ordinary typography, standalone | 2.2 | 2.0–2.5 |
+| Note-heavy typography, standalone | 53.5 | 52.9–67.1 |
+| Python startup to first payload | 1,791.9 | 1,775.4–1,860.6 |
+| Controller next | 2,851.5 | 2,812.8–2,930.2 |
+| Controller previous | 2,866.1 | 2,806.3–2,929.1 |
+| Search | 312.0 | 307.0–323.6 |
+| Search-open | 2,251.5 | 2,221.0–2,317.4 |
+| History back | 2,270.7 | 2,225.5–2,346.3 |
+| Section study `S`, including temporary artifact save | 1,214.9 | 1,184.5–1,230.3 |
+
+- Section moves are slowest; previous has the highest median but its spread overlaps next. A separate, instrumented single-run `cProfile` diagnostic (not baseline timing) reported 52 `_fresh_snapshot` calls, 57 `load_snapshot` calls and about 25.5 million recursive `_json_value` calls. Cumulative times are nested and cannot be added. This points to snapshot/reference preparation for investigation, not proof that guards can be removed.
+
+### Outstanding issues
+
+- Warm process/filesystem; no cold-disk, import, Neovim launch/version probe, IPC, drawing, Alacritty/Kitty or human latency measurement. Controller timings include SQLite checks/saves; isolated stages overlap and cannot be subtracted for attribution. Ordinary/heavy section lengths differ substantially. Five samples on an unpinned workstation are evidence for this run, not a performance guarantee.
+- Candidates only: profile repeated full-snapshot JSON validation and capture/check calls within one controller request; inspect graph-copy/serialization costs; consider sharing already prepared typography/callout work. Do not cache trust across requests over caller-mutable collections or relax generation guards. No optimisation is adopted.
+- Private source files, personal workspaces and `AGENTS.md` were untouched; generated workspaces/studies lived in cleaned temporary directories. No code under `sol/` was edited, and no manual terminal-reading trial was performed.
+
+### Decisions requiring approval
+
+- None introduced; no reserved decision is taken. Defaults: checkout-only script under `scripts/`, five measured runs after one warm-up, width 72, first minimum/maximum-note sections and first two controller sections. Future invalidation or public-contract changes need a separate task and any applicable reserved approval.
+
 ## Editor-trimmed marking forms — 18 October 2026
 
 **Task:** [Codex: Make sentence marking practical by hand](https://github.com/dialectmaterial/SOL/blob/11576774cadab3a9ad204128fae3abf1b44b9cc3/docs/coordination/CURRENT_TASK.md#codex-make-sentence-marking-practical-by-hand), maintainer-requested follow-up to [Claude's PR #8 review](https://github.com/dialectmaterial/SOL/pull/8#issuecomment-6242615575).
