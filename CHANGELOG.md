@@ -7,9 +7,18 @@
 `c` now shows each footnote's text, numbered as in the book. Before, it showed
 only the converter's heading ("Note 99"), because a converted footnote keeps its
 text in separate `note_paragraph` records that the reader never loaded. A
-paragraph with footnotes ends with a quiet `[99, 100] c` cue; the callout
-markers themselves are not in the source text, so their exact positions are
-not shown.
+paragraph with footnotes ends with a quiet `[99, 100] c` cue. The canonical
+Markdown records each callout's position, but the plain reading text drops it,
+so the cue does not yet sit at the callout itself.
+
+### Retyped mathematics in the local corpus — 17 October 2026
+
+Thirty passages of the private corpus had their mathematics retyped from the
+printed page as linear Unicode (`s = at²`, `dy/dx`, `(x + dx/2)(y + dy/2)`),
+replacing converter output such as `xd y y d x … − − + 2 2 4`. The corpus is
+not in Git; its `audit/math-retyping-2026-10-17.json` lists every before/after
+pair. The passages keep `needs_visual_review` until a person confirms them
+against `s`.
 
 ### Personal notes in the reader — 17 October 2026
 
