@@ -35,7 +35,7 @@ Write "None." rather than deleting a heading.
 ## Editor-trimmed marking forms — 18 October 2026
 
 **Task:** [Codex: Make sentence marking practical by hand](CURRENT_TASK.md#codex-make-sentence-marking-practical-by-hand), maintainer-requested follow-up to [Claude's PR #8 review](https://github.com/dialectmaterial/SOL/pull/8#issuecomment-6242615575).
-**Branch / PR:** `codex/marking-form-trailing-space`; PR to be opened after pushing. Status: `In review`.
+**Branch / PR:** `codex/marking-form-trailing-space` · [PR #11](https://github.com/dialectmaterial/SOL/pull/11), opened with `gh pr create --base main`. Status: `In review`.
 **Last implementation commit:** `7d553efc66fcea8271a5afcb87b1f4b58e5a5df2` (fix and documentation; this report follows).
 
 ### Changed files
