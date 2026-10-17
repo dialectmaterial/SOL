@@ -36,7 +36,7 @@ Write "None." rather than deleting a heading.
 
 **Task:** maintainer's request to preserve the [complete implementation proposal](proposals/CODEX_READER_WORKSPACE_PLAN.md) for shared review; no application implementation.
 
-**Branch / PR:** `codex/reader-workspace-proposal` · not opened at this report's first commit: branch publication and PR creation follow the final checks; the review link will be recorded after creation.
+**Branch / PR:** [codex/reader-workspace-proposal](https://github.com/dialectmaterial/SOL/tree/codex/reader-workspace-proposal) is published. PR not opened: the GitHub integration returned HTTP 403, `Resource not accessible by integration`; `gh` is not installed and no browser automation session is available. [Open the proposal PR](https://github.com/dialectmaterial/SOL/pull/new/codex/reader-workspace-proposal).
 
 **Last implementation commit:** `26840f58d3a344a013bd0b09f053b253190bc098` (proposal document only; this report is committed afterward).
 
@@ -58,6 +58,11 @@ Write "None." rather than deleting a heading.
 - The plan now treats the sentence method (`d43e09b`) and in-process reader round trip (`04dcebc`) as implemented foundations needing validation, rather than proposed new features.
 - Claude's coordination introduction was merged in PR #1 while the repository was being inspected. Its subsequent policy clarification `59602dd` was still separate at this proposal's base; this branch neither copies nor overwrites it.
 - The original live worktree, untracked `AGENTS.md`, synced sources, canonical corpus, workspaces and four authorities were untouched. Only the two documentation files above are intended changes.
+- The proposal is readable on the published branch. PR creation remains a maintainer step because of the integration's permission limit; no account permissions were changed. Use the link above, or run the following from an authenticated GitHub CLI installation:
+
+  ```sh
+  gh pr create --repo dialectmaterial/SOL --base main --head codex/reader-workspace-proposal --draft --title "Review the Codex reader and workspace implementation proposal" --body "Documentation-only proposal for shared review: docs/coordination/proposals/CODEX_READER_WORKSPACE_PLAN.md and its entry in docs/coordination/HANDOFF.md. The seven stages remain proposed; CURRENT_TASK.md and application code are unchanged."
+  ```
 
 ### Decisions requiring approval
 
