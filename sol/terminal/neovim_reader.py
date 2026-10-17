@@ -146,7 +146,11 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         return {"persistent": workspace_reader is not None, "slots": rows}
 
     def personal_notes(shown):
-        """The workspace's notes on the shown passages, following retired IDs."""
+        """The workspace's notes on the shown passages, following retired IDs.
+
+        Each note says whether this reader may edit it and whether its passage
+        changed since it was written; the note keeps its original binding.
+        """
         if workspace_reader is None:
             return {"persistent": False, "notes": {}}
         shown_ids = {passage.identifier for passage in shown.passages}
@@ -157,9 +161,23 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                 seen.add(target)
                 target = book.redirects[target]
             if target in shown_ids:
+                if record["revision"] is None:
+                    refusal = "editing needs workspace version 2; upgrade a copy with workspace upgrade FILE"
+                elif record["actor"] != workspace_reader.actor:
+                    refusal = "only the note's author can edit it"
+                elif any(unicodedata.category(c) in {"Cc", "Cf", "Cs", "Zl", "Zp"} and c not in "\n\t"
+                         for c in record["body"]):
+                    refusal = "this note has invisible control characters; edit it with sol --shell"
+                else:
+                    refusal = ""
                 notes.setdefault(target, []).append({
                     "id": record["id"], "author": display_line(record["actor"]),
                     "created_at": display_line(record["created_at"]),
+                    "revision": record["revision"], "edit_refusal": refusal,
+                    "changed_source": record["content_sha256"] != book.canonical_records[target]["content_sha256"],
+                    "retired_target": record["target_id"] != target,
+                    # The exact text goes to the editor only when it is safe to show raw.
+                    "body": None if refusal else record["body"],
                     "lines": [display_line(line) for line in record["body"].split("\n")]})
         return {"persistent": True, "notes": notes}
 
@@ -187,21 +205,26 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
 
     payload, sample, extent = prepare()
 
-    # Each action's one extra field, its check and the refusal shown in Neovim.
+    # Each action's extra fields, their checks and the refusals shown in Neovim.
     # Actions without an entry take no extra field.
+    note_body = ("body", lambda body: isinstance(body, str) and 1 <= len(body.strip()) and len(body) <= NOTE_LIMIT,
+                 f"a note needs 1–{NOTE_LIMIT} characters")
+    note_id = ("note", lambda note: isinstance(note, str), "choose one of your notes on this passage")
     extra_fields = {
-        "marker_set": ("slot", lambda slot: type(slot) is int and slot in (1, 2, 3),
-                       "reader markers have slots 1, 2 and 3"),
-        "node_open": ("node", lambda node: True, ""),
-        "source_preview": ("page", lambda page: type(page) is int, "choose a source page by number"),
-        "search": ("query", lambda query: isinstance(query, str) and 1 <= len(query.strip()) <= 256,
-                   "search needs 1–256 characters"),
-        "search_open": ("result", lambda result: type(result) is int and 1 <= result <= len(actions.results),
-                        "choose a displayed search result"),
-        "study_open": ("row", lambda row: study is not None and type(row) is int and 1 <= row <= len(study["longest"]),
-                       "choose a displayed sentence"),
-        "note_add": ("body", lambda body: isinstance(body, str) and 1 <= len(body.strip()) and len(body) <= NOTE_LIMIT,
-                     f"a note needs 1–{NOTE_LIMIT} characters"),
+        "marker_set": [("slot", lambda slot: type(slot) is int and slot in (1, 2, 3),
+                        "reader markers have slots 1, 2 and 3")],
+        "node_open": [("node", lambda node: True, "")],
+        "source_preview": [("page", lambda page: type(page) is int, "choose a source page by number")],
+        "search": [("query", lambda query: isinstance(query, str) and 1 <= len(query.strip()) <= 256,
+                    "search needs 1–256 characters")],
+        "search_open": [("result", lambda result: type(result) is int and 1 <= result <= len(actions.results),
+                         "choose a displayed search result")],
+        "study_open": [("row", lambda row: study is not None and type(row) is int and 1 <= row <= len(study["longest"]),
+                        "choose a displayed sentence")],
+        "note_add": [note_body],
+        "note_edit": [note_id, ("revision", lambda revision: type(revision) is int and revision >= 1,
+                                "the note's revision is required"), note_body],
+        "note_history": [note_id],
     }
     extra_fields["marker_clear"] = extra_fields["marker_open"] = extra_fields["marker_set"]
     navigation_actions = {"next", "previous", "passage_next", "passage_previous", "node_open", "marker_open",
@@ -278,8 +301,46 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         workspace_reader.add_annotation(request["body"], actions.session, identifier)
         return {"personal": personal_notes(sample)}
 
+    def shown_note(request, identifier):
+        """A note listed under the passage the editor sent, never an arbitrary ID."""
+        if workspace_reader is None:
+            raise ValueError("notes need a workspace; this temporary -n session saves nothing")
+        target = request["packet"]["reference"]["reference"]["target_id"]
+        listed = personal_notes(sample)["notes"].get(target, [])
+        row = next((row for row in listed if row["id"] == request["note"]), None)
+        if row is None:
+            raise ValueError("that note is not on this passage; open c on its passage")
+        return row
+
+    def note_edit_panel(request, identifier):
+        # Only the note's author edits it, from the revision they opened; the
+        # note keeps its ID, target and original source digest. A save that
+        # changes nothing adds no revision.
+        row = shown_note(request, identifier)
+        if row["edit_refusal"]:
+            raise ValueError(row["edit_refusal"])
+        captured = workspace_reader.prepare_annotation_edit(row["id"])
+        if captured.revision != request["revision"]:
+            raise ValueError("this note changed in another session since you opened it; "
+                             "your draft is kept, reopen c to see the newer text")
+        saved = workspace_reader.save_annotation_edit(captured, request["body"], expected_revision=request["revision"])
+        return {"personal": personal_notes(sample),
+                "note_saved": {"id": saved["id"], "revision": saved["revision"],
+                               "changed": saved["revision"] != captured.revision}}
+
+    def note_history_panel(request, identifier):
+        row = shown_note(request, identifier)
+        revisions = [] if row["revision"] is None else workspace_reader.store.list_annotation_history(row["id"])
+        return {"note_history": {"id": row["id"], "author": row["author"], "revisions": [
+            {"revision": item["revision"], "kind": display_line(item["kind"]),
+             "editor": display_line(item["editor"] or item["actor"]),
+             "recorded_at": display_line(item["recorded_at"]),
+             "lines": [display_line(line) for line in item["body"].split("\n")]}
+            for item in reversed(revisions)]}}
+
     panels = {"search": search_panel, "source_preview": source_panel, "marker_set": marker_panel,
-              "marker_clear": marker_panel, "note_add": note_panel, "sentence_study": study_panel}
+              "marker_clear": marker_panel, "note_add": note_panel, "sentence_study": study_panel,
+              "note_edit": note_edit_panel, "note_history": note_history_panel}
 
     def handle(request):
         nonlocal payload, sample, extent, mode, start_tree, notice, focused, theme, search_marks
@@ -295,8 +356,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                 raise ValueError("unknown reader theme")
         if operation not in panels and operation not in navigation_actions:
             raise ValueError("unknown reader action")
-        if operation in extra_fields:
-            name, valid, refusal = extra_fields[operation]
+        for name, valid, refusal in extra_fields.get(operation, ()):
             fields.add(name)
             if not valid(request.get(name)):
                 raise ValueError(refusal)
