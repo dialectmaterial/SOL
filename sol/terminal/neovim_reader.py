@@ -211,10 +211,14 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     def study_panel(request, identifier):
         # ESSENCE measures the loaded section; BEING only shows the result and
         # keeps the origin. Nothing here moves the cursor or writes the workspace.
+        # The origin is where the cursor is now: native motion sends no request,
+        # so Python's last accepted position may be another paragraph.
         nonlocal study
         from sol.essence.sentences import analyze_sentences, save_sentence_result
+        origin = request["packet"]["reference"]
+        actions.check_return_reference(origin)
         scope = {"kind": "passages", "ids": [passage.identifier for passage in sample.passages]}
-        study = analyze_sentences(book.corpus_snapshot, scope=scope, origin=actions.capture_active_reference())
+        study = analyze_sentences(book.corpus_snapshot, scope=scope, origin=origin)
         saved = None if workspace_reader is None else str(save_sentence_result(study))
         summary, rows = study["summary"], []
         for number, index in enumerate(study["longest"], 1):
