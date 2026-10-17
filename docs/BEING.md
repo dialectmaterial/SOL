@@ -4,6 +4,8 @@
 **Repository baseline:** `main` at `1d200e4fcbff1ca69f48b5dc96c55765f215f303`.  
 **Companions:** [Architecture](ARCHITECTURE.md) · [CORE](CORE.md) · [ESSENCE](ESSENCE.md).
 
+**Implementation reviewed through:** `8ae7b3c` (17 October 2026). The baseline above is the original adoption snapshot; the implemented theme, source-preview and note features below were added afterward.
+
 ## 1. Purpose and non-negotiable experience
 
 BEING is the place to **read Hegel's *Science of Logic***, locate source evidence, think, mark, question, annotate, compare, and depart for/return from computation. It is not an ebook format, a terminal emulator, or merely a virtual filesystem. Its primary use case is a comfortable sustained reading session. A working structure tree, extensive keybindings and correct UUID handling are only foundations; an unpleasant reading surface is an unresolved product defect even when automated tests pass.
@@ -46,6 +48,8 @@ The current implementation also includes literal book search, source-positioned 
 `n` means *next paragraph*, **not** Neovim's default next regex match. `gg/G` operate only within the loaded section. Selections remain inside a single canonical passage and are not automatically saved as annotations. A note written with `a` attaches to the whole passage through the same workspace service as the shell's `note add` (actor, content digest, revision history); a selection is shown above the editor as context but is not stored, because no workspace schema records spans. Drafts survive closing the editor or a failed save, until saved or discarded with `Ctrl-C`. The `c` popup lists the workspace's notes on the passage; temporary `-n` sessions refuse notes. Search and passage navigation preserve source offsets as far as the verified projection allows.
 
 **Adoption clarification:** use `j/k` for wrapped rows. Up/Down retain native Neovim buffer-line motion; they are not currently mapped to the same visual-row actions. The single vertical outline has no shipped horizontal-layout switch. No control behavior was changed by the documentation migration.
+
+**Draft lifetime:** unsaved note drafts are process-local recovery state. Closing the note editor (including `:q!`) or a failed save keeps the draft available under `a` during that SOL session; quitting/restarting SOL does not durably save an unpublished draft. Save through `Ctrl-S` or `:w` before leaving SOL. Clipboard, viewer and Ctrl-S behavior still need the manual terminal checks described below.
 
 ### Basic operations
 
@@ -127,7 +131,7 @@ Checkout-only proofs include continuous terminal and offline self-contained HTML
 
 ## 5. Mathematical notation and source fidelity
 
-This corpus includes separate `formula` records and prose passages with `contains_math: true`. Some formula transcriptions require review and may have source-image facsimiles. **Implemented:** mathematical passages remain addressable and navigable; PDF/source evidence is retained; optional Kitty source viewing exists. **Not implemented:** faithful native Neovim rendering of arbitrary 2-D mathematical notation or a verified general LaTeX conversion pipeline.
+The corpus contract supports separate `formula` records and prose passages with `contains_math: true`; this does not mean every supported type is present in the imported book. The recorded scratch import below found **no `formula` records** and 46 mixed main-text paragraphs containing mathematics, all `needs_visual_review`. **Implemented:** mathematical passages remain addressable and navigable; `s` renders printed evidence from the verified PDF without requiring Kitty; the older Kitty source-view integration also remains. **Not implemented:** faithful native Neovim rendering of arbitrary 2-D mathematical notation or a verified general LaTeX conversion pipeline.
 
 **Near-term decision:** prioritize a **source-faithful formula preview**. From the current formula or mixed passage, offer a single action that displays the correct original crop/page (or a reviewed typed formula where available) and returns without losing passage and cursor position. For Alacritty, a separate local image/PDF/browser viewer is legitimate. Kitty can optionally offer enhanced panes, but formula access must not depend on Kitty. Avoid OCR hallucination: generated LaTeX is an unreviewed candidate, not authoritative source. Preserve exponent/fraction placement, printed/PDF page labels, transcription status, attribution, image provenance, and warning flags. Never replace ambiguous formula content with a guessed linear string.
 
@@ -147,7 +151,7 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 
 - Current normal reading is bounded by chapters/64-record sections, not a whole-book text buffer.
 - No native cross-paragraph span selection; normal visual selection is transient and passage-local.
-- Rich mathematical and source facsimile rendering is incomplete.
+- Printed-source preview is implemented, but native 2-D mathematical typesetting and the real-terminal popup/viewer acceptance remain incomplete.
 - The outline/search/marker UI is functional but readability, styling, and mode transitions require actual use testing.
 - Some scholarly actions are still most accessible through the optional compatibility shell: editing notes and their history, comparisons, reviews and relations. Writing and viewing notes is in the reader.
 - Notes cannot yet anchor to a selected span; that needs a new workspace schema version.

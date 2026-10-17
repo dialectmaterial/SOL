@@ -4,9 +4,11 @@
 **Repository baseline:** [`dialectmaterial/SOL`](https://github.com/dialectmaterial/SOL), `main` at `1d200e4fcbff1ca69f48b5dc96c55765f215f303`.  
 **Companion documents:** [BEING](BEING.md) · [ESSENCE](ESSENCE.md) · [CORE](CORE.md).
 
+**Implementation reviewed through:** `8ae7b3c` (17 October 2026). The baseline above records the original documentation adoption, not the latest feature state.
+
 > **Interpretation rule.** A statement marked **Implemented** describes the inspected baseline. A statement marked **Decision** expresses the present design direction; it may require code changes. **Proposed** features are not available merely because they appear here. Code, tests, and the relevant schema control the precise behavior of an implemented function. The Git working tree may be ahead of this snapshot: inspect it before making changes.
 
-**Adoption check:** the repository matched the baseline above. Neovim is the single default reader, continuous views remain bounded, and Terminal/Dark/Paper presets are not shipped. The migration corrected setup/dependency wording in CORE and a navigation detail in BEING; it implements none of the decisions below. Historical documents and the migration inventory are in the [legacy archive](legacy/README.md).
+**Adoption check:** at the original baseline, Neovim was the single default reader, continuous views were bounded, and the three theme presets were not yet shipped. The documentation migration corrected setup/dependency wording in CORE and a navigation detail in BEING; it implemented no reader features. Subsequent commits added Terminal/Dark/Paper, fingerprint-checked printed-source preview (`s`), and passage-level note writing (`a`). Sustained terminal/visual acceptance remains open. Historical documents and the original migration inventory remain unchanged in the [legacy archive](legacy/README.md).
 
 ## 1. What SOL is for
 
@@ -45,7 +47,7 @@ CORE is **not** a fourth Hegelian stage; it is a shared engineering substrate. B
 
 **Decision, 17 October:** narrow active development to the existing audited Cambridge/George di Giovanni *Science of Logic* corpus. Do not start an arbitrary-PDF importer, multi-book catalog, or translation alignment project. Maintain the existing edition/source metadata and make no compatibility-breaking shortcuts that would obstruct later versions, but design future ingestion only when the present reader-and-inquiry loop justifies it.
 
-**Implemented:** first-run installation can import the *exact audited source PDF*; it rejects unknown editions, scans, and recoded copies. OpenDataLoader produces extraction/review candidates but does **not** make the application a general importer. Canonical Markdown is the text correction surface; JSONL is generated. Source PDFs, private corpora, crops, and analysis exports are not committed publicly. See [CORE](CORE.md).
+**Implemented:** after installation, first interactive `sol` launch can import the *exact audited source PDF*; it rejects unknown editions, scans, and recoded copies. The installer itself does not import the book. OpenDataLoader produces extraction/review candidates but does **not** make the application a general importer. Canonical Markdown is the text correction surface; JSONL is generated. Source PDFs, private corpora, crops, and analysis exports are not committed publicly. See [CORE](CORE.md).
 
 ## 4. User experience: one system, multiple surfaces
 
@@ -69,9 +71,9 @@ A paragraph UUID represents a source record; a PDF page is evidence/provenance, 
 
 Workstreams can overlap, but must stay bounded:
 
-**A. Reader quality.** Compare historical prompt_toolkit presentation with current Neovim, identify visual regressions, improve actual spacing/flow/semantics, add Terminal/Dark/Paper, and conduct sustained reading trials. A screenshot or headless smoke test is necessary but insufficient. Avoid repetitive migrations.
+**A. Reader quality.** Compare historical prompt_toolkit presentation with current Neovim, identify visual regressions, improve actual spacing/flow/semantics, evaluate the shipped Terminal/Dark/Paper presets, and conduct sustained reading trials. A screenshot or headless smoke test is necessary but insufficient. Avoid repetitive migrations.
 
-**B. Formula fidelity.** Inventory existing `formula` / `contains_math` records and image assets; retain warnings and provenance; implement reliable on-demand previews, then optionally reviewed LaTeX/MathML rendering. The reader must never flatten an unverified formula into apparently certain prose.
+**B. Formula fidelity.** Use the recorded mixed-math inventory and verify the shipped on-demand printed-source preview in the normal terminal/viewer workflow. The scratch import reported no `formula` records and 46 flagged mixed paragraphs; see [BEING §5](BEING.md#5-mathematical-notation-and-source-fidelity). Preserve warnings and provenance. Previews are rendered from the fingerprint-checked PDF, not the converter's unverified image assets. Reviewed LaTeX/MathML rendering remains future work; the reader must never flatten an unverified formula into apparently certain prose.
 
 **C. First complete inquiry.** From a chapter or passage context in BEING, launch a **sentence-length / syntactic distribution** experiment in ESSENCE; produce a versioned and source-bound artifact; inspect findings; return to a referenced sentence/passage without losing the reader's prior location. Do this before adding a model zoo.
 
