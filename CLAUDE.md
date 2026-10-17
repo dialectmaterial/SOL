@@ -9,16 +9,19 @@ never edit it.
 
 ## Roles
 
-- **Claude Code** implements the current task on a branch and reports.
-- **ChatGPT** reviews through GitHub (the pull request, its diff and the
-  coordination files) and drafts the next task. It needs no conversation transcript.
-- **The maintainer** approves decisions, merges pull requests and commits task
-  changes that ChatGPT drafts.
+- **Claude Code** implements its current task on a `claude/` branch and reports.
+- **Codex** implements its own current task on a `codex/` branch, in parallel,
+  following the same procedure; its task never touches the same files.
+- **Reviewers:** each implementing agent reviews the other's pull request when
+  the maintainer asks; ChatGPT reviews through GitHub (the pull request, its diff
+  and the coordination files) and drafts next tasks. Nobody needs a conversation
+  transcript.
+- **The maintainer** assigns tasks, approves decisions and merges pull requests.
 
 ## Before starting
 
 1. Read [`docs/coordination/CURRENT_TASK.md`](docs/coordination/CURRENT_TASK.md).
-   Work only on that task; if it is unclear or conflicts with the four authorities,
+   Work only on the task assigned to you; if it is unclear or conflicts with the four authorities,
    ask instead of guessing.
 2. Read the latest entry in [`docs/coordination/HANDOFF.md`](docs/coordination/HANDOFF.md)
    and the authority sections the task names.
@@ -49,7 +52,9 @@ never edit it.
 1. Add a report at the top of `docs/coordination/HANDOFF.md` using its template.
    The report names the last implementation commit; commit the report itself
    last, as `Record handoff: <task>`.
-2. Set the task's status in `CURRENT_TASK.md` to `In review`.
+2. Set your task's status in `CURRENT_TASK.md` to `In review`. If `main` moved
+   meanwhile (the other agent's pull request merged), rebase onto it; conflicts
+   at the top of `HANDOFF.md` are resolved by keeping both reports, newest first.
 3. Push the branch and open a pull request against `main` whose description
    links the handoff entry. If pushing or opening the pull request is not
    possible, say so in the report and give the exact commands.
