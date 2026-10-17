@@ -35,7 +35,7 @@ Write "None." rather than deleting a heading.
 ## Reader speed baseline — 18 October 2026
 
 **Task:** [Codex: Measure reader speed before optimising](CURRENT_TASK.md#codex-measure-reader-speed-before-optimising).
-**Branch / PR:** `codex/reader-timings`; PR to be opened after pushing. Status: `In review`.
+**Branch / PR:** `codex/reader-timings` · [PR #14](https://github.com/dialectmaterial/SOL/pull/14), opened with `gh pr create --base main`. Status: `In review`.
 **Last implementation commit:** `fbba797fe4a9e22807712e060d86d207ba8e8923` (script/tests and documentation; this report follows).
 
 ### Changed files
