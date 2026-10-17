@@ -1,4 +1,4 @@
-"""Read-only lexical experiments over an independently selected local corpus."""
+"""Read-only analysis inputs and experiments over a selected local corpus."""
 
 from __future__ import annotations
 
@@ -25,7 +25,8 @@ def build_parser() -> argparse.ArgumentParser:
                       help="maximum representative passages (default: 10)")
     check = commands.add_parser("check", help="recompute and verify a saved experiment against the local corpus")
     check.add_argument("file", metavar="FILE|-", help="saved result JSON, or - for piped input")
-    for command in (term, check):
+    prose = commands.add_parser("prose", help="prepare prose-only analysis input, retaining headings as metadata")
+    for command in (term, check, prose):
         command.add_argument("--corpus", type=Path, metavar="DIRECTORY",
                              help="use this local canonical corpus instead of discovery")
         command.add_argument("--json", action="store_true", help="print machine-readable JSON instead of a human summary")
@@ -120,13 +121,22 @@ def main(arguments: list[str] | None = None) -> int:
         # Reject unsafe input before inspecting corpus/configuration data.
         if options.action == "check":
             result = decode_term_result(read_json_input(options.file, MAX_RESULT_BYTES))
-        elif options.reference is not None:
+        elif options.action == "term" and options.reference is not None:
             origin = decode_reference(read_json_input(options.reference, MAX_REFERENCE_BYTES))
         directory = discover_corpus(options.corpus)
         if directory is None:
             raise ValueError("No canonical corpus configured; use --corpus DIRECTORY or sol --set-corpus DIRECTORY")
         snapshot = load_snapshot(directory)
-        if options.action == "term":
+        if options.action == "prose":
+            from sol.essence.prose import export_prose
+            result = export_prose(snapshot)
+            print(_json(result) if options.json else (
+                f"{len(result['passages'])} prose passages ready for analysis; "
+                f"{result['exclusions']['excluded_records']} records excluded.\n"
+                "Vector input: passages[].text (headings and image labels excluded).\n"
+                "Canonical ancestry, headings and source references remain in metadata.\n"
+                "Use sol analyze prose --json to export the complete input."))
+        elif options.action == "term":
             result = analyze_term(snapshot, options.word, origin=origin,
                                   doctrine=options.doctrine.upper() if options.doctrine else None,
                                   limit=options.limit)

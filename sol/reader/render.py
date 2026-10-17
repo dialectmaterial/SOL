@@ -271,11 +271,13 @@ Your reading position and personal notes stay local. Canonical text is read-only
 
 MORE WHEN YOU NEED IT
   sol --engine neovim  try continuous reading (requires Neovim 0.11+)
+  sol --dynamic-structure  explore the interactive vertical/horizontal tree
   sol guide --depth 2  reveal more of the book's structure
   sol --help          see options and one-shot reading commands
   sol --shell         open the optional command interface
 In that interface: guide PATH --depth N; help shows its command syntax.
-Neovim keeps native search/word keys: ? shows its separate reader bindings.
+Neovim: p toggles paragraph/continuous mode; m1-3 mark; y copies; t opens tree.
+It keeps native search/word keys: ? shows its separate reader bindings.
 BEING runs in Alacritty and other capable terminals; Kitty is optional."""
     if book is None:
         starting += """\n\nCORPUS SETUP (the book tree is an abbreviated fallback)

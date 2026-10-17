@@ -63,7 +63,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
     def test_adjacent_records_share_one_view_without_changing_canonical_text(self):
         self.extend()
         before = self.files()
-        def native(payload, executable):
+        def native(payload, executable, **options):
             self.assertEqual([row["id"] for row in payload["records"]],
                              [p.identifier for p in self.book.passages])
             self.assertTrue(payload["integrated"])
@@ -79,7 +79,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         service = self.service()
         self.position(service, 9)
         observed = []
-        def native(payload, _):
+        def native(payload, _, **options):
             observed.append((payload["width"], payload["restore"]["cursor_offset"]))
             return 0, self.reply(payload, record=1, offset=17)
         with patch.object(neovim, "launch_payload", side_effect=native):
@@ -101,7 +101,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         self.write_records(rows)
         service = self.service()
         self.position(service, 5, RETIRED)
-        def native(payload, _):
+        def native(payload, _, **options):
             self.assertEqual(payload["restore"]["reference"]["reference"]["requested_id"], RETIRED)
             self.assertEqual(payload["records"][0]["reference"]["reference"]["requested_id"], RETIRED)
             return 0, self.reply(payload, offset=11)
@@ -127,7 +127,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
                 service = self.service(self.root / f"invalid-{str(bad)}.sqlite3")
                 self.position(service, 4)
                 before = service.store.get_state()
-                with patch.object(neovim, "launch_payload", side_effect=lambda p, _: (0, self.reply(p, offset=bad))), \
+                with patch.object(neovim, "launch_payload", side_effect=lambda p, _, **kw: (0, self.reply(p, offset=bad))), \
                         self.assertRaises(ValueError):
                     self.run_view(service)
                 self.assertEqual(service.store.get_state(), before)
@@ -145,7 +145,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         service = self.service()
         self.position(service, 4)
         before = service.store.get_state()
-        def native(payload, _):
+        def native(payload, _, **options):
             source = self.corpus / "sample.md"
             source.write_text(source.read_text() + "\nAn unindexed edit.\n")
             return 0, self.reply(payload)
@@ -158,7 +158,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         self.position(service, 4)
         before = service.store.get_state()
         for action in ("next", "previous", "execute", None, []):
-            def native(payload, _):
+            def native(payload, _, **options):
                 return 0, self.reply(payload, action=action)
             with self.subTest(action=action), patch.object(neovim, "launch_payload", side_effect=native), \
                     self.assertRaises(ValueError):
@@ -199,7 +199,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         service = self.service()
         self.position(service, 4)
         seen = []
-        def native(payload, _):
+        def native(payload, _, **options):
             seen.append([r["id"] for r in payload["records"]])
             if len(seen) == 1:
                 self.assertTrue(payload["navigation"]["next"])
@@ -254,6 +254,112 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 actions.accept_return_position(reference, 14, replace(selection, **changes))
             self.assertEqual(actions.snapshot(), before)
+
+    def test_three_markers_save_immediately_even_if_editor_later_quits_without_cursor_save(self):
+        self.extend(3)
+        service = self.service()
+        self.position(service, 4)
+        before = service.store.get_state()
+        def native(payload, _, on_request):
+            for slot, index in ((1, 0), (2, 1), (3, 2)):
+                result = on_request({"op": "marker_set", "slot": slot, "mode": "continuous",
+                                     "packet": self.reply(payload, record=index)["packet"]})
+                self.assertTrue(result["markers"]["persistent"])
+                self.assertEqual(service.store.get_bookmark(f"sol:reader-marker:{slot}")["target_id"],
+                                 self.book.passages[index].identifier)
+            return 0, None
+        with patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+        self.assertEqual(service.store.get_state(), before)
+        def reopened(payload, _, **kwargs):
+            self.assertEqual([row["target"] for row in payload["markers"]["slots"]],
+                             [row.identifier for row in self.book.passages])
+            return 0, self.reply(payload)
+        with patch.object(neovim, "launch_payload", side_effect=reopened):
+            self.assertEqual(self.run_view(service), 0)
+
+    def test_marker_clear_preserves_other_slots_and_ordinary_bookmarks(self):
+        service = self.service()
+        actions = self.position(service)
+        service.save_bookmark("An ordinary named bookmark", actions.session)
+        def native(payload, _, on_request):
+            packet = self.reply(payload)["packet"]
+            for slot in (1, 2):
+                on_request({"op": "marker_set", "slot": slot, "packet": packet, "mode": "paragraph"})
+            result = on_request({"op": "marker_clear", "slot": 1, "packet": packet, "mode": "paragraph"})
+            self.assertIsNone(result["markers"]["slots"][0]["target"])
+            self.assertEqual(result["markers"]["slots"][1]["target"], self.identifier)
+            self.assertIsNotNone(service.store.get_bookmark("An ordinary named bookmark"))
+            return 0, self.reply(payload)
+        with patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+
+    def test_temporary_markers_can_jump_without_opening_any_workspace(self):
+        self.extend(3)
+        before = self.files()
+        def native(payload, _, on_request):
+            packet = self.reply(payload, record=2)["packet"]
+            result = on_request({"op": "marker_set", "slot": 1, "packet": packet, "mode": "paragraph"})
+            self.assertFalse(result["markers"]["persistent"])
+            result = on_request({"op": "marker_open", "slot": 1, "packet": packet, "mode": "paragraph"})
+            shown = result["payload"]
+            self.assertEqual(shown["mode"], "paragraph")
+            self.assertEqual(shown["restore"]["reference"]["reference"]["target_id"], self.book.passages[2].identifier)
+            return 0, {"action": "quit", "packet": shown["restore"]}
+        with patch.object(neovim, "launch_payload", side_effect=native), \
+                patch("sol.workspace.store.Workspace", side_effect=AssertionError("No personal store")):
+            self.assertEqual(self.run_view(), 0)
+        self.assertEqual(self.files(), before)
+
+    def test_live_section_transition_does_not_restart_the_native_process(self):
+        self.extend(3)
+        def native(payload, _, on_request):
+            packet = self.reply(payload)["packet"]
+            result = on_request({"op": "next", "mode": "paragraph", "packet": packet})
+            shown = result["payload"]
+            self.assertEqual(shown["mode"], "paragraph")
+            self.assertEqual(shown["records"][0]["id"], self.book.passages[1].identifier)
+            return 0, {"action": "quit", "packet": shown["restore"]}
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native) as launch:
+            self.assertEqual(self.run_view(), 0)
+        launch.assert_called_once()
+
+    def test_invalid_live_requests_do_not_write_markers_or_positions(self):
+        service = self.service()
+        self.position(service, 4)
+        before = service.store.export()
+        def native(payload, _, on_request):
+            packet = self.reply(payload)["packet"]
+            requests = [
+                {"op": "marker_set", "slot": slot, "packet": packet, "mode": "continuous"}
+                for slot in (True, 0, 4, "1")]
+            requests += [{"op": "node_open", "node": [], "packet": packet, "mode": "continuous"},
+                         {"op": "node_open", "node": "/nonexistent", "packet": packet, "mode": "continuous"},
+                         {"op": "execute", "packet": packet, "mode": "continuous"}]
+            for request in requests:
+                with self.subTest(request=request), self.assertRaises(ValueError):
+                    on_request(request)
+            return 0, None
+        with patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+        after = service.store.export()
+        before.pop("exported_at")
+        after.pop("exported_at")
+        self.assertEqual(after, before)
+
+    def test_tree_selection_resolves_display_path_to_existing_source_identity(self):
+        self.extend(3)
+        def native(payload, _, on_request):
+            tree = payload["structure"]
+            row = next(row for row in tree["nodes"] if row["key"] == tree["current"])
+            self.assertEqual(row["title"], "Synthetic section")
+            packet = self.reply(payload, record=2)["packet"]
+            result = on_request({"op": "node_open", "node": row["key"], "packet": packet, "mode": "continuous"})
+            self.assertEqual(result["payload"]["restore"]["reference"]["reference"]["target_id"], self.identifier)
+            return 0, {"action": "quit", "packet": result["payload"]["restore"]}
+        with patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(), 0)
 
 
 if __name__ == "__main__":

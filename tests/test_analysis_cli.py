@@ -142,6 +142,22 @@ class AnalysisCLITests(unittest.TestCase):
         self.assertNotIn("protocol", receipt)
         self.assertEqual(self.files(), before)
 
+    def test_prose_export_has_only_body_features_and_keeps_source_metadata(self):
+        before = self.files()
+        exported = self.run_cli(["prose", "--json"])
+        self.assertEqual(exported.returncode, 0, exported.stderr)
+        result = json.loads(exported.stdout)
+        self.assertEqual(result["format"], "sol.prose-input")
+        self.assertEqual(len(result["passages"]), 3)
+        self.assertEqual([row["text"] for row in result["passages"]],
+                         [record["plain_text"] for record in self.records if record["id"] in self.identifiers.values()])
+        self.assertEqual(result["passages"][0]["metadata"]["ancestry"][0]["title"], "BEING")
+        self.assertEqual(self.files(), before)
+        status, output, error = self.call(["prose"])
+        self.assertEqual(status, 0, error)
+        self.assertIn("3 prose passages", output)
+        self.assertIn("headings and image labels excluded", output)
+
     def test_human_summary_explains_method_locations_review_and_context(self):
         status, output, error = self.call(["term", "GROUND", "--limit", "1"])
         self.assertEqual(status, 0, error)
@@ -390,7 +406,7 @@ class AnalysisCLITests(unittest.TestCase):
         self.assertIn(self.identifiers["BEING"], rendered)
 
     def test_help_never_discovers_or_opens_application_data(self):
-        for arguments in (["--help"], ["term", "--help"], ["check", "--help"]):
+        for arguments in (["--help"], ["term", "--help"], ["check", "--help"], ["prose", "--help"]):
             with self.subTest(arguments=arguments), \
                     patch("sol.core.discover_corpus", side_effect=AssertionError("No discovery")), \
                     patch("sol.core.load_snapshot", side_effect=AssertionError("No load")), \

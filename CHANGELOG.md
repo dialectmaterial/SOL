@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+The optional Neovim reader adds three immediately saved paragraph markers,
+clipboard yank, a continuous/paragraph mode toggle and an on-demand book map.
+The map supports expandable vertical outlines and horizontal columns, contextual
+scope and depth; `--dynamic-structure` opens it independently. Paragraph-mode
+motions stay within the paragraph; explicit `[p` / `]p` change paragraphs.
+Private inherited pipes let explicit actions use existing workspace services
+without restarting Neovim, introducing a listener or changing workspace schemas.
+
 An optional installed `sol --engine neovim` reader displays adjacent paragraphs
 continuously, using native word wrapping and Vim navigation. It shares normal
 actor/workspace onboarding and source-codepoint position persistence with the

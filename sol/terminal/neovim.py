@@ -222,6 +222,8 @@ def _write_json(path, value):
 
 def _isolated_environment(root, input_path, output_path):
     environment = os.environ.copy()
+    for key in ("SOL_NVIM_REQUEST_FD", "SOL_NVIM_RESPONSE_FD"):
+        environment.pop(key, None)
     for key in tuple(environment):
         if key.startswith("NVIM") or key in {"VIM", "VIMRUNTIME", "VIMINIT", "EXINIT", "GVIMINIT", "MYVIMRC", "LUA_PATH", "LUA_CPATH"}:
             environment.pop(key)
@@ -238,7 +240,7 @@ def _isolated_environment(root, input_path, output_path):
     return environment
 
 
-def launch_payload(payload, executable):
+def launch_payload(payload, executable, *, on_request=None):
     """One native, isolated terminal session; its result is still untrusted."""
     adapter = Path(__file__).with_name("neovim.lua")
     if not adapter.is_file():
@@ -255,14 +257,19 @@ def launch_payload(payload, executable):
         command = [executable, "--clean", "-u", "NONE", "-i", "NONE", "-n", "--noplugin",
                    "--cmd", _READ_ONLY_OPTIONS, "-c", _STOP_SERVERS, "-c", _LOAD_ADAPTER]
         try:
-            # Inherit the real terminal: no embedded screen, pipe, shell, server
-            # connection or user config. Native startup briefly creates its own
+            # Inherit the real terminal: its screen is not embedded or piped.
+            # Optional action pipes carry data only, with no shell or listener.
+            # Native startup briefly creates its own
             # private RPC socket; the first -c immediately stops every listener.
-            result = subprocess.run(command, cwd=root, env=environment, check=False)
+            if on_request is None:
+                code = subprocess.run(command, cwd=root, env=environment, check=False).returncode
+            else:
+                from sol.terminal.reader_channel import run_native
+                code = run_native(command, cwd=root, env=environment, handler=on_request)
         except KeyboardInterrupt:
             return 130, None
-        if result.returncode:
-            return (result.returncode if result.returncode > 0 else 128 - result.returncode), None
+        if code:
+            return (code if code > 0 else 128 - code), None
         return 0, _read_packet(output_path) if output_path.exists() else None
 
 

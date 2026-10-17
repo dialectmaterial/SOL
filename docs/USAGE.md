@@ -17,7 +17,8 @@ This manual covers the reader, virtual shell, personal workspaces, corpus mainte
 8. [Optional kitty integration and source viewing](#read-in-kitty-and-inspect-the-source)
 9. [Explicit BEING–ESSENCE handoff](HANDOFF.md)
 10. [Reproducible term study](TERM_STUDY.md)
-11. [Development checks](#development-checks)
+11. [Prose-only inputs for models](PROSE_INPUTS.md)
+12. [Development checks](#development-checks)
 
 ## Install with pipx
 

@@ -1,5 +1,6 @@
 -- Native SOL reading surface. Source strings are data, never Ex/Lua code.
 -- Python owns corpus verification and validates the returned research packet.
+local supplied = ...
 local api, uv = vim.api, vim.uv or vim.loop
 for _, server in ipairs(vim.fn.serverlist()) do pcall(vim.fn.serverstop, server) end
 
@@ -66,26 +67,37 @@ if type(input_path) ~= "string" or input_path:sub(1, 1) ~= "/"
   or type(output_path) ~= "string" or output_path:sub(1, 1) ~= "/" or input_path == output_path then
   fail("private absolute input and output paths are required")
 end
-local fd, read_error = uv.fs_open(input_path, "r", 0)
-if not fd then fail("cannot read private input: " .. tostring(read_error)) end
-local stat = uv.fs_fstat(fd)
-if not stat or stat.type ~= "file" or stat.size > 16 * 1024 * 1024 then
-  uv.fs_close(fd); fail("input must be a regular file smaller than 16 MiB")
+local data
+if type(supplied) == "table" then data = supplied
+else
+  local fd, read_error = uv.fs_open(input_path, "r", 0)
+  if not fd then fail("cannot read private input: " .. tostring(read_error)) end
+  local stat = uv.fs_fstat(fd)
+  if not stat or stat.type ~= "file" or stat.size > 16 * 1024 * 1024 then
+    uv.fs_close(fd); fail("input must be a regular file smaller than 16 MiB")
+  end
+  local raw, read_problem = uv.fs_read(fd, stat.size, 0)
+  uv.fs_close(fd)
+  if not raw then fail("cannot read input: " .. tostring(read_problem)) end
+  local decoded
+  decoded, data = pcall(vim.json.decode, raw)
+  if not decoded then fail("invalid input JSON") end
 end
-local raw, read_problem = uv.fs_read(fd, stat.size, 0)
-uv.fs_close(fd)
-if not raw then fail("cannot read input: " .. tostring(read_problem)) end
-local decoded, data = pcall(vim.json.decode, raw)
-if not decoded or type(data) ~= "table" or type(data.records) ~= "table"
+if type(data) ~= "table" or type(data.records) ~= "table"
   or #data.records < 1 or #data.records > 64 then fail("invalid bounded source input") end
 if not integer(data.width) or data.width < 8 or data.width > 1000 then fail("invalid reading width") end
 if data.emphasis ~= nil and data.emphasis ~= "italic" and data.emphasis ~= "underline" then
   fail("invalid semantic emphasis presentation")
 end
 local integrated = data.integrated == true
+local mode = data.mode or "continuous"
+if mode ~= "continuous" and mode ~= "paragraph" then fail("invalid reading mode") end
+local focused_id = data.restore and data.restore ~= vim.NIL and data.restore.reference.reference.target_id or data.records[1].id
 if integrated and (not exact_keys(data.navigation, { "previous", "next" })
   or type(data.navigation.previous) ~= "boolean" or type(data.navigation.next) ~= "boolean"
   or type(data.notice) ~= "string") then fail("invalid reading navigation") end
+local previous_reader = rawget(_G, 'SOLNvimReader')
+if previous_reader and previous_reader.dispose then previous_reader.dispose() end
 
 local records, by_id, positions, source_rows = data.records, {}, {}, {}
 local projection, heading_rows, warning_rows, style_runs = {}, {}, {}, {}
@@ -144,31 +156,33 @@ for _, record in ipairs(records) do
   end
   boundaries(record.heading)
   by_id[record.id] = record
-  if record.heading ~= previous_heading then
-    if previous_heading then append("") end
-    append_lines(record.heading, function(_, row) heading_rows[#heading_rows + 1] = row end)
+  if mode ~= "paragraph" or record.id == focused_id then
+    if record.heading ~= previous_heading then
+      if previous_heading then append("") end
+      append_lines(record.heading, function(_, row) heading_rows[#heading_rows + 1] = row end)
+      append("")
+      previous_heading = record.heading
+    end
+    for _, warning in ipairs(record.warnings) do
+      append_lines("Warning: " .. warning, function(_, row) warning_rows[#warning_rows + 1] = row end)
+    end
+    local position, start_cp = { rows = {} }, 0
+    positions[record.id] = position
+    append_lines(record.plain_text, function(text, row)
+      local row_length = #boundaries(text) - 1
+      local item = { row = row, start = start_cp, finish = start_cp + row_length, text = text, id = record.id }
+      position.rows[#position.rows + 1], source_rows[row] = item, item
+      start_cp = item.finish + 1 -- the canonical newline, not an inserted paragraph break
+    end)
+    position.first_row, position.last_row = position.rows[1].row, position.rows[#position.rows].row
+    for _, note in ipairs(record.notes) do
+      if type(note) ~= "table" or type(note.attribution) ~= "table" then fail("invalid attributed note") end
+      local note_length = #boundaries(note.plain_text) - 1
+      valid_styles(note.styles, note_length)
+      valid_strings(note.warnings)
+    end
     append("")
-    previous_heading = record.heading
   end
-  for _, warning in ipairs(record.warnings) do
-    append_lines("Warning: " .. warning, function(_, row) warning_rows[#warning_rows + 1] = row end)
-  end
-  local position, start_cp = { rows = {} }, 0
-  positions[record.id] = position
-  append_lines(record.plain_text, function(text, row)
-    local row_length = #boundaries(text) - 1
-    local item = { row = row, start = start_cp, finish = start_cp + row_length, text = text, id = record.id }
-    position.rows[#position.rows + 1], source_rows[row] = item, item
-    start_cp = item.finish + 1 -- the canonical newline, not an inserted paragraph break
-  end)
-  position.first_row, position.last_row = position.rows[1].row, position.rows[#position.rows].row
-  for _, note in ipairs(record.notes) do
-    if type(note) ~= "table" or type(note.attribution) ~= "table" then fail("invalid attributed note") end
-    local note_length = #boundaries(note.plain_text) - 1
-    valid_styles(note.styles, note_length)
-    valid_strings(note.warnings)
-  end
-  append("")
 end
 local frozen_records = vim.deepcopy(records)
 
@@ -179,7 +193,7 @@ vim.o.showmode, vim.o.showcmd, vim.o.ruler, vim.o.hidden = false, false, false, 
 vim.o.mouse, vim.o.clipboard = "", ""
 vim.o.statusline = " j/k lines   [p/]p passages   / search   v select   c source/notes   ? help   q return"
 if integrated then
-  vim.o.statusline = " j/k read   [c/]c sections   / search   v select   c source/notes   ? help   q save/quit"
+  vim.o.statusline = " SOL " .. mode .. " | p mode  m1-3 mark  y copy  t tree  c context  ? help  q quit"
 end
 vim.o.selection = "inclusive"
 vim.o.hlsearch = true
@@ -212,7 +226,7 @@ local function source_location(row, byte)
 end
 local function source_point(id, cp)
   local record, position = by_id[id], positions[id]
-  if not record or not integer(cp) or cp < 0 or cp > record._length then fail("position is outside the sample") end
+  if not record or not position or not integer(cp) or cp < 0 or cp > record._length then fail("position is outside the visible source") end
   for _, item in ipairs(position.rows) do
     if cp >= item.start and cp <= item.finish then
       return { row = item.row, byte = codepoint_to_byte(item.text, cp - item.start) }
@@ -352,25 +366,28 @@ for _, row in ipairs(warning_rows) do
     { end_row = row - 1, end_col = #projection[row], hl_group = "SOLSourceWarning" })
 end
 for _, record in ipairs(records) do
-  for _, span in ipairs(record.styles) do
-    local enabled, names = {}, {}
-    for _, name in ipairs(span.styles) do enabled[name], names[#names + 1] = true, name end
-    table.sort(names)
-    local group = "SOLSemantic_" .. table.concat(names, "_")
-    api.nvim_set_hl(0, group, { italic = enabled.emphasis and not not italic_capable or false,
-      underline = (enabled.emphasis and not italic_capable) or enabled.code or false,
-      bold = enabled.strong or enabled.heading or false })
-    local first, last = source_point(record.id, span.start), source_point(record.id, span["end"])
-    api.nvim_buf_set_extmark(buffer, namespace, first.row - 1, first.byte,
-      { end_row = last.row - 1, end_col = last.byte, hl_group = group, priority = 100 })
-    style_runs[#style_runs + 1] = { id = record.id, start = span.start, ["end"] = span["end"], group = group }
+  if positions[record.id] then
+    for _, span in ipairs(record.styles) do
+      local enabled, names = {}, {}
+      for _, name in ipairs(span.styles) do enabled[name], names[#names + 1] = true, name end
+      table.sort(names)
+      local group = "SOLSemantic_" .. table.concat(names, "_")
+      api.nvim_set_hl(0, group, { italic = enabled.emphasis and not not italic_capable or false,
+        underline = (enabled.emphasis and not italic_capable) or enabled.code or false,
+        bold = enabled.strong or enabled.heading or false })
+      local first, last = source_point(record.id, span.start), source_point(record.id, span["end"])
+      api.nvim_buf_set_extmark(buffer, namespace, first.row - 1, first.byte,
+        { end_row = last.row - 1, end_col = last.byte, hl_group = group, priority = 100 })
+      style_runs[#style_runs + 1] = { id = record.id, start = span.start, ["end"] = span["end"], group = group }
+    end
   end
 end
 
-local popup
+local popup, popup_context = nil, false
 local function close_popup()
   if popup and api.nvim_win_is_valid(popup) then api.nvim_win_close(popup, true) end
   popup = nil
+  popup_context = false
   if api.nvim_win_is_valid(window) then api.nvim_set_current_win(window) end
 end
 local function show_lines(lines)
@@ -389,9 +406,131 @@ local function show_lines(lines)
   vim.keymap.set("n", "j", "gj", { buffer = panel, silent = true })
   vim.keymap.set("n", "k", "gk", { buffer = panel, silent = true })
 end
+local function current_packet()
+  local cursor = native_cursor()
+  if vim.fn.mode(1) == "n" and not source_rows[cursor.row] then
+    local nearest, distance
+    for row, item in pairs(source_rows) do
+      local delta = math.abs(row - cursor.row)
+      if not distance or delta < distance or (delta == distance and row < nearest.row) then
+        nearest, distance = item, delta
+      end
+    end
+    set_exact_cursor(source_point(nearest.id, cursor.row > nearest.row and nearest.finish or nearest.start))
+  end
+  return capture()
+end
+local function reload(payload)
+  return assert(loadfile(vim.env.SOL_NVIM_ADAPTER))(payload)
+end
+local function toggle_mode()
+  local active_channel = rawget(_G, 'SOLReaderChannel')
+  if active_channel and active_channel.navigation_pending then fail('wait for the reading location to finish loading') end
+  local packet = current_packet()
+  local payload = vim.deepcopy(data)
+  payload.restore, payload.mode, payload.tree_only = packet, mode == 'paragraph' and 'continuous' or 'paragraph', false
+  reload(payload)
+end
+
+-- Inherited pipes carry bounded data requests to the existing Python owner.
+-- They survive view reloads, unlike buffers; no listener or user config exists.
+local channel = rawget(_G, 'SOLReaderChannel')
+if not channel and vim.env.SOL_NVIM_REQUEST_FD and vim.env.SOL_NVIM_RESPONSE_FD then
+  channel = { serial = 0, pending = {}, incoming = '' }
+  channel.writer, channel.reader = uv.new_pipe(false), uv.new_pipe(false)
+  assert(channel.writer:open(tonumber(vim.env.SOL_NVIM_REQUEST_FD)))
+  assert(channel.reader:open(tonumber(vim.env.SOL_NVIM_RESPONSE_FD)))
+  channel.reader:read_start(vim.schedule_wrap(function(problem, chunk)
+    if problem or not chunk then
+      for _, callback in pairs(channel.pending) do callback(nil, 'SOL action channel closed; no save acknowledged') end
+      channel.pending = {}
+      channel.navigation_pending = nil
+      return
+    end
+    channel.incoming = channel.incoming .. chunk
+    if #channel.incoming > 16 * 1024 * 1024 then fail('reader response exceeds budget') end
+    while channel.incoming:find('\n', 1, true) do
+      local at = channel.incoming:find('\n', 1, true)
+      local line = channel.incoming:sub(1, at - 1)
+      channel.incoming = channel.incoming:sub(at + 1)
+      local ok, reply = pcall(vim.json.decode, line)
+      if ok and type(reply) == 'table' then
+        local callback = channel.pending[reply.id]
+        channel.pending[reply.id] = nil
+        if callback then callback(reply.ok and reply.result or nil, reply.error) end
+      end
+    end
+  end))
+  _G.SOLReaderChannel = channel
+end
+local function request(operation, fields, callback)
+  if not channel then fail('this action needs the installed SOL reader, not a research export') end
+  if channel.navigation_pending then return end
+  local message = vim.deepcopy(fields or {})
+  channel.serial = channel.serial + 1
+  message.id, message.op, message.packet, message.mode = channel.serial, operation, current_packet(), mode
+  if operation == 'next' or operation == 'previous' or operation == 'marker_open' or operation == 'node_open' then
+    channel.navigation_pending = message.id
+  end
+  channel.pending[message.id] = function(result, problem)
+    if channel.navigation_pending == message.id then channel.navigation_pending = nil end
+    if not result then vim.notify(tostring(problem), vim.log.levels.ERROR); return end
+    local ok, error = pcall(function()
+      if result.payload then reload(result.payload)
+      elseif result.markers then
+        _G.SOLNvimReader.update_markers(result.markers)
+        vim.api.nvim_echo({{'Markers updated' .. (result.markers.persistent and '' or ' for this temporary session'), 'None'}}, false, {})
+      end
+      if callback then callback(result) end
+    end)
+    if not ok then vim.notify(tostring(error), vim.log.levels.ERROR) end
+  end
+  channel.writer:write(vim.json.encode(message) .. '\n', vim.schedule_wrap(function(problem)
+    if problem then
+      local callback = channel.pending[message.id]
+      channel.pending[message.id] = nil
+      if callback then callback(nil, tostring(problem)) end
+    end
+  end))
+end
+local function marker(slot, operation)
+  request(operation or 'marker_set', {slot = slot})
+end
+local function yank()
+  local packet = current_packet()
+  local record = by_id[packet.reference.reference.target_id]
+  local text = packet.selection ~= vim.NIL and packet.selection.text or record.plain_text
+  vim.fn.setreg('"', text, 'v')
+  if vim.fn.has('clipboard') ~= 1 then
+    fail('No system clipboard provider. Text is in the Neovim register only; install wl-clipboard (Wayland) or xclip (X11).')
+  end
+  if vim.fn.setreg('+', text, 'v') ~= 0 then fail('clipboard provider refused the yank') end
+  normal_escape()
+  api.nvim_echo({{'Copied to clipboard', 'None'}}, false, {})
+  return text
+end
+local tree_view
+local function tree()
+  if not data.structure then fail('tree navigation needs the installed SOL reader') end
+  close_popup()
+  local packet = current_packet()
+  local record = by_id[packet.reference.reference.target_id]
+  local structure = vim.deepcopy(data.structure)
+  structure.current = record.context.path
+  local implementation = assert(loadfile(vim.fn.fnamemodify(vim.env.SOL_NVIM_ADAPTER, ':h') .. '/neovim_tree.lua'))()
+  tree_view = implementation.open(structure, {
+    choose = function(key) request('node_open', {node = key}) end,
+    close = function()
+      tree_view = nil
+      if api.nvim_win_is_valid(window) then api.nvim_set_current_win(window) end
+      if data.tree_only then current_packet(); export('quit'); vim.cmd('qa!') end
+    end,
+  })
+  return tree_view
+end
 local function context()
-  local location = point(native_cursor())
-  local record = by_id[location.id]
+  local packet = current_packet()
+  local record = by_id[packet.reference.reference.target_id]
   local lines = { record.heading, "", "Source context (not selectable passage text)", "" }
   local function add(text)
     for _, line in ipairs(vim.split(tostring(text), "\n", { plain = true })) do lines[#lines + 1] = line end
@@ -401,6 +540,13 @@ local function context()
   add("PDF pages: " .. vim.json.encode(record.context.pdf_pages))
   add("Attribution: " .. vim.json.encode(record.context.attribution))
   add("Record: " .. record.id)
+  if data.markers then
+    add(''); add('Paragraph markers' .. (data.markers.persistent and ' (saved in workspace)' or ' (temporary session only)'))
+    for _, slot in ipairs(data.markers.slots) do
+      add(tostring(slot.slot) .. '. ' .. slot.label .. (slot.resolved == record.id and '  [here]' or ''))
+    end
+    add("m1/m2/m3 place; '1/'2/'3 return; dm1/dm2/dm3 clear")
+  end
   for _, warning in ipairs(record.warnings) do add("Warning: " .. warning) end
   for _, note in ipairs(record.notes) do
     add(""); add("Note attribution: " .. vim.json.encode(note.attribution))
@@ -409,22 +555,35 @@ local function context()
   end
   add(""); add("Esc returns to reading. Notes and context have no passage-selection identity.")
   show_lines(lines)
+  popup_context = true
+  if data.markers then
+    for slot = 1, 3 do
+      local number = slot
+      vim.keymap.set('n', tostring(number), function() request('marker_open', {slot = number}) end,
+        {buffer = api.nvim_get_current_buf(), silent = true})
+    end
+  end
 end
 local function help()
   if integrated then
-    show_lines({ "SOL continuous reader — Neovim", "",
+    show_lines({ "SOL reader — Neovim (" .. mode .. ")", "",
       "j/k, Ctrl-d/u    wrapped reading lines / half-window scroll",
       "h/l, w/b         native character / word motions",
       "gg/G             start / end of this loaded reading section",
       "[p / ]p          previous / next source passage",
       "[c / ]c          previous / next reading section",
+      "p                toggle continuous / one-paragraph reading",
+      "m1, m2, m3       attach/move one of three paragraph markers",
+      "'1, '2, '3       jump to a marker; dm1/dm2/dm3 clear it",
+      "y                copy the selection or current paragraph to clipboard",
+      "t                interactive tree; Tab changes its layout",
       "/, n, N          native search within this reading section",
       "v                characterwise selection inside one passage",
       "c                source pages, attribution and linked notes",
       "q / Ctrl-q       save the semantic position and quit",
       ":qa!             quit without saving the current cursor", "",
-      "At the bottom/top, j/k can continue to the adjacent section.",
-      "Long chapters load in bounded sections; transitions restart the native view.",
+      "In paragraph mode, j/k stay here. Use [p/]p to change paragraph.",
+      "In continuous mode, j/k can continue across reading sections.",
       "Selections are transient; no annotation is created automatically.",
       "Canonical text is read-only. Personal Neovim configuration is not loaded.",
       "Esc closes this help." })
@@ -456,6 +615,13 @@ local function reading_request(action)
   if action ~= "quit" then
     if not integrated or not data.navigation[action] then return end
     if vim.fn.mode(1) ~= "n" then fail("clear selection before changing reading sections") end
+    if channel then request(action); return end
+  end
+  if channel and next(channel.pending) then
+    if not vim.wait(2500, function() return next(channel.pending) == nil end, 10) then
+      fail('waiting for a marker/navigation save; retry quitting after it is acknowledged')
+    end
+    if not api.nvim_buf_is_valid(buffer) then return _G.SOLNvimReader.quit() end
   end
   -- Metadata is not prose identity. In normal mode only, a quit/section request
   -- on a heading or separator explicitly lands on the closest actual source row.
@@ -476,19 +642,19 @@ local function reading_request(action)
   vim.cmd("qa!")
 end
 local function passage(delta)
-  local row, selected = api.nvim_win_get_cursor(window)[1], nil
-  if delta > 0 then
-    for _, record in ipairs(records) do
-      if positions[record.id].first_row > row then selected = record; break end
-    end
-  else
-    for index = #records, 1, -1 do
-      local record = records[index]
-      if positions[record.id].first_row < row then selected = record; break end
-    end
+  local packet = current_packet()
+  local selected
+  for index, record in ipairs(records) do
+    if record.id == packet.reference.reference.target_id then selected = records[index + delta]; break end
   end
-  if selected then set_exact_cursor(source_point(selected.id, 0)); vim.cmd("normal! zt")
-  elseif integrated then reading_request(delta > 0 and "next" or "previous") end
+  if selected then
+    if mode == 'paragraph' then
+      local payload = vim.deepcopy(data)
+      payload.restore = {reference = vim.deepcopy(selected.reference), selection = vim.NIL, cursor_offset = 0}
+      payload.mode, payload.tree_only = mode, false
+      reload(payload)
+    else set_exact_cursor(source_point(selected.id, 0)); vim.cmd('normal! zt') end
+  elseif integrated then reading_request(delta > 0 and 'next' or 'previous') end
 end
 for _, key in ipairs({ "q", "<C-q>" }) do
   vim.keymap.set({ "n", "x" }, key, guarded(function() reading_request("quit") end), { buffer = buffer, silent = true })
@@ -501,21 +667,38 @@ if integrated then
       local before = api.nvim_win_get_cursor(window)
       vim.cmd("normal! " .. motion)
       local after = api.nvim_win_get_cursor(window)
-      local edge = key == "j" and after[1] >= positions[records[#records].id].last_row
-        or key == "k" and after[1] <= positions[records[1].id].first_row
-      if edge and vim.deep_equal(before, after) then reading_request(key == "j" and "next" or "previous") end
+      if mode == 'paragraph' then
+        if not source_rows[after[1]] then
+          local record = by_id[focused_id]
+          set_exact_cursor(source_point(record.id, key == 'j' and record._length or 0))
+        end
+      else
+        local edge = key == "j" and after[1] >= positions[records[#records].id].last_row
+          or key == "k" and after[1] <= positions[records[1].id].first_row
+        if edge and vim.deep_equal(before, after) then reading_request(key == "j" and "next" or "previous") end
+      end
     end), { buffer = buffer, silent = true })
   end
   vim.keymap.set("n", "[c", guarded(function() reading_request("previous") end), { buffer = buffer, silent = true })
   vim.keymap.set("n", "]c", guarded(function() reading_request("next") end), { buffer = buffer, silent = true })
+  vim.keymap.set({'n', 'x'}, 'p', guarded(toggle_mode), {buffer = buffer, silent = true})
+  vim.keymap.set({'n', 'x'}, 'y', guarded(yank), {buffer = buffer, silent = true})
+  vim.keymap.set('n', 't', guarded(tree), {buffer = buffer, silent = true})
+  for slot = 1, 3 do
+    local number = slot
+    vim.keymap.set('n', 'm' .. number, guarded(function() marker(number) end), {buffer = buffer, silent = true})
+    vim.keymap.set('n', "'" .. number, guarded(function() marker(number, 'marker_open') end), {buffer = buffer, silent = true})
+    vim.keymap.set('n', 'dm' .. number, guarded(function() marker(number, 'marker_clear') end), {buffer = buffer, silent = true})
+  end
 end
 vim.keymap.set("n", "[p", guarded(function() passage(-1) end), { buffer = buffer, silent = true })
 vim.keymap.set("n", "]p", guarded(function() passage(1) end), { buffer = buffer, silent = true })
 vim.keymap.set("n", "c", guarded(context), { buffer = buffer, silent = true })
 vim.keymap.set("n", "?", help, { buffer = buffer, silent = true })
 if not integrated then api.nvim_create_user_command("SOLExport", guarded(function() export() end), {}) end
-api.nvim_create_autocmd("VimResized", { callback = function()
-  close_popup()
+local group = api.nvim_create_augroup('SOLReaderView', {clear = true})
+api.nvim_create_autocmd("VimResized", { group = group, callback = function()
+  if tree_view then tree_view.resize() else close_popup() end
   if api.nvim_win_is_valid(window) then api.nvim_win_set_config(window, window_config()) end
 end })
 
@@ -524,6 +707,20 @@ _G.SOLNvimReader = { records = records, buffer = buffer, window = window, positi
   source_location = source_location, source_point = source_point, capture = capture,
   restore = restore, export = export, validate_packet = validate_packet,
   byte_to_codepoint = byte_to_codepoint, codepoint_to_byte = codepoint_to_byte,
-  verified_projection = verified_projection, context = context, help = help }
+  verified_projection = verified_projection, context = context, help = help,
+  toggle_mode = toggle_mode, mode = mode, yank = yank, tree = tree, marker = marker,
+  quit = function() reading_request('quit') end,
+  marker_slots = function() return vim.deepcopy(data.markers) end,
+  update_markers = function(markers)
+    data.markers = markers
+    if popup_context then context() end
+  end,
+  dispose = function()
+    close_popup()
+    if tree_view then tree_view.dispose() end
+    if api.nvim_win_is_valid(window) then api.nvim_win_close(window, true) end
+    if api.nvim_buf_is_valid(buffer) then api.nvim_buf_delete(buffer, {force = true}) end
+  end }
 if data.restore ~= nil and data.restore ~= vim.NIL then restore(data.restore)
 else set_exact_cursor(source_point(records[1].id, 0)) end
+if data.tree_only then tree() end

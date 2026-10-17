@@ -166,6 +166,23 @@ class ReaderViewCLITests(unittest.TestCase):
                 status, _, _ = self.call(["--engine", "neovim", *arguments])
             self.assertEqual(status, 2)
 
+    def test_dynamic_structure_launches_temporary_native_tree_without_onboarding(self):
+        with patch("sol.terminal.neovim.validate_environment"), \
+                patch("sol.terminal.neovim_reader.run_reader", return_value=0) as reader, \
+                patch.object(app, "shell_identity", side_effect=AssertionError("No actor setup")):
+            status, _, error = self.call(["--dynamic-structure", "--depth", "3"])
+        self.assertEqual(status, 0, error)
+        self.assertEqual(reader.call_args.kwargs, {"width": 72, "start_tree": True, "tree_depth": 3})
+        self.assertFalse((self.root / "data").exists())
+
+    def test_dynamic_structure_refuses_workspace_pdf_and_noninteractive_output(self):
+        for options in (["--pdf", "source.pdf"], ["--workspace", "reading"], ["--actor", "Actor"],
+                        ["--json"], ["--plain"], ["--depth", "0"], ["--engine", "builtin"]):
+            with self.subTest(options=options), \
+                    patch.object(app, "discover_corpus", side_effect=AssertionError("No source access")):
+                status, _, _ = self.call(["--dynamic-structure", *options])
+            self.assertEqual(status, 2)
+
     def test_ordinary_random_output_does_not_import_the_reader_adapter(self):
         import subprocess
         import sys

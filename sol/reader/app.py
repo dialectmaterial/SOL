@@ -241,10 +241,10 @@ def main(argv: list[str] | None = None) -> int:
         validate_workspace_management(args)
         if mode in (ExecutionMode.WORKSPACE_LIST, ExecutionMode.WORKSPACE_DELETE):
             return run_workspace_management(args)
-        if mode is ExecutionMode.READER:
+        if mode in (ExecutionMode.READER, ExecutionMode.DYNAMIC_STRUCTURE):
             # Refuse an unavailable view before corpus discovery, onboarding,
             # actor registration or opening/creating a personal workspace.
-            if args.engine == "neovim":
+            if args.engine == "neovim" or mode is ExecutionMode.DYNAMIC_STRUCTURE:
                 from sol.terminal.neovim import validate_environment
                 validate_environment(args.width or DEFAULT_READER_WIDTH)
             else:
@@ -320,6 +320,10 @@ def main(argv: list[str] | None = None) -> int:
                 emit_json({"outline": tree_data(book.root, args.depth), "abbreviated": False})
             else:
                 print(render_tree(book.root, depth=args.depth))
+        elif mode is ExecutionMode.DYNAMIC_STRUCTURE:
+            from sol.terminal.neovim_reader import run_reader as run_native_reader
+            return run_native_reader(book, width=args.width or DEFAULT_READER_WIDTH,
+                                     start_tree=True, tree_depth=args.depth or 2)
         elif mode is ExecutionMode.GUIDE:
             print(render_guide(book, width, 1 if args.depth is None else args.depth))
         elif mode is ExecutionMode.READER:

@@ -394,6 +394,80 @@ end
 ''')
         self.assertEqual(validate_packet(self.sample.book, report["packet"]).text, "\u0099")
 
+    def test_toggle_preserves_source_selection_and_paragraph_mode_contains_motion(self):
+        report = self.run_lua(r'''
+  local id = data.records[1].id
+  local packet = reader.capture('v', reader.source_point(id, 7), reader.source_point(id, 13))
+  reader.restore(packet)
+  reader.toggle_mode()
+  reader = SOLNvimReader
+  assert(reader.mode == 'paragraph' and vim.tbl_count(reader.positions) == 1)
+  assert(vim.deep_equal(reader.capture(), packet))
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>gg99j99k', true, false, true), 'xt', false)
+  assert(reader.capture().reference.reference.target_id == id)
+  vim.api.nvim_feedkeys(']p', 'xt', false)
+  reader = SOLNvimReader
+  assert(reader.mode == 'paragraph')
+  assert(reader.capture().reference.reference.target_id == data.records[2].id)
+  reader.toggle_mode()
+  reader = SOLNvimReader
+  assert(reader.mode == 'continuous' and vim.tbl_count(reader.positions) == 3)
+  report.packet = reader.capture()
+''', integrated=True)
+        self.assertEqual(report["packet"]["reference"]["reference"]["target_id"], self.sample.passages[1].identifier)
+
+    def test_yank_calls_clipboard_provider_with_exact_semantic_text(self):
+        report = self.run_lua(r'''
+  local clipboard
+  vim.g.clipboard = {name = 'SOL isolated clipboard test', cache_enabled = 0,
+    copy = {['+'] = function(lines, kind) clipboard = table.concat(lines, '\n') end,
+            ['*'] = function(lines, kind) clipboard = table.concat(lines, '\n') end},
+    paste = {['+'] = function() return {{clipboard or ''}, 'v'} end,
+             ['*'] = function() return {{clipboard or ''}, 'v'} end}}
+  local id = data.records[1].id
+  local packet = reader.capture('v', reader.source_point(id, 7), reader.source_point(id, 13))
+  reader.restore(packet)
+  reader.yank()
+  assert(clipboard == 'thought')
+  report.clipboard = clipboard
+''', integrated=True)
+        self.assertEqual(report["clipboard"], "thought")
+
+    def test_tree_layout_scope_depth_resize_and_return_do_not_navigate_text(self):
+        from sol.reader.structure import structure_payload
+        from unittest.mock import patch
+        from sol.terminal import neovim
+        original = neovim.build_payload
+        def payload(*args, **kwargs):
+            value = original(*args, **kwargs)
+            value["structure"] = structure_payload(self.sample.book, self.sample.passages[0])
+            return value
+        with patch.object(neovim, "build_payload", side_effect=payload):
+            report = self.run_lua(r'''
+  local before = reader.capture()
+  local tree = reader.tree()
+  assert(tree.state().layout == 'vertical' and tree.state().depth == 2)
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Tab>jlhb+r', true, false, true), 'xt', false)
+  assert(tree.state().layout == 'horizontal')
+  vim.o.columns = 42
+  vim.api.nvim_exec_autocmds('VimResized', {})
+  assert(vim.api.nvim_get_current_win() == tree.window)
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'xt', false)
+  assert(vim.deep_equal(reader.capture(), before))
+  report.restored = true
+''', integrated=True)
+        self.assertTrue(report["restored"])
+
+    def test_missing_clipboard_provider_retains_register_but_refuses_success(self):
+        report = self.run_lua(r'''
+  local original = vim.fn.has
+  vim.fn.has = function(name) if name == 'clipboard' then return 0 end; return original(name) end
+  refuse(function() reader.yank() end)
+  assert(vim.fn.getreg('"') == data.records[1].plain_text)
+  report.register = true
+''', integrated=True)
+        self.assertTrue(report["register"])
+
 
 if __name__ == "__main__":
     unittest.main()

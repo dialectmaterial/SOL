@@ -65,6 +65,13 @@ unmapped or invalid virtual file locations, explicitly generated text, and trans
 presenting this subset as every word of the edition. An explicit doctrine filter
 restricts the eligible subset further.
 
+Section heading records and heading metadata are therefore already excluded.
+This version-1 lexical experiment otherwise counts canonical visible text with
+its recorded facsimile mask; it is not the model-input projection. For future
+vectorization, use the separate [prose-only input](PROSE_INPUTS.md), which also
+removes embedded structural headings and image labels while retaining ancestry
+as metadata.
+
 Tokens begin with a Unicode letter and continue through letters and combining
 marks. Internal straight or curly apostrophes stay within a token; numbers,
 underscores, and hyphens separate tokens. Comparison uses NFC normalization,

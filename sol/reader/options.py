@@ -24,6 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
                "  sol                         resume reading\n"
                "  sol -n                      read without a workspace or actor\n"
                "  sol --engine neovim         continuous reading with native Neovim\n"
+               "  sol --dynamic-structure     explore the book tree interactively\n"
                "  sol --actor NAME            use that actor's last workspace\n"
                "  sol --workspace NAME        choose a different workspace\n"
                "  sol guide                   reader keys, examples, and book structure\n"
@@ -48,6 +49,8 @@ def build_parser() -> argparse.ArgumentParser:
     modes = parser.add_argument_group("Other actions (choose one)")
     mode = modes.add_mutually_exclusive_group()
     mode.add_argument("--structure", action="store_true", help="show the outline (prefer the indexed local corpus)")
+    mode.add_argument("--dynamic-structure", action="store_true",
+                      help="open the interactive vertical/horizontal book tree (Neovim 0.11+)")
     mode.add_argument("--guide", action="store_true", help="reader keys, examples, and book structure; same as sol guide")
     mode.add_argument("--shell", action="store_true", help="open the optional book command interface instead of the reader")
     mode.add_argument("-r", "--random", action="store_true", help="print a random passage and leave")
@@ -102,6 +105,7 @@ class ExecutionMode(str, Enum):
     SHELL = "shell"
     GUIDE = "guide"
     STRUCTURE = "structure"
+    DYNAMIC_STRUCTURE = "dynamic_structure"
     RANDOM = "random"
     READ = "read"
     FIRST = "first"
@@ -154,8 +158,14 @@ def validate_options(args: argparse.Namespace) -> ExecutionMode:
         raise ValueError("-n/--none is a temporary interactive session; omit one-shot/guide actions")
     mode = select_execution_mode(args)
     args.reader = mode is ExecutionMode.READER
-    if args.engine is not None and not args.reader:
+    if args.engine is not None and not args.reader and mode is not ExecutionMode.DYNAMIC_STRUCTURE:
         raise ValueError("--engine selects the interactive reader, not a shell or one-shot action")
+    if mode is ExecutionMode.DYNAMIC_STRUCTURE:
+        if (args.pdf is not None or args.workspace is not None or args.actor is not None
+                or args.plain or args.json or args.engine == "builtin"):
+            raise ValueError("--dynamic-structure uses a temporary Neovim tree over the canonical corpus; omit PDF/workspace/output options")
+        if args.depth is not None and not 1 <= args.depth <= 6:
+            raise ValueError("dynamic tree depth must be between 1 and 6")
     if args.reader:
         if args.pdf is not None:
             raise ValueError("--reader requires the indexed canonical corpus, not --pdf. "
@@ -189,8 +199,8 @@ def validate_options(args: argparse.Namespace) -> ExecutionMode:
         if not 0 <= args.context <= 10:
             raise ValueError("--context must be between 0 and 10")
     if args.depth is not None:
-        if not args.structure and not args.guide:
-            raise ValueError("--depth requires --structure or guide")
+        if not args.structure and not args.guide and not args.dynamic_structure:
+            raise ValueError("--depth requires --structure, --dynamic-structure or guide")
         if not 0 <= args.depth <= 32:
             raise ValueError("--depth must be between 0 and 32")
     if args.json and (args.shell or args.guide):

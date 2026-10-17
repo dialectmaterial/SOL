@@ -19,7 +19,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_FILES = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol").rglob("*.py")}
-PACKAGE_ASSETS = {"sol/terminal/neovim.lua"}
+PACKAGE_ASSETS = {"sol/terminal/neovim.lua", "sol/terminal/neovim_tree.lua"}
 ENTRY_POINTS = {
     "sol": "sol:cli",
     "sol-kitty": "sol.terminal.kitty:main",
@@ -219,7 +219,7 @@ from sol.reader import app
 from sol.terminal import neovim
 assert Path(neovim.__file__).with_name('neovim.lua').is_file()
 neovim.validate_environment = lambda width: '/invented/nvim'
-def native(payload, executable):
+def native(payload, executable, **options):
     assert payload['integrated'] is True
     assert payload['records'] and payload['restore']['cursor_offset'] == 0
     return 0, {'action': 'quit', 'packet': payload['restore']}

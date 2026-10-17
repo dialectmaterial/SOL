@@ -25,12 +25,13 @@ from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 from sol.reader import app
 from sol.terminal import neovim
-original = neovim.subprocess.run
+from sol.terminal import reader_channel
+original = reader_channel.subprocess.Popen
 def native(command, **options):
     if command[-1] == neovim._LOAD_ADAPTER:
         command = [*command, '-c', 'lua dofile(vim.env.SOL_NVIM_TEST_SCENARIO)']
     return original(command, **options)
-neovim.subprocess.run = native
+reader_channel.subprocess.Popen = native
 raise SystemExit(app.main(['--engine', 'neovim', '--actor', 'Invented acceptance reader',
     '--workspace', 'reading', '--workspace-dir', sys.argv[2], '--width', sys.argv[3]]))
 '''
@@ -58,6 +59,14 @@ vim.defer_fn(function()
       assert(data.width == 40 and data.restore.cursor_offset == 11)
       assert(data.restore.reference.reference.target_id == data.records[2].id)
       assert(reader.capture().cursor_offset == 11)
+      assert(reader.marker_slots().slots[2].target == data.records[2].id)
+      local prior, original_reader = reader.capture(), reader
+      reader.context()
+      api.nvim_feedkeys('2', 'xt', false)
+      assert(vim.wait(3000, function() return SOLNvimReader ~= original_reader end, 10), 'marker jump was not acknowledged')
+      reader = SOLNvimReader
+      assert(reader.capture().cursor_offset == 0)
+      reader.restore(prior)
       reader.help()
       api.nvim_feedkeys(api.nvim_replace_termcodes('<Esc>', true, false, true), 'xt', false)
       reader.context()
@@ -74,6 +83,21 @@ vim.defer_fn(function()
     local cp = reader.source_point(data.records[2].id, 11)
     api.nvim_win_set_cursor(reader.window, {cp.row, cp.byte})
     saved = reader.capture()
+    api.nvim_feedkeys('m2', 'xt', false)
+    assert(vim.wait(3000, function()
+      return reader.marker_slots().slots[2].target == data.records[2].id
+    end, 10), 'marker was not immediately saved')
+    reader.toggle_mode()
+    reader = SOLNvimReader
+    assert(reader.mode == 'paragraph')
+    api.nvim_feedkeys('99j99k', 'xt', false)
+    assert(reader.capture().reference.reference.target_id == data.records[2].id)
+    reader.restore(saved)
+    local tree = reader.tree()
+    api.nvim_feedkeys(api.nvim_replace_termcodes('<Tab>', true, false, true), 'xt', false)
+    assert(tree.state().layout == 'horizontal')
+    api.nvim_feedkeys(api.nvim_replace_termcodes('<Esc>', true, false, true), 'xt', false)
+    assert(vim.deep_equal(reader.capture(), saved))
     report({status = 'wide', xid = assert(vim.env.ALACRITTY_WINDOW_ID), columns = vim.o.columns})
     stage = 1
   end, debug.traceback)
