@@ -24,11 +24,12 @@ terminal checks; passing unit tests is not evidence of manual reading quality.
 The Python 3.14 CI job also installs Zsh and ripgrep to exercise the native shell
 pipeline. That external-tool check skips explicitly when those programs are absent.
 
-## Commit and push workflow
+## Branch and pull request workflow
 
-For agent-assisted work in this repository, commit and push completed, verified
-changes by default unless the user explicitly asks otherwise. Review the diff
-and stage only task-related files. Never include the private corpus, source PDF,
+For agent-assisted work in this repository, work on a branch, never directly on
+`main`: commit completed, verified changes there, push the branch and open a pull
+request against `main` for review. The maintainer merges. Review the diff and
+stage only task-related files. Never include the private corpus, source PDF,
 personal workspaces or unrelated local changes. If pushing requires resolving
 divergent history or additional access, report that rather than force-pushing.
 
