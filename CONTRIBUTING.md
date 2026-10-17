@@ -32,6 +32,11 @@ and stage only task-related files. Never include the private corpus, source PDF,
 personal workspaces or unrelated local changes. If pushing requires resolving
 divergent history or additional access, report that rather than force-pushing.
 
+Claude Code tasks are coordinated through [CLAUDE.md](CLAUDE.md),
+[the current task](docs/coordination/CURRENT_TASK.md) and
+[handoff reports](docs/coordination/HANDOFF.md): one branch and pull request per
+task, reviewed before merging.
+
 ## Where behavior belongs
 
 | Area | Owner |
