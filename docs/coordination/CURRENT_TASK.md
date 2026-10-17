@@ -51,7 +51,7 @@ key bindings chosen, as defaults the maintainer may overrule.
 
 ## Codex: Measure reader speed before optimising
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/reader-timings`
 **Requested:** 18 October 2026, by the maintainer
 

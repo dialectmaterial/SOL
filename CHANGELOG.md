@@ -10,6 +10,15 @@ when the passage has changed since you wrote it. Only a note's author can edit
 it, a newer version saved elsewhere is never overwritten, and a save that
 changes nothing adds no version. Before, editing needed `sol --shell`.
 
+### Measure reader speed before optimising — 18 October 2026
+
+`scripts/reader_timings.py` reports repeated Python reader timings with medians
+and spread, using invented text by default or an explicitly supplied local
+corpus. It measures loading, verification, payload/typography preparation and
+real controller navigation, search, history and sentence study in temporary
+workspaces. No Neovim/terminal speed claim, cache, runtime change or dependency
+is introduced. Tests check reporting and isolation, not timing thresholds.
+
 ### Marking forms survive editor line-end trimming — 18 October 2026
 
 Import accepts `EXCLUDE:` with or without its trailing space and restores source
