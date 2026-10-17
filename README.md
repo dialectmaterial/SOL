@@ -20,7 +20,7 @@ The present foundation is careful reading: a dependable corpus, clear navigation
 Computational linguistics, classification, concordances, topic modeling, machine learning, and deep learning can investigate explicit and discovered organizations of the text. Every method should answer a research question and retain its connection to the passages that produced it.
 
 For model input, `sol analyze prose --json` exports prose separately from headings,
-canonical ancestry, and source metadata. See the [prose input policy](docs/PROSE_INPUTS.md).
+canonical ancestry, and source metadata. See the [prose input policy](docs/legacy/PROSE_INPUTS.md).
 
 ### CONCEPT: an operating system (organization of the inquiry)
 
