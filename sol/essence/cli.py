@@ -23,10 +23,14 @@ def build_parser() -> argparse.ArgumentParser:
                       help="explicitly restrict the experiment to one doctrine")
     term.add_argument("--limit", type=int, default=10, metavar="N",
                       help="maximum representative passages (default: 10)")
+    sentences = commands.add_parser("sentences", help="measure sentence lengths in the English translation")
+    sentences.add_argument("--within", metavar="PATH",
+                           help="only passages under this reader path, e.g. /BEING/i-determinateness-quality")
+    sentences.add_argument("--reference", metavar="FILE|-", help="optional CORE reference anchor; it does not restrict the scope")
     check = commands.add_parser("check", help="recompute and verify a saved experiment against the local corpus")
     check.add_argument("file", metavar="FILE|-", help="saved result JSON, or - for piped input")
     prose = commands.add_parser("prose", help="prepare prose-only analysis input, retaining headings as metadata")
-    for command in (term, check, prose):
+    for command in (term, sentences, check, prose):
         command.add_argument("--corpus", type=Path, metavar="DIRECTORY",
                              help="use this local canonical corpus instead of discovery")
         command.add_argument("--json", action="store_true", help="print machine-readable JSON instead of a human summary")
@@ -106,6 +110,41 @@ def render_result(result: dict) -> str:
     return "\n".join(lines)
 
 
+def render_sentences(result: dict) -> str:
+    """Summarize a sentence study; locations only, never stored book text."""
+    summary = result["summary"]
+    scope = result["scope"]
+    label = {"corpus": "whole corpus", "within": scope.get("path"), "passages": f"{len(scope.get('ids', []))} chosen passages"}
+    lines = [f"Sentence lengths: {_safe(label[scope['kind']])}",
+             "Word tokens per sentence in the English translation; punctuation-rule segmentation.", ""]
+    if not summary["sentences"]:
+        return "\n".join(lines + ["No eligible sentences in this scope."])
+    lines.append(f"{summary['sentences']} sentences, {summary['tokens']} tokens in {len(result['passages'])} passages.")
+    lines.append(f"Mean {summary['mean']:.1f}, median {summary['median']}, 10th–90th percentile "
+                 f"{summary['p10']}–{summary['p90']}, longest {summary['max']}.")
+    peak = max(row["sentences"] for row in result["histogram"]) or 1
+    lines.append("")
+    for row in result["histogram"]:
+        span = f"{row['from']}–{row['to']}" if row["to"] is not None else f"{row['from']}+"
+        lines.append(f"  {span:>7} {row['sentences']:>6}  " + "█" * round(24 * row["sentences"] / peak))
+    lines += ["", "By position in the paragraph (mean tokens):"]
+    for name, values in result["by_position"].items():
+        if values["sentences"]:
+            lines.append(f"  {name:6} {values['mean']:6.1f}  ({values['sentences']} sentences)")
+    excluded = result["exclusions"]
+    review = excluded["by_reason"]["review"]
+    other = excluded["excluded_records"] - review - excluded["by_reason"]["scope"]
+    lines += ["", f"Excluded in scope: {review} passage{'s' * (review != 1)} awaiting source review, "
+                  f"{other} non-Hegel or non-prose record{'s' * (other != 1)}."]
+    lines += ["", "Longest sentences:"]
+    for number in result["longest"]:
+        index, start, end, tokens = result["sentences"][number]
+        passage = result["passages"][index]
+        lines.append(f"  {tokens:>4} tokens  {_safe(passage['reader_path'])}  ({_location(passage['sources'])})")
+        lines.append(f"        {_safe(passage['id'])} at {start}–{end}")
+    return "\n".join(lines)
+
+
 def main(arguments: list[str] | None = None) -> int:
     """Analyze or verify without opening BEING, a workspace, or a source PDF."""
     options = build_parser().parse_args(arguments)
@@ -117,11 +156,17 @@ def main(arguments: list[str] | None = None) -> int:
             decode_term_result, encode_term_result,
         )
 
+        from sol.essence import sentences as sentence_study
+
         origin = result = None
         # Reject unsafe input before inspecting corpus/configuration data.
         if options.action == "check":
-            result = decode_term_result(read_json_input(options.file, MAX_RESULT_BYTES))
-        elif options.action == "term" and options.reference is not None:
+            raw = read_json_input(options.file, MAX_RESULT_BYTES)
+            data = raw.encode("utf-8") if isinstance(raw, str) else raw
+            decode = (sentence_study.decode_sentence_result if b'"sol.sentence-study"' in data
+                      else decode_term_result)
+            result = decode(data)
+        elif options.action in ("term", "sentences") and options.reference is not None:
             origin = decode_reference(read_json_input(options.reference, MAX_REFERENCE_BYTES))
         directory = discover_corpus(options.corpus)
         if directory is None:
@@ -136,11 +181,20 @@ def main(arguments: list[str] | None = None) -> int:
                 "Vector input: passages[].text (headings and image labels excluded).\n"
                 "Canonical ancestry, headings and source references remain in metadata.\n"
                 "Use sol analyze prose --json to export the complete input."))
+        elif options.action == "sentences":
+            scope = {"kind": "within", "path": options.within} if options.within else None
+            result = sentence_study.analyze_sentences(snapshot, scope=scope, origin=origin)
+            print(sentence_study.encode_sentence_result(result) if options.json else render_sentences(result))
         elif options.action == "term":
             result = analyze_term(snapshot, options.word, origin=origin,
                                   doctrine=options.doctrine.upper() if options.doctrine else None,
                                   limit=options.limit)
             print(encode_term_result(result) if options.json else render_result(result))
+        elif result["protocol"] == "sol.sentence-study":
+            result = sentence_study.check_sentence_result(snapshot, result)
+            print(_json({"status": "current", "protocol": result["protocol"], "corpus_id": result["corpus"]["id"],
+                         "generation": result["generation"], "summary": result["summary"]}) if options.json
+                  else "Verified against the current corpus generation.\n\n" + render_sentences(result))
         else:
             result = check_term_result(snapshot, result)
             print(_json(verification_receipt(result)) if options.json
