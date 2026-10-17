@@ -35,7 +35,7 @@ Write "None." rather than deleting a heading.
 ## Sentence marking in an ordinary text editor — 18 October 2026
 
 **Task:** [Codex: Make sentence marking practical by hand](CURRENT_TASK.md#codex-make-sentence-marking-practical-by-hand).
-**Branch / PR:** `codex/segmentation-marking-form`; PR to be opened with `gh pr create --base main` after pushing. Task status: `In review`.
+**Branch / PR:** `codex/segmentation-marking-form` · [PR #8](https://github.com/dialectmaterial/SOL/pull/8), opened with `gh pr create --base main`. Task status: `In review`.
 **Last implementation commit:** `6e27ed1c58d6439e6b7ec46603a0884d39074f25` (implementation and documentation; the task-board merge and this report follow).
 
 ### Changed files
