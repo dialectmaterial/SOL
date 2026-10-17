@@ -38,7 +38,7 @@ The current implementation also includes literal book search, source-positioned 
 | `y` | Copy selection or current passage; desktop clipboard provider depends on environment |
 | `m1`–`m3`; `'1`–`'3`; `dm1`–`dm3` | Set, open, clear one of three paragraph markers |
 | `t` | Dynamic structure tree (Vim-style navigation) |
-| `c` | Passage source context, numbered footnotes with their text, your notes, markers |
+| `c` | Passage source context, numbered footnotes with their text, workspace notes, markers; in it, `e` edits your note under the cursor and `r` shows its versions |
 | `a` | Write a personal note on this passage, saved in the workspace (`Ctrl-S` or `:w` saves, `Ctrl-C` discards) |
 | `s` | Printed source of this passage (formulas), cropped from the verified PDF, in a separate image viewer |
 | `S` | Sentence lengths in the loaded section (ESSENCE study); Enter reads a listed sentence, Alt-Left returns |
@@ -55,6 +55,8 @@ The current implementation also includes literal book search, source-positioned 
 **Refused moves (18 October):** every move in the reader (sections, `b/n` across sections, tree, markers, search results, history, study sentences) first accepts the position the screen shows, then prepares the destination's view, and saves the destination only once that view is ready. If preparation, a changed corpus or another session's newer save refuses the move, the screen, the saved position and the history stay where they were; the same key can be tried again. Another session's save is never overwritten: until SOL is reopened, moves keep being refused. A study sentence in the current paragraph is its own history entry, so Alt-Left returns to the earlier cursor. Tested with injected failures on every route; not yet exercised by hand in a terminal.
 
 **Transient state (18 October):** marks hidden with `Esc` stay hidden through `p`, `f`, `b/n`, resizing and `T`; opening another search result marks its matches again. Nothing about this is saved. Selection and `y` copy the exact source text around footnote numbers, multibyte and combining characters and wrapped emphasis, forward and backward, in both modes and at narrow widths (headless Neovim tests). `S` takes the paragraph the cursor is in as its origin, so a study started after moving with `j/k` returns there with Alt-Left; running it saves no visit. Not yet checked by hand in Alacritty or Kitty.
+
+**Editing notes (18 October):** in `c`, each workspace note shows its author, date and revision, and says when its passage has changed since it was written or when it was written on a retired record ID. `e` opens the note under the cursor (or the only one) in the same editor as `a`; `r` lists its versions, newest first. A save goes through the workspace's edit service: only the note's author can edit it, a newer revision saved from another session refuses the save, and so does a corpus that changed since the reader opened. The note keeps its ID, target and original source digest, so an edit never rebinds it to newer text; a save that changes nothing adds no revision. A refused save keeps the draft for the next `e`. Notes cannot be deleted, hidden or retracted; that needs a retention decision. Tested in headless Neovim and through the controller; not yet used by hand.
 
 ### Basic operations
 
@@ -160,7 +162,7 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 - No native cross-paragraph span selection; normal visual selection is transient and passage-local.
 - Printed-source preview is implemented and was used in a real terminal (17 October); the reader judged the separate viewer helpful but awkward. Native 2-D mathematical typesetting remains unimplemented; retyped linear mathematics awaits human review.
 - The outline/search/marker UI is functional but readability, styling, and mode transitions require actual use testing.
-- Some scholarly actions are still most accessible through the optional compatibility shell: editing notes and their history, comparisons, reviews and relations. Writing and viewing notes is in the reader.
+- Some scholarly actions are still most accessible through the optional compatibility shell: comparisons, reviews and relations. Writing, editing and viewing notes and their versions is in the reader; a note containing invisible control characters is edited through the shell.
 - Footnote marks are inline display text: they can push a wrapped line one cell further, and nested notes (notes inside notes) are listed through their parent only.
 - Notes cannot yet anchor to a selected span; that needs a new workspace schema version.
 - Comparison presentation is not yet a mature integrated side-by-side desk; authoring/version-binding details matter.
