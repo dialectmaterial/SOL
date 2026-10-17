@@ -72,7 +72,7 @@ Write "None." rather than deleting a heading.
 ## Coordination workflow between Claude Code and ChatGPT — 17 October 2026
 
 **Task:** [CURRENT_TASK](CURRENT_TASK.md), "Coordination workflow between Claude Code and ChatGPT"
-**Branch / PR:** `claude/coordination-workflow` · not opened yet: the session could not push, and `gh` is not installed
+**Branch / PR:** `claude/coordination-workflow` · merged as PR #1 (`dfe075a`) and, for the later CONTRIBUTING commit `59602dd`, PR #2 (`f574d84`)
 **Last implementation commit:** `3303502a3adab2275f42d85bc7a47d3273f3fcf0`
 
 ### Changed files
