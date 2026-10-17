@@ -8,6 +8,7 @@ import sys
 import unittest
 from unittest.mock import patch
 
+from sol.corpus.markdown import plain_text
 from sol.reader.typography import Typography, TypographySpan, map_typography
 
 
@@ -156,11 +157,21 @@ class CommonMarkTypographyTests(unittest.TestCase):
                 self.assertIn("disagree", result.reason)
 
     def test_mapping_contract_drift_explicitly_degrades(self):
-        with patch("sol.reader.typography._project", return_value=("changed", ())):
+        with patch("sol.reader.typography._project", return_value=("changed", (), ())):
             result = map_typography("A *term*.", "A term.")
         self.assertTrue(result.degraded)
         self.assertEqual(result.spans, ())
         self.assertIn("projection", result.reason)
+
+    def test_footnote_callouts_keep_their_plain_text_offsets(self):
+        markdown = ('Kant,<sup data-sol-note="aaaaaaaa-0000-4000-8000-000000000001">[7](notes.md#aaaaaaaa-0000-4000-8000-000000000001)</sup> *Critique*\n\n\n\n'
+                    'Fichte.<sup data-sol-note="aaaaaaaa-0000-4000-8000-000000000002">[8](notes.md#aaaaaaaa-0000-4000-8000-000000000002)</sup>')
+        text = plain_text(markdown)
+        result = map_typography(markdown, text)
+        self.assertFalse(result.degraded)
+        self.assertEqual(text, "Kant, Critique\nFichte.")
+        self.assertEqual(result.callouts, ((5, "aaaaaaaa-0000-4000-8000-000000000001"), (len(text), "aaaaaaaa-0000-4000-8000-000000000002")))
+        self.assertEqual(text[:5], "Kant,")
 
     def test_untrusted_controls_are_source_characters_not_generated_escape_styles(self):
         text, spans = self.projection("*A\x1b[31mB\u202eC*")

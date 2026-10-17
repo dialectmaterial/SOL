@@ -7,6 +7,7 @@ fallback is safer than applying emphasis to the wrong source characters.
 """
 from __future__ import annotations
 
+from bisect import bisect_left
 from dataclasses import dataclass
 import re
 
@@ -24,6 +25,8 @@ class Typography:
     """Nonoverlapping styled runs, or an explicit unstyled degradation."""
     spans: tuple[TypographySpan, ...] = ()
     degraded: bool = False
+    # Hidden footnote callouts: (offset before which the callout sat, note ID).
+    callouts: tuple[tuple[int, str], ...] = ()
     reason: str | None = None
 
 
@@ -39,12 +42,14 @@ def _ordered(styles) -> tuple[str, ...]:
     return tuple(style for style in _STYLE_ORDER if style in styles)
 
 
-def _project(tokens: list) -> tuple[str, tuple[TypographySpan, ...]]:
+def _project(tokens: list) -> tuple[str, tuple[TypographySpan, ...], tuple[tuple[int, str], ...]]:
     # Reuse the contract's HTML visibility, especially annotated note callouts.
     # The final independent projection check below catches any contract drift.
-    from sol.corpus.markdown import VisibleHTML
+    from sol.corpus.markdown import _NOTE_UUID, VisibleHTML
 
     decorated: list[tuple[str, tuple[str, ...]]] = []
+    main = decorated
+    callouts: list[tuple[int, str]] = []
 
     def emit(value: str, styles=()) -> None:
         ordered = _ordered(styles)
@@ -66,6 +71,9 @@ def _project(tokens: list) -> tuple[str, tuple[TypographySpan, ...]]:
                 emit(value, self.current_styles() | self.styles())
 
         def handle_starttag(self, tag, attrs):
+            note = dict(attrs).get("data-sol-note") if tag == "sup" else None
+            if isinstance(note, str) and _NOTE_UUID.fullmatch(note) and decorated is main:
+                callouts.append((len(decorated), note))
             style = _HTML_STYLES.get(tag)
             if style:
                 self.counts[style] = self.counts.get(style, 0) + 1
@@ -146,15 +154,18 @@ def _project(tokens: list) -> tuple[str, tuple[TypographySpan, ...]]:
     # Mirror the contract's newline collapse and strip without losing offsets.
     raw = "".join(character for character, _ in decorated)
     normalized: list[tuple[str, tuple[str, ...]]] = []
+    origin: list[int] = []
     cursor = 0
     for match in re.finditer(r"\n{3,}", raw):
         normalized.extend(decorated[cursor:match.start() + 2])
+        origin.extend(range(cursor, match.start() + 2))
         cursor = match.end()
     normalized.extend(decorated[cursor:])
+    origin.extend(range(cursor, len(decorated)))
     projected = "".join(character for character, _ in normalized)
     left = len(projected) - len(projected.lstrip())
     right = len(projected.rstrip())
-    normalized = normalized[left:right]
+    normalized, origin = normalized[left:right], origin[left:right]
     projected = projected.strip()
 
     spans: list[TypographySpan] = []
@@ -167,7 +178,8 @@ def _project(tokens: list) -> tuple[str, tuple[TypographySpan, ...]]:
         if styles:
             spans.append(TypographySpan(start, end, styles))
         start = end
-    return projected, tuple(spans)
+    placed = tuple((bisect_left(origin, position), note) for position, note in callouts)
+    return projected, tuple(spans), placed
 
 
 def map_typography(markdown: str, plain_text: str) -> Typography:
@@ -188,7 +200,7 @@ def map_typography(markdown: str, plain_text: str) -> Typography:
         return Typography(degraded=True, reason="CommonMark typography parser is unavailable.")
     if tokens_plain_text(tokens) != plain_text:
         return Typography(degraded=True, reason="Canonical Markdown and indexed text disagree; plain text shown.")
-    projected, spans = _project(tokens)
+    projected, spans, callouts = _project(tokens)
     if projected != plain_text:
         return Typography(degraded=True, reason="Typography projection disagrees with source; plain text shown.")
-    return Typography(spans)
+    return Typography(spans, callouts=callouts)

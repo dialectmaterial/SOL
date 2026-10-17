@@ -639,6 +639,33 @@ end
         self.assertIn("— Invented reader, 2026-10-17T12:00:00Z\nA thought\non two lines", context)
         self.assertIn("notes need a workspace", report["temporary"])
 
+    def test_footnote_callouts_show_inline_without_changing_source_text(self):
+        report = self.run_lua(r'''
+  local payload = vim.deepcopy(data)
+  payload.records[1].callouts = {{offset = 4, label = '12'}, {offset = 0, label = 'k'}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(payload)
+  reader = SOLNvimReader
+  local id = data.records[1].id
+  report.marks = {}
+  for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(reader.buffer, -1, 0, -1, {details = true})) do
+    local details = mark[4]
+    if details.virt_text_pos == 'inline' then
+      report.marks[#report.marks + 1] = {mark[2], mark[3], details.virt_text[1][1]}
+    end
+  end
+  report.expected = {point(id, 0), point(id, 4)}
+  report.line = vim.api.nvim_buf_get_lines(reader.buffer, report.expected[1][1] - 1, report.expected[1][1], false)[1]
+  local broken = vim.deepcopy(data)
+  broken.records[1].callouts = {{offset = data.records[1]._length or 1e9, label = '1'}}
+  report.refused = not pcall(loadfile(os.getenv('SOL_NVIM_ADAPTER')), broken)
+''')
+        text = self.sample.passages[0].text
+        self.assertEqual(report["line"], text.split("\n")[0])
+        expected = sorted([[report["expected"][0][0] - 1, report["expected"][0][1], "[k]"],
+                           [report["expected"][1][0] - 1, report["expected"][1][1], "¹²"]])
+        self.assertEqual(sorted(report["marks"]), expected)
+        self.assertTrue(report["refused"])
+
     def test_theme_survives_mode_reload_and_invalid_presets_are_refused(self):
         report = self.run_lua(r'''
   reader.cycle_theme()

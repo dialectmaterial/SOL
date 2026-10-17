@@ -207,6 +207,12 @@ for _, record in ipairs(records) do
       start_cp = item.finish + 1 -- the canonical newline, not an inserted paragraph break
     end)
     position.first_row, position.last_row = position.rows[1].row, position.rows[#position.rows].row
+    if type(record.callouts) ~= "table" then fail("invalid footnote callouts") end
+    for _, callout in ipairs(record.callouts) do
+      if type(callout) ~= "table" or not integer(callout.offset) or callout.offset < 0
+        or callout.offset > record._length or type(callout.label) ~= "string" then fail("invalid footnote callout") end
+      boundaries(callout.label)
+    end
     for _, note in ipairs(record.notes) do
       if type(note) ~= "table" or type(note.attribution) ~= "table" or type(note.label) ~= "string" then
         fail("invalid attributed note")
@@ -435,15 +441,18 @@ for _, record in ipairs(records) do
     end
   end
 end
--- Footnote callouts are not in the source text; a quiet end-of-paragraph cue
--- says the passage has notes, which c shows in full.
+-- Footnote callouts are hidden from the source text; each is shown where
+-- the canonical Markdown places it, as inline display text only.
+local superscript = { ["0"] = "⁰", ["1"] = "¹", ["2"] = "²", ["3"] = "³", ["4"] = "⁴",
+  ["5"] = "⁵", ["6"] = "⁶", ["7"] = "⁷", ["8"] = "⁸", ["9"] = "⁹" }
 for _, record in ipairs(records) do
-  local position = positions[record.id]
-  if position and #record.notes > 0 then
-    local labels = {}
-    for _, note in ipairs(record.notes) do labels[#labels + 1] = note.label ~= "" and note.label or "?" end
-    api.nvim_buf_set_extmark(buffer, namespace, position.last_row - 1, 0,
-      { virt_text = { { "  [" .. table.concat(labels, ", ") .. "] c", "NonText" } }, virt_text_pos = "eol" })
+  if positions[record.id] then
+    for _, callout in ipairs(record.callouts) do
+      local mark = callout.label:match("^%d+$") and callout.label:gsub("%d", superscript) or "[" .. callout.label .. "]"
+      local point = source_point(record.id, callout.offset)
+      api.nvim_buf_set_extmark(buffer, namespace, point.row - 1, point.byte,
+        { virt_text = { { mark, "NonText" } }, virt_text_pos = "inline", right_gravity = false })
+    end
   end
 end
 

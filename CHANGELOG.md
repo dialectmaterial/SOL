@@ -7,9 +7,10 @@
 `c` now shows each footnote's text, numbered as in the book. Before, it showed
 only the converter's heading ("Note 99"), because a converted footnote keeps its
 text in separate `note_paragraph` records that the reader never loaded. A
-paragraph with footnotes ends with a quiet `[99, 100] c` cue. The canonical
-Markdown records each callout's position, but the plain reading text drops it,
-so the cue does not yet sit at the callout itself.
+footnote's number is shown where the book prints it, as a dim superscript
+(`Landen⁹⁵`, or `[k]` for lettered notes). The number is inline display text
+only: it is not part of the passage, so search, selection and offsets ignore it.
+Its position comes from the callout recorded in the canonical Markdown.
 
 ### Retyped mathematics in the local corpus — 17 October 2026
 

@@ -150,7 +150,7 @@ def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None,
                    "attribution": deepcopy(record["attribution"])}
         heading = passage.heading or passage.node.title
         _safe_metadata({"heading": heading, "context": context, "warnings": warnings})
-        notes = []
+        notes, labels = [], {}
         for identifier in record.get("note_ids", []):
             reference, checked_note = capture.capture(identifier)
             note = checked_note.record
@@ -170,10 +170,16 @@ def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None,
                 note_warnings.insert(0, "Note transcription needs review.")
             attribution = deepcopy(note["attribution"])
             label = str(note.get("label") or "")
+            labels[identifier] = labels[note["id"]] = label
             _safe_metadata({"attribution": attribution, "warnings": note_warnings, "label": label})
             notes.append({"label": label, "plain_text": text, "attribution": attribution,
                           "styles": note_styles, "warnings": note_warnings, "reference": reference})
-        payload.update(heading=heading, styles=styles, warnings=warnings, context=context, notes=notes)
+        # Callouts outside this record's notes (or unplaced) are not invented.
+        callouts = [{"offset": offset, "label": labels[note] or "?"}
+                    for offset, note in map_typography(record["markdown"], payload["plain_text"]).callouts
+                    if note in labels]
+        payload.update(heading=heading, styles=styles, warnings=warnings, context=context, notes=notes,
+                       callouts=callouts)
         records.append(payload)
     if restore is not None:
         # Match the browser proof's strict, disposable packet policy; aliases
