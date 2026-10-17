@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Footnotes in the reader — 17 October 2026
+
+`c` now shows each footnote's text, numbered as in the book. Before, it showed
+only the converter's heading ("Note 99"), because a converted footnote keeps its
+text in separate `note_paragraph` records that the reader never loaded. A
+paragraph with footnotes ends with a quiet `[99, 100] c` cue; the callout
+markers themselves are not in the source text, so their exact positions are
+not shown.
+
 ### Personal notes in the reader — 17 October 2026
 
 Press `a` to write a note on the current passage without leaving the reader.

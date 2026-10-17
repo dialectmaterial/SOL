@@ -23,7 +23,7 @@ from sol.terminal.text import emphasis_style
 from sol.terminal.runtime import managed_neovim
 from sol.terminal.theme import theme_payload
 
-from sol.reader.surface import CaptureExport, Sample, record_payload, validate_packet
+from sol.reader.surface import CaptureExport, Sample, note_paragraph_ids, record_payload, validate_packet
 
 
 MAX_PACKET_BYTES = 1024 * 1024
@@ -131,6 +131,7 @@ def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None,
     if set(requested_ids) - {p.identifier for p in sample.passages}:
         raise ValueError("requested references must belong to the displayed reading section")
     capture = CaptureExport.for_sample(sample, requested_ids)
+    bodies = note_paragraph_ids(sample.book)
     records = []
     for passage in sample.passages:
         requested = requested_ids.get(passage.identifier, passage.identifier)
@@ -155,14 +156,22 @@ def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None,
             note = checked_note.record
             if note.get("type") != "note":
                 raise ValueError("a referenced canonical note is unavailable")
-            text = note["plain_text"]
+            # The note record is only a heading; its text is in its body records.
+            parts = [capture.capture(body)[1].record for body in bodies.get(note["id"], [])] or [note]
+            text, note_styles, note_warnings = "", [], []
+            for part in parts:
+                offset = len(text) + 2 if text else 0
+                text = text + "\n\n" + part["plain_text"] if text else part["plain_text"]
+                spans, degraded = _styles(part["markdown"], part["plain_text"])
+                note_styles += [{**span, "start": span["start"] + offset, "end": span["end"] + offset} for span in spans]
+                note_warnings += [warning for warning in degraded if warning not in note_warnings]
             _safe_source(text)
-            note_styles, note_warnings = _styles(note["markdown"], text)
-            if note.get("transcription_status") in {"needs_review", "needs_visual_review"}:
+            if any(part.get("transcription_status") in {"needs_review", "needs_visual_review"} for part in [note, *parts]):
                 note_warnings.insert(0, "Note transcription needs review.")
             attribution = deepcopy(note["attribution"])
-            _safe_metadata({"attribution": attribution, "warnings": note_warnings})
-            notes.append({"plain_text": text, "attribution": attribution,
+            label = str(note.get("label") or "")
+            _safe_metadata({"attribution": attribution, "warnings": note_warnings, "label": label})
+            notes.append({"label": label, "plain_text": text, "attribution": attribution,
                           "styles": note_styles, "warnings": note_warnings, "reference": reference})
         payload.update(heading=heading, styles=styles, warnings=warnings, context=context, notes=notes)
         records.append(payload)

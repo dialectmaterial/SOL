@@ -208,7 +208,10 @@ for _, record in ipairs(records) do
     end)
     position.first_row, position.last_row = position.rows[1].row, position.rows[#position.rows].row
     for _, note in ipairs(record.notes) do
-      if type(note) ~= "table" or type(note.attribution) ~= "table" then fail("invalid attributed note") end
+      if type(note) ~= "table" or type(note.attribution) ~= "table" or type(note.label) ~= "string" then
+        fail("invalid attributed note")
+      end
+      boundaries(note.label)
       local note_length = #boundaries(note.plain_text) - 1
       valid_styles(note.styles, note_length)
       valid_strings(note.warnings)
@@ -430,6 +433,17 @@ for _, record in ipairs(records) do
         { end_row = last.row - 1, end_col = last.byte, hl_group = group, priority = 100 })
       style_runs[#style_runs + 1] = { id = record.id, start = span.start, ["end"] = span["end"], group = group }
     end
+  end
+end
+-- Footnote callouts are not in the source text; a quiet end-of-paragraph cue
+-- says the passage has notes, which c shows in full.
+for _, record in ipairs(records) do
+  local position = positions[record.id]
+  if position and #record.notes > 0 then
+    local labels = {}
+    for _, note in ipairs(record.notes) do labels[#labels + 1] = note.label ~= "" and note.label or "?" end
+    api.nvim_buf_set_extmark(buffer, namespace, position.last_row - 1, 0,
+      { virt_text = { { "  [" .. table.concat(labels, ", ") .. "] c", "NonText" } }, virt_text_pos = "eol" })
   end
 end
 
@@ -772,8 +786,11 @@ local function context()
     add("m1/m2/m3 place; '1/'2/'3 return; dm1/dm2/dm3 clear")
   end
   for _, warning in ipairs(record.warnings) do add("Warning: " .. warning) end
+  if #record.notes > 0 then add(""); add("Footnotes on this passage (" .. #record.notes .. ")") end
   for _, note in ipairs(record.notes) do
-    add(""); add("Note attribution: " .. vim.json.encode(note.attribution))
+    local author = note.attribution.author
+    add(""); add("[" .. (note.label ~= "" and note.label or "?") .. "] " .. tostring(note.attribution.role)
+      .. ", " .. tostring(note.attribution.status) .. (type(author) == "string" and ", " .. author or ""))
     for _, warning in ipairs(note.warnings) do add("Warning: " .. warning) end
     add(note.plain_text)
   end

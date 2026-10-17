@@ -117,6 +117,27 @@ class NeovimHostTests(fixtures.CorpusFixture, unittest.TestCase):
         self.assertEqual(checked.record["plain_text"], note["plain_text"])
         self.assertEqual(self.files(), before)
 
+    def test_converted_footnote_shows_its_body_paragraphs_not_only_its_heading(self):
+        note_id = self.add_note()
+        records = [json.loads(line) for line in (self.corpus / "index.jsonl").read_text().splitlines()]
+        note = next(row for row in records if row["id"] == note_id)
+        note.update(label="7", markdown="#### Note 7", plain_text="Note 7")
+        for index, (markdown, text) in enumerate((("A *first* invented body.", "A first invented body."),
+                                                  ("A second body.", "A second body."))):
+            body = copy.deepcopy(note)
+            body.pop("backlinks"); body.pop("label")
+            body.update(id=f"cccccccc-0000-4000-8000-00000000001{index}", type="note_paragraph",
+                        parent_id=note_id, order=len(records), markdown=markdown, plain_text=text)
+            records.append(body)
+        self.write_records(records)
+        [shown] = neovim.build_payload(self.sample())["records"][0]["notes"]
+        self.assertEqual(shown["label"], "7")
+        self.assertEqual(shown["plain_text"], "A first invented body.\n\nA second body.")
+        if shown["styles"]:
+            span = shown["styles"][0]
+            self.assertEqual(shown["plain_text"][span["start"]:span["end"]], "first")
+        self.assertEqual(core.check_reference(self.book.corpus_snapshot, shown["reference"]).target_id, note_id)
+
     def test_source_review_warning_is_preserved(self):
         records = [json.loads(line) for line in (self.corpus / "index.jsonl").read_text().splitlines()]
         next(row for row in records if row["id"] == self.identifier)["transcription_status"] = "needs_visual_review"

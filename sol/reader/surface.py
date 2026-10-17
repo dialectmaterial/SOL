@@ -24,6 +24,20 @@ class Sample:
     actions: ReaderActions
 
 
+def note_paragraph_ids(book: Book) -> dict[str, list[str]]:
+    """Map each note to its body records, in reading order.
+
+    A converted footnote is a ``note`` record holding only its heading
+    ("Note 12"); the text lives in ``note_paragraph`` children.
+    """
+    bodies = {}
+    for record in book.canonical_records.values():
+        if record.get("type") == "note_paragraph":
+            bodies.setdefault(record.get("parent_id"), []).append(record)
+    return {parent: [row["id"] for row in sorted(rows, key=lambda row: row["order"])]
+            for parent, rows in bodies.items()}
+
+
 def sample_from_book(book: Book, start: str | None = None, count: int = 24) -> Sample:
     """Choose a bounded sequential view, never a new canonical combined record."""
     if type(count) is not int or not 1 <= count <= 64:
@@ -67,10 +81,11 @@ class CaptureExport:
     @classmethod
     def for_sample(cls, sample, requested_ids=None):
         requested_ids = requested_ids or {}
-        identifiers = []
+        identifiers, bodies = [], note_paragraph_ids(sample.book)
         for passage in sample.passages:
             identifiers.append(requested_ids.get(passage.identifier, passage.identifier))
-            identifiers.extend(sample.book.canonical_records[passage.identifier].get("note_ids", []))
+            for note in sample.book.canonical_records[passage.identifier].get("note_ids", []):
+                identifiers += [note, *bodies.get(note, [])]
         return cls(sample.book, identifiers=identifiers)
 
     def capture(self, identifier):
