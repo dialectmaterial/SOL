@@ -20,11 +20,11 @@ Python 3.10 or newer and [pipx](https://pipx.pypa.io/) are required.
 ~~~sh
 git clone https://github.com/dialectmaterial/SOL.git
 cd SOL
-pipx install '.[shell]'
+pipx install .
 pipx ensurepath
 ~~~
 
-Open a new terminal if `sol` is not yet on your path. The `shell` extra adds the optional enhanced prompt: completion, Emacs or Vi editing, and multiline annotation drafts. Use `pipx install .` for the standard-library reader and basic shell instead. Corpus conversion and index rebuilding use the separate `corpus` extra; see the [usage manual](docs/USAGE.md#install-with-pipx).
+Open a new terminal if `sol` is not yet on your path. This installs the reader, enhanced command prompt, and corpus maintenance commands. The book corpus is local data and is not bundled with the application. See the [usage manual](docs/USAGE.md#install-with-pipx) for installation and update details.
 
 After updating a local checkout, refresh an existing installation with:
 
@@ -32,51 +32,33 @@ After updating a local checkout, refresh an existing installation with:
 pipx reinstall sol-organizes-logic
 ~~~
 
-In the kitty reading workspace, `compare PATH_A PATH_B` opens two complete files
-with related personal notes. Tab completes paths; `a` / `b` selects the text to
-scroll. `compare open` refreshes the last desk; `compare close` closes it.
-See [the comparison desk](docs/USAGE.md#open-a-comparison-desk) for the workflow.
-
 ## Choose a local corpus
 
-Installing SOL does not supply or download the book. Point it at an existing SOL corpus once:
+SOL needs an indexed corpus directory containing `corpus.json`, `index.jsonl`, and the canonical Markdown. A PDF by itself is not a corpus, and `--set-corpus` expects the corpus directory rather than the PDF path.
+
+If you already have a prepared corpus, select it once:
 
 ~~~sh
-sol --set-corpus /absolute/path/to/SOL/local-corpus
+sol --set-corpus /absolute/path/to/local-corpus
 ~~~
 
-A local pipx installation can also discover `local-corpus` in its source checkout. The saved setting makes your chosen text explicit and works from any directory. If you only have the PDF, follow the [conversion instructions](docs/USAGE.md#maintain-and-review-the-corpus) before ordinary reading.
+The setting stores the corpus location in your user configuration and works from any working directory. It does not copy the corpus. If you only have the supported source PDF, follow the [corpus conversion instructions](docs/CORPUS.md#create-inspect-and-index) to build and review a local corpus first. SOL does not extract the PDF each time you read.
 
 ## Start reading
 
 ~~~sh
-sol           # Open or create a workspace and choose an actor
-sol -n        # Open a temporary shell without workspace or actor
-sol -r        # Print one random passage
-sol guide     # Show the beginner guide
+sol                       # Open the reader and resume the remembered workspace
+sol --actor "Your name"   # Open that actor's most recently used workspace
+sol -n                    # Read without a workspace or actor
+sol -r                    # Print one random passage
+sol guide                 # Show the beginner's guide
 ~~~
 
-An actor is your local attribution label, not a login account. A workspace remembers your reading position, bookmarks, notes, comparisons, review testimony, and relations between passages. Existing annotation bodies remain inspectable after an edit.
+On first use, SOL asks for an actor and a workspace if none has been selected. An actor is a local attribution label, not a login account. A workspace remembers reading position and supports bookmarks, annotations, comparisons, source review, and relations between passages.
 
-Try this inside the shell:
+The BEING reader runs directly in capable terminal emulators, including Alacritty and Kitty. Kitty is an optional integration; the reader does not require it. The usual keys are `j` and `k` to move through displayed lines, `b` and `n` to move between passages, `/` to search, `v` to select text, `c` to inspect context, and `?` to show reader keys. Ctrl-Q saves and leaves the reader. See the [reader guide](docs/READER_VIEW.md) for details.
 
-~~~text
-cd /being
-ls
-first
-bookmark add beginning
-note add "What does this beginning presuppose?"
-next
-where
-search "infinity" --word --limit 5
-open 1
-context 1
-help
-~~~
-
-Bookmark and note commands require a workspace. Use `guide` for examples, `tree --depth 2` for the book’s structure, and `exit` to leave. With the enhanced prompt, `note draft` opens a multiline note: Ctrl-S saves and Ctrl-C cancels. Use `sol --ui basic` if you prefer basic input.
-
-One-shot commands work without opening a workspace:
+One-shot commands work without opening the reader:
 
 ~~~sh
 sol --structure --depth 2
@@ -86,7 +68,7 @@ sol -r --plain
 sol -r --json
 ~~~
 
-Replace `ID` with an identifier displayed by your own corpus. Passage output shows its location and source pages; `--plain` and `--json` support pipelines and scripts.
+Replace `ID` with an identifier displayed by your corpus. Passage output includes its location and source pages; `--plain` and `--json` support scripts and pipelines.
 
 ## The three stages
 
@@ -106,6 +88,35 @@ The long-term ambition is a NixOS distribution with a distinctive philosophical 
 
 The necessity concerns systematic control of the research environment. The choice of NixOS is a technical judgment about how best to achieve it.
 
+## The optional book shell
+
+The book shell offers path-based navigation through the three doctrines. Its paths describe the book and are not real directories on your computer. Open it with `sol --shell`:
+
+~~~text
+cd /being
+ls
+first
+bookmark add beginning
+note add "What does this beginning presuppose?"
+next
+where
+search "infinity" --word --limit 5
+open 1
+context 1
+help
+~~~
+
+Bookmark and note commands require a workspace. Use `tree --depth 2` to inspect the book's structure and `exit` to leave. The optional enhanced prompt supports completion, Vi or Emacs editing, and multiline annotation drafts. Use `sol --shell --ui basic` for basic command input.
+
+Manage local workspaces without opening the reader:
+
+~~~sh
+sol --workspace-list
+sol --workspace-delete NAME
+~~~
+
+Close the workspace in every SOL window before deleting it. Deletion removes the named workspace from normal use and retains its database in a private `.trash` archive. The command reports the recovery path. Actor profiles and the corpus are retained. See [workspace management](docs/USAGE.md#list-or-remove-a-workspace).
+
 ## Documentation and development
 
 ~~~text
@@ -115,13 +126,10 @@ tests/          Regression tests
 local-corpus/   Your local edition, excluded from Git
 ~~~
 
-The [usage manual](docs/USAGE.md) covers navigation, configuration, workspace history, annotation editing, backup, export, and source viewing. The [corpus contract](docs/CORPUS.md) defines text, identifiers, provenance, and validation. The [workspace plan](docs/WORKSPACE_PLAN.md) separates implemented behavior from future work; [workspace export](docs/WORKSPACE_EXPORT.md) explains readable inquiry reports.
+The [usage manual](docs/USAGE.md) covers navigation, configuration, workspaces, annotations, backup, export, and source viewing. The [corpus contract](docs/CORPUS.md) documents the canonical text, identifiers, provenance, and validation. The [workspace plan](docs/WORKSPACE_PLAN.md) separates current behavior from future work, and [workspace export](docs/WORKSPACE_EXPORT.md) explains readable inquiry reports.
 
-[Interface research](docs/research/INTERFACE_RESEARCH.md) and the [OpenDataLoader investigation](docs/research/OPENDATALOADER_RESEARCH.md) record options without making them reader dependencies.
+[Interface research](docs/research/INTERFACE_RESEARCH.md) and the [OpenDataLoader investigation](docs/research/OPENDATALOADER_RESEARCH.md) document options for later development.
 
-From the checkout, run `python -m sol` to use the current source. See the [development checks](docs/USAGE.md#development-checks) for an isolated environment and the test suite.
+From the checkout, run `python -m sol` to use the current source. The [development checks](docs/USAGE.md#development-checks) describe the isolated environment and test suite.
 
-For normal shell commands and pipes, use `sol-kitty --zsh`. It opens zsh in the
-corpus directory. `sol read FILE --plain | less` reads canonical text;
-`sol compare FILE_A FILE_B` opens a comparison and returns to zsh with `q`.
-See [native shell usage](docs/USAGE.md#use-normal-zsh-commands).
+For ordinary shell commands and pipes, use `sol-kitty --zsh`. It opens zsh in the corpus directory. For example, `sol read FILE --plain | less` reads canonical text and `sol compare FILE_A FILE_B` opens a comparison, returning to zsh when you press `q`. See [native shell usage](docs/USAGE.md#use-normal-zsh-commands).
