@@ -269,6 +269,45 @@ class WorkspaceReaderActionsTests(unittest.TestCase):
                 self.assertEqual(self.state(), before)
         self.assertEqual(self.store.get_state(), saved)
 
+    def test_staged_moves_save_once_and_only_after_the_block_completes(self):
+        self.actions.read(('BEING',), first=True)
+        visits = len(self.store.list_history())
+        with self.actions.staged():
+            self.actions.move(1)
+            self.actions.open(IDS[2])
+            self.assertEqual(len(self.store.list_history()), visits)
+            with self.assertRaises(RuntimeError):
+                with self.actions.staged():
+                    pass
+        self.assertEqual(self.store.get_state()['current_id'], IDS[2])
+        self.assertEqual(len(self.store.list_history()), visits + 1)
+        self.actions.history_back()
+        self.assertEqual(self.actions.session.current().identifier, IDS[1])
+
+    def test_failed_staged_block_restores_local_state_and_saves_nothing(self):
+        self.actions.read(('BEING',), first=True)
+        self.actions.search('ground')
+        before, saved, trail = self.state(), self.store.get_state(), self.actions.snapshot()
+        with self.assertRaisesRegex(RuntimeError, 'invented view failure'):
+            with self.actions.staged():
+                self.actions.move(1)
+                raise RuntimeError('invented view failure')
+        self.assertEqual((self.state(), self.store.get_state(), self.actions.snapshot()), (before, saved, trail))
+        # A conflict at the single save is a failure of the block, too.
+        with Workspace(self.path, CORPUS_ID, self.provenance, actor='Other') as other:
+            newer = other.get_state()
+            newer['current_id'] = IDS[2]
+            other.save_state(newer, newer['revision'])
+            with self.assertRaises(WorkspaceConflict):
+                with self.actions.staged():
+                    self.actions.move(1)
+            self.assertEqual(self.state(), before)
+            self.assertEqual(other.get_state()['current_id'], IDS[2])
+        # Staging leaves no trace: the next ordinary move saves at once.
+        self.reader.revision = self.store.get_state()['revision']
+        self.actions.move(1)
+        self.assertEqual(self.store.get_state()['current_id'], IDS[1])
+
     def test_reference_or_runtime_failure_restores_existing_cursor_and_reference(self):
         self.retire_first()
         self.actions.open(RETIRED)

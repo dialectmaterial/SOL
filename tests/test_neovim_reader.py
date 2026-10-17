@@ -578,6 +578,148 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 0)
 
+    def test_refused_destination_view_keeps_the_shown_and_saved_position(self):
+        """A destination whose view cannot be prepared is never saved or entered in history."""
+        self.extend(3)
+        records = self.rows()
+        text = "Short one. This sentence is the longest one in the passage, by a clear margin of words."
+        records[1].update(markdown=text, plain_text=text)
+        self.write_records(records)
+        build = neovim.build_payload
+        # Each live navigation route, with the request that makes it available first.
+        routes = {"next": ({}, None), "passage_next": ({}, None), "marker_open": ({"slot": 1}, None),
+                  "search_open": ({"result": 1}, {"op": "search", "query": "paragraph 2"}),
+                  "search_next": ({}, {"op": "search", "query": "paragraph 2"}),
+                  "history_back": ({}, {"op": "passage_previous"}),
+                  "study_open": ({"row": 1}, {"op": "sentence_study"})}
+
+        def saved_at(service):
+            state = service.store.get_state()
+            return state["current_id"], state["position"]["cursor_offset"]
+
+        for operation, (extra, setup) in routes.items():
+            with self.subTest(operation=operation):
+                service = self.service(self.root / f"refused-{operation}.sqlite3")
+                self.position(service, 4, self.book.passages[1].identifier)
+                service.save_bookmark("sol:reader-marker:1", ReaderActions(self.book, service).session,
+                                      self.book.passages[2].identifier, replace=True)
+                failing = []
+
+                def build_or_fail(*args, **kwargs):
+                    if failing:
+                        raise RuntimeError("injected view preparation failure")
+                    return build(*args, **kwargs)
+
+                def native(payload, _, on_request):
+                    shown = payload
+                    if setup is not None:
+                        shown = on_request({**setup, "packet": shown["restore"],
+                                            "mode": "continuous"}).get("payload", shown)
+                    origin = deepcopy(shown["restore"])
+                    origin["cursor_offset"] = 6
+                    here = origin["reference"]["reference"]["target_id"], 6
+                    request = {"op": operation, **extra, "packet": origin, "mode": "continuous"}
+                    failing.append(True)
+                    with self.assertRaisesRegex(RuntimeError, "injected"):
+                        on_request(deepcopy(request))
+                    failing.clear()
+                    # The outgoing position the editor showed may be saved; the destination is not.
+                    self.assertEqual(saved_at(service), here)
+                    # The same request succeeds on retry, and history returns once to the origin.
+                    opened = on_request(deepcopy(request))["payload"]["restore"]
+                    there = opened["reference"]["reference"]["target_id"], opened["cursor_offset"]
+                    self.assertNotEqual(there, here)
+                    self.assertEqual(saved_at(service), there)
+                    returning = "history_forward" if operation == "history_back" else "history_back"
+                    back = on_request({"op": returning, "packet": opened, "mode": "continuous"})["payload"]
+                    self.assertEqual(back["restore"]["reference"], origin["reference"])
+                    self.assertEqual(back["restore"]["cursor_offset"], 6)
+                    return 0, {"action": "quit", "packet": back["restore"]}
+
+                with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                        patch.object(neovim, "build_payload", side_effect=build_or_fail), \
+                        patch.dict(os.environ, XDG_DATA_HOME=str(self.root / "data")), \
+                        patch.object(neovim, "launch_payload", side_effect=native):
+                    self.assertEqual(self.run_view(service), 0)
+                reopened = ReaderActions(self.book, service)
+                reopened.restore()
+                self.assertEqual(reopened.snapshot().cursor_offset, 6)
+
+    def test_refused_destination_leaves_mode_and_theme_for_the_next_view(self):
+        self.extend(3)
+        build = neovim.build_payload
+        failing, shown = [], []
+
+        def build_or_fail(*args, **kwargs):
+            if failing:
+                raise RuntimeError("injected view preparation failure")
+            return build(*args, **kwargs)
+
+        def native(payload, _, on_request):
+            shown.append(payload)
+            if len(shown) > 1:
+                return 0, {"action": "quit", "packet": payload["restore"]}
+            failing.append(True)
+            with self.assertRaises(RuntimeError):
+                on_request({"op": "passage_next", "packet": payload["restore"], "mode": "paragraph",
+                            "focus": True, "theme": "dark"})
+            failing.clear()
+            # Leaving the editor for the next section rebuilds the view from the
+            # reader's own state, which the refused move must not have changed.
+            return 0, {"action": "next", "packet": payload["restore"]}
+
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "build_payload", side_effect=build_or_fail), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(), 0)
+        first, second = shown
+        self.assertEqual((second["mode"], second["focus"], second["theme"]),
+                         (first["mode"], first["focus"], first["theme"]))
+        self.assertEqual(second["records"][0]["id"], self.book.passages[1].identifier)
+
+    def test_competing_save_refuses_navigation_without_moving_this_reader(self):
+        self.extend(3)
+        service = self.service()
+        self.position(service, 4)
+        other = self.service(service.store.path)
+
+        def native(payload, _, on_request):
+            competing = ReaderActions(self.book, other)
+            competing.restore()
+            competing.set_cursor(9)
+            competing.save_position()
+            saved = other.store.get_state()
+            with self.assertRaises(WorkspaceConflict):
+                on_request({"op": "next", "packet": payload["restore"], "mode": "continuous"})
+            self.assertEqual(service.store.get_state(), saved)
+            # Retrying cannot overwrite the other session's work either.
+            with self.assertRaises(WorkspaceConflict):
+                on_request({"op": "passage_next", "packet": payload["restore"], "mode": "continuous"})
+            self.assertEqual(service.store.get_state(), saved)
+            return 1, None
+
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 1)
+
+    def test_changed_corpus_refuses_live_navigation_without_saving(self):
+        self.extend(3)
+        service = self.service()
+        self.position(service, 4)
+        before = service.store.get_state()
+
+        def native(payload, _, on_request):
+            source = self.corpus / "sample.md"
+            source.write_text(source.read_text() + "\nAn unindexed edit.\n")
+            with self.assertRaises(ValueError):
+                on_request({"op": "next", "packet": payload["restore"], "mode": "continuous"})
+            self.assertEqual(service.store.get_state(), before)
+            return 1, None
+
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 1)
+
     def test_cross_section_paragraph_previous_lands_at_beginning_and_keeps_focus(self):
         self.extend(3)
         def native(payload, _, on_request):
