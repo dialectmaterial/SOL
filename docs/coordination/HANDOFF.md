@@ -55,7 +55,7 @@ Write "None." rather than deleting a heading.
 - `AGENTS.md` (the ChatGPT project's untracked mirror instructions) stays untracked and unchanged.
 
 ### Decisions requiring approval
-- **Push policy.** CONTRIBUTING still says agent work is committed and pushed by default, which reads as pushing to `main`; CLAUDE.md says branch and pull request. Assumed meanwhile: branch and PR for Claude Code. Approve to reword CONTRIBUTING's first paragraph to match.
+- **Push policy.** Approved by the maintainer: CONTRIBUTING now says branch and pull request, with the maintainer merging, matching CLAUDE.md.
 - **Who writes `CURRENT_TASK.md`.** Assumed: the maintainer, possibly pasting ChatGPT's draft. Alternative: ChatGPT drafts in a PR comment and Claude Code commits it at the start of the task.
 
 ## Footnotes, search marks, retyped mathematics and the sentence study — 17 October 2026
