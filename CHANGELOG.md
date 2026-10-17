@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### A refused move no longer loses your place — 18 October 2026
+
+Moving in the reader used to save the destination before its view was built.
+If building it failed, the screen stayed where it was while the workspace and
+the back-history already pointed at a passage you never saw, and quitting
+resumed there. Now a move is saved only once its view is ready; a refused move
+leaves the screen, the saved position and the history unchanged, and can be
+retried. Opening a study sentence in the paragraph you are reading now makes a
+history entry, so Alt-Left returns to where you were.
+
 ### First inquiry from the reader: sentence lengths — 17 October 2026
 
 `S` in the reader measures the sentences of the loaded section through a new
