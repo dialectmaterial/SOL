@@ -325,6 +325,25 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             self.assertEqual(self.run_view(), 0)
         launch.assert_called_once()
 
+    def test_session_theme_survives_section_reload_without_being_saved(self):
+        self.extend(3)
+        service = self.service()
+        def native(payload, _, on_request):
+            self.assertEqual(payload["theme"]["active"], "paper")
+            packet = self.reply(payload)["packet"]
+            shown = on_request({"op": "next", "mode": "continuous", "theme": "dark", "packet": packet})["payload"]
+            self.assertEqual(shown["theme"]["active"], "dark")
+            for invalid in ("sepia", None, ["dark"]):
+                with self.subTest(theme=invalid), self.assertRaisesRegex(ValueError, "theme"):
+                    on_request({"op": "next", "mode": "continuous", "theme": invalid, "packet": packet})
+            return 0, {"action": "quit", "packet": shown["restore"]}
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service, theme="paper"), 0)
+        self.assertNotIn("theme", json.dumps(service.store.export()))
+        with self.assertRaisesRegex(ValueError, "theme"):
+            self.run_view(theme="sepia")
+
     def test_invalid_live_requests_do_not_write_markers_or_positions(self):
         service = self.service()
         self.position(service, 4)

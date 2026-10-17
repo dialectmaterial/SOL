@@ -21,6 +21,7 @@ import unicodedata
 from sol.reader.typography import map_typography
 from sol.terminal.text import emphasis_style
 from sol.terminal.runtime import managed_neovim
+from sol.terminal.theme import theme_payload
 
 from sol.reader.surface import CaptureExport, Sample, record_payload, validate_packet
 
@@ -110,11 +111,12 @@ def _check_sample_packet(sample, packet, records=None):
     return selected
 
 
-def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None, emphasis="auto"):
+def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None, emphasis="auto", theme=None):
     """Prepare inert JSON; every selection offset remains a source codepoint.
 
     Only supplied document headings are projected. No experiment title or
     concatenated canonical record is introduced into the reading surface.
+    A theme adds presentation presets only; research samples omit it.
     """
     _width(width)
     if sample.actions.workspace_reader is not None:
@@ -169,8 +171,11 @@ def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None,
         # are not silently rewritten into a new requested identity.
         _check_sample_packet(sample, restore, records)
     capture.finish()
-    return {"records": records, "width": width, "emphasis": emphasis_style(emphasis),
-            "restore": deepcopy(restore)}
+    payload = {"records": records, "width": width, "emphasis": emphasis_style(emphasis),
+               "restore": deepcopy(restore)}
+    if theme is not None:
+        payload["theme"] = theme_payload(theme)
+    return payload
 
 
 def _unique_fields(pairs):

@@ -96,6 +96,36 @@ local focused_id = data.restore and data.restore ~= vim.NIL and data.restore.ref
 if integrated and (not exact_keys(data.navigation, { "previous", "next" })
   or type(data.navigation.previous) ~= "boolean" or type(data.navigation.next) ~= "boolean"
   or type(data.notice) ~= "string") then fail("invalid reading navigation") end
+-- Presentation presets are inert highlight data from Python, never sourced files.
+local theme_groups = {}
+for _, name in ipairs({ "Normal", "SOLPanel", "SOLPanelBorder", "SOLSourceHeading", "SOLSourceWarning",
+  "StatusLine", "StatusLineNC", "Visual", "Search", "CurSearch", "IncSearch",
+  "CursorLine", "ErrorMsg", "WarningMsg", "NonText", "EndOfBuffer" }) do theme_groups[name] = true end
+local theme_attributes = { fg = "color", bg = "color", ctermfg = "cterm", ctermbg = "cterm",
+  bold = "flag", italic = "flag", underline = "flag", reverse = "flag" }
+local presets, theme_order = {}, {}
+if data.theme ~= nil then
+  local theme = data.theme
+  if not exact_keys(theme, { "active", "truecolor", "presets" }) or type(theme.truecolor) ~= "boolean"
+    or type(theme.presets) ~= "table" or #theme.presets < 1 then fail("invalid reader theme") end
+  for _, preset in ipairs(theme.presets) do
+    if not exact_keys(preset, { "name", "label", "groups", "notice" }) or type(preset.name) ~= "string"
+      or presets[preset.name] or type(preset.label) ~= "string" or type(preset.notice) ~= "string"
+      or type(preset.groups) ~= "table" then fail("invalid reader theme preset") end
+    boundaries(preset.label); boundaries(preset.notice)
+    for name, attributes in pairs(preset.groups) do
+      if not theme_groups[name] or type(attributes) ~= "table" then fail("invalid reader theme group") end
+      for key, value in pairs(attributes) do
+        local kind = theme_attributes[key]
+        if not ((kind == "color" and type(value) == "string" and value:match("^#%x%x%x%x%x%x$"))
+          or (kind == "cterm" and integer(value) and value >= 0 and value <= 255)
+          or (kind == "flag" and type(value) == "boolean")) then fail("invalid reader theme attribute") end
+      end
+    end
+    presets[preset.name], theme_order[#theme_order + 1] = preset, preset.name
+  end
+  if type(theme.active) ~= "string" or not presets[theme.active] then fail("unknown reader theme") end
+end
 local previous_reader = rawget(_G, 'SOLNvimReader')
 if previous_reader and previous_reader.dispose then previous_reader.dispose() end
 
@@ -191,6 +221,8 @@ vim.o.swapfile, vim.o.backup, vim.o.writebackup, vim.o.undofile = false, false, 
 vim.o.laststatus, vim.o.showtabline, vim.o.cmdheight = 3, 0, 1
 vim.o.showmode, vim.o.showcmd, vim.o.ruler, vim.o.hidden = false, false, false, true
 vim.o.mouse, vim.o.clipboard = "", ""
+-- No "~" past the text and no "@@@" when a paragraph continues below the window.
+vim.o.fillchars = "eob: ,lastline: "
 vim.o.statusline = " j/k lines   [p/]p passages   / search   v select   c source/notes   ? help   q return"
 if integrated then
   vim.o.statusline = " SOL " .. mode .. " | b/n paragraphs  p mode  m1-3 mark  y copy  t tree  ? help  q quit"
@@ -218,6 +250,8 @@ vim.wo[window].number, vim.wo[window].relativenumber, vim.wo[window].cursorline 
 vim.wo[window].signcolumn, vim.wo[window].foldcolumn, vim.wo[window].colorcolumn = "no", "0", ""
 vim.wo[window].conceallevel, vim.wo[window].scrolloff, vim.wo[window].sidescrolloff = 0, 2, 0
 vim.wo[window].virtualedit, vim.wo[window].list, vim.wo[window].spell = "onemore", false, false
+-- The reading float is the page itself, not a box drawn on another surface.
+vim.wo[window].winhighlight = "NormalFloat:Normal"
 
 local function source_location(row, byte)
   if not integer(row) or not source_rows[row] then fail("endpoint is outside selectable source prose") end
@@ -355,8 +389,22 @@ end
 -- Semantic spans map once from source codepoints to UTF-8 extmark boundaries.
 -- Styling never enters canonical strings. Unknown/basic terminals underline em.
 local italic_capable = data.emphasis == "italic"
-api.nvim_set_hl(0, "SOLSourceHeading", { bold = true })
-api.nvim_set_hl(0, "SOLSourceWarning", { link = "WarningMsg" })
+-- Terminal restores the host's own background setting; Dark/Paper declare theirs.
+if rawget(_G, 'SOLInitialBackground') == nil then _G.SOLInitialBackground = vim.o.background end
+local function apply_theme()
+  if not data.theme then
+    api.nvim_set_hl(0, "SOLSourceHeading", { bold = true })
+    api.nvim_set_hl(0, "SOLSourceWarning", { link = "WarningMsg" })
+    return
+  end
+  local active = data.theme.active
+  local background = active == "paper" and "light" or active == "dark" and "dark" or _G.SOLInitialBackground
+  vim.o.termguicolors = active ~= "terminal" and data.theme.truecolor
+  -- Changing 'background' resets Neovim's default groups, so it precedes ours.
+  if vim.o.background ~= background then vim.o.background = background end
+  for name in pairs(theme_groups) do api.nvim_set_hl(0, name, vim.deepcopy(presets[active].groups[name] or {})) end
+end
+apply_theme()
 for _, row in ipairs(heading_rows) do
   api.nvim_buf_set_extmark(buffer, namespace, row - 1, 0,
     { end_row = row - 1, end_col = #projection[row], hl_group = "SOLSourceHeading" })
@@ -400,6 +448,7 @@ local function show_lines(lines)
     col = math.max(0, math.floor((vim.o.columns - width) / 2)), width = width,
     height = math.min(height, math.max(1, #lines)), style = "minimal", border = "single", zindex = 50 })
   vim.wo[popup].wrap, vim.wo[popup].linebreak = true, true
+  vim.wo[popup].winhighlight = "NormalFloat:SOLPanel,FloatBorder:SOLPanelBorder"
   for _, key in ipairs({ "<Esc>", "q", "c" }) do
     vim.keymap.set("n", key, close_popup, { buffer = panel, silent = true })
   end
@@ -478,6 +527,7 @@ local function request(operation, fields, callback)
   channel.serial = channel.serial + 1
   message.id, message.op, message.packet, message.mode = channel.serial, operation, current_packet(), mode
   message.focus = data.focus == true
+  if data.theme then message.theme = data.theme.active end
   if operation ~= 'marker_set' and operation ~= 'marker_clear' then
     channel.navigation_pending = message.id
   end
@@ -602,6 +652,18 @@ local function context()
     end
   end
 end
+local function cycle_theme()
+  if not data.theme then fail('themes need the installed SOL reader') end
+  local at = 1
+  for index, name in ipairs(theme_order) do if name == data.theme.active then at = index end end
+  data.theme.active = theme_order[at % #theme_order + 1]
+  apply_theme()
+  local preset = presets[data.theme.active]
+  local message = preset.notice ~= '' and preset.notice or ('Theme: ' .. preset.label ..
+    ' for this session. Keep it with: sol --set-theme ' .. preset.name)
+  api.nvim_echo({{message, 'None'}}, false, {})
+  return data.theme.active
+end
 local function help()
   if integrated then
     show_lines({ "SOL reader (" .. mode .. ")", "",
@@ -620,6 +682,7 @@ local function help()
       "v                characterwise selection inside one passage",
       "c                source pages, attribution and linked notes",
       "f                toggle quiet focus mode",
+      "T                cycle Terminal / Dark / Paper theme for this session",
       "q / Ctrl-q       save the semantic position and quit",
       ":qa!             quit without saving the current cursor", "",
       "In paragraph mode, j/k stay here. Use b/n to change paragraph.",
@@ -743,11 +806,17 @@ vim.keymap.set("n", "[p", guarded(function() passage(-1) end), { buffer = buffer
 vim.keymap.set("n", "]p", guarded(function() passage(1) end), { buffer = buffer, silent = true })
 vim.keymap.set("n", "c", guarded(context), { buffer = buffer, silent = true })
 vim.keymap.set("n", "?", help, { buffer = buffer, silent = true })
+if data.theme then vim.keymap.set("n", "T", guarded(cycle_theme), { buffer = buffer, silent = true }) end
 if not integrated then api.nvim_create_user_command("SOLExport", guarded(function() export() end), {}) end
 local group = api.nvim_create_augroup('SOLReaderView', {clear = true})
 api.nvim_create_autocmd("VimResized", { group = group, callback = function()
   if tree_view then tree_view.resize() else close_popup() end
   if api.nvim_win_is_valid(window) then api.nvim_win_set_config(window, window_config()) end
+end })
+-- Terminal background detection can reset default groups after startup.
+api.nvim_create_autocmd({ "ColorScheme", "OptionSet" }, { group = group, callback = function(event)
+  if event.event == "OptionSet" and event.match ~= "background" then return end
+  vim.schedule(function() if api.nvim_buf_is_valid(buffer) then apply_theme() end end)
 end })
 
 _G.SOLNvimReader = { records = records, buffer = buffer, window = window, positions = positions,
@@ -757,6 +826,7 @@ _G.SOLNvimReader = { records = records, buffer = buffer, window = window, positi
   byte_to_codepoint = byte_to_codepoint, codepoint_to_byte = codepoint_to_byte,
   verified_projection = verified_projection, context = context, help = help,
   toggle_mode = toggle_mode, mode = mode, yank = yank, tree = tree, marker = marker,
+  cycle_theme = cycle_theme, theme = function() return data.theme and data.theme.active end,
   quit = function() reading_request('quit') end,
   marker_slots = function() return vim.deepcopy(data.markers) end,
   update_markers = function(markers)

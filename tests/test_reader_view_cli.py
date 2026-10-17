@@ -110,7 +110,7 @@ class ReaderViewCLITests(unittest.TestCase):
                 patch.object(app, "run_reader", return_value=0) as view:
             status, _, error = self.call(["--reader", "-n", "--width", "64", "--emphasis", "underline"])
         self.assertEqual(status, 0, error)
-        self.assertEqual(view.call_args.kwargs, {"width": 64, "emphasis": "underline"})
+        self.assertEqual(view.call_args.kwargs, {"width": 64, "emphasis": "underline", "theme": "terminal"})
 
     def test_emphasis_is_reader_only_and_width_validation_precedes_data_access(self):
         for arguments in (["-r", "--emphasis", "italic"], ["--reader", "--width", "19"],
@@ -175,7 +175,7 @@ class ReaderViewCLITests(unittest.TestCase):
             status, _, error = self.call(["-n", "--engine", "neovim", "--width", "64", "--emphasis", "underline"])
         self.assertEqual(status, 0, error)
         reader.assert_called_once()
-        self.assertEqual(reader.call_args.kwargs, {"width": 64, "emphasis": "underline"})
+        self.assertEqual(reader.call_args.kwargs, {"width": 64, "emphasis": "underline", "theme": "terminal"})
         self.assertFalse((self.root / "data").exists())
 
     def test_neovim_engine_is_not_a_shell_or_one_shot_option(self):
@@ -191,7 +191,7 @@ class ReaderViewCLITests(unittest.TestCase):
                 patch.object(app, "shell_identity", side_effect=AssertionError("No actor setup")):
             status, _, error = self.call(["--dynamic-structure", "--depth", "3"])
         self.assertEqual(status, 0, error)
-        self.assertEqual(reader.call_args.kwargs, {"width": 72, "start_tree": True, "tree_depth": 3})
+        self.assertEqual(reader.call_args.kwargs, {"width": 72, "start_tree": True, "tree_depth": 3, "theme": "terminal"})
         self.assertFalse((self.root / "data").exists())
 
     def test_dynamic_structure_refuses_workspace_pdf_and_noninteractive_output(self):

@@ -107,10 +107,13 @@ class ReaderSurfaceNeovimTests(unittest.TestCase):
         self.input, self.output = self.root / "input.json", self.root / "selection.json"
         self.result = self.root / "report.json"
 
-    def run_lua(self, scenario, *, restore=None, automatic_quit=True, integrated=False):
+    def run_lua(self, scenario, *, restore=None, automatic_quit=True, integrated=False, theme=None):
         from experiments.reader_surfaces.neovim import build_payload
+        from sol.terminal.theme import theme_payload
 
         self.payload = build_payload(self.sample, width=72, restore=restore)
+        if theme is not None:
+            self.payload["theme"] = theme_payload(theme, {"COLORTERM": "truecolor"})
         if integrated:
             self.payload.update(integrated=True, navigation={"next": True, "previous": True}, notice="")
         self.input.write_text(json.dumps(self.payload, ensure_ascii=False), encoding="utf-8")
@@ -498,6 +501,62 @@ end
   report.simple_keys = true
 ''', integrated=True)
         self.assertTrue(report["simple_keys"])
+
+    def test_theme_presets_style_only_presentation_and_cycle_in_order(self):
+        report = self.run_lua(r'''
+  local before = vim.api.nvim_buf_get_lines(reader.buffer, 0, -1, false)
+  local packet = reader.capture('v', reader.source_point(data.records[1].id, 5), reader.source_point(data.records[1].id, 12))
+  local function normal() return vim.api.nvim_get_hl(0, {name = 'Normal'}) end
+  assert(reader.theme() == 'paper' and vim.o.termguicolors and vim.o.background == 'light')
+  assert(normal().bg == tonumber('f5f0e4', 16), 'paper page color was not applied')
+  assert(vim.api.nvim_get_hl(0, {name = 'SOLSourceHeading'}).bold)
+  assert(vim.wo[reader.window].winhighlight == 'NormalFloat:Normal')
+  assert(vim.o.fillchars:find('lastline: ', 1, true) and vim.o.fillchars:find('eob: ', 1, true))
+  local order = {}
+  for _ = 1, 3 do order[#order + 1] = reader.cycle_theme() end
+  report.order = order
+  -- Terminal hands foreground, background and palette back to the host.
+  reader.cycle_theme()
+  assert(reader.theme() == 'terminal' and not vim.o.termguicolors and next(normal()) == nil)
+  reader.cycle_theme()
+  assert(vim.o.background == 'dark' and normal().bg == tonumber('1c1b19', 16))
+  assert(vim.deep_equal(before, vim.api.nvim_buf_get_lines(reader.buffer, 0, -1, false)))
+  reader.verified_projection()
+  assert(vim.deep_equal(reader.capture('v', reader.source_point(data.records[1].id, 5),
+    reader.source_point(data.records[1].id, 12)), packet))
+  -- A host background change resets default groups; the preset returns.
+  vim.o.background = 'light'
+  vim.wait(100, function() return vim.o.background == 'dark' end)
+  assert(vim.o.background == 'dark' and normal().bg == tonumber('1c1b19', 16))
+''', theme="paper")
+        self.assertEqual(report["order"], ["terminal", "dark", "paper"])
+
+    def test_theme_survives_mode_reload_and_invalid_presets_are_refused(self):
+        report = self.run_lua(r'''
+  reader.cycle_theme()
+  vim.api.nvim_feedkeys('p', 'xt', false)
+  reader = SOLNvimReader
+  assert(reader.mode == 'paragraph' and reader.theme() == 'paper')
+  vim.api.nvim_feedkeys('T', 'xt', false)
+  assert(SOLNvimReader.theme() == 'terminal')
+  local adapter = os.getenv('SOL_NVIM_ADAPTER')
+  local refused = 0
+  for _, change in ipairs({
+    function(theme) theme.presets[2].groups.Normal.fg = 'red' end,
+    function(theme) theme.presets[2].groups.Normal.ctermfg = 256 end,
+    function(theme) theme.presets[2].groups.Normal.link = 'Comment' end,
+    function(theme) theme.presets[2].groups.Conceal = {} end,
+    function(theme) theme.active = 'sepia' end,
+    function(theme) theme.extra = true end,
+  }) do
+    local payload = vim.deepcopy(data)
+    change(payload.theme)
+    local accepted = pcall(assert(loadfile(adapter)), payload)
+    if not accepted then refused = refused + 1 end
+  end
+  report.refused = refused
+''', theme="dark", integrated=True)
+        self.assertEqual(report["refused"], 6)
 
 
 if __name__ == "__main__":

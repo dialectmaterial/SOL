@@ -38,6 +38,7 @@ The current implementation also includes literal book search, source-positioned 
 | `t` | Dynamic structure tree (Vim-style navigation) |
 | `c` | Passage source context, notes, markers |
 | `f` | Quiet focus mode; keep important warnings |
+| `T` | Cycle Terminal / Dark / Paper theme for this session |
 | `?`, `q` | Help / save position and quit |
 
 `n` means *next paragraph*, **not** Neovim's default next regex match. `gg/G` operate only within the loaded section. Selections remain inside a single canonical passage and are not automatically saved as annotations. Search and passage navigation preserve source offsets as far as the verified projection allows.
@@ -53,6 +54,8 @@ sol                                  # Reader, remembered actor/workspace
 sol -n                               # Temporary reader, no workspace/profile writes
 sol --actor "Researcher" --workspace logic-study
 sol --width 64                       # Adjust prose measure
+sol --theme paper                    # Theme for this session: terminal, dark or paper
+sol --set-theme dark                 # Remember a theme in ~/.config/sol/config.json
 sol --structure --depth 2            # Printable book structure
 sol --dynamic-structure              # Standalone dynamic tree
 sol --search "ground" --within /essence --word --limit 8
@@ -106,6 +109,8 @@ Workspace report exports retain references, questions, notes/revisions, reading 
 | **Terminal** | Existing host's native appearance | Inherit foreground/background; use minimal highlight overrides |
 | **Dark** | Quiet, carefully tuned TUI reading | Readable contrast and restrained differentiation of hierarchy, notes, search and warnings |
 | **Paper** | Book-like page | Light paper-toned background with legible dark text and restrained accents |
+
+**Implemented (17 October):** the three presets above. Python (`sol/terminal/theme.py`) owns the palettes as inert highlight data; the Lua reader validates group names and attributes again and sources no colorscheme file. Terminal clears the reader's colors so the host's foreground, background and 16-color palette show through. Dark and Paper use 24-bit color when `COLORTERM` declares it, a computed xterm-256 approximation otherwise, and fall back to Terminal with a visible notice on basic terminals. `NO_COLOR` removes Terminal's single color accent. Body text meets WCAG AAA (7:1) against page and panel; headings, warnings, status and search meet at least AA (4.5:1); tests enforce these ratios. The default is Terminal. `T` cycles presets for the session only; `sol --theme NAME` selects one for a launch and `sol --set-theme NAME` saves it in the existing `config.json` alongside the corpus pointer. Reading floats share the page color; popups and the outline use a distinct panel color; `~` end-of-buffer and `@@@` last-line markers are hidden. Themes never alter canonical text, offsets, selection identity or workspace data. **Not yet done:** the visual audit below (spacing, heading density, status-line weight, popup intrusion) and sustained manual reading trials in each preset.
 
 Do not confuse installing a Neovim color scheme with designing a reading surface. Evaluate: paragraph spacing, inter-section gaps, measure, top/bottom breathing room, heading density, how emphasis maps to actual fonts, whether the always-visible status hints dominate, line-wrap behavior, warning visibility, tree/search popup intrusion and preservation of position after resizing. The present source defines a centered floating window without border and a verbose action statusline; these are concrete starting points for visual audit.
 

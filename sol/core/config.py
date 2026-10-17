@@ -20,7 +20,7 @@ def config_path() -> Path:
     return directory / "sol" / "config.json"
 
 
-def configured_corpus() -> Path | None:
+def _read_config(reset: str) -> dict | None:
     path = config_path()
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -28,8 +28,41 @@ def configured_corpus() -> Path | None:
         return None
     except (OSError, ValueError, UnicodeError) as error:
         raise ValueError(f"Cannot read SOL configuration {path}: {error}\n"
-                         "Reset it with sol --set-corpus DIRECTORY.") from error
-    value = data.get("corpus") if isinstance(data, dict) else None
+                         f"Reset it with {reset}.") from error
+    return data if isinstance(data, dict) else {}
+
+
+def _write_config(**values) -> Path:
+    """Atomically replace the file, keeping settings another command saved."""
+    path = config_path()
+    try:
+        current = _read_config("a new sol --set-corpus or --set-theme") or {}
+    except ValueError:
+        current = {}
+    current.update(values, version=1)
+    temporary = None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix=".config-", suffix=".tmp", delete=False) as stream:
+            temporary = Path(stream.name)
+            json.dump(current, stream, indent=2)
+            stream.write("\n")
+        temporary.replace(path)
+    except OSError as error:
+        raise ValueError(f"Cannot save SOL configuration {path}: {error}") from error
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
+    return path
+
+
+def configured_corpus() -> Path | None:
+    path = config_path()
+    data = _read_config("sol --set-corpus DIRECTORY")
+    if data is None or ("corpus" not in data and "theme" in data):
+        return None
+    value = data.get("corpus")
     if not isinstance(value, str) or not value or not Path(value).is_absolute():
         raise ValueError(f"Invalid SOL configuration {path}: corpus must be an absolute path.\n"
                          "Reset it with sol --set-corpus DIRECTORY.")
@@ -140,19 +173,20 @@ def save_corpus(directory: Path) -> tuple[Path, Path]:
             "Then select the resulting directory: sol --set-corpus local-corpus"
         )
     load_corpus_book(corpus)
-    path = config_path()
-    temporary = None
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
-                                         prefix=".config-", suffix=".tmp", delete=False) as stream:
-            temporary = Path(stream.name)
-            json.dump({"version": 1, "corpus": str(corpus)}, stream, indent=2)
-            stream.write("\n")
-        temporary.replace(path)
-    except OSError as error:
-        raise ValueError(f"Cannot save SOL configuration {path}: {error}") from error
-    finally:
-        if temporary is not None and temporary.exists():
-            temporary.unlink()
-    return corpus, path
+    return corpus, _write_config(corpus=str(corpus))
+
+
+def configured_theme(choices) -> str | None:
+    """The reader preset saved by sol --set-theme; the reader supplies the names."""
+    data = _read_config("sol --set-theme NAME")
+    value = None if data is None else data.get("theme")
+    if value is not None and value not in choices:
+        raise ValueError(f"Invalid SOL configuration {config_path()}: theme must be one of "
+                         f"{', '.join(choices)}.\nReset it with sol --set-theme NAME.")
+    return value
+
+
+def save_theme(name: str, choices) -> Path:
+    if name not in choices:
+        raise ValueError(f"reader theme must be one of: {', '.join(choices)}")
+    return _write_config(theme=name)

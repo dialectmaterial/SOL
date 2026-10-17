@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Reader themes — 17 October 2026
+
+The reader has three presentation presets: **Terminal** (inherits the host's
+colors; the default), **Dark** and **Paper**. Press `T` to cycle them for a
+session, start with `sol --theme NAME`, or save one with `sol --set-theme NAME`.
+Dark and Paper degrade to 256 colors or, on basic terminals, to Terminal with a
+notice; `NO_COLOR` is honoured. Popups and the outline use a distinct panel color,
+and Neovim's `~`/`@@@` filler markers are hidden. Saving a theme now preserves the
+saved corpus pointer and vice versa. Canonical text, offsets and workspace
+schemas are unchanged.
+
 ### Documentation consolidation — 17 October 2026
 
 Adopt four human-facing design documents: [Architecture](docs/ARCHITECTURE.md),

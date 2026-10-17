@@ -50,6 +50,7 @@ function M.open(structure, callbacks)
   draw()
   window = api.nvim_open_win(buffer, true, config())
   vim.wo[window].wrap, vim.wo[window].cursorline, vim.wo[window].scrolloff = false, true, 2
+  vim.wo[window].winhighlight = 'NormalFloat:SOLPanel,FloatBorder:SOLPanelBorder'
   draw()
   local function dispose()
     if window and api.nvim_win_is_valid(window) then api.nvim_win_close(window, true) end

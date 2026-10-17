@@ -14,6 +14,7 @@ from sol.reader.surface import Sample
 from sol.reader.structure import structure_payload
 from sol.terminal import neovim
 from sol.terminal.text import safe_label, safe_output
+from sol.terminal.theme import DEFAULT_THEME, THEMES
 
 
 SECTION_BUDGET = 64
@@ -61,12 +62,14 @@ def reading_section(book, identifier):
     return ReadingSection(first, min(last, first + SECTION_BUDGET - 1))
 
 
-def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_tree=False, tree_depth=2):
+def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_tree=False, tree_depth=2,
+               theme=DEFAULT_THEME):
     """Resume, read continuously, and accept one verified semantic position.
 
     The frontend sends data, never executable commands. Explicit actions use
     private inherited pipes; section changes reload the view in the same native
-    process. Cursor keys do not send workspace requests.
+    process. Cursor keys do not send workspace requests. A theme switched in
+    the reader lasts for this session only; it is never saved implicitly.
     """
     executable = neovim.validate_environment(width)
     actions = ReaderActions(book, workspace_reader)
@@ -78,6 +81,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     transient_markers = {}
     mode = "continuous"
     focused = False
+    if theme not in THEMES:
+        raise ValueError(f"reader theme must be one of: {', '.join(THEMES)}")
 
     def marker_name(slot):
         return f"sol:reader-marker:{slot}"
@@ -108,7 +113,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                     "selection": None if state.selection is None else asdict(state.selection),
                     "cursor_offset": state.cursor_offset}
         payload = neovim.build_payload(sample, width, restored,
-                                      requested_ids=requested_ids, emphasis=emphasis)
+                                      requested_ids=requested_ids, emphasis=emphasis, theme=theme)
         navigation = {"previous": extent.first > 0, "next": extent.last + 1 < len(book.passages)}
         structure = structure_payload(book, state.current)
         structure["depth"] = tree_depth
@@ -116,19 +121,24 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             structure["root"] = "/"
         payload.update(integrated=True, navigation=navigation, notice=notice or "", mode=mode, focus=focused,
                        markers=markers(), structure=structure, tree_only=start_tree)
-        neovim._safe_metadata({"notice": payload["notice"], "markers": payload["markers"], "structure": structure})
+        neovim._safe_metadata({"notice": payload["notice"], "markers": payload["markers"], "structure": structure,
+                               "theme": payload["theme"]})
         return payload, sample, extent
 
     payload, sample, extent = prepare()
 
     def handle(request):
-        nonlocal payload, sample, extent, mode, start_tree, notice, focused
+        nonlocal payload, sample, extent, mode, start_tree, notice, focused, theme
         operation = request.get("op")
         fields = {"op", "packet", "mode"}
         if "focus" in request:
             fields.add("focus")
             if type(request["focus"]) is not bool:
                 raise ValueError("reader focus must be a boolean")
+        if "theme" in request:
+            fields.add("theme")
+            if request["theme"] not in THEMES:
+                raise ValueError("unknown reader theme")
         if operation in ("marker_set", "marker_clear", "marker_open"):
             fields.add("slot")
             if type(request.get("slot")) is not int or request["slot"] not in (1, 2, 3):
@@ -218,6 +228,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         if operation in ("search_open", "search_next", "search_previous"):
             notice = actions.search_highlights().reason or ""
         focused = request.get("focus", focused)
+        theme = request.get("theme", theme)
         payload, sample, extent = prepare()
         return {"payload": payload}
 

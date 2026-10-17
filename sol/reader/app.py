@@ -18,14 +18,15 @@ from pathlib import Path
 
 from sol.corpus.edition import PDF_FILENAME, ROOT, default_pdf
 from sol.core.config import (
-    config_path, configured_corpus, discover_corpus, installed_project_directory,
-    save_corpus, source_project_directory,
+    config_path, configured_corpus, configured_theme, discover_corpus, installed_project_directory,
+    save_corpus, save_theme, source_project_directory,
 )
 from sol.core.models import Book, Node, Passage, node_path, presentation_text
 from sol.core.paths import alias, child_by_name, display_path
 from sol.core.paths import resolve_path as resolve_book_path
-from sol.reader.options import (DEFAULT_READER_WIDTH, ExecutionMode, build_parser,
-                                validate_options, validate_workspace_management)
+from sol.reader.options import (DEFAULT_READER_THEME, DEFAULT_READER_WIDTH, READER_THEMES,
+                                ExecutionMode, build_parser, validate_options,
+                                validate_workspace_management)
 from sol.reader.actions import ReaderActions, ReadingSession, context_passages
 from sol.reader.launch import interactive_input_available, shell_identity
 from sol.reader.shell import install_completion, run_shell
@@ -56,11 +57,11 @@ def resolve_path(value: str | None, cwd: tuple[str, ...], root: Node = ROOT) -> 
 
 
 def run_reader(book: Book, workspace_reader=None, *, width=DEFAULT_READER_WIDTH,
-               emphasis="auto") -> int:
+               emphasis="auto", theme=DEFAULT_READER_THEME) -> int:
     """Load the terminal adapter only for interactive reading."""
     from sol.terminal.neovim_reader import run_reader as run_view
 
-    return run_view(book, workspace_reader, width=width, emphasis=emphasis)
+    return run_view(book, workspace_reader, width=width, emphasis=emphasis, theme=theme)
 
 
 def tree_data(node: Node, depth: int | None = None) -> dict:
@@ -190,7 +191,7 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
             remember_launch(args.actor, store.path, identity, book.corpus_manifest['source']['sha256'])
             if args.reader:
                 return run_reader(book, reader, width=args.width or DEFAULT_READER_WIDTH,
-                                  emphasis=args.emphasis or "auto")
+                                  emphasis=args.emphasis or "auto", theme=args.theme)
             return run_shell(book, width, args.plain, color, reader,
                              ui_mode=args.ui or 'auto', editing_mode=args.editing_mode or 'emacs',
                              source_pdf=args.source_pdf, auto_width=args.width is None)
@@ -241,6 +242,14 @@ def main(argv: list[str] | None = None) -> int:
             # actor registration or opening/creating a personal workspace.
             from sol.terminal.neovim import validate_environment
             validate_environment(args.width or DEFAULT_READER_WIDTH)
+            args.theme = args.theme or configured_theme(READER_THEMES) or DEFAULT_READER_THEME
+        if mode is ExecutionMode.SET_THEME:
+            configuration = save_theme(args.set_theme, READER_THEMES)
+            if args.json:
+                emit_json({"theme": args.set_theme, "configuration": str(configuration)})
+            else:
+                print(display_text(f"Reader theme: {args.set_theme}\nSaved in: {configuration}"))
+            return 0
         if mode is ExecutionMode.SET_CORPUS:
             corpus, configuration = save_corpus(args.set_corpus)
             if args.json:
@@ -313,11 +322,12 @@ def main(argv: list[str] | None = None) -> int:
         elif mode is ExecutionMode.DYNAMIC_STRUCTURE:
             from sol.terminal.neovim_reader import run_reader as run_native_reader
             return run_native_reader(book, width=args.width or DEFAULT_READER_WIDTH,
-                                     start_tree=True, tree_depth=args.depth or 2)
+                                     start_tree=True, tree_depth=args.depth or 2, theme=args.theme)
         elif mode is ExecutionMode.GUIDE:
             print(render_guide(book, width, 1 if args.depth is None else args.depth))
         elif mode is ExecutionMode.READER:
-            return run_reader(book, width=args.width or DEFAULT_READER_WIDTH, emphasis=args.emphasis or "auto")
+            return run_reader(book, width=args.width or DEFAULT_READER_WIDTH, emphasis=args.emphasis or "auto",
+                              theme=args.theme)
         elif mode is ExecutionMode.SHELL:
             return run_shell(book, width, args.plain, color, ui_mode=args.ui or 'auto',
                              editing_mode=args.editing_mode or 'emacs', source_pdf=args.source_pdf,

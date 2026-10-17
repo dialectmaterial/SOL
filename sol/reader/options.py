@@ -10,6 +10,9 @@ from pathlib import Path
 from sol import __version__ as VERSION
 
 DEFAULT_READER_WIDTH = 72
+# Presentation presets; their highlight data lives in sol.terminal.theme.
+READER_THEMES = ("terminal", "dark", "paper")
+DEFAULT_READER_THEME = "terminal"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -45,6 +48,8 @@ def build_parser() -> argparse.ArgumentParser:
     reader.add_argument("--width", type=int, metavar="COLUMNS", help="maximum reading measure (20–240; reader default 72)")
     reader.add_argument("--emphasis", choices=("auto", "italic", "underline"),
                         help="semantic emphasis presentation; auto falls back to underline")
+    reader.add_argument("--theme", choices=READER_THEMES,
+                        help="reading preset for this session (default: saved theme, else terminal); T cycles it")
     modes = parser.add_argument_group("Other actions (choose one)")
     mode = modes.add_mutually_exclusive_group()
     mode.add_argument("--structure", action="store_true", help="show the outline (prefer the indexed local corpus)")
@@ -61,6 +66,8 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--info", metavar="PATH", help="show location, source range, and passage counts")
     mode.add_argument("--set-corpus", type=Path, metavar="DIRECTORY",
                       help="validate and remember the default corpus for reading from any directory")
+    mode.add_argument("--set-theme", choices=READER_THEMES, metavar="{" + ",".join(READER_THEMES) + "}",
+                      help="remember the reader's theme: terminal inherits your colors; dark or paper")
     mode.add_argument("--resume", action="store_true", help="resume the named workspace's saved passage")
     mode.add_argument("--workspace-export", action="store_true", help="export a workspace snapshot (JSON by default)")
     mode.add_argument("--workspace-check", action="store_true", help="report unresolved, retired and versioned workspace references")
@@ -113,6 +120,7 @@ class ExecutionMode(str, Enum):
     PASSAGE = "passage"
     INFO = "info"
     SET_CORPUS = "set_corpus"
+    SET_THEME = "set_theme"
     RESUME = "resume"
     WORKSPACE_EXPORT = "workspace_export"
     WORKSPACE_CHECK = "workspace_check"
@@ -177,6 +185,8 @@ def validate_options(args: argparse.Namespace) -> ExecutionMode:
             raise ValueError("--reader uses its own keyboard view; omit --ui, --editing-mode and --source-pdf")
     elif args.emphasis is not None:
         raise ValueError("--emphasis requires --reader")
+    if args.theme is not None and not args.reader and mode is not ExecutionMode.DYNAMIC_STRUCTURE:
+        raise ValueError("--theme selects the interactive reader's presentation; use --set-theme to save one")
     if args.shell and not args.none and args.pdf is not None:
         raise ValueError("the persistent shell requires an indexed Markdown corpus, not --pdf. "
                          "Use sol -r --pdf PATH for a legacy random passage.")
