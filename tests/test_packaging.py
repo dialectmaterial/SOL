@@ -19,13 +19,14 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_FILES = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol").rglob("*.py")}
+PACKAGE_ASSETS = {"sol/terminal/neovim.lua"}
 ENTRY_POINTS = {
     "sol": "sol:cli",
     "sol-kitty": "sol.terminal.kitty:main",
     "sol-corpus": "sol.corpus.convert:main",
     "sol-corpus-check": "sol.corpus.contract:main",
 }
-PUBLIC_FILES = {"pyproject.toml", "MANIFEST.in", "README.md", "CONTRIBUTING.md", "CHANGELOG.md"} | PACKAGE_FILES
+PUBLIC_FILES = {"pyproject.toml", "MANIFEST.in", "README.md", "CONTRIBUTING.md", "CHANGELOG.md"} | PACKAGE_FILES | PACKAGE_ASSETS
 for directory, suffixes in (("docs", {".md"}), ("tests", {".py"}),
                             ("experiments", {".py", ".lua", ".js", ".cjs"})):
     PUBLIC_FILES.update(path.relative_to(ROOT).as_posix()
@@ -88,7 +89,8 @@ class PackagingTests(unittest.TestCase):
             names = archive.namelist()
         actual_modules = {name for name in names if name.endswith(".py")}
         self.assertEqual(actual_modules, PACKAGE_FILES)
-        self.assertTrue(all(name in PACKAGE_FILES
+        self.assertTrue(PACKAGE_ASSETS <= set(names))
+        self.assertTrue(all(name in PACKAGE_FILES | PACKAGE_ASSETS
                             or ".dist-info/" in name for name in names))
 
     def test_metadata_and_console_entry_points(self):
@@ -138,8 +140,8 @@ class PackagingTests(unittest.TestCase):
             # This archive was just built from our disposable source fixture.
             archive.extractall(destination)
         source = next(destination.iterdir())
-        for name in ("neovim.lua", "browser.js"):
-            self.assertTrue((source / "experiments" / "reader_surfaces" / name).is_file())
+        self.assertTrue((source / "sol" / "terminal" / "neovim.lua").is_file())
+        self.assertTrue((source / "experiments" / "reader_surfaces" / "browser.js").is_file())
         environment = dict(os.environ)
         environment.pop("PYTHONPATH", None)
         result = subprocess.run(
@@ -194,6 +196,39 @@ raise SystemExit(app.cli(sys.argv[2:]))
                 )
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertIn("reader", result.stdout.lower())
+
+    def test_built_wheel_neovim_backend_has_no_checkout_import_dependency(self):
+        installed = Path(self.temporary.name) / "neovim-reader-wheel"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        corpus = Path(self.temporary.name) / "neovim-reader-corpus"
+        write_runtime_corpus(corpus)
+        from sol.corpus.contract import initialize_corpus_identity
+        initialize_corpus_identity(corpus)
+        program = """
+import builtins, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+original_import = builtins.__import__
+def guard(name, *args, **kwargs):
+    if name == 'experiments' or name.startswith('experiments.'):
+        raise AssertionError('Installed reader depends on checkout research code ' + name)
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = guard
+from sol.reader import app
+from sol.terminal import neovim
+assert Path(neovim.__file__).with_name('neovim.lua').is_file()
+neovim.validate_environment = lambda width: '/invented/nvim'
+def native(payload, executable):
+    assert payload['integrated'] is True
+    assert payload['records'] and payload['restore']['cursor_offset'] == 0
+    return 0, {'action': 'quit', 'packet': payload['restore']}
+neovim.launch_payload = native
+raise SystemExit(app.main(['-n', '--engine', 'neovim', '--corpus', sys.argv[2]]))
+"""
+        result = subprocess.run([sys.executable, "-I", "-B", "-c", program, str(installed), str(corpus)],
+                                cwd=self.temporary.name, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_installed_default_reader_and_temporary_reader_route_without_a_tui(self):
         """Exercise the built artifact's routing, not an interactive display."""

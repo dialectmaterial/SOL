@@ -11,6 +11,11 @@ through their existing interfaces.
 
 ## Open the reader
 
+The optional installed `sol --engine neovim` backend presents adjacent paragraphs
+as continuous prose and uses the same workspace positions. It does not change
+the default reader described here. See [Continuous reading with Neovim](NEOVIM_READER.md)
+for its native keys, section boundaries and current limitations.
+
 ```sh
 sol
 sol --workspace reading --actor "Your name"

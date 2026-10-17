@@ -745,3 +745,35 @@ class ReaderActions:
         """Explicit navigation uses the same guarded checkpoint path as ordinary open."""
         reference = self.check_return_reference(packet)
         return self.open(reference.requested_id)
+
+    def accept_return_position(self, packet, cursor_offset, selection=None):
+        """Accept one frontend location as a single guarded workspace visit.
+
+        A backend supplies a CORE reference and semantic codepoint boundary,
+        never buffer rows/bytes. Selection remains the existing transient type.
+        Validation and CAS failure leave both session and saved state untouched.
+        """
+        reference = self.check_return_reference(packet)
+        text = reference.record["plain_text"]
+        if type(cursor_offset) is not int or not 0 <= cursor_offset <= len(text):
+            raise ValueError("cursor offset must be an integer boundary within the source text")
+        if selection is not None:
+            if (not isinstance(selection, TextSelection)
+                    or selection.requested_id != reference.requested_id
+                    or selection.target_id != reference.target_id
+                    or type(selection.start) is not int or type(selection.end) is not int
+                    or not 0 <= selection.start < selection.end <= len(text)
+                    or selection.text != text[selection.start:selection.end]
+                    or selection.content_sha256 != reference.record["content_sha256"]
+                    or selection.plain_text_sha256 != sha256(text.encode("utf-8")).hexdigest()
+                    or cursor_offset not in {selection.start, selection.end}):
+                raise ValueError("selected span does not bind the returned reading position")
+
+        def change():
+            passage = self._open_resolution(reference.requested_id)
+            self.session.cursor_offset, self.session.viewport_offset = cursor_offset, None
+            self._preferred_column = self._preferred_layout = None
+            self._selection = selection
+            return passage
+
+        return self._transition(change)

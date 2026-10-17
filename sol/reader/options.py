@@ -23,18 +23,22 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="Start here:\n"
                "  sol                         resume reading\n"
                "  sol -n                      read without a workspace or actor\n"
+               "  sol --engine neovim         continuous reading with native Neovim\n"
                "  sol --actor NAME            use that actor's last workspace\n"
                "  sol --workspace NAME        choose a different workspace\n"
                "  sol guide                   reader keys, examples, and book structure\n"
                "  sol -r                      print one random passage and leave\n\n"
-               "Reader keys: j/k lines, b/n passages, / search, v select, c context,\n"
+               "Built-in reader keys: j/k lines, b/n passages, / search, v select, c context,\n"
                "f focus, ? keys, Ctrl-Q save and quit. Alacritty is a normal host;\n"
                "Kitty is optional. Use --shell for the separate book command interface.\n"
+               "Neovim keeps native search/word keys; press ? inside it for help.\n"
                "Native read, compare, reference, and analyze commands have their own --help.")
     parser.add_argument("command", nargs="?", choices=("guide",), help="reader guide and a small source-derived book tree")
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     reader = parser.add_argument_group("Reader (the default)")
     reader.add_argument("--reader", action="store_true", help="open the full-screen reader (also what bare sol does)")
+    reader.add_argument("--engine", choices=("builtin", "neovim"),
+                        help="reader backend (default builtin); neovim is opt-in and requires Neovim 0.11+")
     reader.add_argument("-n", "--none", action="store_true", help="read without saving; no workspace or actor")
     reader.add_argument("--workspace", metavar="NAME", help="open this workspace instead of the actor's last one")
     reader.add_argument("--actor", metavar="NAME", help="name attributed to your personal notes; remembers that actor's workspace")
@@ -150,6 +154,8 @@ def validate_options(args: argparse.Namespace) -> ExecutionMode:
         raise ValueError("-n/--none is a temporary interactive session; omit one-shot/guide actions")
     mode = select_execution_mode(args)
     args.reader = mode is ExecutionMode.READER
+    if args.engine is not None and not args.reader:
+        raise ValueError("--engine selects the interactive reader, not a shell or one-shot action")
     if args.reader:
         if args.pdf is not None:
             raise ValueError("--reader requires the indexed canonical corpus, not --pdf. "

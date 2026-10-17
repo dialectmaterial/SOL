@@ -1,4 +1,4 @@
--- Checkout-only reader experiment. Source strings are data, never Ex/Lua code.
+-- Native SOL reading surface. Source strings are data, never Ex/Lua code.
 -- Python owns corpus verification and validates the returned research packet.
 local api, uv = vim.api, vim.uv or vim.loop
 for _, server in ipairs(vim.fn.serverlist()) do pcall(vim.fn.serverstop, server) end
@@ -82,6 +82,10 @@ if not integer(data.width) or data.width < 8 or data.width > 1000 then fail("inv
 if data.emphasis ~= nil and data.emphasis ~= "italic" and data.emphasis ~= "underline" then
   fail("invalid semantic emphasis presentation")
 end
+local integrated = data.integrated == true
+if integrated and (not exact_keys(data.navigation, { "previous", "next" })
+  or type(data.navigation.previous) ~= "boolean" or type(data.navigation.next) ~= "boolean"
+  or type(data.notice) ~= "string") then fail("invalid reading navigation") end
 
 local records, by_id, positions, source_rows = data.records, {}, {}, {}
 local projection, heading_rows, warning_rows, style_runs = {}, {}, {}, {}
@@ -120,6 +124,10 @@ local function valid_strings(values)
 end
 local previous_heading
 append("")
+if integrated and data.notice ~= "" then
+  append_lines(data.notice, function(_, row) warning_rows[#warning_rows + 1] = row end)
+  append("")
+end
 for _, record in ipairs(records) do
   if type(record) ~= "table" or type(record.id) ~= "string" or by_id[record.id]
     or type(record.reference) ~= "table" or type(record.reference.reference) ~= "table"
@@ -170,8 +178,14 @@ vim.o.laststatus, vim.o.showtabline, vim.o.cmdheight = 3, 0, 1
 vim.o.showmode, vim.o.showcmd, vim.o.ruler, vim.o.hidden = false, false, false, true
 vim.o.mouse, vim.o.clipboard = "", ""
 vim.o.statusline = " j/k lines   [p/]p passages   / search   v select   c source/notes   ? help   q return"
+if integrated then
+  vim.o.statusline = " j/k read   [c/]c sections   / search   v select   c source/notes   ? help   q save/quit"
+end
 vim.o.selection = "inclusive"
 vim.o.hlsearch = true
+-- Native visible escaping, not replacement source text. C1 source scalars keep
+-- their one-codepoint identity even when presented as a four-cell <xx> marker.
+vim.o.display = "lastline,uhex"
 local buffer = api.nvim_create_buf(false, true)
 api.nvim_buf_set_lines(buffer, 0, -1, false, projection)
 vim.bo[buffer].buftype, vim.bo[buffer].bufhidden, vim.bo[buffer].filetype = "nofile", "hide", "sol-reader"
@@ -305,9 +319,10 @@ local function restore(packet)
   return record.id
 end
 
-local function export()
+local function export(action)
   local packet = capture()
-  local encoded = vim.json.encode(packet)
+  local result = integrated and { action = action or "quit", packet = packet } or packet
+  local encoded = vim.json.encode(result)
   local output, problem = uv.fs_open(output_path, "wx", 384) -- exclusive owner-only file, never overwrite
   if not output then fail("cannot create private result: " .. tostring(problem)) end
   local at = 0
@@ -396,6 +411,25 @@ local function context()
   show_lines(lines)
 end
 local function help()
+  if integrated then
+    show_lines({ "SOL continuous reader — Neovim", "",
+      "j/k, Ctrl-d/u    wrapped reading lines / half-window scroll",
+      "h/l, w/b         native character / word motions",
+      "gg/G             start / end of this loaded reading section",
+      "[p / ]p          previous / next source passage",
+      "[c / ]c          previous / next reading section",
+      "/, n, N          native search within this reading section",
+      "v                characterwise selection inside one passage",
+      "c                source pages, attribution and linked notes",
+      "q / Ctrl-q       save the semantic position and quit",
+      ":qa!             quit without saving the current cursor", "",
+      "At the bottom/top, j/k can continue to the adjacent section.",
+      "Long chapters load in bounded sections; transitions restart the native view.",
+      "Selections are transient; no annotation is created automatically.",
+      "Canonical text is read-only. Personal Neovim configuration is not loaded.",
+      "Esc closes this help." })
+    return
+  end
   show_lines({ "Reader experiment — not a workspace editor", "",
     "j/k           visual wrapped rows; h/l retain Neovim character motions",
     "Ctrl-d/u      Neovim half-window scroll; gg/G the bounded sample",
@@ -418,6 +452,29 @@ local function guarded(fn)
     return ok, result
   end
 end
+local function reading_request(action)
+  if action ~= "quit" then
+    if not integrated or not data.navigation[action] then return end
+    if vim.fn.mode(1) ~= "n" then fail("clear selection before changing reading sections") end
+  end
+  -- Metadata is not prose identity. In normal mode only, a quit/section request
+  -- on a heading or separator explicitly lands on the closest actual source row.
+  -- Visual endpoints remain strict and are never silently adjusted.
+  local cursor = native_cursor()
+  if integrated and vim.fn.mode(1) == "n" and not source_rows[cursor.row] then
+    local nearest, distance
+    for row, item in pairs(source_rows) do
+      local delta = math.abs(row - cursor.row)
+      if not distance or delta < distance or (delta == distance and row < nearest.row) then
+        nearest, distance = item, delta
+      end
+    end
+    local offset = cursor.row > nearest.row and nearest.finish or nearest.start
+    set_exact_cursor(source_point(nearest.id, offset))
+  end
+  export(action)
+  vim.cmd("qa!")
+end
 local function passage(delta)
   local row, selected = api.nvim_win_get_cursor(window)[1], nil
   if delta > 0 then
@@ -430,18 +487,33 @@ local function passage(delta)
       if positions[record.id].first_row < row then selected = record; break end
     end
   end
-  if selected then set_exact_cursor(source_point(selected.id, 0)); vim.cmd("normal! zt") end
+  if selected then set_exact_cursor(source_point(selected.id, 0)); vim.cmd("normal! zt")
+  elseif integrated then reading_request(delta > 0 and "next" or "previous") end
 end
 for _, key in ipairs({ "q", "<C-q>" }) do
-  vim.keymap.set({ "n", "x" }, key, guarded(function() export(); vim.cmd("qa!") end), { buffer = buffer, silent = true })
+  vim.keymap.set({ "n", "x" }, key, guarded(function() reading_request("quit") end), { buffer = buffer, silent = true })
 end
 vim.keymap.set({ "n", "x" }, "j", "gj", { buffer = buffer, silent = true })
 vim.keymap.set({ "n", "x" }, "k", "gk", { buffer = buffer, silent = true })
+if integrated then
+  for key, motion in pairs({ j = "gj", k = "gk" }) do
+    vim.keymap.set("n", key, guarded(function()
+      local before = api.nvim_win_get_cursor(window)
+      vim.cmd("normal! " .. motion)
+      local after = api.nvim_win_get_cursor(window)
+      local edge = key == "j" and after[1] >= positions[records[#records].id].last_row
+        or key == "k" and after[1] <= positions[records[1].id].first_row
+      if edge and vim.deep_equal(before, after) then reading_request(key == "j" and "next" or "previous") end
+    end), { buffer = buffer, silent = true })
+  end
+  vim.keymap.set("n", "[c", guarded(function() reading_request("previous") end), { buffer = buffer, silent = true })
+  vim.keymap.set("n", "]c", guarded(function() reading_request("next") end), { buffer = buffer, silent = true })
+end
 vim.keymap.set("n", "[p", guarded(function() passage(-1) end), { buffer = buffer, silent = true })
 vim.keymap.set("n", "]p", guarded(function() passage(1) end), { buffer = buffer, silent = true })
 vim.keymap.set("n", "c", guarded(context), { buffer = buffer, silent = true })
 vim.keymap.set("n", "?", help, { buffer = buffer, silent = true })
-api.nvim_create_user_command("SOLExport", guarded(export), {})
+if not integrated then api.nvim_create_user_command("SOLExport", guarded(function() export() end), {}) end
 api.nvim_create_autocmd("VimResized", { callback = function()
   close_popup()
   if api.nvim_win_is_valid(window) then api.nvim_win_set_config(window, window_config()) end

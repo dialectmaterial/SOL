@@ -25,7 +25,7 @@ from fixtures_corpus import write_runtime_corpus
 
 
 _ROOT = Path(__file__).resolve().parents[1]
-_ADAPTER = _ROOT / "experiments/reader_surfaces/neovim.lua"
+_ADAPTER = _ROOT / "sol/terminal/neovim.lua"
 _GENERATED = {"markdown", "plain_text", "document", "context", "content_sha256"}
 
 
@@ -44,7 +44,7 @@ def neovim_environment(root):
     return environment
 
 
-def invented_sample(root):
+def invented_sample(root, *, controls=False):
     """Create exact source/index bindings without depending on a Markdown parser."""
     corpus = root / "corpus"
     identifier, _ = write_runtime_corpus(corpus)
@@ -52,6 +52,9 @@ def invented_sample(root):
     first = records[1]
     first["markdown"] = "Lead 𝔸 *thought* e\u0301 and **ground**, Greek α, CJK 界.\nNext\tline `code` repeats."
     first["plain_text"] = "Lead 𝔸 thought e\u0301 and ground, Greek α, CJK 界.\nNext\tline code repeats."
+    if controls:
+        first["markdown"] += " Literal C1 \u0099 and \u008a."
+        first["plain_text"] += " Literal C1 \u0099 and \u008a."
     second = deepcopy(first)
     second.update(id="cccccccc-0000-4000-8000-000000000003", order=2,
         markdown="A second invented paragraph has a different identity and a fairly long sequence of ordinary words for soft wrapping.",
@@ -104,10 +107,12 @@ class ReaderSurfaceNeovimTests(unittest.TestCase):
         self.input, self.output = self.root / "input.json", self.root / "selection.json"
         self.result = self.root / "report.json"
 
-    def run_lua(self, scenario, *, restore=None, automatic_quit=True):
+    def run_lua(self, scenario, *, restore=None, automatic_quit=True, integrated=False):
         from experiments.reader_surfaces.neovim import build_payload
 
         self.payload = build_payload(self.sample, width=72, restore=restore)
+        if integrated:
+            self.payload.update(integrated=True, navigation={"next": True, "previous": True}, notice="")
         self.input.write_text(json.dumps(self.payload, ensure_ascii=False), encoding="utf-8")
         environment = {**self.environment,
             "SOL_NVIM_INPUT": str(self.input), "SOL_NVIM_OUTPUT": str(self.output),
@@ -323,6 +328,71 @@ end
         self.output.unlink()
         restored = self.run_lua("  report.packet = reader.capture()\n", restore=packet)
         self.assertEqual(restored["packet"], packet)
+
+    def test_installed_quit_returns_existing_packet_inside_narrow_action_envelope(self):
+        self.run_lua(r'''
+  local cp = reader.source_point(data.records[2].id, 11)
+  vim.api.nvim_win_set_cursor(reader.window, {cp.row, cp.byte})
+  vim.api.nvim_feedkeys('q', 'xt', false)
+''', integrated=True)
+        result = json.loads(self.output.read_text())
+        self.assertEqual(set(result), {"action", "packet"})
+        self.assertEqual(result["action"], "quit")
+        self.assertEqual(result["packet"]["cursor_offset"], 11)
+        self.assertIsNone(validate_packet(self.sample.book, result["packet"]))
+
+    def test_installed_next_section_uses_native_mapped_key(self):
+        self.run_lua("  vim.api.nvim_feedkeys(']c', 'xt', false)\n", integrated=True)
+        result = json.loads(self.output.read_text())
+        self.assertEqual(result["action"], "next")
+        self.assertIsNone(validate_packet(self.sample.book, result["packet"]))
+
+    def test_installed_bottom_j_continues_instead_of_stalling_on_separator(self):
+        self.run_lua("  vim.api.nvim_feedkeys('Gj', 'xt', false)\n", integrated=True)
+        result = json.loads(self.output.read_text())
+        self.assertEqual(result["action"], "next")
+        self.assertEqual(result["packet"]["reference"]["reference"]["target_id"], self.sample.passages[-1].identifier)
+        self.assertEqual(result["packet"]["cursor_offset"], len(self.sample.passages[-1].text))
+
+    def test_installed_top_k_can_return_to_previous_reading_section(self):
+        self.run_lua("  vim.api.nvim_feedkeys('ggk', 'xt', false)\n", integrated=True)
+        result = json.loads(self.output.read_text())
+        self.assertEqual(result["action"], "previous")
+        self.assertEqual(result["packet"]["cursor_offset"], 0)
+
+    def test_installed_visual_selection_across_styled_unicode_prose_remains_exact(self):
+        self.run_lua(r'''
+  local id = data.records[1].id
+  local packet = reader.capture('v', reader.source_point(id, 5), reader.source_point(id, 31))
+  reader.restore(packet)
+  vim.o.columns = 38
+  vim.api.nvim_exec_autocmds('VimResized', {})
+  assert(vim.deep_equal(reader.capture(), packet))
+  vim.api.nvim_feedkeys('q', 'xt', false)
+''', integrated=True)
+        result = json.loads(self.output.read_text())
+        selected = validate_packet(self.sample.book, result["packet"])
+        self.assertEqual(selected.text, self.sample.passages[0].text[5:32])
+
+    def test_native_c1_markers_preserve_source_scalars_and_following_offsets(self):
+        root = self.root / "with-controls"
+        root.mkdir()
+        self.corpus, self.sample = invented_sample(root, controls=True)
+        self.before = {path.name: path.read_bytes() for path in self.corpus.iterdir()}
+        offset = self.sample.passages[0].text.index("\u0099")
+        report = self.run_lua(r'''
+  assert(vim.o.display:find('uhex', 1, true))
+  assert(vim.fn.strtrans('\194\153') == '<99>')
+  local id, at = data.records[1].id, ''' + str(offset) + r'''
+  local packet = reader.capture('v', reader.source_point(id, at), reader.source_point(id, at))
+  assert(packet.selection.start == at and packet.selection['end'] == at + 1)
+  reader.restore(packet)
+  vim.o.columns = 38
+  vim.api.nvim_exec_autocmds('VimResized', {})
+  assert(vim.deep_equal(reader.capture(), packet))
+  report.packet = reader.capture()
+''')
+        self.assertEqual(validate_packet(self.sample.book, report["packet"]).text, "\u0099")
 
 
 if __name__ == "__main__":

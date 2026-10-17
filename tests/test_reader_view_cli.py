@@ -110,7 +110,7 @@ class ReaderViewCLITests(unittest.TestCase):
                 patch.object(app, "run_reader", return_value=0) as view:
             status, _, error = self.call(["--reader", "-n", "--width", "64", "--emphasis", "underline"])
         self.assertEqual(status, 0, error)
-        self.assertEqual(view.call_args.kwargs, {"width": 64, "emphasis": "underline"})
+        self.assertEqual(view.call_args.kwargs, {"width": 64, "emphasis": "underline", "engine": "builtin"})
 
     def test_emphasis_is_reader_only_and_width_validation_precedes_data_access(self):
         for arguments in (["-r", "--emphasis", "italic"], ["--reader", "--width", "19"],
@@ -137,6 +137,34 @@ class ReaderViewCLITests(unittest.TestCase):
             app.main(["--help"])
         self.assertEqual(caught.exception.code, 0)
         self.assertIn("--reader", output.getvalue())
+
+    def test_neovim_preflight_precedes_corpus_and_actor_access(self):
+        with patch("sol.terminal.neovim.validate_environment", side_effect=ValueError("Neovim unavailable")), \
+                patch.object(app, "discover_corpus", side_effect=AssertionError("No source access")), \
+                patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")):
+            status, _, error = self.call(["--engine", "neovim"])
+        self.assertEqual(status, 2)
+        self.assertIn("Neovim unavailable", error)
+        self.assertFalse((self.root / "config").exists())
+        self.assertFalse((self.root / "data").exists())
+
+    def test_neovim_temporary_reader_does_not_require_builtin_frontend(self):
+        with patch("sol.terminal.neovim.validate_environment"), \
+                patch("sol.terminal.reader.validate_reader_environment", side_effect=AssertionError("Wrong frontend")), \
+                patch("sol.terminal.neovim_reader.run_reader", return_value=0) as reader, \
+                patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")):
+            status, _, error = self.call(["-n", "--engine", "neovim", "--width", "64", "--emphasis", "underline"])
+        self.assertEqual(status, 0, error)
+        reader.assert_called_once()
+        self.assertEqual(reader.call_args.kwargs, {"width": 64, "emphasis": "underline"})
+        self.assertFalse((self.root / "data").exists())
+
+    def test_neovim_engine_is_not_a_shell_or_one_shot_option(self):
+        for arguments in (["--shell"], ["-r"], ["--structure"], ["guide"], ["--workspace-list"]):
+            with self.subTest(arguments=arguments), \
+                    patch.object(app, "discover_corpus", side_effect=AssertionError("No source access")):
+                status, _, _ = self.call(["--engine", "neovim", *arguments])
+            self.assertEqual(status, 2)
 
     def test_ordinary_random_output_does_not_import_the_reader_adapter(self):
         import subprocess

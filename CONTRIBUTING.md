@@ -29,6 +29,8 @@ pipeline. That external-tool check skips explicitly when those programs are abse
 | One-shot and book-shell text rendering | `sol/reader/render.py` |
 | Semantic reading cursor, selection and history | `sol/reader/actions.py` |
 | Fullscreen presentation | `sol/terminal/reader.py` |
+| Optional native continuous reader | `sol/terminal/neovim_reader.py`, `sol/terminal/neovim.py`, `sol/terminal/neovim.lua` |
+| Checked read-only surface projections | `sol/reader/surface.py` |
 | Generic terminal escaping and POSIX utilities | `sol/terminal/text.py`, `sol/terminal/tty.py` |
 | Workspace operations and persistence guards | `sol/workspace/reader.py`, `sol/workspace/store.py` |
 | Workspace command syntax and summaries | `sol/workspace/commands.py` |
@@ -55,6 +57,11 @@ unpacked source archive. They do not copy the local book or personal databases.
 Research adapters remain opt-in, checkout/source-archive tools. Their presence in
 the source archive does not install them as reader commands. Keep engine adoption
 dependent on the existing reading trials rather than adding more frontends.
+The original Neovim experiment now reuses the installed optional backend;
+`sol --engine neovim` is available without the experiments package. Its Lua
+asset is included in the wheel. This does not change the default reader or
+install Neovim. See [the backend contract](docs/NEOVIM_READER.md) for the native
+keys, workspace boundary, bounded section transitions and live acceptance test.
 
 ## Scope of the cleanup
 

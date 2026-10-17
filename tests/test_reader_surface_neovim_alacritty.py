@@ -88,7 +88,7 @@ class NeovimAlacrittyTests(unittest.TestCase):
                 "dimensions = { columns = 100, lines = 28 }\n", encoding="utf-8")
             script.write_text(_SCENARIO, encoding="utf-8")
             source.write_text(json.dumps(build_payload(sample), ensure_ascii=False), encoding="utf-8")
-            adapter = Path(__file__).resolve().parents[1] / "experiments/reader_surfaces/neovim.lua"
+            adapter = Path(__file__).resolve().parents[1] / "sol/terminal/neovim.lua"
             environment = {**neovim_environment(root), "SOL_NVIM_INPUT": str(source),
                 "SOL_NVIM_OUTPUT": str(output), "SOL_NVIM_ADAPTER": str(adapter),
                 "SOL_NVIM_TEST_REPORT": str(report)}

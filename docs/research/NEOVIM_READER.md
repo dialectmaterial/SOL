@@ -1,6 +1,9 @@
 # Native Neovim reader experiment
 
-This is an opt-in, checkout-only BEING frontend, not a replacement for `sol`.
+This command remains an opt-in, checkout-only comparison trial, not a replacement
+for `sol`. Its implementation is now shared with the optional installed
+[`sol --engine neovim` backend](../NEOVIM_READER.md), which connects to normal
+workspace persistence. The research commands below remain temporary.
 Neovim supplies its own terminal interface. SOL supplies verified corpus records,
 semantic typography and source-bound selection/position validation. Nothing is
 embedded inside prompt_toolkit, and neither Neovim nor an editor distribution is
@@ -83,7 +86,8 @@ disabled. Native Neovim may create its normal local server during startup; the
 launcher isolates its runtime directory and stops servers before loading the
 reader. This is not a sandbox against a malicious local user or editor binary.
 
-No actor, personal workspace, annotation schema or normal SOL default changes.
+This research command does not change an actor, personal workspace, annotation
+schema or normal SOL default.
 There is no tree/sidebar, analytical method or operating-system work in this
 proof. Initial corpus verification/export still has a cost; the experiment does
 not bypass CORE checks to make startup look faster.

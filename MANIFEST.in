@@ -2,7 +2,7 @@ include README.md
 include CONTRIBUTING.md CHANGELOG.md
 recursive-include docs *.md
 include pyproject.toml MANIFEST.in
-recursive-include sol *.py
+recursive-include sol *.py *.lua
 recursive-include tests *.py
 recursive-include experiments *.py *.lua *.js *.cjs
 exclude AGENTS.md
