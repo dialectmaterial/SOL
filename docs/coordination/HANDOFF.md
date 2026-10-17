@@ -53,11 +53,10 @@ Write "None." rather than deleting a heading.
 ### Outstanding issues
 - A note containing invisible control characters (for example a zero-width joiner from older shell input) is shown escaped and must be edited with `sol --shell`; the reader will not send such text raw to Neovim.
 - Notes on a retired record ID are listed under the successor and are editable; the edit keeps the retired ID as the note's target.
-- No deletion, hiding or retraction (reserved; see below).
+- No deletion, hiding or retraction: that is a future reserved decision (a retention policy, possibly a schema change). Nothing here depends on it.
 
 ### Decisions requiring approval
 - **Key bindings (default):** `e` and `r` inside the `c` popup, acting on the note under the cursor or the only note. `a` still adds. Alternatives: numbered notes, or keys in the reading view.
-- **Note removal (reserved):** deleting, hiding or retracting an audited note needs a retention policy and possibly a schema change; not implemented.
 
 ## Editor-trimmed marking forms — 18 October 2026
 
