@@ -714,6 +714,87 @@ end
         self.assertEqual((report["before"], report["after"]), (1, 0))
         self.assertTrue(report["refused"])
 
+    def test_dismissed_search_marks_stay_hidden_until_a_new_result(self):
+        report = self.run_lua(r'''
+  local adapter = os.getenv('SOL_NVIM_ADAPTER')
+  local payload = vim.deepcopy(data)
+  payload.search_marks = {id = data.records[1].id, spans = {{0, 4}}}
+  assert(loadfile(adapter))(vim.deepcopy(payload))
+  reader = SOLNvimReader
+  local function count()
+    local found = 0
+    for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(SOLNvimReader.buffer, -1, 0, -1, {details = true})) do
+      if mark[4].hl_group == 'Search' then found = found + 1 end
+    end
+    return found
+  end
+  report.counts = {shown = count()}
+  vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  report.counts.escape = count()
+  -- Every view rebuilt from the current one keeps the dismissal.
+  vim.api.nvim_feedkeys('p', 'xt', false)
+  report.counts.paragraph = count()
+  vim.api.nvim_feedkeys(']p', 'xt', false)
+  vim.api.nvim_feedkeys('[p', 'xt', false)
+  report.counts.paragraph_back = count()
+  vim.api.nvim_feedkeys('p', 'xt', false)
+  report.counts.continuous = count()
+  vim.api.nvim_feedkeys('f', 'xt', false)
+  report.counts.focus = count()
+  vim.o.columns = 50
+  vim.api.nvim_exec_autocmds('VimResized', {})
+  report.counts.resize = count()
+  vim.api.nvim_feedkeys('T', 'xt', false)
+  report.counts.theme = count()
+  -- A deliberate new result arrives as a new payload and shows its marks.
+  assert(loadfile(adapter))(vim.deepcopy(payload))
+  report.counts.new_result = count()
+''', integrated=True, theme="terminal")
+        self.assertEqual(report["counts"], {"shown": 1, "escape": 0, "paragraph": 0, "paragraph_back": 0,
+                                            "continuous": 0, "focus": 0, "resize": 0, "theme": 0, "new_result": 1})
+
+    def test_selection_and_yank_are_exact_around_callouts_in_both_modes_and_widths(self):
+        text = self.sample.passages[0].text
+        start, end = text.index("𝔸"), text.index("ground") + len("ground")
+        report = self.run_lua(r'''
+  local adapter = os.getenv('SOL_NVIM_ADAPTER')
+  local clipboard
+  vim.g.clipboard = {name = 'SOL isolated clipboard test', cache_enabled = 0,
+    copy = {['+'] = function(lines) clipboard = table.concat(lines, '\n') end,
+            ['*'] = function(lines) clipboard = table.concat(lines, '\n') end},
+    paste = {['+'] = function() return {{clipboard or ''}, 'v'} end,
+             ['*'] = function() return {{clipboard or ''}, 'v'} end}}
+  local payload = vim.deepcopy(data)
+  -- Callouts inside the selection, beside a combining mark and at its edge.
+  payload.records[1].callouts = {{offset = ''' + str(start) + r''', label = '3'},
+    {offset = ''' + str(text.index("é") + 2) + r''', label = 'k'},
+    {offset = ''' + str(end) + r''', label = '14'}}
+  report.yanks = {}
+  for _, width in ipairs({72, 24}) do
+    payload.width = width
+    assert(loadfile(adapter))(vim.deepcopy(payload))
+    for _, mode in ipairs({'continuous', 'paragraph'}) do
+      reader = SOLNvimReader
+      if reader.mode ~= mode then reader.toggle_mode(); reader = SOLNvimReader end
+      local id = data.records[1].id
+      local first = reader.source_point(id, ''' + str(start) + r''')
+      local last = reader.source_point(id, ''' + str(end - 1) + r''')
+      for _, ends in ipairs({{first, last}, {last, first}}) do
+        clipboard = nil
+        local packet = reader.capture('v', ends[1], ends[2])
+        reader.restore(packet)
+        reader.yank()
+        report.yanks[#report.yanks + 1] = {width, mode, packet.selection.start, packet.selection['end'], clipboard}
+        vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+      end
+    end
+  end
+''', integrated=True)
+        self.assertEqual(len(report["yanks"]), 8)
+        for width, mode, first, last, copied in report["yanks"]:
+            with self.subTest(width=width, mode=mode):
+                self.assertEqual((first, last, copied), (start, end, text[start:end]))
+
     def test_theme_survives_mode_reload_and_invalid_presets_are_refused(self):
         report = self.run_lua(r'''
   reader.cycle_theme()

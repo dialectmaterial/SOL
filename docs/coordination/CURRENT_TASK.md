@@ -14,7 +14,7 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ## Claude Code: Keep dismissed marks dismissed and study the live paragraph
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `claude/transient-reader-state`
 **Requested:** 18 October 2026, by the maintainer
 

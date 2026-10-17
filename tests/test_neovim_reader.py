@@ -720,6 +720,30 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 1)
 
+    def test_sentence_study_starts_from_the_paragraph_the_cursor_is_in(self):
+        """A native move sends no request; the study's packet is still the live origin."""
+        self.extend(3)
+        service = self.service()
+        self.position(service, 4)
+        data_home = self.root / "data"
+
+        def native(payload, _, on_request):
+            moved = self.reply(payload, record=2, offset=5)["packet"]
+            saved = service.store.get_state()
+            study = on_request({"op": "sentence_study", "packet": moved, "mode": "continuous"})["study"]
+            origin = json.loads(Path(study["saved"]).read_text())["origin"]
+            self.assertEqual(origin, moved["reference"])
+            self.assertEqual(service.store.get_state(), saved)  # Studying saves no visit.
+            opened = on_request({"op": "study_open", "row": 1, "packet": moved, "mode": "continuous"})["payload"]
+            back = on_request({"op": "history_back", "packet": opened["restore"], "mode": "continuous"})["payload"]
+            self.assertEqual(back["restore"]["reference"], moved["reference"])
+            self.assertEqual(back["restore"]["cursor_offset"], 5)
+            return 0, {"action": "quit", "packet": back["restore"]}
+
+        with patch.dict(os.environ, XDG_DATA_HOME=str(data_home)), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+
     def test_cross_section_paragraph_previous_lands_at_beginning_and_keeps_focus(self):
         self.extend(3)
         def native(payload, _, on_request):

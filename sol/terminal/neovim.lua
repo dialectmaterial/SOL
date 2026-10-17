@@ -1042,8 +1042,11 @@ if integrated then
   vim.keymap.set('n', 'n', guarded(function() passage(1) end), {buffer = buffer, silent = true})
   vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
   vim.keymap.set('n', 'S', guarded(function() request('sentence_study') end), {buffer = buffer, silent = true})
-  vim.keymap.set('n', '<Esc>', function() api.nvim_buf_clear_namespace(buffer, search_namespace, 0, -1) end,
-    {buffer = buffer, silent = true})
+  -- Views rebuilt from this one (p, f, b/n) copy data, so forget the marks there too.
+  vim.keymap.set('n', '<Esc>', function()
+    api.nvim_buf_clear_namespace(buffer, search_namespace, 0, -1)
+    data.search_marks = vim.NIL
+  end, {buffer = buffer, silent = true})
   vim.keymap.set('n', 's', guarded(source), {buffer = buffer, silent = true})
   vim.keymap.set({'n', 'x'}, 'a', guarded(note), {buffer = buffer, silent = true})
   vim.keymap.set('n', '<C-n>', guarded(function() request('search_next') end), {buffer = buffer, silent = true})

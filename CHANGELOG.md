@@ -13,6 +13,17 @@ Both output files are owner-only, outside Git and never overwrite a target.
 The segmenter, sentence-study artifacts, CORE protocol, dependencies, sample-size
 and quality-target decisions are unchanged.
 
+### Hidden search marks stay hidden; the study starts where you are — 18 October 2026
+
+After `Esc` hid the search marks, switching modes with `p`, focus with `f`, or
+paragraphs with `b/n` brought them back; now they stay hidden until you open
+another search result. `S` used to take the last paragraph SOL had saved as the
+study's origin, not the one you had since moved to with `j/k`; it now uses the
+paragraph under the cursor, so Alt-Left from a listed sentence returns there.
+A new test confirms that selecting and copying text around footnote numbers,
+accented and non-Latin characters and italics stays exact in both modes and at
+narrow widths.
+
 ### Sentence-segmentation validation — 18 October 2026
 
 `sol analyze segmentation-sample` prepares a reproducible blind private form

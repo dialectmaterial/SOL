@@ -50,7 +50,7 @@ Write "None." rather than deleting a heading.
 
 - `.venv/bin/python -B -m unittest discover -s tests -p 'test_segmentation*.py'` — 35 tests; OK (4 existing expected failures).
 - `.venv/bin/python -B scripts/check_docs.py` — OK; external URLs were not network-checked.
-- `.venv/bin/python -B -m unittest discover -s tests` — 1,579 tests; OK (11 skipped, 4 existing expected failures). XDG config/data/cache/state and Neovim log locations were isolated; packaging checks are included.
+- `.venv/bin/python -B -m unittest discover -s tests` — 1,582 tests after merging PR #9; OK (11 skipped, 4 existing expected failures). XDG config/data/cache/state and Neovim log locations were isolated; packaging checks are included.
 - Both command help pages work through `python -m sol analyze`. The synthetic end-to-end CLI review retains 4 matching boundaries, 1 false split and 1 miss (80% precision/recall/F1), not a book accuracy estimate. Existing sentence artifacts and source fixture bytes remain unchanged.
 - No real-book sample or human markings were made, and no manual graphical-editor or terminal-reader trial was performed.
 
@@ -58,11 +58,38 @@ Write "None." rather than deleting a heading.
 
 - Source newlines are preserved but are not marks; adding another Enter there marks a boundary. An unsplit block declares one sentence, so a blank exclusion line cannot prove a passage was actually reviewed. The form and ESSENCE explain this; unreviewed blocks should be excluded explicitly.
 - Editors must preserve spaces, Unicode and LF line endings. Auto-indent, trailing-space trimming, hard reflow, BOM/CRLF conversion or normalization cause refusal rather than silent repair.
-- The branch started at `origin/main` (`e203a6d`), then merged PR #7 (`2e21734`) as requested. Claude's task slot, reader/terminal files and previous reports were not edited. No segmenter, sentence-study artifact, CORE protocol, dependency, canonical corpus or workspace changes are included; private source material and `AGENTS.md` stay outside Git.
+- The branch started at `origin/main` (`e203a6d`), then merged PR #7 (`2e21734`) and PR #9 (`8c7cf31`) without rewriting published history. The CHANGELOG/HANDOFF conflicts retain both entries with this work first; Claude's entries and task status are preserved. Relative to current main, no reader/terminal, segmenter, sentence-study artifact, CORE protocol, dependency, canonical corpus or workspace changes are included; private source material and `AGENTS.md` stay outside Git.
 
 ### Decisions requiring approval
 
 - The earlier proposed pilot size, seed, annotation adjudication and quality targets remain maintainer decisions (90 passages/30 per doctrine, seed `20261018`, seek 300 internal gold boundaries; proposed precision/recall targets 98% overall and 95% per doctrine). This task neither adopts defaults nor runs or approves that pilot.
+
+## Keep dismissed marks dismissed and study the live paragraph — 18 October 2026
+
+**Task:** [CURRENT_TASK](CURRENT_TASK.md), "Claude Code: Keep dismissed marks dismissed and study the live paragraph" ([proposal stage 2](proposals/CODEX_READER_WORKSPACE_PLAN.md#2-stabilize-transient-reader-state), live-origin part of stage 7)
+**Branch / PR:** `claude/transient-reader-state` · opened with `gh pr create`
+**Last implementation commit:** `ca654fbe851e5769727d51dcc172a34c6fb23cdf`
+
+### Changed files
+- `sol/terminal/neovim.lua` — `Esc` also clears `data.search_marks`, so views rebuilt from the current one (`p`, `f`, paragraph-mode `b/n`) no longer redraw dismissed marks.
+- `sol/terminal/neovim_reader.py` — the study's origin is the request packet's reference (checked with `check_return_reference`), not Python's last accepted position.
+- `tests/test_reader_surface_neovim.py` — headless Neovim: dismissal survives `p`, `]p`/`[p`, `p`, `f`, resize and `T`, and a new result shows marks; exact selection and yank around callouts, multibyte/combining characters and emphasis, forward and reverse, both modes, widths 72 and 24.
+- `tests/test_neovim_reader.py` — the study origin follows the live packet, saves no visit, and Alt-Left from a result returns to the live cursor.
+- `docs/BEING.md` (§2 controls table and "Transient state"), `CHANGELOG.md`.
+
+### Tests performed
+- Reproduced first: marks returned after `p`, `]p`/`[p` and `f` (not after resize or `T`); the study named the previously saved paragraph as origin.
+- The selection/yank test passed before the change; it pins existing behaviour.
+- `.venv/bin/python -B scripts/check_docs.py` — OK.
+- `.venv/bin/python -B -m unittest discover -s tests` — 1568 tests, OK (11 skipped, 4 expected failures).
+- Real terminal: none by hand. The headless tests run the real Lua adapter in Neovim, not a terminal emulator.
+
+### Outstanding issues
+- `Esc` hides marks for the shown view only; history back to a search result reloads from Python without marks, as before (history never restored marks).
+- Visual checks in Alacritty/Kitty at 80x24 remain for the stage 5 reading pass.
+
+### Decisions requiring approval
+- **When marks return.** Implemented as the proposal suggested: only a newly opened search result (`/` then Enter, Ctrl-N/Ctrl-P) shows marks again; mode, focus, theme and layout changes never do.
 
 ## Sentence-segmentation error measurement — 18 October 2026
 
