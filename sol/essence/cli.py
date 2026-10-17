@@ -1,4 +1,4 @@
-"""Read-only analysis inputs and experiments over a selected local corpus."""
+"""Analysis inputs, experiments and private review over a selected local corpus."""
 
 from __future__ import annotations
 
@@ -30,7 +30,13 @@ def build_parser() -> argparse.ArgumentParser:
     check = commands.add_parser("check", help="recompute and verify a saved experiment against the local corpus")
     check.add_argument("file", metavar="FILE|-", help="saved result JSON, or - for piped input")
     prose = commands.add_parser("prose", help="prepare prose-only analysis input, retaining headings as metadata")
-    for command in (term, sentences, check, prose):
+    sample = commands.add_parser("segmentation-sample", help="prepare a blind private sample for human sentence marking")
+    sample.add_argument("--per-doctrine", type=int, required=True, metavar="N", help="explicit number of whole passages from each doctrine")
+    sample.add_argument("--seed", type=int, required=True, help="explicit reproducible sampling seed")
+    sample.add_argument("--output", type=Path, required=True, metavar="FILE", help="new private JSON file outside every Git checkout")
+    review = commands.add_parser("segmentation-check", help="measure false splits and misses against human-marked sentences")
+    review.add_argument("file", metavar="FILE|-", help="completed private review JSON, or - for piped input")
+    for command in (term, sentences, check, prose, sample, review):
         command.add_argument("--corpus", type=Path, metavar="DIRECTORY",
                              help="use this local canonical corpus instead of discovery")
         command.add_argument("--json", action="store_true", help="print machine-readable JSON instead of a human summary")
@@ -160,7 +166,10 @@ def main(arguments: list[str] | None = None) -> int:
 
         origin = result = None
         # Reject unsafe input before inspecting corpus/configuration data.
-        if options.action == "check":
+        if options.action == "segmentation-check":
+            from sol.essence.segmentation_check import MAX_REVIEW_BYTES, decode_sample
+            result = decode_sample(read_json_input(options.file, MAX_REVIEW_BYTES))
+        elif options.action == "check":
             raw = read_json_input(options.file, MAX_RESULT_BYTES)
             data = raw.encode("utf-8") if isinstance(raw, str) else raw
             decode = (sentence_study.decode_sentence_result if b'"sol.sentence-study"' in data
@@ -172,7 +181,32 @@ def main(arguments: list[str] | None = None) -> int:
         if directory is None:
             raise ValueError("No canonical corpus configured; use --corpus DIRECTORY or sol --set-corpus DIRECTORY")
         snapshot = load_snapshot(directory)
-        if options.action == "prose":
+        if options.action == "segmentation-sample":
+            from sol.essence.segmentation_check import prepare_sample, write_sample
+            sample = prepare_sample(snapshot, per_doctrine=options.per_doctrine, seed=options.seed)
+            path = write_sample(sample, options.output)
+            receipt = {"sample": str(path), "passages": len(sample["passages"]), "status": "unmarked"}
+            print(_json(receipt) if options.json else
+                  f"Created private blind sample: {_safe(path)}\n"
+                  f"{receipt['passages']} passages; human marking is required before scoring.")
+        elif options.action == "segmentation-check":
+            from sol.essence.segmentation_check import compare_sample
+            report = compare_sample(snapshot, result)
+            if options.json:
+                print(_json(report))
+            else:
+                counts = report["summary"]
+                def rate(value):
+                    return "undefined (no boundaries)" if value is None else f"{100 * value:.2f}%"
+                print(f"Sentence segmentation against marks by {_safe(report['reviewer'])}\n"
+                      f"{counts['passages']} scored passages; {len(report['excluded_passages'])} explicitly excluded.\n"
+                      f"{counts['gold_boundaries']} gold internal boundaries; "
+                      f"{counts['false_splits']} false splits, {counts['misses']} misses.\n"
+                      f"Precision {rate(counts['precision'])}; recall {rate(counts['recall'])}; "
+                      f"F1 {rate(counts['f1'])}.\n"
+                      "Final passage ends are excluded. This scores declared marks, not proof of human review.\n"
+                      "Use --json for per-doctrine counts and exact error offsets.")
+        elif options.action == "prose":
             from sol.essence.prose import export_prose
             result = export_prose(snapshot)
             print(_json(result) if options.json else (
