@@ -34,6 +34,20 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
                 self.fail("reader did not reach its expected state")
             await asyncio.sleep(.01)
 
+    async def wait_for_render(self, view):
+        """A model/focus change can precede the frame that scrolls its cursor."""
+        rendered = asyncio.Event()
+
+        def completed(_application):
+            rendered.set()
+
+        view.application.after_render += completed
+        try:
+            view.application.invalidate()
+            await asyncio.wait_for(rendered.wait(), 3)
+        finally:
+            view.application.after_render -= completed
+
     @asynccontextmanager
     async def view(self, *, book=None, width=None, emphasis="underline", workspace=None):
         from prompt_toolkit.data_structures import Size
@@ -150,6 +164,7 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(any("emphasis" in span.styles for span in view.typography.spans))
             await self.wait_for(lambda: view.body.window.render_info.cursor_position.y <
                                 view.body.window.render_info.window_height)
+            await self.wait_for_render(view)
             self.assertGreater(view.body.window.vertical_scroll_2, 0)
             pipe.send_text("\x1b[1;3D")
             await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
@@ -394,6 +409,7 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(actions.selection)
             self.assertIsNone(view.body.buffer.selection_state)
             self.assertEqual(view.body.text, plain)
+            await self.wait_for_render(view)
             self.assertGreater(view.body.window.vertical_scroll_2, 0)
             fragments = view.body.control._get_formatted_text_for_line_func(view.body.buffer.document)(0)
             self.assertTrue(all("source.search" in style and "source.emphasis" in style

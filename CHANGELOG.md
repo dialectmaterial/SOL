@@ -33,3 +33,5 @@ The first CI run exposed older assumptions about installed shell tools and the
 minimum Python version. Native pipeline checks now discover their executables,
 test context cleanup supports Python 3.10, and fractional UTC timestamps are
 parsed consistently across supported versions without rewriting saved data.
+Reader layout assertions wait for a completed render after navigation instead
+of assuming that model changes and screen repaint happen simultaneously.
