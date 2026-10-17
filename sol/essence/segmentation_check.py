@@ -219,6 +219,12 @@ def decode_sample(data):
 
 def write_sample(sample, destination):
     """Create a private annotation form outside Git, refusing any existing target."""
+    payload = json.dumps(sample, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8") + b"\n"
+    return _write_private(payload, destination)
+
+
+def _write_private(payload, destination):
+    """Shared privacy guard for local JSON reviews and plain-text marking forms."""
     destination = Path(destination).expanduser()
     parent = destination.parent.resolve(strict=True)
     # Linked worktrees have a .git file; ordinary checkouts have .git/HEAD.
@@ -227,7 +233,6 @@ def write_sample(sample, destination):
            for directory in (parent, *parent.parents)):
         raise ValueError("segmentation samples contain book text; choose a location outside every Git checkout")
     path = parent / destination.name
-    payload = json.dumps(sample, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8") + b"\n"
     if len(payload) > MAX_REVIEW_BYTES:
         raise ValueError("sample exceeds 8 MiB; choose fewer passages")
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Sentence marking in a text editor — 18 October 2026
+
+`sol analyze segmentation-export` makes a blind plain-text form from an
+unmarked sample. Add Enter between sentences or give an exclusion reason;
+`sol analyze segmentation-import` creates a new review for `segmentation-check`
+without editing JSON. Import preserves original spaces, Unicode and newlines,
+refuses text/header/sample changes and names the passage and mismatch location.
+Both output files are owner-only, outside Git and never overwrite a target.
+The segmenter, sentence-study artifacts, CORE protocol, dependencies, sample-size
+and quality-target decisions are unchanged.
+
 ### Hidden search marks stay hidden; the study starts where you are — 18 October 2026
 
 After `Esc` hid the search marks, switching modes with `p`, focus with `f`, or

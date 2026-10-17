@@ -123,49 +123,75 @@ counts. This balanced passage sample is a descriptive pilot, not a book-wide
 weighted error estimate. It measures `segment` boundaries in exact canonical
 `plain_text`, not the accuracy of token counts or subsequent facsimile masking.
 
-The maintainer can perform a private review as follows, after approving a size:
+**Marking in an ordinary text editor (18 October).** No JSON editing is needed:
 
-```sh
-# Choose an existing private directory outside Git and outside the corpus.
-sol analyze segmentation-sample --corpus /absolute/path/to/local-corpus \
-  --per-doctrine 30 --seed 20261018 --output /absolute/private/path/review.json
-# Mark the JSON locally before inspecting predictions.
-sol analyze segmentation-check /absolute/private/path/review.json \
-  --corpus /absolute/path/to/local-corpus
-sol analyze segmentation-check /absolute/private/path/review.json \
-  --corpus /absolute/path/to/local-corpus --json > /absolute/private/path/report.json
+1. After approving a size, create an unmarked sample in an existing private
+   directory outside Git and outside the corpus. Replace the example paths.
+
+   ```sh
+   sol analyze segmentation-sample --corpus /absolute/path/to/local-corpus \
+     --per-doctrine 30 --seed 20261018 --output /absolute/private/path/sample.json
+   ```
+
+2. Export a blind text form. Keep the original `sample.json` unchanged.
+
+   ```sh
+   sol analyze segmentation-export /absolute/private/path/sample.json \
+     --corpus /absolute/path/to/local-corpus --output /absolute/private/path/sentences.txt
+   ```
+
+3. Open `sentences.txt` in your text editor, using UTF-8, LF line endings and
+   **soft wrap**. Inside each `TEXT` block, press Enter after every complete
+   sentence, including its punctuation and closing quotes/brackets. Keep every
+   original space: do not replace the space between sentences with Enter.
+   Do not correct words, change Unicode, hard-wrap, auto-indent, trim trailing
+   spaces or edit headings. Turn off editor features that make those changes.
+   An original source newline is **not** a mark; add another Enter there if it
+   really ends a sentence. An unsplit block declares one whole sentence. Visit
+   every block; put a reason on its `EXCLUDE: ` line if it is unreviewed or too
+   doubtful to adjudicate. Even excluded text must remain intact. Save the file.
+
+4. Import using that same original sample, supply your reviewer label, then score
+   the new review. Output files must not already exist.
+
+   ```sh
+   sol analyze segmentation-import /absolute/private/path/sample.json \
+     /absolute/private/path/sentences.txt --reviewer "Your name" \
+     --corpus /absolute/path/to/local-corpus --output /absolute/private/path/review.json
+   sol analyze segmentation-check /absolute/private/path/review.json \
+     --corpus /absolute/path/to/local-corpus
+   ```
+
+For example, this invented text has a retained space at the start of the second
+line; Enter was **added**, not substituted for that space:
+
+```text
+TEXT
+A first invented statement.
+ A second one follows.
 ```
 
-The example's size and seed are explicit, not approved defaults. Preparation
-creates an owner-only file, refuses existing targets/symlinks and refuses Git
-checkouts. Raw samples, marked forms and reports must stay private and outside
-Git. Keep the source corpus unchanged while marking; comparison refuses a
-different source generation, method, selection, order, digest or source text.
+The form shows the original unsplit text and passage IDs/doctrines, never the
+segmenter's boundaries or counts. A fingerprint binds it to the complete
+original sample. Import allows only added LF breaks inside `TEXT` and reasons
+on the designated exclusion lines; an edited word, missing space, dropped or
+reordered passage, changed sample or changed source generation is refused.
+Text mismatches name the passage, source codepoint (1-based) and form line/column.
+No newline is inserted into canonical text: the new JSON stores exact source
+slices in the existing `gold_sentences` field, or an explicit `exclude_reason`.
+JSON-based marking remains supported for scripts and expert users.
 
-Set the form's `reviewer` to a declared label. For every passage, replace
-`gold_sentences: null` with a JSON array of its sentences, copied exactly from
-`text` in order. Split at actual sentence boundaries, not merely a newline,
-semicolon or abbreviation; include sentence-final punctuation and closing
-quotes/brackets. Preserve spaces and Unicode inside sentences. Inter-sentence
-whitespace remains in the source but can be omitted between array entries.
-Do not correct spelling or normalization in the form. For example, this is
-synthetic material, not book content:
-
-```json
-{
-  "text": "A first invented statement. A second one follows.",
-  "gold_sentences": ["A first invented statement.", "A second one follows."],
-  "exclude_reason": null,
-  "comment": ""
-}
-```
-
-If a passage cannot be adjudicated, retain `gold_sentences: null` and give a
-nonempty `exclude_reason`; use `comment` for other observations. Unmarked rows
-and reviews with no scored passages are refused. Explicit exclusions are
-reported, not hidden. Mark a random pilot before inspecting the predicted
-splits, and have a second reader independently check doubtful cases. A reviewer
-label and completed form are declarations, not proof of human review.
+Sample, form and review creation use owner-only files, refuse existing targets
+and symlinks, and refuse Git checkouts. Keep raw samples, marked forms and reports
+private and outside Git. Keep the corpus unchanged while marking. The example's
+size and seed are explicit, not approved defaults. Import is a declaration of
+marks, not evidence that each block was read; blank exclusion lines and no added
+breaks cannot distinguish an unreviewed passage from a one-sentence passage.
+Reviews with no scored passages are refused, and exclusions are reported, not
+hidden. Mark the pilot before inspecting predictions and have a second reader
+independently check doubtful cases. A reviewer label is attribution, not proof
+of human review. To save the text-free score report privately, use
+`segmentation-check ... --json > /absolute/private/path/report.json`.
 
 Scoring compares exact **internal sentence-end codepoint offsets**. The final
 passage end is obligatory and excluded. A false split is a predicted boundary

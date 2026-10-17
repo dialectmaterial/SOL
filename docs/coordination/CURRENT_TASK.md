@@ -50,7 +50,7 @@ and the normal checks pass; the handoff says which terminal checks ran.
 
 ## Codex: Make sentence marking practical by hand
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/segmentation-marking-form`
 **Requested:** 18 October 2026, by the maintainer
 

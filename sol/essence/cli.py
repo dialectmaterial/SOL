@@ -36,7 +36,15 @@ def build_parser() -> argparse.ArgumentParser:
     sample.add_argument("--output", type=Path, required=True, metavar="FILE", help="new private JSON file outside every Git checkout")
     review = commands.add_parser("segmentation-check", help="measure false splits and misses against human-marked sentences")
     review.add_argument("file", metavar="FILE|-", help="completed private review JSON, or - for piped input")
-    for command in (term, sentences, check, prose, sample, review):
+    marking_export = commands.add_parser("segmentation-export", help="export a blind sample for marking in a text editor")
+    marking_export.add_argument("file", metavar="SAMPLE_JSON|-", help="original unmarked segmentation-sample JSON")
+    marking_export.add_argument("--output", type=Path, required=True, metavar="FORM_TXT", help="new private text file outside Git")
+    marking_import = commands.add_parser("segmentation-import", help="turn added sentence breaks into a new private review JSON")
+    marking_import.add_argument("file", metavar="SAMPLE_JSON|-", help="the same original unmarked sample used for export")
+    marking_import.add_argument("form", metavar="FORM_TXT|-", help="marked UTF-8 text form; only one input may be piped")
+    marking_import.add_argument("--reviewer", required=True, metavar="NAME", help="declared human reviewer label")
+    marking_import.add_argument("--output", type=Path, required=True, metavar="REVIEW_JSON", help="new private review file outside Git")
+    for command in (term, sentences, check, prose, sample, review, marking_export, marking_import):
         command.add_argument("--corpus", type=Path, metavar="DIRECTORY",
                              help="use this local canonical corpus instead of discovery")
         command.add_argument("--json", action="store_true", help="print machine-readable JSON instead of a human summary")
@@ -166,9 +174,14 @@ def main(arguments: list[str] | None = None) -> int:
 
         origin = result = None
         # Reject unsafe input before inspecting corpus/configuration data.
-        if options.action == "segmentation-check":
+        if options.action in {"segmentation-check", "segmentation-export", "segmentation-import"}:
             from sol.essence.segmentation_check import MAX_REVIEW_BYTES, decode_sample
+            if options.action == "segmentation-import" and options.file == options.form == "-":
+                raise ValueError("only one of the sample and marking form may use stdin")
             result = decode_sample(read_json_input(options.file, MAX_REVIEW_BYTES))
+            if options.action == "segmentation-import":
+                from sol.essence.segmentation_marking import decode_marking_form
+                form = decode_marking_form(read_json_input(options.form, MAX_REVIEW_BYTES))
         elif options.action == "check":
             raw = read_json_input(options.file, MAX_RESULT_BYTES)
             data = raw.encode("utf-8") if isinstance(raw, str) else raw
@@ -189,6 +202,24 @@ def main(arguments: list[str] | None = None) -> int:
             print(_json(receipt) if options.json else
                   f"Created private blind sample: {_safe(path)}\n"
                   f"{receipt['passages']} passages; human marking is required before scoring.")
+        elif options.action == "segmentation-export":
+            from sol.essence.segmentation_marking import export_marking_form, write_marking_form
+            form = export_marking_form(snapshot, result)
+            path = write_marking_form(form, options.output)
+            receipt = {"form": str(path), "passages": len(result["passages"]), "status": "unmarked"}
+            print(_json(receipt) if options.json else
+                  f"Created private blind marking form: {_safe(path)}\n"
+                  "Open it in a text editor. Add sentence breaks; keep every original space and character.")
+        elif options.action == "segmentation-import":
+            from sol.essence.segmentation_check import write_sample
+            from sol.essence.segmentation_marking import import_marking_form
+            review = import_marking_form(snapshot, result, form, reviewer=options.reviewer)
+            path = write_sample(review, options.output)
+            receipt = {"review": str(path), "passages": len(review["passages"]),
+                       "excluded": sum(row["exclude_reason"] is not None for row in review["passages"]), "status": "marked"}
+            print(_json(receipt) if options.json else
+                  f"Created private marked review: {_safe(path)}\n"
+                  "Score it with sol analyze segmentation-check; import does not certify the marks.")
         elif options.action == "segmentation-check":
             from sol.essence.segmentation_check import compare_sample
             report = compare_sample(snapshot, result)
