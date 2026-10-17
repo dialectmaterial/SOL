@@ -1,0 +1,151 @@
+# SOL BEING — Reading, Presentation, and Scholarly Workspace
+
+**Status:** current implementation + explicitly marked decisions; 17 October 2026.  
+**Repository baseline:** `main` at `1d200e4fcbff1ca69f48b5dc96c55765f215f303`.  
+**Companions:** [Architecture](ARCHITECTURE.md) · [CORE](CORE.md) · [ESSENCE](ESSENCE.md).
+
+## 1. Purpose and non-negotiable experience
+
+BEING is the place to **read Hegel's *Science of Logic***, locate source evidence, think, mark, question, annotate, compare, and depart for/return from computation. It is not an ebook format, a terminal emulator, or merely a virtual filesystem. Its primary use case is a comfortable sustained reading session. A working structure tree, extensive keybindings and correct UUID handling are only foundations; an unpleasant reading surface is an unresolved product defect even when automated tests pass.
+
+**Decision:** improve the existing Neovim reader before contemplating another engine. Do not demand perfection before developing one ESSENCE interaction. Reject both traps: endlessly building a reader without research operations, or shipping every new operation while neglecting what it feels like to read.
+
+## 2. What is implemented
+
+`sol` invokes a **single native Neovim 0.11+ reader** with a private SOL configuration. Personal Neovim/LazyVim settings are neither loaded nor changed. The former fullscreen prompt_toolkit reader was removed from the installed distribution but remains under `experiments/reader_surfaces/baseline.py` for controlled research. `sol --engine neovim` remains compatible syntax, not a distinct engine.
+
+Python/CORE owns source verification, IDs, lineage, actions and workspace persistence. Neovim owns disposable buffers, layout, input, motions and visual styling. A view contains **at most 64 canonical paragraphs**, divided into bounded reading sections; the reading position is a UUID plus source-codepoint offset, *never* a Neovim buffer address or screen row. Reloading a section in the same native Neovim process preserves the semantic contract. The reader can display adjacent passages continuously or one passage at a time. The book is **not** one unbounded editor buffer.
+
+The reader presently uses a centered maximum width of **72 terminal columns** (configurable), native word-aware wrap, semantic emphasis/strong/code spans, headings, a source-context display and review warnings. It is a character-cell presentation, not proportional typesetting. It runs in capable terminal hosts including Alacritty and Kitty; terminal capability heuristics can choose italic or underline fallback. Three presentation presets (Terminal, Dark, Paper) are implemented; see section 4.
+
+The current implementation also includes literal book search, source-positioned results, a dynamic outline/tree, selection and copy, markers, focus/paragraph modes, a session navigation trail, saved reading position, annotated workspaces, comparisons, notes and source-review operations. The most mature workspace operations are additionally exposed via `sol --shell`; not every operation has an equally convenient Neovim keybinding. Avoid claiming full GUI/TUI parity.
+
+### Reading controls (current)
+
+| Input | Function |
+|---|---|
+| `j/k`; `h/l`; `w` | Wrapped-line; character; forward-word motion |
+| `Ctrl-D` / `Ctrl-U` | Half-screen scroll |
+| `b/n` | Previous / next paragraph |
+| `p` | Continuous / single-paragraph mode |
+| `gg` / `G` | Start / end of *loaded section*, not entire book |
+| `/` + Enter | Literal case-insensitive search across book; select result |
+| `Ctrl-N` / `Ctrl-P` | Next / previous result paragraph |
+| `Alt-Left` / `Alt-Right` | Session reading history back / forward |
+| `v`, move, `Esc` | Transient selection within *one* source record |
+| `y` | Copy selection or current passage; desktop clipboard provider depends on environment |
+| `m1`–`m3`; `'1`–`'3`; `dm1`–`dm3` | Set, open, clear one of three paragraph markers |
+| `t` | Dynamic structure tree (Vim-style navigation) |
+| `c` | Passage source context, notes, markers |
+| `f` | Quiet focus mode; keep important warnings |
+| `?`, `q` | Help / save position and quit |
+
+`n` means *next paragraph*, **not** Neovim's default next regex match. `gg/G` operate only within the loaded section. Selections remain inside a single canonical passage and are not automatically saved as annotations. Search and passage navigation preserve source offsets as far as the verified projection allows.
+
+**Adoption clarification:** use `j/k` for wrapped rows. Up/Down retain native Neovim buffer-line motion; they are not currently mapped to the same visual-row actions. The single vertical outline has no shipped horizontal-layout switch. No control behavior was changed by the documentation migration.
+
+### Basic operations
+
+```sh
+python3 scripts/install.py --check   # Verify setup without installing
+python3 scripts/install.py           # Install/update checkout; may offer native dependencies
+sol                                  # Reader, remembered actor/workspace
+sol -n                               # Temporary reader, no workspace/profile writes
+sol --actor "Researcher" --workspace logic-study
+sol --width 64                       # Adjust prose measure
+sol --structure --depth 2            # Printable book structure
+sol --dynamic-structure              # Standalone dynamic tree
+sol --search "ground" --within /essence --word --limit 8
+sol --passage RECORD_UUID --context 1
+sol guide
+```
+
+First-run setup for this baseline accepts the **specific audited Cambridge/di Giovanni PDF only**, not arbitrary files. `sol --set-corpus /absolute/path/to/local-corpus` selects an already indexed corpus. Reading normally neither reruns PDF extraction nor accesses the network. See [CORE](CORE.md).
+
+## 3. What makes this a scholarly workspace
+
+**Canonical text and personal research are distinct.** The book is identity-managed local canonical Markdown and generated JSONL; the workspace is a separate local SQLite database of reader activity. Workspaces retain explicit actor labels (not authenticated accounts), checkpointed positions, bookmarks, attributed notes and revisions, comparisons/questions, review testimony and directed relations. An author's assertion is not book metadata; an ML output is not a reader-authored assertion.
+
+A workspace is bound to the corpus identity and source fingerprint. New workspaces use **schema 3**; older supported versions can be opened without silent migration. Upgrades produce separate copies. Concurrent/stale revisions are refused rather than overwritten. Reading history in a session and durable checkpoint visits are separate. Existing notes and comparisons may refer to *live* records, not frozen historical quotations; after edits, disclose that distinction. A durable selected-span note with exact source-version binding is still **future work**.
+
+Examples of available compatibility-shell operations (not necessarily Neovim shortcuts):
+
+```text
+bookmark add beginning
+note draft
+note list
+note history NOTE_ID
+note edit NOTE_ID
+compare save examination UUID_A UUID_B --question "What is the relation?"
+compare show examination
+relate add UUID_A compares-with UUID_B --reason "A provisional observation"
+review show
+review queue --limit 10
+workspace history --limit 10
+workspace check
+```
+
+Unverified/flagged source material stays visible to the reader with warnings but does not become verified because it has been displayed. Notes from the translator or edition stay separate from Hegel's prose and personal annotations.
+
+### Exports, backup, integrity
+
+```sh
+sol --workspace logic-study --workspace-export --export-format markdown > logic-study.sol-workspace.md
+sol --workspace logic-study --workspace-export > logic-study.sol-workspace.json
+# Source-aware backup/upgrade commands are documented through the installed `sol` help and workspace interface.
+```
+
+Workspace report exports retain references, questions, notes/revisions, reading state, attribution, source provenance and unresolved IDs; adding `--include-passages` includes the *current* canonical Markdown of referenced records, **not** historic text snapshots. Exports can include copyrighted and private material: keep out of Git. Workspace backup/upgrade operations produce validated separate SQLite copies and reject overwriting targets.
+
+## 4. Theming and typography: next bounded task
+
+**Decision:** implement exactly three shipped presets before introducing theme plugins or large theme catalogs:
+
+| Preset | Intent | Technical rule |
+|---|---|---|
+| **Terminal** | Existing host's native appearance | Inherit foreground/background; use minimal highlight overrides |
+| **Dark** | Quiet, carefully tuned TUI reading | Readable contrast and restrained differentiation of hierarchy, notes, search and warnings |
+| **Paper** | Book-like page | Light paper-toned background with legible dark text and restrained accents |
+
+Do not confuse installing a Neovim color scheme with designing a reading surface. Evaluate: paragraph spacing, inter-section gaps, measure, top/bottom breathing room, heading density, how emphasis maps to actual fonts, whether the always-visible status hints dominate, line-wrap behavior, warning visibility, tree/search popup intrusion and preservation of position after resizing. The present source defines a centered floating window without border and a verbose action statusline; these are concrete starting points for visual audit.
+
+**Safety:** presentation styling must never change canonical Markdown, `plain_text`, passage UUIDs, offset mapping, selection content or workspace schema. Theme switching should be runtime-selectable and persist as a preference only through an explicit, simple config path; it must not modify user terminal themes or `~/.config/nvim`. Invalid/high-contrast or no-color terminals must degrade legibly. Test 80×24 and larger sizes, Alacritty, different fonts, Unicode and italics fallback.
+
+### Design experiment before expanding features
+
+The earlier `prompt_toolkit` surface was subjectively easier to read despite less functionality. Compare the historical baseline and current Neovim on **the same chapter**. Document why: use a friction log with (a) interruption point, (b) recovery effort, (c) spacing/typography issue, (d) a source or math issue, (e) one corrective change. Then implement small changes inside Neovim with regression tests. Resist another framework migration based on screenshots alone.
+
+Checkout-only proofs include continuous terminal and offline self-contained HTML surfaces (under `experiments/reader_surfaces/`); these are **research comparisons, not installed alternative readers**. They demonstrate that source-bound selection can survive layout changes but do not establish long-term human comfort. A browser HTML proof is not a finished BEING GUI. If terminal-native reading proves intrinsically inadequate, use the existing CORE/reader-action separation to evaluate a typeset projection later.
+
+## 5. Mathematical notation and source fidelity
+
+This corpus includes separate `formula` records and prose passages with `contains_math: true`. Some formula transcriptions require review and may have source-image facsimiles. **Implemented:** mathematical passages remain addressable and navigable; PDF/source evidence is retained; optional Kitty source viewing exists. **Not implemented:** faithful native Neovim rendering of arbitrary 2-D mathematical notation or a verified general LaTeX conversion pipeline.
+
+**Near-term decision:** prioritize a **source-faithful formula preview**. From the current formula or mixed passage, offer a single action that displays the correct original crop/page (or a reviewed typed formula where available) and returns without losing passage and cursor position. For Alacritty, a separate local image/PDF/browser viewer is legitimate. Kitty can optionally offer enhanced panes, but formula access must not depend on Kitty. Avoid OCR hallucination: generated LaTeX is an unreviewed candidate, not authoritative source. Preserve exponent/fraction placement, printed/PDF page labels, transcription status, attribution, image provenance, and warning flags. Never replace ambiguous formula content with a guessed linear string.
+
+Acceptance: demonstrate one reviewed simple formula, one complex or unreviewed Newton-related formula, a mixed prose/math passage, a missing source image, a corrected formula, and a stale reference; compare actual rendering against original PDF evidence.
+
+## 6. BEING ↔ ESSENCE without terminal dogma
+
+**Implemented:** CORE v1 envelopes can capture and check source identity. With `sol-kitty`, an optional private, one-exchange handoff launches an ordinary Zsh ESSENCE pane; BEING checks a proposed return and explicitly accepts it. This is not a general active-investigation workflow and is currently host-specific. It is not a reason to construct an ESSENCE terminal emulator.
+
+The next development target is a **terminal-independent handoff interface**, using existing CORE references and guarded reader actions. Starting from the current chapter/passage, preserve an investigation origin and a way to return to the exact passage while retaining previous navigation state. Any new result must be a separately versioned, attributable **computation artifact**; do not auto-insert model interpretations into the authored workspace.
+
+A narrow, demonstrable first scenario: read a chapter → select scope → initiate an ESSENCE sentence-length analysis → inspect measurements and supporting passage IDs → choose a result → return to its source in BEING → recover the original reading context. **Returning to the result's passage** and **returning to the previous reader position** are different operations; support or explicitly distinguish both rather than assuming one action solves both.
+
+## 7. Boundaries and known limitations
+
+- Current normal reading is bounded by chapters/64-record sections, not a whole-book text buffer.
+- No native cross-paragraph span selection; normal visual selection is transient and passage-local.
+- Rich mathematical and source facsimile rendering is incomplete.
+- The outline/search/marker UI is functional but readability, styling, and mode transitions require actual use testing.
+- Some scholarly actions are still most accessible through the optional compatibility shell.
+- Comparison presentation is not yet a mature integrated side-by-side desk; authoring/version-binding details matter.
+- The current Kitty exchange is host-bound; the terminal-independent research workflow remains proposed.
+- Human reading acceptance is **not** established by headless tests, mock terminal checks, or a 24-passage HTML rendering benchmark.
+
+## 8. Acceptance checklist for agents
+
+A change may be called done only when (1) core corpus/ref/workspace tests pass; (2) recorded UUID+codepoint location survives theme switches, resizing, section transitions, and restart; (3) warnings and notes remain correctly attributed; (4) regular Alacritty and optional Kitty degrade gracefully; (5) reading in a chosen substantial *Science of Logic* chapter demonstrates fewer interruptions; (6) math preview and ESSENCE returns demonstrably preserve the right context; and (7) code and these documents agree on what is actually implemented.
+
+**Source lineage:** consolidated from GitHub's reader view, Neovim implementation, reader actions, workspace plan/export, usage manual, handoff documentation, renderer experiments and dated discussions. Detailed historical experiments remain in `docs/legacy/` after migration.

@@ -29,6 +29,8 @@ jobs:
       - name: Enable the native shell pipeline check
         if: matrix.python == '3.14'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zsh ripgrep
+      - name: Check documentation links and legacy archive
+        run: python -B scripts/check_docs.py
       - name: Run public corpus, workspace, reader and archive checks
         run: python -B -m unittest discover -s tests
       - name: Check patch whitespace

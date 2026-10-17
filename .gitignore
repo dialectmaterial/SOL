@@ -27,3 +27,6 @@ dist/
 
 # Local analysis artifacts can include passages from the private corpus.
 *.sol-analysis.json
+
+# Neovim's own log, written when its server socket cannot start.
+.nvimlog

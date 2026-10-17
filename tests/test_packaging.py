@@ -26,7 +26,8 @@ ENTRY_POINTS = {
     "sol-corpus": "sol.corpus.convert:main",
     "sol-corpus-check": "sol.corpus.contract:main",
 }
-PUBLIC_FILES = {"pyproject.toml", "MANIFEST.in", "README.md", "CONTRIBUTING.md", "CHANGELOG.md"} | PACKAGE_FILES | PACKAGE_ASSETS
+PUBLIC_FILES = {"pyproject.toml", "MANIFEST.in", "README.md", "CONTRIBUTING.md", "CHANGELOG.md",
+                "docs/legacy/inventory.json"} | PACKAGE_FILES | PACKAGE_ASSETS
 for directory, suffixes in (("docs", {".md"}), ("tests", {".py"}),
                             ("experiments", {".py", ".lua", ".js", ".cjs"}), ("scripts", {".py"})):
     PUBLIC_FILES.update(path.relative_to(ROOT).as_posix()

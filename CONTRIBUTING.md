@@ -1,10 +1,16 @@
 # Working on SOL
 
+The four human-facing design authorities are [Architecture](docs/ARCHITECTURE.md),
+[BEING](docs/BEING.md), [ESSENCE](docs/ESSENCE.md), and [CORE](docs/CORE.md).
+This contributor guide covers operational development procedures, not a separate
+architecture. Earlier instructions are preserved in the [legacy archive](docs/legacy/README.md).
+
 Use Python 3.10 or newer. From a checkout, prepare an isolated environment:
 
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -e . setuptools wheel
+.venv/bin/python -B scripts/check_docs.py
 .venv/bin/python -B -m unittest discover -s tests
 ```
 
@@ -12,7 +18,7 @@ The ordinary suite uses invented corpora and temporary workspaces. A private PDF
 model download, GUI terminal, personal workspace or actor profile is unnecessary.
 Tests for external engines and real terminal windows skip unless their documented
 requirements are available. GitHub Actions runs the public suite on Python 3.10
-and 3.14. See [reader acceptance](docs/READER_ACCEPTANCE.md) for the additional
+and 3.14. See [BEING acceptance](docs/BEING.md#8-acceptance-checklist-for-agents) for the additional
 terminal checks; passing unit tests is not evidence of manual reading quality.
 
 The Python 3.14 CI job also installs Zsh and ripgrep to exercise the native shell
@@ -69,9 +75,8 @@ dependent on the existing reading trials rather than adding more frontends.
 The original Neovim experiment reuses the installed reader backend. Its Lua
 assets are included in the wheel; the historical prompt_toolkit fullscreen
 baseline and wrapping code remain research-only, outside the installed package.
-Bare `sol` opens the Neovim-backed reader. See [the reader contract](docs/NEOVIM_READER.md)
-for workspace boundaries and bounded section transitions, and
-[the reader guide](docs/READER_VIEW.md) for controls and acceptance checks.
+Bare `sol` opens the Neovim-backed reader. See [BEING](docs/BEING.md#2-what-is-implemented)
+for workspace boundaries, bounded section transitions, controls and acceptance checks.
 
 ## Scope of the cleanup
 

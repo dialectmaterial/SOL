@@ -10,7 +10,7 @@ execution modes live in `sol.reader.options`. Interactive onboarding belongs to
 `sol.reader.launch`, the optional command loop to `sol.reader.shell`, and one-shot
 text presentation to `sol.reader.render`. These interfaces use the same actions.
 Workspace writes have service methods on `WorkspaceReader`; their command syntax
-and summaries live in `sol.workspace.commands`. See [contributing](../CONTRIBUTING.md)
+and summaries live in `sol.workspace.commands`. See [contributing](root/CONTRIBUTING.md)
 for the module map and verification procedure.
 
 `sol.reader.actions` now owns paragraph-reading state independently of the

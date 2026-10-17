@@ -1,8 +1,8 @@
 # SOL usage manual
 
-[Back to SOL](../README.md)
+[Back to SOL](root/README.md)
 
-This manual covers the reader, virtual shell, personal workspaces, corpus maintenance, and optional source-view and ESSENCE handoff integrations. Start with the [README](../README.md) for installation and a first reading session. Use `sol guide` for a compact guide in the terminal and `sol --help` for current CLI syntax.
+This manual covers the reader, virtual shell, personal workspaces, corpus maintenance, and optional source-view and ESSENCE handoff integrations. Start with the [README](root/README.md) for installation and a first reading session. Use `sol guide` for a compact guide in the terminal and `sol --help` for current CLI syntax.
 
 ## Contents
 
@@ -22,7 +22,7 @@ This manual covers the reader, virtual shell, personal workspaces, corpus mainte
 
 ## Install with pipx
 
-The [README](../README.md#install) gives the complete checkout installation:
+The [README](root/README.md#install) gives the complete checkout installation:
 
 ~~~sh
 python3 scripts/install.py
@@ -569,8 +569,8 @@ comparison requires neither a saved name nor a new workspace record.
 
 ## Development checks
 
-The [contributor guide](../CONTRIBUTING.md) gives the current module map, shared
-test fixtures, archive checks and CI matrix. [Release notes](../CHANGELOG.md)
+The [contributor guide](root/CONTRIBUTING.md) gives the current module map, shared
+test fixtures, archive checks and CI matrix. [Release notes](root/CHANGELOG.md)
 record behavior changes and compatibility decisions.
 
 Use a separate environment in the project directory. Editable installation exposes the current package and installs the normal reader dependencies for testing:
