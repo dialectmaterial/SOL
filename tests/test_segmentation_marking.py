@@ -92,6 +92,38 @@ class SegmentationMarkingTests(CorpusFixture, unittest.TestCase):
         self.assertEqual(encode_sentence_result(analyze_sentences(self.snapshot)), artifact)
         self.assertEqual(self.files(), before)
 
+    def test_every_line_rstripped_round_trips_without_changing_marks_or_source(self):
+        # Move each inserted break after the inter-sentence space before saving.
+        form = self.marked_form().replace("\n ", " \n")
+        stripped = "\n".join(line.rstrip() for line in form.split("\n"))
+        self.assertIn("EXCLUDE:\n", stripped)
+        self.assertNotEqual(form, stripped)
+        self.assertEqual(self.imported(stripped), self.imported())
+        self.assertEqual(compare_sample(self.snapshot, self.imported(stripped))["summary"]["f1"], 0.8)
+
+    def test_whitespace_missing_at_an_added_break_is_restored_from_source(self):
+        records = deepcopy(list(self.snapshot.records))
+        record = next(row for row in records if row["id"] == self.sample["passages"][0]["id"])
+        text = "A first thought.\t \u00a0Another thought follows.  "
+        record.update(markdown=text, plain_text=text)
+        self.write_records(records)
+        snapshot = core.load_snapshot(self.corpus)
+        sample = prepare_sample(snapshot, per_doctrine=2, seed=20261018)
+        form = export_marking_form(snapshot, sample)
+        for gap in ("\n", "\n\n", "\n\t \u00a0", "\t \u00a0\n", "\n \u00a0"):
+            with self.subTest(gap=gap):
+                marked = form.replace("thought.\t \u00a0Another", "thought." + gap + "Another", 1)
+                review = import_marking_form(snapshot, sample, marked, reviewer="Synthetic")
+                self.assertEqual(review["passages"][0]["gold_sentences"],
+                                 ["A first thought.", "Another thought follows."])
+                self.assertEqual(review["passages"][0]["text"], text)
+                stripped = "\n".join(line.rstrip() for line in marked.split("\n"))
+                self.assertEqual(import_marking_form(snapshot, sample, stripped, reviewer="Synthetic"), review)
+
+    def test_trim_tolerance_does_not_allow_missing_whitespace_inside_a_sentence(self):
+        with self.assertRaisesRegex(ValueError, "source mismatch"):
+            self.imported(self.marked_form().replace("Another bell", "Anotherbell", 1))
+
     def test_original_newlines_are_not_marks_and_can_be_marked_with_an_extra_enter(self):
         review = self.imported(self.form)
         source = next(row for row in self.sample["passages"] if "\n" in row["text"])
@@ -220,7 +252,8 @@ class SegmentationMarkingTests(CorpusFixture, unittest.TestCase):
         self.assertEqual(code, 0, errors)
         self.assertEqual(json.loads(output)["status"], "unmarked")
         self.assertNotIn(self.sample["passages"][0]["text"], output)
-        form.write_bytes(self.marked_form().encode("utf-8"))
+        marked = self.marked_form().replace("\n ", " \n")
+        form.write_bytes("\n".join(line.rstrip() for line in marked.split("\n")).encode("utf-8"))
         arguments = ["segmentation-import", str(sample), str(form), "--reviewer", "Synthetic reviewer", "--output", str(review)]
         code, output, errors = self.call(arguments + ["--json"])
         self.assertEqual(code, 0, errors)

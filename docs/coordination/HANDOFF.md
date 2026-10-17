@@ -32,6 +32,34 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Editor-trimmed marking forms — 18 October 2026
+
+**Task:** [Codex: Make sentence marking practical by hand](CURRENT_TASK.md#codex-make-sentence-marking-practical-by-hand), maintainer-requested follow-up to [Claude's PR #8 review](https://github.com/dialectmaterial/SOL/pull/8#issuecomment-6242615575).
+**Branch / PR:** `codex/marking-form-trailing-space` · [PR #11](https://github.com/dialectmaterial/SOL/pull/11), opened with `gh pr create --base main`. Status: `In review`.
+**Last implementation commit:** `7d553efc66fcea8271a5afcb87b1f4b58e5a5df2` (fix and documentation; this report follows).
+
+### Changed files
+
+- `sol/essence/segmentation_marking.py` — accepts `EXCLUDE:` with or without a trailing space; restores omitted source whitespace at added sentence breaks and passage ends. Words, interior sentence whitespace and original newlines still require exact matching. Gold strings and offsets come from canonical source, not normalized form text.
+- `tests/test_segmentation_marking.py` — three regressions and a trimmed-form CLI round trip: every line `rstrip()`ped, retained/trimmed tabs and Unicode spaces, passage-end trimming, unchanged review/score, and rejection of whitespace loss inside a sentence.
+- `docs/ESSENCE.md`, `CHANGELOG.md` — describe the narrow tolerance. Only Codex's task branch, follow-up scope and status change in `CURRENT_TASK.md`; earlier reports remain intact.
+
+### Tests performed
+
+- Reproduced before fixing: stripped `EXCLUDE:` failed at the first heading, trimmed boundary whitespace failed source matching, and the trimmed CLI round trip failed.
+- `.venv/bin/python -B -m unittest discover -s tests -p 'test_segmentation*.py'` — 38 tests; OK (4 existing expected failures).
+- `.venv/bin/python -B scripts/check_docs.py` — OK; external URLs were not network-checked.
+- `.venv/bin/python -B -m unittest discover -s tests` — 1,585 tests; OK (11 skipped, 4 existing expected failures), with isolated XDG config/data/cache/state and Neovim logs. The fully trimmed synthetic CLI review retains the same marks and 80% F1; this is not a book estimate.
+- `gh pr list` at session start found no open PRs from the other agent; PR #10 was already merged. No cross-agent review or merge was necessary. Main remained at `b2863c1` when refreshed before reporting.
+
+### Outstanding issues
+
+- No real-book sample, human annotation or manual graphical-editor trial was performed. UTF-8/LF, unmodified headings, original newlines and exact non-boundary source text remain required. Forms remain blind; no segmenter, artifact, CORE protocol, schema, dependency, reader or terminal changes are included.
+
+### Decisions requiring approval
+
+- None introduced; no reserved decision is taken. Defaults: restore only known canonical whitespace at added breaks/passage ends, and keep exported v1 headers byte-compatible so existing forms continue to import. Their conservative instruction to retain spaces remains useful but is no longer a requirement at the tolerated boundaries.
+
 ## Sentence marking in an ordinary text editor — 18 October 2026
 
 **Task:** [Codex: Make sentence marking practical by hand](CURRENT_TASK.md#codex-make-sentence-marking-practical-by-hand).

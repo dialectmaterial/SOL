@@ -143,9 +143,10 @@ weighted error estimate. It measures `segment` boundaries in exact canonical
 3. Open `sentences.txt` in your text editor, using UTF-8, LF line endings and
    **soft wrap**. Inside each `TEXT` block, press Enter after every complete
    sentence, including its punctuation and closing quotes/brackets. Keep every
-   original space: do not replace the space between sentences with Enter.
-   Do not correct words, change Unicode, hard-wrap, auto-indent, trim trailing
-   spaces or edit headings. Turn off editor features that make those changes.
+   original space when possible. If your editor trims whitespace before an added
+   sentence break or at a passage end, import restores it from the source.
+   Do not delete spaces inside sentences, correct words, change Unicode,
+   hard-wrap, auto-indent or edit headings. Turn off those editor features.
    An original source newline is **not** a mark; add another Enter there if it
    really ends a sentence. An unsplit block declares one whole sentence. Visit
    every block; put a reason on its `EXCLUDE: ` line if it is unreviewed or too
@@ -173,9 +174,14 @@ A first invented statement.
 
 The form shows the original unsplit text and passage IDs/doctrines, never the
 segmenter's boundaries or counts. A fingerprint binds it to the complete
-original sample. Import allows only added LF breaks inside `TEXT` and reasons
-on the designated exclusion lines; an edited word, missing space, dropped or
-reordered passage, changed sample or changed source generation is refused.
+original sample. Import allows added LF breaks inside `TEXT`, source whitespace
+trimmed at those breaks or passage ends, and reasons on the designated exclusion
+lines (`EXCLUDE:` with or without its trailing space). It reconstructs sentence
+strings from canonical source slices, not the edited form. An edited word,
+missing space inside a sentence, dropped or reordered passage, changed sample or
+changed source generation is refused. Existing v1 form headers remain unchanged
+for compatibility; their advice to retain spaces is conservative, not a demand
+to disable line-end trimming at added sentence breaks.
 Text mismatches name the passage, source codepoint (1-based) and form line/column.
 No newline is inserted into canonical text: the new JSON stores exact source
 slices in the existing `gold_sentences` field, or an explicit `exclude_reason`.

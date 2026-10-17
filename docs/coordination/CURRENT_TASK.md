@@ -51,7 +51,7 @@ and the normal checks pass; the handoff says which terminal checks ran.
 ## Codex: Make sentence marking practical by hand
 
 **Status:** In review
-**Branch:** `codex/segmentation-marking-form`
+**Branch:** `codex/marking-form-trailing-space`
 **Requested:** 18 October 2026, by the maintainer
 
 ### Goal
@@ -59,6 +59,9 @@ and the normal checks pass; the handoff says which terminal checks ran.
 The maintainer can mark a segmentation sample in an ordinary text editor by
 pressing Enter after each sentence, instead of editing JSON, and turn the result
 back into a review file that `sol analyze segmentation-check` scores.
+Follow-up requested after PR #8: tolerate an editor trimming the `EXCLUDE:` line
+and source whitespace immediately before added sentence breaks or passage ends;
+an every-line-`rstrip()` round trip must preserve marks and source identity.
 
 ### Scope
 
@@ -71,7 +74,8 @@ exclusion reason) and an import that fills `gold_sentences` or
 ### Constraints
 
 Blind: the form never shows the segmenter's boundaries. The import refuses any
-change other than added line breaks (and exclusion lines), names the passage and
+change other than added line breaks, whitespace trimmed at those breaks or
+passage ends, and exclusion lines; it names the passage and
 place of a mismatch, and writes a new owner-only file outside Git without
 overwriting. Sample size, seed and targets stay the maintainer's decision.
 `punctuation-rules-v1`, its artifacts, the protocol and dependencies are

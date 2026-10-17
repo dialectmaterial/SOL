@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Marking forms survive editor line-end trimming — 18 October 2026
+
+Import accepts `EXCLUDE:` with or without its trailing space and restores source
+whitespace trimmed before an added sentence break or at a passage end. A form
+with every line `rstrip()`ped now round-trips to the same marks and scores.
+Words, interior sentence spacing, source newlines and canonical text remain
+protected; existing exported forms, review fields and segmentation are unchanged.
+
 ### Sentence marking in a text editor — 18 October 2026
 
 `sol analyze segmentation-export` makes a blind plain-text form from an
