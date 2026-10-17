@@ -17,103 +17,22 @@ import unittest
 import zipfile
 
 
-PACKAGE_FILES = {
-    "sol/__init__.py", "sol/__main__.py",
-    "sol/core/__init__.py", "sol/core/config.py", "sol/core/corpus.py",
-    "sol/core/models.py", "sol/core/paths.py", "sol/core/references.py", "sol/core/protocol.py", "sol/core/wire.py",
-    "sol/essence/__init__.py", "sol/essence/terms.py", "sol/essence/cli.py",
-    "sol/reader/__init__.py", "sol/reader/app.py", "sol/reader/models.py", "sol/reader/legacy_pdf.py",
-    "sol/reader/options.py", "sol/reader/actions.py", "sol/reader/navigation.py", "sol/reader/typography.py",
-    "sol/reader/search.py",
-    "sol/corpus/__init__.py", "sol/corpus/convert.py", "sol/corpus/contract.py", "sol/corpus/notes.py",
-    "sol/corpus/references.py", "sol/corpus/structure.py", "sol/corpus/layout.py", "sol/corpus/edition.py",
-    "sol/corpus/extraction.py", "sol/corpus/ingest.py",
-    "sol/corpus/backends/__init__.py", "sol/corpus/backends/opendataloader.py",
-    "sol/workspace/__init__.py", "sol/workspace/store.py", "sol/workspace/reader.py",
-    "sol/workspace/diagnostics.py", "sol/workspace/catalog.py", "sol/workspace/export.py",
-    "sol/workspace/launch.py", "sol/workspace/lifecycle.py",
-    "sol/workspace/profiles.py", "sol/workspace/comparison.py", "sol/terminal/__init__.py", "sol/terminal/prompt.py",
-    "sol/terminal/source.py", "sol/terminal/kitty.py", "sol/terminal/comparison.py", "sol/terminal/commands.py",
-    "sol/terminal/reference.py", "sol/terminal/handoff.py", "sol/terminal/essence.py", "sol/terminal/reader.py",
-    "sol/terminal/reading_layout.py",
-}
+ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_FILES = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol").rglob("*.py")}
 ENTRY_POINTS = {
     "sol": "sol:cli",
     "sol-kitty": "sol.terminal.kitty:main",
     "sol-corpus": "sol.corpus.convert:main",
     "sol-corpus-check": "sol.corpus.contract:main",
 }
-PUBLIC_FILES = {
-    "pyproject.toml", "MANIFEST.in", "README.md", "docs/CORPUS.md", "docs/USAGE.md",
-    "docs/WORKSPACE_PLAN.md", "docs/WORKSPACE_EXPORT.md", "docs/MODULARITY.md", "docs/EXTRACTION.md",
-    "docs/READER_ACTIONS.md",
-    "docs/REFERENCE_PROTOCOL.md",
-    "docs/HANDOFF.md",
-    "docs/TERM_STUDY.md",
-    "docs/READER_VIEW.md",
-    "docs/READER_ACCEPTANCE.md",
-    "docs/research/INTERFACE_RESEARCH.md", "docs/research/OPENDATALOADER_RESEARCH.md",
-} | PACKAGE_FILES
+PUBLIC_FILES = {"pyproject.toml", "MANIFEST.in", "README.md", "CONTRIBUTING.md", "CHANGELOG.md"} | PACKAGE_FILES
+for directory, suffixes in (("docs", {".md"}), ("tests", {".py"}),
+                            ("experiments", {".py", ".lua", ".js", ".cjs"})):
+    PUBLIC_FILES.update(path.relative_to(ROOT).as_posix()
+                        for path in (ROOT / directory).rglob("*")
+                        if path.is_file() and path.suffix in suffixes)
 
-
-def write_runtime_corpus(directory, *, pending_review=False):
-    """Create a valid tiny index using stdlib only, without a source PDF."""
-    import sol.corpus.contract as contract
-
-    directory.mkdir(parents=True)
-    section_id = "aaaaaaaa-0000-4000-8000-000000000001"
-    passage_id = "bbbbbbbb-0000-4000-8000-000000000002"
-    body = "An invented passage makes this installed research reader useful without extracting any PDF."
-    common = {
-        "sources": [{"pdf_page": 80, "printed_page": "7"}],
-        "attribution": {"author": "G. W. F. Hegel", "role": "main_text", "status": "confirmed"},
-        "reader_path": "/BEING/synthetic.txt", "reader_title": "Synthetic section",
-    }
-    section = {**common, "id": section_id, "type": "section", "parent_id": None,
-               "order": 0, "title": "Synthetic section", "path": "/synthetic"}
-    paragraph = {**common, "id": passage_id, "type": "paragraph",
-                 "parent_id": section_id, "order": 1}
-    if pending_review:
-        paragraph["transcription_status"] = "needs_review"
-    markdown = "\n".join((
-        contract.render_record(section, "# Synthetic section"),
-        contract.render_record(paragraph, body),
-    ))
-    (directory / "sample.md").write_text(markdown, encoding="utf-8")
-    manifest = {
-        "contract_version": 1, "edition": {"title": "Synthetic installed reader edition"},
-        "source": {"filename": "absent.pdf", "sha256": "0" * 64, "pdf_pages": 80},
-        "documents": ["sample.md"],
-        "page_inventory": [
-            {"pdf_page": page, "printed_page": None, "disposition": "blank",
-             "reason": "Invented blank page"}
-            for page in range(1, 80)
-        ] + [{"pdf_page": 80, "printed_page": "7", "disposition": "records"}],
-    }
-    encoded_manifest = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
-    (directory / "corpus.json").write_bytes(encoded_manifest)
-    records = [
-        {**section, "document": "sample.md", "markdown": "# Synthetic section",
-         "plain_text": "Synthetic section", "context": []},
-        {**paragraph, "document": "sample.md", "markdown": body, "plain_text": body,
-         "context": [{"id": section_id, "type": "section", "title": "Synthetic section",
-                      "path": "/synthetic"}]},
-    ]
-    for record in records:
-        record["content_sha256"] = hashlib.sha256(record["markdown"].encode("utf-8")).hexdigest()
-    payload = "".join(json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
-                      for record in records).encode("utf-8")
-    (directory / "index.jsonl").write_bytes(payload)
-    metadata = {
-        "contract_version": 1,
-        "manifest_sha256": hashlib.sha256(encoded_manifest).hexdigest(),
-        "source_sha256": "0" * 64,
-        "documents": {"sample.md": hashlib.sha256(markdown.encode("utf-8")).hexdigest()},
-        "index_sha256": hashlib.sha256(payload).hexdigest(),
-        "record_count": len(records),
-    }
-    (directory / "index.meta.json").write_text(json.dumps(metadata), encoding="utf-8")
-    return passage_id, body
+from fixtures_corpus import write_runtime_corpus
 
 
 @unittest.skipUnless(importlib.util.find_spec("setuptools"), "setuptools is needed to build archives")
@@ -128,10 +47,6 @@ class PackagingTests(unittest.TestCase):
         for filename in PUBLIC_FILES:
             (cls.stage / filename).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(root / filename, cls.stage / filename)
-        tests = cls.stage / "tests"
-        tests.mkdir()
-        for source in (root / "tests").glob("*.py"):
-            shutil.copy2(source, tests / source.name)
         # Synthetic sentinels exercise archive exclusions without copying the book.
         for relative in ("Hegel-SOL.pdf", "sources/source.pdf", "local-corpus/hegel/chapter.md",
                          "local-corpus/index.jsonl", ".sol-corpus-work/layout.xml",
@@ -216,6 +131,23 @@ class PackagingTests(unittest.TestCase):
                                            ".sol-analysis.json")), name)
             self.assertFalse(Path(name).name.endswith(".sqlite3")
                              or ".sqlite3-" in Path(name).name, name)
+
+    def test_source_archive_runs_its_research_contract_checks(self):
+        destination = Path(self.temporary.name) / "source-archive-check"
+        with tarfile.open(self.sdist) as archive:
+            # This archive was just built from our disposable source fixture.
+            archive.extractall(destination)
+        source = next(destination.iterdir())
+        for name in ("neovim.lua", "browser.js"):
+            self.assertTrue((source / "experiments" / "reader_surfaces" / name).is_file())
+        environment = dict(os.environ)
+        environment.pop("PYTHONPATH", None)
+        result = subprocess.run(
+            [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests",
+             "-p", "test_reader_surface_export_guards.py"],
+            cwd=source, env=environment, text=True, capture_output=True, timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_built_wheel_entry_points_import_and_display_help(self):
         unpacked = Path(self.temporary.name) / "wheel"
@@ -438,7 +370,8 @@ print(json.dumps({'query': result['query'], 'occurrences': result['totals']['occ
         stage.mkdir(parents=True)
         destination.mkdir()
         root = Path(__file__).resolve().parents[1]
-        selected = {"sol/__init__.py", "sol/corpus/__init__.py", "sol/corpus/contract.py"}
+        selected = {"sol/__init__.py", "sol/corpus/__init__.py", "sol/corpus/contract.py",
+                    "sol/corpus/errors.py", "sol/corpus/markdown.py"}
         selected.update(path for path in PACKAGE_FILES if path.startswith("sol/core/"))
         for filename in selected:
             target = stage / filename

@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from sol import core
 from sol.corpus import contract
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 RETIRED_A = "cccccccc-0000-4000-8000-000000000003"
@@ -31,6 +31,39 @@ class CoreProtocolTests(unittest.TestCase):
         contract.initialize_corpus_identity(self.corpus)
         self.snapshot = core.load_snapshot(self.corpus)
         self.payload = core.capture_reference(self.snapshot, self.identifier)
+
+    def test_batch_preserves_order_and_uses_one_verified_generation(self):
+        identifiers = [self.identifier, self.snapshot.records[0]["id"], self.identifier]
+        with patch.object(contract, "load_snapshot", wraps=contract.load_snapshot) as load:
+            payloads = core.capture_references(self.snapshot, identifiers)
+        self.assertEqual(load.call_count, 1)
+        self.assertEqual([p["reference"]["requested_id"] for p in payloads], identifiers)
+        self.assertEqual(payloads[0], self.payload)
+        self.assertIsNot(payloads[0], payloads[2])
+        with patch.object(contract, "load_snapshot", wraps=contract.load_snapshot) as load:
+            refs = core.check_references(self.snapshot, payloads)
+        self.assertEqual(load.call_count, 1)
+        self.assertEqual([r.requested_id for r in refs], identifiers)
+
+    def test_batch_refuses_bad_last_packet_and_generation_changes(self):
+        bad = copy.deepcopy(self.payload)
+        bad["generation"]["index_sha256"] = "0" * 64
+        with self.assertRaises(core.ProtocolError):
+            core.check_references(self.snapshot, [self.payload, bad])
+        for operation in (lambda: core.capture_references(self.snapshot, [self.identifier] * 3),
+                          lambda: core.check_references(self.snapshot, [self.payload] * 3)):
+            with patch.object(contract, "verify_snapshot_current",
+                              side_effect=contract.CorpusError("Changed during batch")), \
+                    self.assertRaises(core.ProtocolError) as caught:
+                operation()
+            self.assertEqual(caught.exception.code, "generation_changed")
+
+    def test_batch_input_is_bounded_and_not_a_lazy_callback(self):
+        for value in ([], "not an ID collection", iter([self.identifier]),
+                      [self.identifier] * (core.MAX_REFERENCE_BATCH + 1)):
+            with self.subTest(value=type(value).__name__), self.assertRaises(core.ProtocolError) as caught:
+                core.capture_references(self.snapshot, value)
+            self.assertEqual(caught.exception.code, "batch_limit")
 
     def rewrite(self, modify):
         """Generate an invented, internally consistent fixture without Markdown extras."""

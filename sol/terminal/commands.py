@@ -78,11 +78,12 @@ def main(arguments):
                 print(json.dumps({"selection": selection, "corpus": book.corpus_manifest,
                                   "records": records}, ensure_ascii=False, indent=2))
             elif options.markdown:
-                print("\n\n".join(record["markdown"] for record in records))
+                from sol.terminal.text import display_text
+                print(display_text("\n\n".join(record["markdown"] for record in records)))
             else:
                 text = _text(selection, records, options.plain)
                 if sys.stdout.isatty():
-                    from sol.workspace.reader import safe_output
+                    from sol.terminal.text import safe_output
                     text = safe_output(text)
                 print(text)
             return 0

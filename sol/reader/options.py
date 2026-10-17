@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+from enum import Enum
+import re
 from pathlib import Path
 
 from sol import __version__ as VERSION
@@ -88,3 +90,145 @@ def build_parser() -> argparse.ArgumentParser:
     output.add_argument("--plain", action="store_true", help="passage text without metadata or ANSI styling")
     output.add_argument("--json", action="store_true", help="structured output for scripts")
     return parser
+
+
+class ExecutionMode(str, Enum):
+    """One interpreted action, independent of the spelling used to select it."""
+    READER = "reader"
+    SHELL = "shell"
+    GUIDE = "guide"
+    STRUCTURE = "structure"
+    RANDOM = "random"
+    READ = "read"
+    FIRST = "first"
+    CAT = "cat"
+    SEARCH = "search"
+    PASSAGE = "passage"
+    INFO = "info"
+    SET_CORPUS = "set_corpus"
+    RESUME = "resume"
+    WORKSPACE_EXPORT = "workspace_export"
+    WORKSPACE_CHECK = "workspace_check"
+    WORKSPACE_BACKUP = "workspace_backup"
+    WORKSPACE_UPGRADE = "workspace_upgrade"
+    WORKSPACE_LIST = "workspace_list"
+    WORKSPACE_DELETE = "workspace_delete"
+    REVIEW_QUEUE = "review_queue"
+
+    @property
+    def interactive(self) -> bool:
+        return self in (ExecutionMode.READER, ExecutionMode.SHELL)
+
+
+def _selected_actions(args):
+    return [mode for mode in ExecutionMode
+            if mode not in (ExecutionMode.READER, ExecutionMode.SHELL)
+            and getattr(args, mode.value) is not None
+            and getattr(args, mode.value) is not False]
+
+
+def select_execution_mode(args: argparse.Namespace) -> ExecutionMode:
+    actions = _selected_actions(args)
+    if args.reader and (args.shell or actions):
+        raise ValueError("--reader cannot be combined with --shell or another action")
+    if actions:
+        return actions[0]
+    return ExecutionMode.SHELL if args.shell else ExecutionMode.READER
+
+
+def validate_options(args: argparse.Namespace) -> ExecutionMode:
+    management = bool(getattr(args, "workspace_list", False) or
+                      getattr(args, "workspace_delete", None) is not None)
+    if args.command:
+        if _selected_actions(args) or args.shell or args.none:
+            raise ValueError("guide cannot be combined with another action")
+        args.guide = True
+    if management:
+        # Management validation owns its smaller surface and runs before I/O.
+        return ExecutionMode.WORKSPACE_LIST if args.workspace_list else ExecutionMode.WORKSPACE_DELETE
+    if args.none and _selected_actions(args):
+        raise ValueError("-n/--none is a temporary interactive session; omit one-shot/guide actions")
+    mode = select_execution_mode(args)
+    args.reader = mode is ExecutionMode.READER
+    if args.reader:
+        if args.pdf is not None:
+            raise ValueError("--reader requires the indexed canonical corpus, not --pdf. "
+                             "Use sol -r --pdf PATH for a legacy random passage.")
+        if args.plain or args.json:
+            raise ValueError("--reader is interactive; omit --plain and --json")
+        if args.ui is not None or args.editing_mode is not None or args.source_pdf is not None:
+            raise ValueError("--reader uses its own keyboard view; omit --ui, --editing-mode and --source-pdf")
+    elif args.emphasis is not None:
+        raise ValueError("--emphasis requires --reader")
+    if args.shell and not args.none and args.pdf is not None:
+        raise ValueError("the persistent shell requires an indexed Markdown corpus, not --pdf. "
+                         "Use sol -r --pdf PATH for a legacy random passage.")
+    if args.none and (args.workspace is not None or args.actor is not None or args.workspace_dir is not None):
+        raise ValueError("-n/--none does not use a workspace or actor; omit workspace options")
+    if not args.shell and (args.ui is not None or args.editing_mode is not None):
+        raise ValueError("--ui and --editing-mode are available only in the shell")
+    if args.source_pdf is not None and (not args.shell or args.pdf is not None):
+        raise ValueError("--source-pdf is for source viewing in the canonical shell; omit --pdf and one-shot actions")
+    if args.word and args.search is None:
+        raise ValueError("--word requires --search")
+    if args.search is None and not args.review_queue and (args.within is not None or args.limit is not None):
+        raise ValueError("--within and --limit require --search or --review-queue")
+    if args.search is not None and not args.search.strip():
+        raise ValueError("search requires a nonempty query")
+    if args.limit is not None and not 1 <= args.limit <= 1000:
+        raise ValueError("--limit must be between 1 and 1000")
+    if args.context is not None:
+        if args.passage is None:
+            raise ValueError("--context requires --passage")
+        if not 0 <= args.context <= 10:
+            raise ValueError("--context must be between 0 and 10")
+    if args.depth is not None:
+        if not args.structure and not args.guide:
+            raise ValueError("--depth requires --structure or guide")
+        if not 0 <= args.depth <= 32:
+            raise ValueError("--depth must be between 0 and 32")
+    if args.json and (args.shell or args.guide):
+        raise ValueError("--json is not a shell/guide mode; use sol -r --json for a random passage")
+    if args.set_corpus is not None and (args.corpus is not None or args.pdf is not None):
+        raise ValueError("--set-corpus cannot be combined with --corpus or --pdf")
+    if args.workspace is None and not mode.interactive and (args.workspace_dir is not None or args.actor is not None or args.resume
+                                   or args.workspace_export or args.workspace_check or args.workspace_backup is not None
+                                   or args.workspace_upgrade is not None):
+        raise ValueError("workspace options require --workspace NAME")
+    if args.resume_revision is not None and (not args.resume or args.resume_revision < 1):
+        raise ValueError("--resume-revision requires --resume and a positive checkpoint revision")
+    if args.review_queue and args.pdf is not None:
+        raise ValueError("--review-queue requires the canonical corpus, not --pdf")
+    if args.workspace is not None:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", args.workspace):
+            raise ValueError("workspace name must contain 1–64 letters, numbers, underscores or hyphens")
+        if args.actor is not None and not args.actor.strip():
+            raise ValueError("--actor requires a nonempty name")
+        if args.pdf is not None or args.set_corpus is not None or args.guide or args.structure:
+            raise ValueError("--workspace requires the indexed corpus and cannot accompany --pdf, --set-corpus, or an outline action")
+        if args.search is not None or args.info is not None or args.cat is not None:
+            raise ValueError("--workspace is available for reading, --shell, --resume, and --workspace-export")
+        if args.context is not None:
+            raise ValueError("workspace reading does not yet save a context view; use --passage ID --context N without --workspace")
+    if args.workspace_export and args.plain:
+        raise ValueError("--workspace-export emits an artifact, not plain passage output; omit --plain")
+    if args.export_format is not None and not args.workspace_export:
+        raise ValueError("--export-format requires --workspace-export")
+    if args.workspace_export and args.export_format == "markdown" and args.json:
+        raise ValueError("--json cannot accompany a Markdown export; omit --json or choose --export-format json")
+    if args.include_passages and not (args.workspace_export and args.export_format == "markdown"):
+        raise ValueError("--include-passages requires --workspace-export --export-format markdown")
+
+    return mode
+
+
+def validate_workspace_management(args) -> None:
+    """Keep local-data management independent of book and reader setup."""
+    if not (args.workspace_list or args.workspace_delete is not None):
+        return
+    allowed = {"workspace_list", "workspace_delete", "workspace_dir", "json"}
+    incompatible = ["--" + key.replace("_", "-") for key, value in vars(args).items()
+                    if key not in allowed and value is not None and value is not False]
+    if incompatible:
+        raise ValueError("workspace listing/removal accepts only --workspace-dir and --json; omit "
+                         + ", ".join(incompatible))

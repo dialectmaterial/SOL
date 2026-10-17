@@ -565,12 +565,16 @@ comparison requires neither a saved name nor a new workspace record.
 
 ## Development checks
 
+The [contributor guide](../CONTRIBUTING.md) gives the current module map, shared
+test fixtures, archive checks and CI matrix. [Release notes](../CHANGELOG.md)
+record behavior changes and compatibility decisions.
+
 Use a separate environment in the project directory. Editable installation exposes the current package and installs the normal reader dependencies for testing:
 
 ~~~sh
 python3 -m venv .venv
 . .venv/bin/activate
-python3 -m pip install -e .
+python3 -m pip install -e . setuptools wheel
 python3 -m sol guide
 python3 -m unittest discover -s tests -v
 ~~~

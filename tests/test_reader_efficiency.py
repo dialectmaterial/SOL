@@ -86,7 +86,7 @@ class ReaderEfficiencyTests(unittest.TestCase):
         book.passages[0] = replace(book.passages[0], text='x', kind='formula', random_eligible=False)
         session = app.ReadingSession(book)
         with patch.object(app.re, 'findall', side_effect=AssertionError('No random token scan')), \
-                patch.object(app.random, 'choice', side_effect=AssertionError('No random choice')):
+                patch('sol.reader.actions.random.choice', side_effect=AssertionError('No random choice')):
             self.assertIs(session.read(('example.txt',), first=True), book.passages[0])
         self.assertEqual(session.path, ('example.txt',))
         self.assertEqual(session.cursor, 0)

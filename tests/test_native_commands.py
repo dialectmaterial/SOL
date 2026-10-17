@@ -17,7 +17,7 @@ import unittest
 from unittest.mock import patch
 
 from sol.reader import app
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 class NativeCommandsTests(unittest.TestCase):

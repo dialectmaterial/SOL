@@ -6,19 +6,14 @@ import json
 import stat
 import unittest
 
-import test_reader_surface_html as fixtures
+import fixtures_corpus as fixtures
 
 from experiments.reader_surfaces.common import sample_from_book, selection_packet
 from experiments.reader_surfaces.html import render_html, write_html
 from experiments.reader_surfaces.trials import ReadingTrial
 
 
-class ReaderSurfaceTrialHTMLTests(unittest.TestCase):
-    # Reuse only the disposable corpus helpers, not another TestCase's tests.
-    setUp = fixtures.ReaderSurfaceHTMLTests.setUp
-    rewrite_body = fixtures.ReaderSurfaceHTMLTests.rewrite_body
-    write_records = fixtures.ReaderSurfaceHTMLTests.write_records
-    add_note = fixtures.ReaderSurfaceHTMLTests.add_note
+class ReaderSurfaceTrialHTMLTests(fixtures.CorpusFixture, unittest.TestCase):
 
     def trial(self, sample=None):
         sample = sample if sample is not None else sample_from_book(self.book, count=1)

@@ -17,15 +17,10 @@ from sol.reader.typography import Typography
 
 from experiments.reader_surfaces import neovim
 from experiments.reader_surfaces.common import sample_from_book, selection_packet
-import test_reader_surface_html as fixtures
+import fixtures_corpus as fixtures
 
 
-class NeovimHostTests(unittest.TestCase):
-    setUp = fixtures.ReaderSurfaceHTMLTests.setUp
-    rewrite_body = fixtures.ReaderSurfaceHTMLTests.rewrite_body
-    write_records = fixtures.ReaderSurfaceHTMLTests.write_records
-    add_note = fixtures.ReaderSurfaceHTMLTests.add_note
-    files = fixtures.ReaderSurfaceHTMLTests.files
+class NeovimHostTests(fixtures.CorpusFixture, unittest.TestCase):
 
     def sample(self, count=1):
         return sample_from_book(self.book, count=count)

@@ -8,7 +8,7 @@ import json
 
 from sol.corpus.contract import CorpusSnapshot, verify_snapshot_current
 from sol.core.models import Book, Passage
-from sol.core.protocol import capture_reference, check_reference, decode_reference, encode_reference
+from sol.core.protocol import capture_reference, capture_references, check_reference, decode_reference, encode_reference
 from sol.core.references import resolve_record_reference, resolve_reference
 from sol.reader.actions import ReaderActions, TextSelection
 
@@ -40,13 +40,12 @@ def sample_from_book(book: Book, start: str | None = None, count: int = 24) -> S
 class CaptureExport:
     """One short-lived export over an owned graph, with no shared trust cache.
 
-    CORE capture already verifies the full generation, graph, binding and source
-    files. Do that once per distinct reference, not a second time as its own
-    receiver. Imported packets still use the unchanged full check_reference.
+    A declared sample captures its references together through CORE's bounded
+    batch API. Imported packets still use the unchanged full check_reference.
     Copies prevent callers from changing what was checked while it is rendered.
     """
 
-    def __init__(self, book: Book):
+    def __init__(self, book: Book, *, identifiers=None):
         if not isinstance(book.corpus_snapshot, CorpusSnapshot):
             raise ValueError("HTML export requires a verified corpus snapshot with explicit corpus identity")
         self.book = book
@@ -56,6 +55,18 @@ class CaptureExport:
         self._reader_ids = set()
         self.manifest = deepcopy(self.snapshot.manifest)
         self._closed = False
+        self._packets = None if identifiers is None else {
+            packet["reference"]["requested_id"]: packet
+            for packet in capture_references(self.snapshot, tuple(dict.fromkeys(identifiers)))
+        }
+
+    @classmethod
+    def for_sample(cls, sample):
+        identifiers = []
+        for passage in sample.passages:
+            identifiers.append(passage.identifier)
+            identifiers.extend(sample.book.canonical_records[passage.identifier].get("note_ids", []))
+        return cls(sample.book, identifiers=identifiers)
 
     def capture(self, identifier):
         if self._closed:
@@ -67,7 +78,13 @@ class CaptureExport:
         if key not in self._cache:
             # Serialization validates the existing protocol's shape, not a new
             # export format. CORE remains the producer of every reference.
-            payload = decode_reference(encode_reference(capture_reference(self.snapshot, identifier)))
+            if self._packets is None:
+                packet = capture_reference(self.snapshot, identifier)
+            else:
+                if key not in self._packets:
+                    raise ValueError("record was not included in this checked export batch")
+                packet = self._packets[key]
+            payload = decode_reference(encode_reference(packet))
             reference = resolve_record_reference(self.records, payload["reference"]["requested_id"])
             row = reference.record
             edition = json.dumps(self.snapshot.manifest["edition"], ensure_ascii=False,

@@ -15,7 +15,7 @@ from unittest.mock import patch
 from sol import core
 
 from experiments.reader_surfaces import common, html
-import test_reader_surface_html as fixtures
+import fixtures_corpus as fixtures
 
 
 RETIRED_A = "dddddddd-0000-4000-8000-000000000004"
@@ -23,13 +23,7 @@ RETIRED_B = "eeeeeeee-0000-4000-8000-000000000005"
 SECOND_PASSAGE = "ffffffff-0000-4000-8000-000000000006"
 
 
-class ReaderSurfaceExportGuardTests(unittest.TestCase):
-    # Reuse fixture construction, not its TestCase inheritance or test methods.
-    setUp = fixtures.ReaderSurfaceHTMLTests.setUp
-    rewrite_body = fixtures.ReaderSurfaceHTMLTests.rewrite_body
-    write_records = fixtures.ReaderSurfaceHTMLTests.write_records
-    add_note = fixtures.ReaderSurfaceHTMLTests.add_note
-    files = fixtures.ReaderSurfaceHTMLTests.files
+class ReaderSurfaceExportGuardTests(fixtures.CorpusFixture, unittest.TestCase):
 
     def records(self):
         return [json.loads(line) for line in
@@ -56,10 +50,11 @@ class ReaderSurfaceExportGuardTests(unittest.TestCase):
         next(record for record in records if record["id"] == note_id)["backlinks"].append(SECOND_PASSAGE)
         self.write_records(records)
         sample = common.sample_from_book(self.book, count=2)
-        with patch.object(common, "capture_reference", wraps=core.capture_reference) as capture, \
+        with patch.object(common, "capture_references", wraps=core.capture_references) as capture, \
                 patch.object(common, "check_reference", side_effect=AssertionError("fresh export checked twice")):
             rendered = html.render_html(sample)
-        requested = [call.args[1] for call in capture.call_args_list]
+        capture.assert_called_once()
+        requested = capture.call_args.args[1]
         self.assertCountEqual(requested, [self.identifier, SECOND_PASSAGE, note_id])
         self.assertEqual(requested.count(note_id), 1)
         self.assertIn(second["plain_text"], rendered)
@@ -197,11 +192,11 @@ class ReaderSurfaceExportGuardTests(unittest.TestCase):
         )
         for field, value in changes:
             with self.subTest(field=field):
-                def changed(snapshot, identifier):
-                    payload = core.capture_reference(snapshot, identifier)
-                    payload["reference"][field] = value
-                    return payload
-                with patch.object(common, "capture_reference", side_effect=changed), self.assertRaises(ValueError):
+                def changed(snapshot, identifiers):
+                    payloads = core.capture_references(snapshot, identifiers)
+                    payloads[0]["reference"][field] = value
+                    return payloads
+                with patch.object(common, "capture_references", side_effect=changed), self.assertRaises(ValueError):
                     html.render_html(common.sample_from_book(self.book, count=1))
 
     def test_captured_corpus_and_generation_bindings_cannot_be_mixed(self):
@@ -211,11 +206,11 @@ class ReaderSurfaceExportGuardTests(unittest.TestCase):
                                     ("generation", "index_sha256", "0" * 64),
                                     ("generation", "manifest_sha256", "0" * 64)):
             with self.subTest(group=group, field=field):
-                def changed(snapshot, identifier):
-                    payload = core.capture_reference(snapshot, identifier)
-                    payload[group][field] = value
-                    return payload
-                with patch.object(common, "capture_reference", side_effect=changed), self.assertRaises(ValueError):
+                def changed(snapshot, identifiers):
+                    payloads = core.capture_references(snapshot, identifiers)
+                    payloads[0][group][field] = value
+                    return payloads
+                with patch.object(common, "capture_references", side_effect=changed), self.assertRaises(ValueError):
                     html.render_html(common.sample_from_book(self.book, count=1))
 
     def test_source_edit_during_last_typography_projection_leaves_no_artifact(self):

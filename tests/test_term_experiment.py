@@ -15,7 +15,7 @@ from sol import core
 from sol.corpus import contract
 from sol.essence import (MAX_RESULT_BYTES, TermExperimentError, analyze_term,
                          check_term_result, decode_term_result, encode_term_result)
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 _GENERATED = {"markdown", "plain_text", "document", "context", "content_sha256"}

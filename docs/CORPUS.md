@@ -21,7 +21,7 @@ material.
 ## Create, inspect, and index
 
 Python 3.10 or newer is required. The converter needs Poppler's PDF tools and the
-CommonMark parser supplied by the `corpus` extra. Dependency requirements are
+CommonMark parser included in the normal installation (`corpus` remains a compatibility extra). Dependency requirements are
 defined once in `pyproject.toml`. On Debian/Ubuntu:
 
 ```sh
@@ -80,19 +80,24 @@ cd ~
 sol
 ```
 
-`sol` and `--shell` now open a persistent reader and ask for any missing workspace
-and actor labels. Initialize the corpus identity explicitly first, as described
-below. `-r` prints one random passage; `-n` opens a temporary shell without reading
-or creating actor profiles or workspace databases. Search and other one-shot
-actions retain their existing behavior. Redirected input requires both shell
-labels as flags, or a nonpersistent/one-shot action; setup does not consume piped
-commands to answer missing identity questions.
+`sol` opens the fullscreen reader and remembers the last selected actor and that
+actor's workspace for this corpus and source. Missing choices are requested on
+first use. `--shell` opens the optional book command interface. Initialize the
+corpus identity explicitly first, as described below. `-r` prints one random
+passage; `-n` opens a temporary reader without actor profiles or workspace
+databases. `--shell -n` chooses a temporary command interface. The fullscreen
+reader needs an interactive terminal; one-shot commands support pipes. Setup
+does not consume piped commands to answer missing identity questions.
 
 `--set-corpus` validates the corpus before saving its absolute path in
 `$XDG_CONFIG_HOME/sol/config.json`, with `~/.config/sol/config.json` as the default
 location. It stores a location, not a copy of the corpus. Run the command again if
 the corpus moves. `python3 -m sol --set-corpus DIRECTORY` supplies the same setting
 when running directly from the checkout.
+
+The argument is an indexed corpus directory, not a PDF filename. If only the
+supported source PDF is available, follow the conversion procedure above, then
+select the resulting `local-corpus` directory. `--set-corpus` never converts a PDF.
 
 Reader discovery proceeds through an explicit `--corpus`, the `SOL_CORPUS`
 environment variable, `./local-corpus`, the saved default, a local pipx

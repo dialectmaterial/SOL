@@ -12,7 +12,7 @@ from sol.core.corpus import load_corpus_book
 from experiments.reader_surfaces.__main__ import main
 from experiments.reader_surfaces.common import sample_from_book, selection_packet
 from experiments.reader_surfaces.html import write_html
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 class ReaderSurfaceCLITests(unittest.TestCase):

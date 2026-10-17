@@ -131,6 +131,14 @@ def save_corpus(directory: Path) -> tuple[Path, Path]:
     from sol.core.corpus import load_corpus_book
 
     corpus = directory.expanduser().resolve()
+    if corpus.suffix.lower() == ".pdf" and not corpus.is_dir():
+        from shlex import quote
+        raise ValueError(
+            "--set-corpus expects an indexed corpus directory containing corpus.json, not a PDF.\n"
+            "For the supported source PDF, first create a local corpus:\n"
+            f"  sol-corpus convert --pdf {quote(str(corpus))} --output local-corpus\n"
+            "Then select the resulting directory: sol --set-corpus local-corpus"
+        )
     load_corpus_book(corpus)
     path = config_path()
     temporary = None

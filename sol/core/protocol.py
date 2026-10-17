@@ -17,6 +17,7 @@ from sol.core.references import resolve_record_reference
 
 PROTOCOL_VERSION = 1
 MAX_REFERENCE_BYTES = 65536
+MAX_REFERENCE_BATCH = 1024
 _PROTOCOL = "sol.reference"
 
 
@@ -233,12 +234,13 @@ def _project(snapshot, reference):
     }
 
 
-def _resolve(snapshot, identifier):
+def _resolve(snapshot, identifier, records=None):
     if (not isinstance(identifier, str) or not 1 <= len(identifier.strip()) <= 36
             or not re.fullmatch(r"[0-9a-fA-F-]+", identifier.strip())):
         raise ProtocolError("A canonical record identifier is required", code="invalid_identifier")
     try:
-        return resolve_record_reference({record["id"]: record for record in snapshot.records}, identifier)
+        return resolve_record_reference(
+            records if records is not None else {record["id"]: record for record in snapshot.records}, identifier)
     except ValueError as error:
         raise ProtocolError(str(error), status="unresolved", code="unresolved_reference") from error
 
@@ -255,17 +257,47 @@ def _still_current(snapshot):
 
 def capture_reference(snapshot, identifier):
     """Capture a canonical record, including notes/editorial text and retirements."""
+    return capture_references(snapshot, [identifier])[0]
+
+
+def _batch(items):
+    if type(items) not in (list, tuple) or not 1 <= len(items) <= MAX_REFERENCE_BATCH:
+        raise ProtocolError(f"Reference batch requires a list or tuple of 1–{MAX_REFERENCE_BATCH} items",
+                            code="batch_limit")
+    return tuple(items)
+
+
+def capture_references(snapshot, identifiers):
+    """Capture an ordered bounded batch against one freshly verified generation.
+
+    Results are released only after a final disk check. There is no reusable
+    trust cache, and each result is an ordinary version-1 reference envelope.
+    """
+    identifiers = _batch(identifiers)
     fresh = _fresh_snapshot(snapshot)
-    reference = _resolve(fresh, identifier)
-    payload = _validate(_project(fresh, reference))
+    records = {record["id"]: record for record in fresh.records}
+    payloads = [_validate(_project(fresh, _resolve(fresh, identifier, records)))
+                for identifier in identifiers]
     _still_current(fresh)
-    return payload
+    return payloads
 
 
 def check_reference(snapshot, payload):
     """Return the canonical Reference only after exact local-generation agreement."""
-    payload = _validate(payload)
+    return check_references(snapshot, [payload])[0]
+
+
+def check_references(snapshot, payloads):
+    """Check a whole batch before releasing any resolved record to the caller."""
+    payloads = [_validate(payload) for payload in _batch(payloads)]
     fresh = _fresh_snapshot(snapshot)
+    records = {record["id"]: record for record in fresh.records}
+    references = [_check_on_snapshot(fresh, payload, records) for payload in payloads]
+    _still_current(fresh)
+    return references
+
+
+def _check_on_snapshot(fresh, payload, records):
     corpus = payload["corpus"]
     if corpus["id"] != fresh.corpus_id:
         raise ProtocolError("Reference belongs to another corpus", status="mismatch", code="corpus_mismatch")
@@ -277,10 +309,9 @@ def check_reference(snapshot, payload):
     if payload["generation"] != generation:
         raise ProtocolError("Reference was captured from another corpus generation; recapture deliberately",
                             status="stale", code="generation_changed")
-    reference = _resolve(fresh, payload["reference"]["requested_id"])
+    reference = _resolve(fresh, payload["reference"]["requested_id"], records)
     expected = _validate(_project(fresh, reference))["reference"]
     if _json(payload["reference"]) != _json(expected):
         raise ProtocolError("Reference target, chain, content or provenance disagrees with the canonical record",
                             status="mismatch", code="record_mismatch")
-    _still_current(fresh)
     return reference

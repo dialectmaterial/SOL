@@ -138,7 +138,7 @@ class CorpusReaderTests(unittest.TestCase):
         self.assertEqual(session.read(path, first=True).identifier, self.ids[4])
         self.assertEqual(session.move(1).identifier, self.ids[5])
         self.assertEqual(session.move(-1).identifier, self.ids[4])
-        with patch("sol.reader.app.random.choice", side_effect=lambda values: values[-1]):
+        with patch("sol.reader.actions.random.choice", side_effect=lambda values: values[-1]):
             self.assertEqual(session.read(path).identifier, self.ids[4])
 
     def test_default_corpus_never_uses_pdf_or_markdown_parser(self) -> None:
@@ -343,7 +343,7 @@ class CorpusReaderTests(unittest.TestCase):
         self.assertEqual(pending.kind, "paragraph")
         self.assertFalse(pending.random_eligible)
         session = sol.ReadingSession(book)
-        with patch("sol.reader.app.random.choice", side_effect=lambda values: values[-1]):
+        with patch("sol.reader.actions.random.choice", side_effect=lambda values: values[-1]):
             self.assertEqual(session.read(()).identifier, self.ids[2])
         self.assertEqual(session.read(pending.path, first=True).identifier, self.ids[4])
         self.assertEqual(session.move(1).identifier, self.ids[5])

@@ -16,7 +16,7 @@ import tempfile
 import unittest
 
 from sol.corpus import contract
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 PROGRAM = r'''

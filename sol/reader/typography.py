@@ -42,7 +42,7 @@ def _ordered(styles) -> tuple[str, ...]:
 def _project(tokens: list) -> tuple[str, tuple[TypographySpan, ...]]:
     # Reuse the contract's HTML visibility, especially annotated note callouts.
     # The final independent projection check below catches any contract drift.
-    from sol.corpus.contract import _VisibleHTML
+    from sol.corpus.markdown import VisibleHTML
 
     decorated: list[tuple[str, tuple[str, ...]]] = []
 
@@ -50,7 +50,7 @@ def _project(tokens: list) -> tuple[str, tuple[TypographySpan, ...]]:
         ordered = _ordered(styles)
         decorated.extend((character, ordered) for character in value)
 
-    class StyledHTML(_VisibleHTML):
+    class StyledHTML(VisibleHTML):
         def __init__(self, current_styles):
             super().__init__()
             self.counts: dict[str, int] = {}
@@ -180,12 +180,13 @@ def map_typography(markdown: str, plain_text: str) -> Typography:
     """
     if not isinstance(markdown, str) or not isinstance(plain_text, str):
         return Typography(degraded=True, reason="Canonical typography source is unavailable.")
-    from sol.corpus.contract import CorpusError, _commonmark_tokens, _plain_tokens
+    from sol.corpus.errors import CorpusError
+    from sol.corpus.markdown import commonmark_tokens, tokens_plain_text
     try:
-        tokens = _commonmark_tokens(markdown)
+        tokens = commonmark_tokens(markdown)
     except CorpusError:
         return Typography(degraded=True, reason="CommonMark typography parser is unavailable.")
-    if _plain_tokens(tokens) != plain_text:
+    if tokens_plain_text(tokens) != plain_text:
         return Typography(degraded=True, reason="Canonical Markdown and indexed text disagree; plain text shown.")
     projected, spans = _project(tokens)
     if projected != plain_text:

@@ -9,7 +9,7 @@ from unittest.mock import patch
 from experiments.reader_surfaces.__main__ import main
 from sol.core.corpus import load_corpus_book
 from sol.corpus import contract
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 class NeovimReaderCLITests(unittest.TestCase):

@@ -40,10 +40,10 @@ class ShellEntryTests(unittest.TestCase):
                 patch('sol.reader.app.discover_corpus', return_value=Path('/invented/corpus')), \
                 patch('sol.reader.app.load_corpus_book', return_value=self.book), \
                 patch('sol.reader.app.load_book', side_effect=AssertionError('PDF extraction forbidden')), \
-                patch('sol.reader.app.interactive_input_available', return_value=interactive), \
+                patch('sol.reader.launch.interactive_input_available', return_value=interactive), \
                 patch('sol.terminal.reader.validate_reader_environment'), \
                 patch('sol.reader.app.run_reader', side_effect=self.launch_reader), \
-                patch('sol.reader.app.install_completion', return_value=lambda: None), \
+                patch('sol.reader.shell.install_completion', return_value=lambda: None), \
                 patch('builtins.input', side_effect=commands):
             status = sol.main(arguments)
         return status, stdout.getvalue(), stderr.getvalue()

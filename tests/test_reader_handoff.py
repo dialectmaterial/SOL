@@ -20,7 +20,7 @@ from sol.terminal.handoff import submit_return
 from sol.terminal.prompt import CompletionCatalog
 from sol.workspace.reader import WorkspaceReader
 from sol.workspace.store import Workspace, WorkspaceConflict
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 SECOND = "cccccccc-0000-4000-8000-000000000003"
@@ -134,7 +134,7 @@ class ReaderHandoffTests(unittest.TestCase):
         def emit(value="", end="\n"):
             output.write(str(value) + end)
 
-        with patch.object(app, "ReadingSession", return_value=session):
+        with patch("sol.reader.shell.ReadingSession", return_value=session):
             status = app.run_shell(self.book, 80, workspace_reader=reader,
                                    read_command=read, write_output=emit, essence_pane=pane)
         self.assertEqual(status, 0)

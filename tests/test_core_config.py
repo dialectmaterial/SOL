@@ -39,6 +39,17 @@ class CoreConfigTests(unittest.TestCase):
         self.assertIsNone(config.discover_corpus())
         self.assertFalse((self.root / "configuration").exists())
 
+    def test_pdf_setup_explains_conversion_without_writing_configuration(self):
+        pdf = self.cwd / "my source.PDF"
+        pdf.write_bytes(b"Invented PDF sentinel")
+        before = pdf.read_bytes()
+        with self.assertRaisesRegex(ValueError, "expects an indexed corpus directory") as caught:
+            config.save_corpus(pdf)
+        self.assertIn("sol-corpus convert --pdf", str(caught.exception))
+        self.assertIn("sol --set-corpus local-corpus", str(caught.exception))
+        self.assertEqual(pdf.read_bytes(), before)
+        self.assertFalse((self.root / "configuration").exists())
+
     def test_explicit_and_environment_choices_bypass_broken_saved_pointer(self):
         self.saved("{broken")
         explicit = self.root / "absent-explicit"

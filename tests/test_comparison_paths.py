@@ -35,7 +35,7 @@ class ComparisonPathTests(unittest.TestCase):
                              workspace_reader=self.reader, **kwargs)
 
     def test_virtual_files_are_two_complete_ordered_sides(self):
-        with patch("sol.reader.app.random.choice", side_effect=AssertionError("no random sampling")), \
+        with patch("sol.reader.actions.random.choice", side_effect=AssertionError("no random sampling")), \
                 patch.object(self.store, "export", wraps=self.store.export) as export:
             snapshot = self.capture()
         export.assert_called_once_with()
@@ -124,7 +124,7 @@ class ComparisonPathTests(unittest.TestCase):
     def shell(self, commands, *, workspace=True):
         output = StringIO()
         iterator = iter(commands)
-        with redirect_stdout(output), patch("sol.reader.app.install_completion", return_value=lambda: None):
+        with redirect_stdout(output), patch("sol.reader.shell.install_completion", return_value=lambda: None):
             result = app.run_shell(self.book, 80, workspace_reader=self.reader if workspace else None,
                                    read_command=lambda prompt: next(iterator), comparison_pane=self.pane)
         self.assertEqual(result, 0)

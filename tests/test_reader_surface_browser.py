@@ -13,7 +13,7 @@ from sol.core.corpus import load_corpus_book
 from sol.corpus import contract
 from experiments.reader_surfaces.common import sample_from_book, validate_packet
 from experiments.reader_surfaces.html import write_html
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 @unittest.skipUnless(os.environ.get("SOL_TEST_LIVE_SURFACE_BROWSER") == "1", "real browser proof is explicit opt-in")

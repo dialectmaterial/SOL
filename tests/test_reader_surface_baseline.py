@@ -9,7 +9,7 @@ from unittest.mock import patch
 from experiments.reader_surfaces.__main__ import main
 from sol.corpus import contract
 from sol.reader.actions import ReaderActions
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 from test_reader_actions import IDS, invented_book
 
 

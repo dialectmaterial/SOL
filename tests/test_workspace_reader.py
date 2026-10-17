@@ -64,6 +64,42 @@ class WorkspaceReaderTests(unittest.TestCase):
         self.session = sol.ReadingSession(self.book)
         self.reader = self.make_reader()
 
+    def test_workspace_services_are_usable_without_command_syntax(self):
+        self.session.read((), first=True)
+        first, second = self.book.passages[:2]
+        ref = self.reader.save_bookmark("start", self.session)
+        self.assertEqual(ref.requested_id, first.identifier)
+        note = self.reader.add_annotation("An attributed inquiry.", self.session)
+        self.assertEqual(note["target_id"], first.identifier)
+        self.reader.save_comparison("question", [first.identifier, second.identifier], "What changes?")
+        self.assertEqual(self.store.get_comparison("question")["target_ids"],
+                         [first.identifier, second.identifier])
+        review = self.reader.record_review("inspected", "Checked the source.", self.session)
+        self.assertEqual(review["target_id"], first.identifier)
+        relation = self.reader.add_relation(first.identifier, "compares-with", second.identifier, "An inquiry.")
+        self.assertEqual(relation["source_id"], first.identifier)
+        self.reader.remove_bookmark("start")
+        self.assertIsNone(self.store.get_bookmark("start"))
+
+    def test_direct_authored_services_preserve_actor_requirement(self):
+        self.session.read((), first=True)
+        reader = self.make_reader(actor=None)
+        first, second = self.book.passages[:2]
+        before = self.store.export()
+        before.pop("exported_at")
+        operations = (
+            lambda: reader.add_annotation("A note", self.session),
+            lambda: reader.save_comparison("q", [first.identifier, second.identifier], "A question"),
+            lambda: reader.record_review("inspected", "A review", self.session),
+            lambda: reader.add_relation(first.identifier, "compares-with", second.identifier, "A reason"),
+        )
+        for operation in operations:
+            with self.assertRaisesRegex(ValueError, "requires --actor"):
+                operation()
+        after = self.store.export()
+        after.pop("exported_at")
+        self.assertEqual(after, before)
+
     def make_reader(self, store=None, actor='Ada'):
         return WorkspaceReader(self.book, store or self.store, actor, sol.resolve_path,
                                sol.display_path, sol.render_passage)
@@ -71,7 +107,7 @@ class WorkspaceReaderTests(unittest.TestCase):
     def shell(self, commands, reader=None):
         stdout = StringIO()
         with redirect_stdout(stdout), patch('builtins.input', side_effect=commands), \
-                patch('sol.reader.app.install_completion', return_value=lambda: None):
+                patch('sol.reader.shell.install_completion', return_value=lambda: None):
             status = sol.run_shell(self.book, 80, workspace_reader=reader or self.reader)
         return status, stdout.getvalue()
 
@@ -269,7 +305,7 @@ class WorkspaceReaderTests(unittest.TestCase):
     def test_standard_shell_never_opens_workspace_storage(self):
         with patch('sol.workspace.store.Workspace', side_effect=AssertionError('No database for ordinary shell')), \
                 patch('builtins.input', side_effect=['first /being', 'exit']), \
-                patch('sol.reader.app.install_completion', return_value=lambda: None):
+                patch('sol.reader.shell.install_completion', return_value=lambda: None):
             status, _, stderr = self.main(['--shell', '-n'])
         self.assertEqual(status, 0, stderr)
 
@@ -312,8 +348,8 @@ class WorkspaceReaderTests(unittest.TestCase):
                 return command
             stdout = StringIO()
             with redirect_stdout(stdout), patch('builtins.input', side_effect=entered), \
-                    patch('sol.reader.app.ReadingSession', return_value=self.session), \
-                    patch('sol.reader.app.install_completion', return_value=lambda: None):
+                    patch('sol.reader.shell.ReadingSession', return_value=self.session), \
+                    patch('sol.reader.shell.install_completion', return_value=lambda: None):
                 self.assertEqual(sol.run_shell(self.book, 80, workspace_reader=self.reader), 0)
         output = stdout.getvalue()
         self.assertIn('sol: ', output)
@@ -475,7 +511,7 @@ class WorkspaceReaderTests(unittest.TestCase):
             return next(commands)
         def emit(*values, **options):
             print(*values, file=stdout, **options)
-        with patch('sol.reader.app.install_completion', side_effect=AssertionError('Custom adapter owns completion')):
+        with patch('sol.reader.shell.install_completion', side_effect=AssertionError('Custom adapter owns completion')):
             status = sol.run_shell(self.book, 80, workspace_reader=self.reader,
                                    read_command=read_command, write_output=emit)
         self.assertEqual(status, 0)
@@ -568,7 +604,7 @@ class WorkspaceReaderTests(unittest.TestCase):
 
     def test_changed_canonical_generation_refuses_writes_without_reading_pdf(self):
         import sol.corpus.contract as contract
-        from test_packaging import write_runtime_corpus
+        from fixtures_corpus import write_runtime_corpus
         corpus = self.directory / 'actual-corpus'
         write_runtime_corpus(corpus)
         contract.initialize_corpus_identity(corpus)
@@ -595,7 +631,7 @@ class WorkspaceReaderTests(unittest.TestCase):
 
     def test_source_changed_during_draft_refuses_one_insert_and_preserves_checkpoint(self):
         import sol.corpus.contract as contract
-        from test_packaging import write_runtime_corpus
+        from fixtures_corpus import write_runtime_corpus
         corpus = self.directory / 'draft-corpus'
         write_runtime_corpus(corpus)
         contract.initialize_corpus_identity(corpus)

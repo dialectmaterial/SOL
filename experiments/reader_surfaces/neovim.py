@@ -117,7 +117,7 @@ def build_payload(sample: Sample, width=72, restore=None):
         raise ValueError("Neovim reader proof needs distinct canonical passages")
     if restore is not None:
         _check_sample_packet(sample, restore)
-    capture = CaptureExport(sample.book)
+    capture = CaptureExport.for_sample(sample)
     records = []
     for passage in sample.passages:
         payload = record_payload(sample, passage, capture=capture)

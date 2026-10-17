@@ -26,8 +26,8 @@ language, an ontology of the Logic, or the canonical meaning of a passage.
 The `sol --reader` view is the visible BEING reader slice, running directly in
 capable terminals including Alacritty; Kitty is an optional host, not a dependency:
 continuous canonical text, local selection, search, and a bounded reading trail.
-It uses the existing reader-action seam and `shell` extra; the default command
-interface and existing panes remain available. Its selections and trail are
+It is the default `sol` interface and uses the existing reader-action seam.
+The explicit `--shell` command interface and existing panes remain available. Its selections and trail are
 session-local. Schema 3 adds source-bound cursor and viewport positions through
 the existing checkpoint revision; older workspaces stay in their original format
 unless explicitly upgraded into a separate copy. [Reader view](READER_VIEW.md).
@@ -116,7 +116,7 @@ Workspace storage remains the responsibility of BEING's existing operations. Reu
 
 A Python import package and an installable distribution are different things. Creating `sol/core/` establishes a code boundary; it does not itself create a `sol-core` wheel or make parts of the current wheel independently selectable. Separate build metadata and archive contents must enforce that later. Proposed distribution names are design labels, not instructions to install similarly named projects from a package index. [Python Packaging: distribution versus import packages](https://packaging.python.org/en/latest/discussions/distribution-package-vs-import-package/).
 
-The existing `shell` and `corpus` extras add optional dependencies to the aggregate installation. Extras do not remove application files from its wheel. Future split packages will need deliberate ownership of each module, compatible dependency ranges, and console-script entry points, without two wheels accidentally owning the same file. [Python Packaging: dependencies and extras](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#dependencies-and-requirements).
+The `shell` and `corpus` extras remain compatibility aliases: their dependencies are now included in the normal reader installation. The `extraction` extra adds the optional extraction engine. Extras do not remove application files from the wheel. Future split packages will need deliberate ownership of each module, compatible dependency ranges, and console-script entry points, without two wheels accidentally owning the same file. [Python Packaging: dependencies and extras](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#dependencies-and-requirements).
 
 pipx installs applications into isolated environments. Installing two SOL applications separately with pipx will not make one application's Python imports visible to the other. Each must declare its own compatible CORE dependency. In-process integration can use an explicitly configured shared environment or deliberate injection; communication between separately launched applications uses documented, versioned messages. CORE's reference protocol supplies the JSON contract used by the explicit local handoff, not shared Python imports, workspace synchronization, or automatic return navigation. [How pipx works](https://pipx.pypa.io/stable/explanation/how-pipx-works.html).
 
@@ -129,7 +129,7 @@ NixOS remains one possible future reproducible environment, not the meaning of H
 Implemented foundations include the extraction adapter and reviewed-copy proof,
 the CORE/action seam, the version-1 reference contract, the explicit local shell
 bridge, and a bounded [term study](TERM_STUDY.md) exercising that bridge. The
-[optional reader view](READER_VIEW.md) adds the first BEING reading slice. These
+[reader view](READER_VIEW.md) provides the default BEING reading surface. These
 are bounded results, not completion of every architecture-handoff phase.
 
 The immediate priority is sustained use of the reader: readable prose, coherent

@@ -123,3 +123,22 @@ terminal adapter, not CORE. Automatic navigation, analysis-result ingestion,
 workspace synchronization, and authenticated actor transfer are not supplied by
 this reference protocol. A substantial ESSENCE application needs its own bounded
 result contract and review policy before any personal-write integration.
+
+## Bounded batch operations
+
+`sol.core.capture_references(snapshot, identifiers)` and
+`check_references(snapshot, payloads)` accept a list or tuple of 1 to 1,024 items.
+They preserve input order, requested identities and complete retirement chains.
+Their outputs are ordinary version-1 envelopes or resolved references; there is
+no additional wire format or authority.
+
+Each call loads and verifies one current generation, checks its agreement with
+the supplied caller-owned snapshot, and verifies the disk generation again before
+returning any result. A bad item or changed generation refuses the entire batch.
+There is no shared trust cache. The existing single-record functions use the same
+checks through a batch of one.
+
+Reader sample exports declare the passages and linked notes together, then retain
+their independent final graph, projection and disk checks before writing an
+artifact. Batch verification does not permit a renderer to change source text,
+offsets, provenance or identities after capture.

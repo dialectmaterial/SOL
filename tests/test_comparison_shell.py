@@ -30,7 +30,7 @@ class ComparisonShellTests(unittest.TestCase):
 
     def shell(self, commands, reader=True, **options):
         output = StringIO()
-        with redirect_stdout(output), patch('sol.reader.app.install_completion', return_value=lambda: None):
+        with redirect_stdout(output), patch('sol.reader.shell.install_completion', return_value=lambda: None):
             iterator = iter(commands)
             status = app.run_shell(self.book, 80, workspace_reader=self.reader if reader else None,
                                    read_command=lambda prompt: next(iterator), comparison_pane=self.pane,
@@ -98,8 +98,8 @@ class ComparisonShellTests(unittest.TestCase):
         self.assertIn('does not take a name', output)
 
     def test_split_change_reflows_without_creating_another_checkpoint(self):
-        with patch('sol.reader.app.sensible_width', side_effect=[80, 80, 40, 40]), \
-                patch('sol.reader.app.render_passage', wraps=app.render_passage) as render:
+        with patch('sol.reader.shell.sensible_width', side_effect=[80, 80, 40, 40]), \
+                patch('sol.reader.shell.render_passage', wraps=app.render_passage) as render:
             self.shell(['first /being', 'compare open "ground inquiry"', 'exit'], auto_width=True)
         self.assertEqual([call.args[1] for call in render.call_args_list], [80, 40])
         self.assertEqual(len(self.store.export()['history']), 1)

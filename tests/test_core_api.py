@@ -10,7 +10,7 @@ import tempfile
 import unittest
 
 import sol.core as core
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 class PublicCoreTests(unittest.TestCase):

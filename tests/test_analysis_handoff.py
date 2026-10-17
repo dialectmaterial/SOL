@@ -15,7 +15,7 @@ from sol import core
 from sol.corpus import contract
 from sol.reader.actions import ReaderActions
 from sol.terminal.handoff import HandoffSession
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 class AnalysisHandoffTests(unittest.TestCase):

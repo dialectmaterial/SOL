@@ -142,7 +142,7 @@ class ReaderStartupMemoryTests(unittest.TestCase):
         with redirect_stdout(output), redirect_stderr(errors), \
                 patch.object(app, "discover_corpus", return_value=Path("/invented/corpus")), \
                 patch.object(app, "load_corpus_book", return_value=self.book), \
-                patch.object(app, "interactive_input_available", return_value=interactive), \
+                patch("sol.reader.launch.interactive_input_available", return_value=interactive), \
                 patch("sol.terminal.reader.validate_reader_environment"), \
                 patch.object(app, "run_reader", side_effect=launch), \
                 patch("builtins.input", side_effect=responses) as prompt:

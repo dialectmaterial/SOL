@@ -13,6 +13,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 import sol.reader.app as sol
+from sol import __version__
 
 
 def synthetic_book():
@@ -61,7 +62,7 @@ class TerminalTests(unittest.TestCase):
     def run_shell(self, commands, width=80, plain=False, color=False):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout), patch('builtins.input', side_effect=commands), \
-                patch('sol.reader.app.install_completion', return_value=lambda: None):
+                patch('sol.reader.shell.install_completion', return_value=lambda: None):
             status = sol.run_shell(self.book, width, plain, color)
         return status, stdout.getvalue()
 
@@ -210,7 +211,7 @@ class TerminalTests(unittest.TestCase):
         self.assertTrue(rendered.isascii())
         self.assertNotIn('\x1b', rendered)
         for field in (
-                'OS: SOL (concept preview)', 'Shell: SOL-shell ' + sol.VERSION,
+                'OS: SOL (concept preview)', 'Shell: SOL-shell ' + __version__,
                 'Stage: BEING', 'Passages: 4', 'Location: /ESSENCE',
                 'Kernel: dialectic [placeholder]', 'Packages: [placeholder]',
                 'Terminal: [placeholder]', 'Theme: [placeholder]'):
@@ -340,7 +341,7 @@ class TerminalTests(unittest.TestCase):
         session = sol.ReadingSession(self.book)
         session.read(('BEING',), first=True)
         self.assertIs(session.move(1), formula)
-        with patch('sol.reader.app.random.choice', side_effect=lambda indices: indices[-1]) as choose:
+        with patch('sol.reader.actions.random.choice', side_effect=lambda indices: indices[-1]) as choose:
             self.assertIs(session.read(('BEING',)), self.third)
         self.assertEqual(choose.call_args.args[0], [0, 2])
 
@@ -388,7 +389,7 @@ class TerminalTests(unittest.TestCase):
             'cd .', 'cd /being', 'cd /BEING', 'where', 'next', 'where',
             'open 2', 'where', 'pwd', 'exit',
         ]
-        with patch('sol.reader.app.ReadingSession', return_value=session):
+        with patch('sol.reader.shell.ReadingSession', return_value=session):
             status, output = self.run_shell(commands)
         self.assertEqual(status, 0)
         for position in (1, 2, 3):
@@ -400,7 +401,7 @@ class TerminalTests(unittest.TestCase):
 
     def test_shell_root_noop_navigation_preserves_reading_selection(self):
         session = sol.ReadingSession(self.book)
-        with patch('sol.reader.app.ReadingSession', return_value=session):
+        with patch('sol.reader.shell.ReadingSession', return_value=session):
             status, output = self.run_shell([
                 'first', 'next', 'cd /', 'up', 'cd .', 'where', 'pwd', 'exit',
             ])
@@ -448,8 +449,8 @@ class TerminalTests(unittest.TestCase):
             'neofetch', 'where', 'next', 'where', 'open 2', 'where', 'pwd', 'exit',
         ]
         session = sol.ReadingSession(self.book)
-        with patch('sol.reader.app.ReadingSession', return_value=session), \
-                patch('sol.reader.app.render_neofetch', wraps=sol.render_neofetch) as render:
+        with patch('sol.reader.shell.ReadingSession', return_value=session), \
+                patch('sol.reader.shell.render_neofetch', wraps=sol.render_neofetch) as render:
             status, output = self.run_shell(commands)
         self.assertEqual(status, 0)
         render.assert_called_once_with(self.book, ('BEING',), 80, False)
@@ -489,7 +490,7 @@ class TerminalTests(unittest.TestCase):
 
     def test_cli_plain_shell_keeps_neofetch_art_and_suppresses_color(self):
         with patch('builtins.input', side_effect=['neofetch', 'exit']), \
-                patch('sol.reader.app.install_completion', return_value=lambda: None), \
+                patch('sol.reader.shell.install_completion', return_value=lambda: None), \
                 patch('sol.reader.app.terminal_color', return_value=True):
             status, output, error = self.run_main(['--corpus', 'synthetic', '--shell', '-n', '--plain'])
         self.assertEqual(status, 0, error)

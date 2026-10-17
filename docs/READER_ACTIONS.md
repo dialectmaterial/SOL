@@ -5,6 +5,14 @@ to that reader, not the application's governing architecture. The current
 `sol` opens the full-screen reader by default; `sol --shell` retains the optional
 command interface.
 
+Startup dispatch lives in `sol.reader.app`; argument interpretation and explicit
+execution modes live in `sol.reader.options`. Interactive onboarding belongs to
+`sol.reader.launch`, the optional command loop to `sol.reader.shell`, and one-shot
+text presentation to `sol.reader.render`. These interfaces use the same actions.
+Workspace writes have service methods on `WorkspaceReader`; their command syntax
+and summaries live in `sol.workspace.commands`. See [contributing](../CONTRIBUTING.md)
+for the module map and verification procedure.
+
 `sol.reader.actions` now owns paragraph-reading state independently of the
 command loop: a `ReadingSession`, semantic source cursor, viewport anchor, browsing
 location, previous browsing location, and latest search results. `ReaderActions`

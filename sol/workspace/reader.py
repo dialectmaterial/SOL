@@ -6,19 +6,17 @@ them. Missing references are reported, never reconciled by text similarity.
 """
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
-import shlex
 import textwrap
-import unicodedata
 
 from sol.core.references import Reference, resolve_reference
 from sol.workspace.store import Workspace, WorkspaceError, _position
+from sol.terminal.text import safe_output
 
 
 def workspace_path(name: str, directory: Path | None = None) -> Path:
@@ -44,17 +42,6 @@ class AnnotationEdit:
     body: str
 
 
-def safe_output(text: str) -> str:
-    """Show literal source/user text without terminal control-code injection."""
-    result = []
-    for character in text:
-        if unicodedata.bidirectional(character) in {"LRE", "RLE", "LRO", "RLO", "PDF", "LRI", "RLI", "FSI", "PDI"}:
-            result.append(f"\\u{ord(character):04x}")
-        elif character not in "\n\t" and (ord(character) < 32 or 127 <= ord(character) <= 159):
-            result.append(f"\\x{ord(character):02x}")
-        else:
-            result.append(character)
-    return "".join(result)
 
 
 def render_review_queue(rows, width=80):
@@ -69,51 +56,6 @@ def render_review_queue(rows, width=80):
                       "Latest reader testimony: " + json.dumps(row['latest_review'], ensure_ascii=False)])
     return safe_output("\n".join(textwrap.fill(line, width=width, break_on_hyphens=False) if line else ""
                                  for line in lines))
-
-
-class CommandParser(argparse.ArgumentParser):
-    def error(self, message):
-        raise ValueError(message)
-
-
-@dataclass
-class CommandResult:
-    text: str = ""
-    open_id: str | None = None
-
-
-WORKSPACE_COMMANDS = {"workspace", "bookmark", "note", "compare", "review", "relate"}
-WORKSPACE_HELP = """workspace                         workspace identity and storage location
-workspace export / check          portable JSON / reference health report
-workspace export --format markdown [--include-passages]
-                                  readable inquiry; current excerpts are optional
-workspace backup FILE.sqlite3     create a verified, non-overwriting backup
-workspace upgrade FILE.sqlite3    upgrade an older workspace into a separate copy
-workspace history --limit N       recent reading checkpoints (default 20)
-resume [REVISION]                 latest position / historical position as new visit
-bookmark add NAME [ID]             save current passage or explicit record
-bookmark set NAME [ID]             explicitly replace a bookmark
-bookmark list / open NAME / remove NAME
-note add TEXT [--on ID]            attributed personal annotation
-note draft [--on ID]               multiline note (enhanced prompt; Ctrl-S saves)
-note list [--on ID] / show NOTE_ID
-note edit NOTE_ID [TEXT --expect-revision N]
-                                  edit own note; omit TEXT for enhanced editor
-note history NOTE_ID              inspect preserved note revisions
-compare save NAME ID ID... --question TEXT
-compare list / show NAME           saved, ordered passage comparison
-compare PATH_A PATH_B              compare complete files; Tab completes paths
-compare open / close              refresh the last desk / close it
-compare open NAME                 open a saved passage comparison
-review show [ID]                   canonical Markdown and source provenance
-review record OUTCOME --issue TEXT [--on ID]
-review list [--on ID]              version-aware reader review testimony
-review queue [--within PATH] --limit N
-                                  canonical pending flags, independent of testimony
-relate add ID KIND ID --reason TEXT
-relate list [--on ID]              attributed directed relations
-Authored writes require an actor chosen at setup or with --actor NAME.
-Review outcomes: inspected, correction_needed, verified. No corpus edits occur."""
 
 
 class WorkspaceReader:
@@ -432,236 +374,46 @@ class WorkspaceReader:
             lines.insert(2, "WARNING: the corpus changed on disk; this is the previously loaded record.")
         return "\n".join(lines)
 
+    def save_bookmark(self, name, session, identifier=None, *, replace=False):
+        self.ensure_corpus_current()
+        ref = self.current_reference(session, identifier)
+        self.book.find_passage(ref.target_id)
+        self.store.set_bookmark(name, ref.requested_id, replace=replace)
+        return ref
+
+    def remove_bookmark(self, name):
+        self.ensure_corpus_current()
+        self.store.delete_bookmark(name)
+
+    def add_annotation(self, body, session, identifier=None):
+        self.require_author()
+        ref = self.current_reference(session, identifier)
+        return self.store.add_annotation(ref.requested_id, body, ref.record["content_sha256"])
+
+    def save_comparison(self, name, identifiers, question):
+        self.require_author()
+        if not isinstance(question, str) or not question.strip():
+            raise ValueError("comparison requires a nonempty question")
+        refs = [resolve_reference(self.book, value) for value in identifiers]
+        return self.store.save_comparison(name, [ref.requested_id for ref in refs], question)
+
+    def record_review(self, outcome, issue, session, identifier=None):
+        self.require_author()
+        if not isinstance(issue, str) or not issue.strip():
+            raise ValueError("review testimony requires a nonempty issue or inspection description")
+        ref = self.current_reference(session, identifier)
+        return self.store.add_review(ref.requested_id, outcome, issue, ref.record["content_sha256"],
+                                     self.book.corpus_manifest["source"]["sha256"])
+
+    def add_relation(self, source, kind, target, reason):
+        self.require_author()
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("a reader-asserted relation requires a nonempty reason")
+        source_ref = resolve_reference(self.book, source)
+        target_ref = resolve_reference(self.book, target)
+        return self.store.add_relation(source_ref.requested_id, target_ref.requested_id, kind, reason)
+
     def execute(self, verb, arguments, session):
-        parser = CommandParser(prog=verb, add_help=False)
-        if verb == "workspace":
-            parser.add_argument("action", choices=["export", "history", "check", "backup", "upgrade"], nargs="?")
-            parser.add_argument("destination", nargs="?", type=Path)
-            parser.add_argument("--limit", type=int)
-            parser.add_argument("--format", choices=('json', 'markdown'))
-            parser.add_argument("--include-passages", action='store_true')
-            options = parser.parse_args(arguments)
-            if (options.format is not None or options.include_passages) and options.action != 'export':
-                raise ValueError('--format and --include-passages are only available for workspace export')
-            if options.include_passages and options.format != 'markdown':
-                raise ValueError('--include-passages requires workspace export --format markdown')
-            if options.action in {"backup", "upgrade"}:
-                if options.destination is None or options.limit is not None:
-                    raise ValueError(f"workspace {options.action} requires FILE.sqlite3 and does not accept --limit")
-                if options.action == "upgrade":
-                    self.ensure_corpus_current()
-                    requested = options.destination.expanduser().absolute()
-                    if requested.name != workspace_path(requested.stem, requested.parent).name:
-                        raise ValueError("an upgraded workspace filename must end in lowercase .sqlite3 "
-                                         "so reopening its workspace name selects the same file")
-                    destination = self.store.upgrade_copy(requested)
-                    return CommandResult(f"Verified upgraded copy: {destination}\n"
-                                         "Original workspace retained; this session still uses the original.\n"
-                                         f"Reopen with --workspace {shlex.quote(destination.stem)} "
-                                         f"--workspace-dir {shlex.quote(str(destination.parent))}.")
-                return CommandResult(f"Verified workspace backup: {self.store.backup(options.destination)}")
-            if options.destination is not None or (options.limit is not None and options.action != "history"):
-                raise ValueError("only backup/upgrade accept a destination; only history accepts --limit")
-            if options.action == "export":
-                return CommandResult(self.export_text(options.format or 'json',
-                                                      include_passages=options.include_passages))
-            if options.action == "check":
-                return CommandResult(self.render_health(self.health()))
-            if options.action == "history":
-                return CommandResult(self._list("READING CHECKPOINTS — visits, not completion claims", [
-                    f"Revision {r['revision']} | {r['created_at']}\n{self.describe(r['current_id'])}\n"
-                    f"Scope: {r['scope']} | browsing: {r['cwd']}"
-                    for r in self.store.list_history(20 if options.limit is None else options.limit)]))
-            return CommandResult(f"Workspace: {self.store.path}\nCorpus ID: {self.store.corpus_id}\n"
-                                 f"Storage version: {self.store.schema_version}\n"
-                                 f"Actor: {self.actor or '[not set; authored writes disabled]'}\n"
-                                 f"Checkpoint revision: {self.revision}")
-        actions = parser.add_subparsers(dest="action", required=True)
-        if verb == "bookmark":
-            for action in ("add", "set"):
-                sub = actions.add_parser(action, add_help=False)
-                sub.add_argument("name")
-                sub.add_argument("identifier", nargs="?")
-            actions.add_parser("list", add_help=False)
-            for action in ("open", "remove"):
-                actions.add_parser(action, add_help=False).add_argument("name")
-            options = parser.parse_args(arguments)
-            if options.action in {"add", "set"}:
-                self.ensure_corpus_current()
-                ref = self.current_reference(session, options.identifier)
-                self.book.find_passage(ref.target_id)
-                self.store.set_bookmark(options.name, ref.requested_id, replace=options.action == "set")
-                return CommandResult(f"Bookmark {options.name}:\n{self.describe(ref.requested_id)}")
-            if options.action == "open":
-                record = self.store.get_bookmark(options.name)
-                if record is None:
-                    raise ValueError("no bookmark with that name")
-                ref = resolve_reference(self.book, record["target_id"])
-                return CommandResult(self.describe(ref.requested_id), ref.requested_id)
-            if options.action == "remove":
-                self.ensure_corpus_current()
-                self.store.delete_bookmark(options.name)
-                return CommandResult("Bookmark removed.")
-            return CommandResult(self._list("BOOKMARKS", [f"{r['name']}\n{self.describe(r['target_id'])}"
-                                                         for r in self.store.list_bookmarks()]))
-        if verb == "note":
-            sub = actions.add_parser("add", add_help=False)
-            sub.add_argument("body")
-            sub.add_argument("--on", dest="identifier")
-            actions.add_parser("list", add_help=False).add_argument("--on", dest="identifier")
-            actions.add_parser("show", add_help=False).add_argument("identifier")
-            actions.add_parser("history", add_help=False).add_argument("identifier")
-            sub = actions.add_parser("edit", add_help=False)
-            sub.add_argument("identifier")
-            sub.add_argument("body", nargs="?")
-            sub.add_argument("--expect-revision", type=int)
-            options = parser.parse_args(arguments)
-            if options.action == "add":
-                self.require_author()
-                ref = self.current_reference(session, options.identifier)
-                record = self.store.add_annotation(ref.requested_id, options.body, ref.record["content_sha256"])
-                return CommandResult(f"Personal annotation saved: {record['id']}\n{self.authored(record)}")
-            if options.action == "edit":
-                if options.body is None:
-                    raise ValueError("note edit NOTE_ID needs the enhanced prompt for multiline editing; "
-                                     "otherwise use note edit NOTE_ID \"TEXT\" --expect-revision N")
-                if options.expect_revision is None or options.expect_revision < 1:
-                    raise ValueError("note edit with TEXT requires --expect-revision N from note show NOTE_ID")
-                captured = self.prepare_annotation_edit(options.identifier)
-                record = self.save_annotation_edit(captured, options.body,
-                                                   expected_revision=options.expect_revision)
-                return CommandResult(self.annotation_edit_result(captured.revision, record))
-            if options.action == "history":
-                record = self.store.get_annotation(options.identifier)
-                if record is None:
-                    raise ValueError("no annotation with that ID")
-                rows = self.store.list_annotation_history(options.identifier)
-                if self.store.schema_version < 2:
-                    return CommandResult("This version-1 workspace has no annotation revision audit.\n"
-                                         "Use workspace upgrade FILE.sqlite3 to preserve a baseline in a separate copy.")
-                lines = [self.authored(record), self.describe(record['target_id']),
-                         "Original source binding: " + str(record['content_sha256'])]
-                for row in rows:
-                    label = "Baseline from version 1; earlier edits and editor are unknown" \
-                        if row['kind'] == 'legacy_baseline' else row['kind']
-                    lines.extend(["", f"Revision {row['revision']} | {label}",
-                                  f"Recorded: {row['recorded_at']} | Editor: {row['editor'] or '[unknown]'}",
-                                  self.wrap(row['body'])])
-                return CommandResult("ANNOTATION HISTORY — preserved personal prose\n" + "\n".join(lines))
-            if options.action == "show":
-                record = self.store.get_annotation(options.identifier)
-                if record is None:
-                    raise ValueError("no annotation with that ID")
-                records = [record]
-            else:
-                target = self.current_reference(session, options.identifier).requested_id if options.identifier is not None else None
-                records = self.store.list_annotations(target)
-            lines = []
-            for record in records:
-                try:
-                    changed = resolve_reference(self.book, record['target_id']).record['content_sha256'] != record['content_sha256']
-                    status = "[target text changed since annotation]" if changed else ""
-                except ValueError:
-                    status = "[unresolved target]"
-                revision = f"revision {record['revision']}" if record['revision'] is not None else "legacy; no revision audit"
-                lines.append(f"{record['id']} | personal_note | {revision} {status}\n{self.authored(record)}\n"
-                             f"{self.describe(record['target_id'])}\n\n{self.wrap(record['body'])}")
-            return CommandResult(self._list("READER ANNOTATIONS — not edition notes", lines))
-        if verb == "compare":
-            sub = actions.add_parser("save", add_help=False)
-            sub.add_argument("name")
-            sub.add_argument("identifiers", nargs="+")
-            sub.add_argument("--question", required=True)
-            actions.add_parser("list", add_help=False)
-            actions.add_parser("show", add_help=False).add_argument("name")
-            options = parser.parse_args(arguments)
-            if options.action == "save":
-                self.require_author()
-                if not options.question.strip():
-                    raise ValueError("comparison requires a nonempty question")
-                refs = [resolve_reference(self.book, value) for value in options.identifiers]
-                self.store.save_comparison(options.name, [r.requested_id for r in refs], options.question)
-                return CommandResult(f"Comparison saved: {options.name}")
-            if options.action == "list":
-                return CommandResult(self._list("COMPARISONS", [f"{r['name']} | {self.authored(r)}\n{r['question']}"
-                                                               for r in self.store.list_comparisons()]))
-            comparison = self.store.get_comparison(options.name)
-            if comparison is None:
-                raise ValueError("no comparison with that name")
-            lines = [f"COMPARISON: {comparison['name']}", self.authored(comparison), comparison['question']]
-            for identifier in comparison['target_ids']:
-                lines.extend(["", self.describe(identifier)])
-                try:
-                    ref = resolve_reference(self.book, identifier)
-                    passage = self.book.find_passage(ref.target_id)
-                    lines.append(self.render_passage(passage, self.width, self.plain, False))
-                except ValueError:
-                    # Canonical notes/editorial records may also be compared.
-                    try:
-                        lines.append(resolve_reference(self.book, identifier).record['markdown'])
-                    except ValueError:
-                        pass
-            return CommandResult("\n".join(lines))
-        if verb == "review":
-            actions.add_parser("show", add_help=False).add_argument("identifier", nargs="?")
-            sub = actions.add_parser("record", add_help=False)
-            sub.add_argument("outcome", choices=["inspected", "correction_needed", "verified"])
-            sub.add_argument("--issue", required=True)
-            sub.add_argument("--on", dest="identifier")
-            actions.add_parser("list", add_help=False).add_argument("--on", dest="identifier")
-            sub = actions.add_parser("queue", add_help=False)
-            sub.add_argument("--within")
-            sub.add_argument("--limit", type=int, default=20)
-            options = parser.parse_args(arguments)
-            if options.action == "queue":
-                within = None
-                if options.within is not None:
-                    _, within = self.resolve_path(options.within, (), self.book.root)
-                return CommandResult(self.render_queue(self.queue(within, options.limit)))
-            if options.action == "show":
-                return CommandResult(self.review_view(self.current_reference(session, options.identifier)))
-            if options.action == "record":
-                self.require_author()
-                if not options.issue.strip():
-                    raise ValueError("review testimony requires a nonempty issue or inspection description")
-                ref = self.current_reference(session, options.identifier)
-                source_sha = self.book.corpus_manifest['source']['sha256']
-                record = self.store.add_review(ref.requested_id, options.outcome, options.issue,
-                                               ref.record['content_sha256'], source_sha)
-                return CommandResult(f"Reader review recorded: {record['id']}\n{self.authored(record)}\n"
-                                     "Canonical transcription status and random eligibility are unchanged.")
-            target = self.current_reference(session, options.identifier).requested_id if options.identifier is not None else None
-            lines = []
-            for record in self.store.list_reviews(target):
-                try:
-                    ref = resolve_reference(self.book, record['target_id'])
-                    current = (len(ref.chain) == 1 and
-                               ref.record['content_sha256'] == record['content_sha256'] and
-                               self.book.corpus_manifest['source']['sha256'] == record['source_sha256'])
-                    status = ("same text/PDF fingerprints; PDF hash is manifest-declared; record metadata is not bound" if current else
-                              "STALE: source/text version or target changed")
-                except ValueError:
-                    status = "UNRESOLVED target"
-                lines.append(f"{record['id']} | {record['outcome']} | {status}\n{self.authored(record)}\n"
-                             f"{self.describe(record['target_id'])}\n{record['issue']}")
-            return CommandResult(self._list("READER REVIEW TESTIMONY — not canonical verification", lines))
-        if verb == "relate":
-            sub = actions.add_parser("add", add_help=False)
-            sub.add_argument("source")
-            sub.add_argument("kind")
-            sub.add_argument("target")
-            sub.add_argument("--reason", required=True)
-            actions.add_parser("list", add_help=False).add_argument("--on", dest="identifier")
-            options = parser.parse_args(arguments)
-            if options.action == "add":
-                self.require_author()
-                if not options.reason.strip():
-                    raise ValueError("a reader-asserted relation requires a nonempty reason")
-                source, target = resolve_reference(self.book, options.source), resolve_reference(self.book, options.target)
-                record = self.store.add_relation(source.requested_id, target.requested_id, options.kind, options.reason)
-                return CommandResult(f"Reader-asserted relation saved: {record['id']}\n{self.authored(record)}")
-            target = self.current_reference(session, options.identifier).requested_id if options.identifier is not None else None
-            return CommandResult(self._list("READER-ASSERTED RELATIONS — outside the published tree", [
-                f"{r['id']} | {r['kind']}\n{self.authored(r)}\n{self.describe(r['source_id'])}\n"
-                f"  -> {self.describe(r['target_id'])}\n{r['rationale']}" for r in self.store.list_relations(target)]))
-        raise ValueError("unknown workspace command")
+        """Compatibility entry point; command syntax belongs to its adapter."""
+        from sol.workspace.commands import execute
+        return execute(self, verb, arguments, session)

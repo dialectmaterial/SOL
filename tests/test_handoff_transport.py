@@ -14,7 +14,7 @@ from sol import core
 from sol.corpus import contract
 from sol.terminal import handoff
 from sol.terminal.essence import _sol_shim
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 class HandoffTransportTests(unittest.TestCase):

@@ -21,7 +21,7 @@ import unittest
 from sol.core.corpus import load_corpus_book
 from sol.corpus import contract
 from experiments.reader_surfaces.common import sample_from_book, validate_packet
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 _ROOT = Path(__file__).resolve().parents[1]

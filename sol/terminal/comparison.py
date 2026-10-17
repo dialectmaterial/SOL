@@ -20,7 +20,8 @@ import termios
 import tty
 import unicodedata
 
-from sol.terminal import kitty
+from sol.terminal import tty as terminal
+from sol.terminal.text import safe_label
 
 
 _MODES = ("passages", "annotations", "question")
@@ -58,7 +59,7 @@ def wrap_text(value: str, width: int) -> list[WrappedLine]:
     result, offset = [], 0
     # Line breaks are formatting; other control characters remain literal escapes.
     for original in str(value).replace("\r\n", "\n").split("\n"):
-        text = kitty._safe(original)
+        text = safe_label(original)
         clusters = list(_clusters(text))
         if not clusters:
             result.append(WrappedLine("", offset))
@@ -86,7 +87,7 @@ def _wrap(value: str, width: int) -> list[str]:
 
 
 def _clip(value, width: int) -> str:
-    text = kitty._safe(value)
+    text = safe_label(value)
     if cell_width(text) <= width:
         return text
     out, occupied = [], 0
@@ -100,7 +101,7 @@ def _clip(value, width: int) -> str:
 
 def _short_path(value: str, width: int) -> str:
     """Retain the distinguishing file/section name when its prefix is long."""
-    text = kitty._safe(value)
+    text = safe_label(value)
     if cell_width(text) <= width:
         return text
     components = text.rstrip("/").split("/")
@@ -133,25 +134,25 @@ def _short_path(value: str, width: int) -> str:
 def validate_snapshot(snapshot: dict) -> None:
     if (not isinstance(snapshot, dict) or type(snapshot.get("version")) is not int
             or snapshot["version"] != 1 or snapshot.get("kind") != "comparison"):
-        raise kitty.KittyError("Unsupported comparison snapshot.")
+        raise terminal.TerminalError("Unsupported comparison snapshot.")
     comparison = snapshot.get("comparison")
     if not isinstance(comparison, dict) or any(not isinstance(comparison.get(k), str) for k in ("name", "question", "actor")):
-        raise kitty.KittyError("Comparison snapshot lacks its saved question and author.")
+        raise terminal.TerminalError("Comparison snapshot lacks its saved question and author.")
     records = snapshot.get("records")
     if not isinstance(records, list) or not records:
-        raise kitty.KittyError("Comparison snapshot lacks its identified passages.")
+        raise terminal.TerminalError("Comparison snapshot lacks its identified passages.")
     for record in records:
         if not isinstance(record, dict) or not isinstance(record.get("requested_id"), str):
-            raise kitty.KittyError("Comparison snapshot contains an unidentified passage.")
+            raise terminal.TerminalError("Comparison snapshot contains an unidentified passage.")
         if record.get("state") not in {"live", "retired", "unresolved"}:
-            raise kitty.KittyError("Comparison snapshot contains an invalid passage state.")
+            raise terminal.TerminalError("Comparison snapshot contains an invalid passage state.")
         if not isinstance(record.get("plain_text", ""), str):
-            raise kitty.KittyError("Comparison snapshot passage text must be a string.")
+            raise terminal.TerminalError("Comparison snapshot passage text must be a string.")
         if "presentation_text" in record and not isinstance(record["presentation_text"], str):
-            raise kitty.KittyError("Comparison snapshot display text must be a string.")
+            raise terminal.TerminalError("Comparison snapshot display text must be a string.")
         notes = record.get("notes", [])
         if not isinstance(notes, list) or any(not isinstance(note, dict) or not isinstance(note.get("body"), str) for note in notes):
-            raise kitty.KittyError("Comparison snapshot contains invalid annotations.")
+            raise terminal.TerminalError("Comparison snapshot contains invalid annotations.")
 
 
 def read_selection(mailbox: Path) -> tuple[int, dict]:
@@ -163,7 +164,7 @@ def read_selection(mailbox: Path) -> tuple[int, dict]:
         validate_snapshot(snapshot)
         return sequence, snapshot
     except (KeyError, TypeError, ValueError, UnicodeError) as error:
-        raise kitty.KittyError(f"Cannot read the comparison selection: {error}") from error
+        raise terminal.TerminalError(f"Cannot read the comparison selection: {error}") from error
 
 
 def _source_label(record: dict) -> str:
@@ -530,8 +531,8 @@ def draw_frame(output, frame: list[str]) -> None:
 
 def viewer_main(mailbox: Path) -> int:
     if not sys.stdin.isatty() or not sys.stdout.isatty():
-        raise kitty.KittyError("The comparison viewer requires its own interactive kitty pane.")
-    for name in (*kitty._CONTROL_ENV, "SOL_KITTY_SESSION"):
+        raise terminal.TerminalError("The comparison viewer requires an interactive terminal.")
+    for name in ("KITTY_LISTEN_ON", "KITTY_RC_PASSWORD", "SOL_KITTY_SESSION"):
         os.environ.pop(name, None)
     sequence, snapshot = read_selection(mailbox)
     view = ComparisonView(snapshot)
@@ -552,7 +553,7 @@ def viewer_main(mailbox: Path) -> int:
         for signum in (signal.SIGTERM, signal.SIGHUP):
             previous_handlers[signum] = signal.signal(signum, stop)
         tty.setraw(fd)
-        sys.stdout.write(kitty._ENTER)
+        sys.stdout.write(terminal.ENTER)
         sys.stdout.flush()
         while not terminating:
             try:
@@ -567,9 +568,9 @@ def viewer_main(mailbox: Path) -> int:
                     if next_sequence != sequence:
                         sequence, view = next_sequence, ComparisonView(next_snapshot)
                         error, dirty = "", True
-                except (OSError, kitty.KittyError) as failure:
+                except (OSError, terminal.TerminalError) as failure:
                     error, dirty = str(failure), True
-            size = kitty.window_size(fd)
+            size = terminal.window_size(fd)
             if size != old_size:
                 old_size, dirty = size, True
             if dirty:
@@ -580,7 +581,7 @@ def viewer_main(mailbox: Path) -> int:
                 data = os.read(fd, 64)
                 if not data:
                     break
-                actions, pending_keys = kitty.consume_keys(pending_keys + data, key_action)
+                actions, pending_keys = terminal.consume_keys(pending_keys + data, key_action)
                 for action in actions:
                     if action == "close":
                         terminating = True
@@ -588,7 +589,7 @@ def viewer_main(mailbox: Path) -> int:
                     dirty = view.action(action) or dirty
     finally:
         try:
-            sys.stdout.write("\x1b[0m" + kitty._LEAVE)
+            sys.stdout.write("\x1b[0m" + terminal.LEAVE)
             sys.stdout.flush()
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, original)

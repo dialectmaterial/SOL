@@ -26,7 +26,7 @@ class SourceShellTests(unittest.TestCase):
     def run_shell(self, commands, reader=None, **kwargs):
         output = StringIO()
         with patch('sol.terminal.source.SourceService', return_value=self.service), \
-                redirect_stdout(output), patch('sol.reader.app.install_completion', return_value=lambda: None):
+                redirect_stdout(output), patch('sol.reader.shell.install_completion', return_value=lambda: None):
             iterator = iter(commands)
             status = sol.run_shell(self.book, 80, workspace_reader=reader,
                                    read_command=lambda prompt: next(iterator),
@@ -100,14 +100,14 @@ class SourceShellTests(unittest.TestCase):
         self.assertIn((IDS[0], 0), catalog.suggestions('source show '))
 
     def test_auto_width_updates_subsequent_and_workspace_rendering(self):
-        with patch('sol.reader.app.sensible_width', side_effect=[28, 60, 60]), \
-                patch('sol.reader.app.render_passage', wraps=sol.render_passage) as render:
+        with patch('sol.reader.shell.sensible_width', side_effect=[28, 60, 60]), \
+                patch('sol.reader.shell.render_passage', wraps=sol.render_passage) as render:
             self.run_shell(['first /being', 'next', 'exit'], auto_width=True)
         self.assertEqual([call.args[1] for call in render.call_args_list], [28, 60])
 
     def test_opening_source_rerenders_current_at_changed_width_without_moving(self):
-        with patch('sol.reader.app.sensible_width', side_effect=[80, 80, 40, 40]), \
-                patch('sol.reader.app.render_passage', wraps=sol.render_passage) as render:
+        with patch('sol.reader.shell.sensible_width', side_effect=[80, 80, 40, 40]), \
+                patch('sol.reader.shell.render_passage', wraps=sol.render_passage) as render:
             self.run_shell(['first /being', 'source show', 'exit'], auto_width=True)
         self.assertEqual([call.args[1] for call in render.call_args_list], [80, 40])
         self.assertEqual([call.args[0].identifier for call in render.call_args_list], [IDS[0], IDS[0]])

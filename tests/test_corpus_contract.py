@@ -46,6 +46,12 @@ class CorpusContractTests(unittest.TestCase):
         (self.root / "corpus.json").write_text(json.dumps(self.manifest), encoding="utf-8")
         (self.root / document).write_text("\n".join(contract.render_record(meta, body) for meta, body in pairs), encoding="utf-8")
 
+    def test_jsonl_does_not_split_unicode_separators_inside_strings(self):
+        rows = [{"text": "Before\u2028middle\u2029after"}, {"text": "Next record"}]
+        (self.root / "index.jsonl").write_text(
+            "\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + "\n", encoding="utf-8")
+        self.assertEqual(contract.load_index(self.root, verify=False), rows)
+
     def test_roundtrip_preserves_ids_unicode_markdown_and_metadata(self) -> None:
         body = 'A *cursive* αβγ sentence, **strong** text, “quotes”, and \n\n> a quotation.\n\n- a list item'
         encoded = contract.render_record(self.paragraph, body)

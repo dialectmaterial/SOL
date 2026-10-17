@@ -29,6 +29,10 @@ from typing import Any
 from urllib.parse import urlsplit
 import uuid
 
+from sol.corpus.errors import CorpusError
+from sol.corpus.markdown import (commonmark_tokens as _commonmark_tokens,
+                                tokens_plain_text as _plain_tokens, plain_text)
+
 
 CONTRACT_VERSION = 1
 MANIFEST_FILENAME = "corpus.json"
@@ -39,10 +43,6 @@ _OPEN = re.compile(r"^<!-- sol:(.+) -->$")
 _ANCHOR = re.compile(r'^<a id="([0-9a-f-]+)"></a>$')
 _RESERVED = {"markdown", "plain_text", "document", "context", "content_sha256"}
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
-
-
-class CorpusError(ValueError):
-    """Canonical content or its generated index fails the corpus contract."""
 
 
 @dataclass(frozen=True)
@@ -205,62 +205,6 @@ def render_record(metadata: dict, markdown: str) -> str:
     return f'<!-- sol:{marker} -->\n<a id="{metadata["id"]}"></a>\n\n{markdown.rstrip()}\n<!-- /sol -->\n'
 
 
-class _VisibleHTML(HTMLParser):
-    """Extract HTML's visible data without leaking anchors, tags, or comments."""
-
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.parts: list[str] = []
-        self.hidden = 0
-        self.sup_hidden: list[bool] = []
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag in {"script", "style"}:
-            self.hidden += 1
-        elif tag == "sup":
-            identifier = dict(attrs).get("data-sol-note")
-            hide = isinstance(identifier, str) and _UUID.fullmatch(identifier) is not None
-            self.sup_hidden.append(hide)
-            if hide:
-                self.hidden += 1
-        if self.hidden:
-            return
-        if tag in {"br", "p", "div", "li", "tr"}:
-            self.parts.append("\n")
-        elif tag in {"td", "th"}:
-            self.parts.append(" ")
-        elif tag == "img":
-            self.parts.append(dict(attrs).get("alt") or "")
-
-    def handle_endtag(self, tag: str) -> None:
-        if tag in {"script", "style"} and self.hidden:
-            self.hidden -= 1
-        elif tag == "sup" and self.sup_hidden:
-            if self.sup_hidden.pop():
-                self.hidden -= 1
-        elif not self.hidden and tag in {"p", "div", "li", "tr"}:
-            self.parts.append("\n")
-
-    def handle_data(self, data: str) -> None:
-        if not self.hidden:
-            self.parts.append(data)
-
-
-def _html_plain(markup: str) -> str:
-    parser = _VisibleHTML()
-    parser.feed(markup)
-    parser.close()
-    return "".join(parser.parts)
-
-
-def _commonmark_tokens(markdown: str) -> list:
-    try:
-        from markdown_it import MarkdownIt
-    except ImportError as exc:
-        raise CorpusError("Reindexing requires markdown-it-py; install it with python3 -m pip install markdown-it-py") from exc
-    return MarkdownIt("commonmark").parse(markdown)
-
-
 def _note_annotations(tokens: list) -> set[str]:
     class Attributes(HTMLParser):
         def __init__(self) -> None:
@@ -302,50 +246,6 @@ def _note_annotations(tokens: list) -> set[str]:
     if parser.ids - parser.linked:
         raise CorpusError(f"Annotated note callouts require matching CommonMark links: {sorted(parser.ids - parser.linked)}")
     return parser.ids
-
-
-def _plain_tokens(parsed_tokens: list) -> str:
-
-    def inline(tokens: list) -> str:
-        parts: list[str] = []
-        markup = _VisibleHTML()
-        for token in tokens:
-            if token.type in {"text", "code_inline"}:
-                if not markup.hidden:
-                    parts.append(token.content)
-            elif token.type in {"softbreak", "hardbreak"}:
-                if not markup.hidden:
-                    parts.append("\n")
-            elif token.type == "image":
-                if not markup.hidden:
-                    parts.append(inline(token.children or []))
-            elif token.type == "html_inline":
-                markup.feed(token.content)
-                parts.extend(markup.parts)
-                markup.parts.clear()
-        return "".join(parts)
-
-    parts: list[str] = []
-    for token in parsed_tokens:
-        if token.type == "inline":
-            parts.append(inline(token.children or []))
-        elif token.type in {"fence", "code_block"}:
-            parts.append(token.content.rstrip("\n") + "\n")
-        elif token.type == "html_block":
-            parts.append(_html_plain(token.content).strip("\n") + "\n")
-        elif token.type in {"paragraph_close", "heading_close", "list_item_close"}:
-            parts.append("\n")
-    return re.sub(r"\n{3,}", "\n\n", "".join(parts)).strip()
-
-
-def plain_text(markdown: str) -> str:
-    """CommonMark visible text, omitting only SOL-annotated note callouts.
-
-    Paragraph/list/quotation boundaries remain newlines, code remains literal,
-    and presentational emphasis does not become artificial classifier tokens.
-    Ordinary mathematical superscripts remain visible.
-    """
-    return _plain_tokens(_commonmark_tokens(markdown))
 
 
 def parse_document(text: str, document: str = "") -> list[dict]:
@@ -410,7 +310,10 @@ def _safe_file(root: Path, relative: str, suffix: str | None = None) -> Path:
 
 def _read_utf8(path: Path) -> str:
     try:
-        return path.read_text(encoding="utf-8")
+        # Canonical fingerprints bind exact source bytes, including CR/CRLF.
+        # Text-mode universal-newline conversion would silently change them.
+        with path.open(encoding="utf-8", newline="") as stream:
+            return stream.read()
     except (OSError, UnicodeError) as exc:
         raise CorpusError(f"Cannot read UTF-8 corpus file {path}: {exc}") from exc
 
@@ -671,7 +574,8 @@ def reindex(corpus_dir: Path | str, output: Path | str | None = None) -> dict:
 
 
 def _index_records(content: str, target: Path) -> list[dict]:
-    records = [_decode_json(line, f"{target}:{i+1}") for i, line in enumerate(content.splitlines()) if line.strip()]
+    # JSON Lines uses LF delimiters. U+2028/U+2029 are legal inside JSON strings.
+    records = [_decode_json(line, f"{target}:{i+1}") for i, line in enumerate(content.split("\n")) if line.strip()]
     return records
 
 

@@ -11,7 +11,7 @@ from unittest.mock import patch
 from sol.corpus import contract
 from sol.reader import app
 from sol.reader.options import build_parser
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 class ReaderViewCLITests(unittest.TestCase):
@@ -38,16 +38,16 @@ class ReaderViewCLITests(unittest.TestCase):
         for arguments, selected, temporary in (([], True, False), (["--reader"], True, False),
                                                (["-n"], True, True), (["--shell"], False, False),
                                                (["--shell", "-n"], False, True),
-                                               (["--reader", "-n"], True, True),
-                                               (["--reader", "--shell"], True, False)):
+                                               (["--reader", "-n"], True, True)):
             args = build_parser().parse_args(arguments)
-            app.validate_options(args)
-            self.assertTrue(args.shell)
+            mode = app.validate_options(args)
+            self.assertEqual(args.shell, not selected)
+            self.assertEqual(mode.interactive, True)
             self.assertEqual(args.reader, selected)
             self.assertEqual(args.none, temporary)
 
     def test_unsupported_prototype_options_are_refused_before_loading_or_onboarding(self):
-        for arguments in (["--reader", "-r"], ["--reader", "--search", "ground"],
+        for arguments in (["--reader", "--shell"], ["--reader", "-r"], ["--reader", "--search", "ground"],
                           ["--reader", "--json"], ["--reader", "--plain"], ["--reader", "--pdf", "absent.pdf"],
                           ["--reader", "--ui", "basic"], ["--reader", "--editing-mode", "vi"],
                           ["--reader", "--source-pdf", "absent.pdf"],

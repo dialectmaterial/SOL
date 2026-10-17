@@ -76,7 +76,7 @@ def render_html(sample: Sample, *, trial=None) -> str:
                 or trial_info["sample_passages"] != len(sample.passages)):
             raise ValueError("reading trial extent no longer matches its sample")
     script = Path(__file__).with_name("browser.js").read_text(encoding="utf-8")
-    capture = CaptureExport(sample.book)
+    capture = CaptureExport.for_sample(sample)
     records, articles = [], []
     previous_heading = None
     for passage in sample.passages:

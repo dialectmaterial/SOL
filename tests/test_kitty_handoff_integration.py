@@ -18,7 +18,7 @@ import unittest
 
 from sol.corpus import contract
 from sol.terminal.kitty import KITTY_PROFILE
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import write_runtime_corpus
 
 
 READER = '''
@@ -85,7 +85,7 @@ with Workspace(root / "test.sqlite3", book.corpus_manifest["corpus_id"], provena
             assert "Return accepted." in "".join(output), "".join(output)
             return ""
         return command
-    with patch.object(app, "ReadingSession", return_value=session):
+    with patch("sol.reader.shell.ReadingSession", return_value=session):
         result = app.run_shell(book, 80, workspace_reader=reader, read_command=read, write_output=emit, essence_pane=pane)
     assert result == 0
     assert len(store.list_history()) == 2

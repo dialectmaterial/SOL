@@ -172,7 +172,7 @@ class AnnotationEditingTests(unittest.TestCase):
 
     def test_changed_disk_generation_during_edit_refuses_commit(self):
         import sol.corpus.contract as contract
-        from test_packaging import write_runtime_corpus
+        from fixtures_corpus import write_runtime_corpus
         corpus = self.directory / 'edit-corpus'
         write_runtime_corpus(corpus)
         contract.initialize_corpus_identity(corpus)

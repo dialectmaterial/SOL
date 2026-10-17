@@ -10,10 +10,7 @@ import base64
 import copy
 from dataclasses import asdict
 import hashlib
-from html.parser import HTMLParser
 import json
-from pathlib import Path
-import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -22,115 +19,13 @@ from sol.core.corpus import load_corpus_book
 from sol.corpus import contract
 from sol.reader.actions import ReaderActions
 from sol.reader.typography import Typography
-from test_packaging import write_runtime_corpus
+from fixtures_corpus import CorpusFixture, _Document
 
 from experiments.reader_surfaces.common import sample_from_book, selection_packet, validate_packet
 from experiments.reader_surfaces.html import render_html, write_html
 
 
-_GENERATED = {"markdown", "plain_text", "document", "context", "content_sha256"}
-
-
-class _Document(HTMLParser):
-    """Inspect generated syntax without interpreting corpus text as markup."""
-
-    def __init__(self, text):
-        super().__init__(convert_charrefs=True)
-        self.elements = []
-        self.blocks = []
-        self.text = []
-        self._active = None
-        self.feed(text)
-        self.close()
-
-    def handle_starttag(self, tag, attributes):
-        attributes = dict(attributes)
-        self.elements.append((tag, attributes))
-        if tag in {"script", "style"}:
-            self._active = [tag, attributes, ""]
-
-    def handle_endtag(self, tag):
-        if self._active is not None and self._active[0] == tag:
-            self.blocks.append(tuple(self._active))
-            self._active = None
-
-    def handle_data(self, text):
-        if self._active is not None:
-            self._active[2] += text
-        else:
-            self.text.append(text)
-
-
-class ReaderSurfaceHTMLTests(unittest.TestCase):
-    def setUp(self):
-        temporary = tempfile.TemporaryDirectory(prefix="sol-typeset-contract-")
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
-        self.corpus = self.root / "corpus"
-        self.identifier, self.body = write_runtime_corpus(self.corpus)
-        contract.initialize_corpus_identity(self.corpus)
-        self.book = load_corpus_book(self.corpus)
-
-    def rewrite_body(self, text, *, markdown=None):
-        """Rebuild an internally exact tiny generation without optional parsers."""
-        records = [json.loads(line) for line in
-                   (self.corpus / "index.jsonl").read_text(encoding="utf-8").splitlines()]
-        paragraph = next(row for row in records if row["id"] == self.identifier)
-        paragraph.update(markdown=text if markdown is None else markdown, plain_text=text)
-        self.body = text
-        return self.write_records(records)
-
-    def write_records(self, records):
-        manifest_path = self.corpus / "corpus.json"
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        for record in records:
-            record["content_sha256"] = hashlib.sha256(record["markdown"].encode()).hexdigest()
-        document = "\n".join(contract.render_record(
-            {key: value for key, value in row.items() if key not in _GENERATED}, row["markdown"])
-            for row in records)
-        (self.corpus / "sample.md").write_text(document, encoding="utf-8")
-        index = "".join(json.dumps(row, ensure_ascii=False, sort_keys=True,
-                                   separators=(",", ":")) + "\n" for row in records).encode()
-        (self.corpus / "index.jsonl").write_bytes(index)
-        (self.corpus / "index.meta.json").write_text(json.dumps({
-            "contract_version": 1,
-            "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
-            "source_sha256": manifest["source"]["sha256"],
-            "documents": {"sample.md": hashlib.sha256(document.encode()).hexdigest()},
-            "index_sha256": hashlib.sha256(index).hexdigest(), "record_count": len(records),
-        }), encoding="utf-8")
-        self.book = load_corpus_book(self.corpus)
-        return self.book
-
-    def add_note(self):
-        """Retain a separately attributed note with an explicit reciprocal link."""
-        records = [json.loads(line) for line in
-                   (self.corpus / "index.jsonl").read_text(encoding="utf-8").splitlines()]
-        paragraph = next(row for row in records if row["id"] == self.identifier)
-        note_id = "cccccccc-0000-4000-8000-000000000003"
-        paragraph["note_ids"] = [note_id]
-        note = copy.deepcopy(paragraph)
-        note.pop("note_ids")
-        note.update(id=note_id, type="note", order=len(records), backlinks=[self.identifier],
-                    attribution={"author": "Invented translator", "role": "editorial_note", "status": "confirmed"},
-                    markdown="An invented note remains distinct from the philosophical prose.",
-                    plain_text="An invented note remains distinct from the philosophical prose.")
-        records.append(note)
-        self.write_records(records)
-        return note_id
-
-    def packet(self, start=3, end=14, *, cursor=None):
-        actions = ReaderActions(self.book)
-        actions.open(self.identifier)
-        selected = actions.select_span(start, end)
-        return {"reference": core.capture_reference(self.book.corpus_snapshot, self.identifier),
-                "selection": asdict(selected),
-                "cursor_offset": end if cursor is None else cursor}
-
-    def files(self):
-        return {path.relative_to(self.root): path.read_bytes()
-                for path in self.root.rglob("*") if path.is_file()}
-
+class ReaderSurfaceHTMLTests(CorpusFixture, unittest.TestCase):
     def test_packet_roundtrip_reuses_existing_textselection_without_writes(self):
         packet = self.packet()
         before = self.files()
@@ -256,15 +151,6 @@ class ReaderSurfaceHTMLTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             render_html(sample_from_book(self.book, count=1))
 
-    def detach_reader_graph(self):
-        """Keep snapshot/disk intact while replacing the mutable convenience view."""
-        from dataclasses import replace
-        self.book.canonical_records = copy.deepcopy(self.book.canonical_records)
-        text = "A detached invented replacement not present in the verified source."
-        record = self.book.canonical_records[self.identifier]
-        record.update(markdown=text, plain_text=text,
-                      content_sha256=hashlib.sha256(text.encode()).hexdigest())
-        self.book.passages[0] = replace(self.book.passages[0], text=text)
 
     def test_detached_reader_graph_cannot_override_core_packet_source(self):
         self.detach_reader_graph()
