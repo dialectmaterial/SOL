@@ -32,6 +32,41 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Sentence-segmentation error measurement — 18 October 2026
+
+**Task:** [Codex: Measure sentence-segmentation error](https://github.com/dialectmaterial/SOL/blob/b07fdffacaf9ac812d947b351bb7a309d6e4b966/docs/coordination/CURRENT_TASK.md#codex-measure-sentence-segmentation-error).
+
+**Branch / PR:** `codex/sentence-segmentation-check`; [open the review PR](https://github.com/dialectmaterial/SOL/pull/new/codex/sentence-segmentation-check) after branch publication.
+
+**Last implementation commit:** `ce0135ef69ead149013bbb4d730d6b502e216a6a` (code and documentation complete; this report is committed last).
+
+### Changed files
+
+- `sol/essence/segmentation_check.py` — blind, reproducible equal-per-doctrine samples; complete source-bound marks or explicit exclusions; exact internal-boundary scores, error offsets and per-doctrine summaries. Samples are owner-only, non-overwriting and outside Git.
+- `sol/essence/cli.py` — `sol analyze segmentation-sample` and `segmentation-check`; no change to existing sentence-study commands or formats.
+- `tests/test_segmentation_check.py` — invented gold examples, malformed/stale input and privacy checks; four known rule limitations are expected failures rather than silent method fixes.
+- `docs/ESSENCE.md`, `CHANGELOG.md` — private human-marking procedure, metric definitions, known limits and proposed pilot criteria. This handoff is the only other intended documentation change until the shared task board is available on main.
+
+### Tests performed
+
+- Focused suites: segmentation comparison (20 tests, including 4 expected failures), unchanged sentence study (9 tests) and existing analysis CLI (24 tests) — OK.
+- `.venv/bin/python -B scripts/check_docs.py` — OK; external URLs were not network-checked.
+- `.venv/bin/python -B -m unittest discover -s tests` — 1,558 tests run; OK (11 skipped, 4 expected failures). XDG config/data/cache/state and Neovim log locations were isolated. Packaging checks are included.
+- Both commands' help works through `python -m sol analyze`. Synthetic end-to-end sample/mark/compare gives 4 matching boundaries, 1 false split and 1 miss (80% precision/recall); this is test data, not a book estimate. Existing sentence artifacts and canonical fixture bytes remain unchanged.
+- No real-book sample or markings were generated, no human error rate is claimed, and no terminal UI/manual reading check was required or performed.
+
+### Outstanding issues
+
+- The unchanged rules retain misses inside mid-sentence parentheses, suppression after abbreviations that really end sentences, lower-case sentence starts, and false splits at physical line breaks. Their frequency in the book remains unmeasured.
+- The assigned two-agent board is still only on `origin/claude/two-agent-board` at this report's preparation. The maintainer was asked to merge it before finalization; its Codex status cannot be changed on main without copying or replacing the unmerged board. The implementation is ready for review; the board status update remains pending that merge.
+- The unpublished task branch was checked/rebased against current `origin/main` (`3ef6528`) before this report. Earlier handoff entries remain intact. No `sol/terminal/`, `sol/reader/`, `punctuation-rules-v1` code, protocol, schema or dependency changes are included. Private source/corpus/workspaces and untracked `AGENTS.md` are excluded.
+
+### Decisions requiring approval
+
+- **Pilot size:** propose 90 complete passages, 30 per doctrine, seed `20261018`; seek at least 300 human-marked internal boundaries before using quality targets, expanding by 10 passages per doctrine with the same ranking if approved. No automatic size default or real-book sampling run was adopted.
+- **Error tolerance:** propose at least 98% boundary precision and recall overall, and at least 95% of both per doctrine. These are proposed descriptive pilot targets, not certified population bounds or an acceptance gate applied by the tool.
+- **Gold review:** approve the sentence-end/closing-punctuation convention, explicit exclusions and independent adjudication of doubtful marks. Any later segmentation-rule, artifact or dependency change needs its own approval and versioning; none is proposed as implemented here.
+
 ## Codex reader and workspace proposal — 17 October 2026
 
 **Task:** maintainer's request to preserve the [complete implementation proposal](proposals/CODEX_READER_WORKSPACE_PLAN.md) for shared review; no application implementation.
