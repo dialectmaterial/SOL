@@ -31,7 +31,7 @@ The current implementation also includes literal book search, source-positioned 
 | `b/n` | Previous / next paragraph |
 | `p` | Continuous / single-paragraph mode |
 | `gg` / `G` | Start / end of *loaded section*, not entire book |
-| `/` + Enter | Literal case-insensitive search across book; select result; its matches are marked, `Esc` hides the marks |
+| `/` + Enter | Literal case-insensitive search across book; select result; its matches are marked, `Esc` hides the marks until the next result |
 | `Ctrl-N` / `Ctrl-P` | Next / previous result paragraph |
 | `Alt-Left` / `Alt-Right` | Session reading history back / forward |
 | `v`, move, `Esc` | Transient selection within *one* source record |
@@ -53,6 +53,8 @@ The current implementation also includes literal book search, source-positioned 
 **Draft lifetime:** unsaved note drafts are process-local recovery state. Closing the note editor (including `:q!`) or a failed save keeps the draft available under `a` during that SOL session; quitting/restarting SOL does not durably save an unpublished draft. Save through `Ctrl-S` or `:w` before leaving SOL. Clipboard, viewer and Ctrl-S behavior still need the manual terminal checks described below.
 
 **Refused moves (18 October):** every move in the reader (sections, `b/n` across sections, tree, markers, search results, history, study sentences) first accepts the position the screen shows, then prepares the destination's view, and saves the destination only once that view is ready. If preparation, a changed corpus or another session's newer save refuses the move, the screen, the saved position and the history stay where they were; the same key can be tried again. Another session's save is never overwritten: until SOL is reopened, moves keep being refused. A study sentence in the current paragraph is its own history entry, so Alt-Left returns to the earlier cursor. Tested with injected failures on every route; not yet exercised by hand in a terminal.
+
+**Transient state (18 October):** marks hidden with `Esc` stay hidden through `p`, `f`, `b/n`, resizing and `T`; opening another search result marks its matches again. Nothing about this is saved. Selection and `y` copy the exact source text around footnote numbers, multibyte and combining characters and wrapped emphasis, forward and backward, in both modes and at narrow widths (headless Neovim tests). `S` takes the paragraph the cursor is in as its origin, so a study started after moving with `j/k` returns there with Alt-Left; running it saves no visit. Not yet checked by hand in Alacritty or Kitty.
 
 ### Basic operations
 
