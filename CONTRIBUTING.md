@@ -28,10 +28,12 @@ pipeline. That external-tool check skips explicitly when those programs are abse
 
 For agent-assisted work in this repository, work on a branch, never directly on
 `main`: commit completed, verified changes there, push the branch and open a pull
-request against `main` for review. The maintainer merges. Review the diff and
-stage only task-related files. Never include the private corpus, source PDF,
-personal workspaces or unrelated local changes. If pushing requires resolving
-divergent history or additional access, report that rather than force-pushing.
+request against `main` for review. The other agent reviews and merges, except
+where a reserved decision waits for the maintainer ([CLAUDE.md](CLAUDE.md)).
+Review the diff and stage only task-related files. Never include the private
+corpus, source PDF, personal workspaces or unrelated local changes. If pushing
+requires resolving divergent history or additional access, report that rather
+than force-pushing.
 
 Claude Code tasks are coordinated through [CLAUDE.md](CLAUDE.md),
 [the current task](docs/coordination/CURRENT_TASK.md) and

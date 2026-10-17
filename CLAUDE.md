@@ -12,25 +12,28 @@ never edit it.
 - **Claude Code** implements its current task on a `claude/` branch and reports.
 - **Codex** implements its own current task on a `codex/` branch, in parallel,
   following the same procedure; its task never touches the same files.
-- **Reviewers:** each implementing agent reviews the other's pull request when
-  the maintainer asks; ChatGPT reviews through GitHub (the pull request, its diff
-  and the coordination files) and drafts next tasks. Nobody needs a conversation
-  transcript.
-- **The maintainer** assigns tasks, approves decisions and merges pull requests.
+- **Reviewers:** each implementing agent reviews, and if the rules below allow,
+  merges the other's pull request; nobody merges their own. ChatGPT may also
+  review through GitHub (the pull request, its diff and the coordination files)
+  and drafts next tasks. Nobody needs a conversation transcript.
+- **The maintainer** assigns tasks, approves reserved decisions, merges the pull
+  requests that wait for them, and may overrule any merged default later.
 
 ## Before starting
 
-1. Read [`docs/coordination/CURRENT_TASK.md`](docs/coordination/CURRENT_TASK.md).
+1. Check `gh pr list`. If the other agent has an open pull request you have not
+   reviewed since its last push, review it first (see *Reviewing and merging*).
+2. Read [`docs/coordination/CURRENT_TASK.md`](docs/coordination/CURRENT_TASK.md).
    Work only on the task assigned to you; if it is unclear or conflicts with the four authorities,
    ask instead of guessing.
-2. Read the latest entry in [`docs/coordination/HANDOFF.md`](docs/coordination/HANDOFF.md)
+3. Read the latest entry in [`docs/coordination/HANDOFF.md`](docs/coordination/HANDOFF.md)
    and the authority sections the task names.
-3. Run `git status` and `git log --oneline -10`; never discard uncommitted work.
+4. Run `git status` and `git log --oneline -10`; never discard uncommitted work.
 
 ## While working
 
 - Branch from up-to-date `main` as `claude/<short-task-name>`. Never commit to
-  or push `main` directly.
+  or push `main` directly; `main` changes only through merged pull requests.
 - Keep commits small, each with a message saying what changed and why.
 - Run focused tests, then the full checks before reporting:
 
@@ -42,10 +45,12 @@ never edit it.
 - When behaviour changes, update the relevant authority document and
   `CHANGELOG.md` in the same pull request. Never commit the private corpus,
   source PDF, workspaces or analysis exports.
-- A decision that changes an authority document's **Decision** statements, a
-  public contract (CORE API, reference protocol, corpus contract, workspace
-  schema) or the dependency set is not yours to make: implement nothing that
-  depends on it, and list it under *Decisions requiring approval*.
+- A **reserved decision** changes an authority document's **Decision**
+  statements, a public contract (CORE API, reference protocol, corpus contract,
+  workspace schema), the dependency set, or how personal work or the canonical
+  corpus can be deleted or overwritten. It is not yours to make: implement
+  nothing that depends on it, and list it under *Decisions requiring approval*
+  marked **(reserved)**. Other choices are defaults: make them, and list them.
 
 ## Finishing a task
 
@@ -55,6 +60,26 @@ never edit it.
 2. Set your task's status in `CURRENT_TASK.md` to `In review`. If `main` moved
    meanwhile (the other agent's pull request merged), rebase onto it; conflicts
    at the top of `HANDOFF.md` are resolved by keeping both reports, newest first.
-3. Push the branch and open a pull request against `main` whose description
-   links the handoff entry. If pushing or opening the pull request is not
-   possible, say so in the report and give the exact commands.
+3. Push the branch and open a pull request against `main` with
+   `gh pr create --base main`, whose description links the handoff entry. If
+   that is not possible, say so in the report and give the exact commands.
+
+## Reviewing and merging the other agent's pull request
+
+1. Read the diff and its handoff report; run the documentation check and the
+   full suite on the branch in a separate worktree, plus whatever real-corpus or
+   headless check the change invites.
+2. If something must change, say what and why with `gh pr comment <n>` and stop;
+   the author fixes it and you review again.
+3. Wait for GitHub's tests: `gh pr checks <n> --watch` must end with every check
+   passing.
+4. If the report lists a **(reserved)** decision, comment "Approved; waiting for
+   the maintainer's decision on …" and leave the merge to the maintainer.
+5. If GitHub reports a conflict and it is only the stacked entries at the top of
+   `HANDOFF.md` or `CHANGELOG.md`, merge `origin/main` into the branch, keep both
+   entries (newest first), rerun the checks, push, and wait for the tests again.
+   Ask the author to resolve any other conflict.
+6. Otherwise merge with `gh pr merge <n> --merge --delete-branch`, then post a
+   comment with what you checked and the defaults the maintainer may overrule.
+   The merged task counts as done; its slot in `CURRENT_TASK.md` is replaced
+   when the next task is assigned.
