@@ -10,6 +10,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 
 from sol.core.references import resolve_reference
+from sol.workspace.time import parse_utc_timestamp
 
 
 _COLLECTIONS = ("bookmarks", "annotations", "comparisons", "reviews", "relations", "history")
@@ -217,7 +218,7 @@ def _review_time(review: dict) -> datetime:
     if not isinstance(value, str):
         raise ValueError("review creation time must be a UTC timestamp")
     try:
-        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        timestamp = parse_utc_timestamp(value)
     except ValueError as error:
         raise ValueError("review creation time must be a UTC timestamp") from error
     if timestamp.tzinfo is None or timestamp.utcoffset() != timezone.utc.utcoffset(timestamp):

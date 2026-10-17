@@ -19,6 +19,8 @@ from typing import Any, Iterator
 import unicodedata
 from uuid import UUID, uuid4
 
+from sol.workspace.time import parse_utc_timestamp
+
 try:
     import fcntl
 except ImportError:  # Normal reading remains available on non-POSIX hosts.
@@ -86,9 +88,7 @@ def _source_fingerprint(provenance: dict) -> str | None:
 
 def _timestamp(value: Any, label: str) -> None:
     try:
-        parsed = datetime.fromisoformat(_string(value, label).replace("Z", "+00:00"))
-        if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
-            raise ValueError("timestamp is not UTC")
+        parse_utc_timestamp(_string(value, label))
     except (TypeError, ValueError) as error:
         raise WorkspaceError(f"{label} is not a valid UTC timestamp") from error
 
@@ -798,7 +798,7 @@ class Workspace:
                     raise WorkspaceError("annotation history update and audit timestamps disagree")
                 if snapshot["kind"] == "created" and snapshot["created_at"] != snapshot["recorded_at"]:
                     raise WorkspaceError("annotation creation timestamp disagrees with its audit")
-                moment = datetime.fromisoformat(snapshot["recorded_at"].replace("Z", "+00:00"))
+                moment = parse_utc_timestamp(snapshot["recorded_at"])
                 if previous_time is not None and moment < previous_time:
                     raise WorkspaceError("annotation history audit timestamps go backwards")
                 previous_time = moment
@@ -846,8 +846,7 @@ class Workspace:
                 raise WorkspaceError("annotation revision counter is exhausted")
             timestamp = _now()
             _timestamp(timestamp, "annotation edit time")
-            if (datetime.fromisoformat(timestamp.replace("Z", "+00:00")) <
-                    datetime.fromisoformat(head["recorded_at"].replace("Z", "+00:00"))):
+            if parse_utc_timestamp(timestamp) < parse_utc_timestamp(head["recorded_at"]):
                 raise WorkspaceError("system clock precedes the latest annotation audit; "
                                      "correct the clock before editing")
             connection.execute(

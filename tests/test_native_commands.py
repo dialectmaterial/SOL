@@ -5,6 +5,7 @@ import json
 import fcntl
 import pty
 import select
+import shutil
 import struct
 import termios
 import time
@@ -105,10 +106,13 @@ class NativeCommandsTests(unittest.TestCase):
         self.assertIn("use --json for pipes", result.stderr)
 
     def test_real_zsh_pipeline_redirection_and_current_directory(self):
+        zsh = shutil.which("zsh")
+        if not zsh or not shutil.which("rg"):
+            self.skipTest("the native pipeline check requires Zsh and ripgrep")
         output = self.root / "reading output.txt"
         # Positional arguments carry paths; no interpolated shell code.
         script = 'cd -- "$1" && "$2" -B -m sol read sample.md --plain | rg --fixed-strings "$3" > "$4"'
-        result = subprocess.run(["/usr/bin/zsh", "-f", "-c", script, "sol-test", str(self.corpus),
+        result = subprocess.run([zsh, "-f", "-c", script, "sol-test", str(self.corpus),
                                  sys.executable, self.body, str(output)], env=self.env, text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(output.read_text(), self.body + "\n")

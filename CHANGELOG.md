@@ -28,3 +28,8 @@ module instead of importing the validator's private parser helpers.
 Public corpus fixtures, source-archive checks and GitHub Actions improve the
 repeatability of development. The source archive includes the research adapters
 needed by its tests; the installed wheel still contains application modules only.
+
+The first CI run exposed older assumptions about installed shell tools and the
+minimum Python version. Native pipeline checks now discover their executables,
+test context cleanup supports Python 3.10, and fractional UTC timestamps are
+parsed consistently across supported versions without rewriting saved data.

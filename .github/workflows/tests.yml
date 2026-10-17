@@ -26,6 +26,9 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Install reader and build tools
         run: python -m pip install . setuptools wheel
+      - name: Enable the native shell pipeline check
+        if: matrix.python == '3.14'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zsh ripgrep
       - name: Run public corpus, workspace, reader and archive checks
         run: python -B -m unittest discover -s tests
       - name: Check patch whitespace

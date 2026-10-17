@@ -12,6 +12,8 @@ import sqlite3
 import unicodedata
 from uuid import UUID, uuid4
 
+from sol.workspace.time import parse_utc_timestamp
+
 
 APPLICATION_ID = 0x534F4C41  # SOLA
 VERSION = 1
@@ -52,9 +54,10 @@ def _verify(connection):
             raise ValueError('invalid actor profile metadata')
         if str(UUID(identifier)) != identifier or actor_name(name) != name:
             raise ValueError('invalid actor profile metadata')
-        moment = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-        if moment.tzinfo is None or moment.utcoffset() != timezone.utc.utcoffset(moment):
-            raise ValueError('invalid actor profile timestamp')
+        try:
+            parse_utc_timestamp(timestamp)
+        except ValueError as error:
+            raise ValueError('invalid actor profile timestamp') from error
     return [{'id': identifier, 'name': name, 'created_at': timestamp} for identifier, name, timestamp in rows]
 
 

@@ -1,6 +1,7 @@
 """Native-shell launch contracts without opening a desktop window."""
 from __future__ import annotations
 
+from contextlib import ExitStack
 import io
 import os
 from pathlib import Path
@@ -19,12 +20,14 @@ class NativeLauncherTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.corpus = Path(self.temporary.name) / "corpus 'quoted' $(literal) `name`"
         self.corpus.mkdir()
-        self.which = self.enterContext(patch("sol.terminal.kitty.shutil.which",
+        contexts = ExitStack()
+        self.addCleanup(contexts.close)
+        self.which = contexts.enter_context(patch("sol.terminal.kitty.shutil.which",
             side_effect=lambda value: {"kitty": "/usr/bin/kitty", "zsh": "/usr/bin/zsh",
                                        "sol": "/opt/sol commands/sol"}.get(value)))
-        self.discover = self.enterContext(patch("sol.core.config.discover_corpus", return_value=self.corpus))
-        self.load = self.enterContext(patch("sol.core.corpus.load_corpus_book"))
-        self.run = self.enterContext(patch("sol.terminal.kitty.subprocess.run",
+        self.discover = contexts.enter_context(patch("sol.core.config.discover_corpus", return_value=self.corpus))
+        self.load = contexts.enter_context(patch("sol.core.corpus.load_corpus_book"))
+        self.run = contexts.enter_context(patch("sol.terminal.kitty.subprocess.run",
                                           return_value=SimpleNamespace(returncode=0)))
 
     def test_launch_uses_real_zsh_private_profile_and_literal_paths(self):

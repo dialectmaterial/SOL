@@ -15,6 +15,7 @@ import re
 import sqlite3
 
 from sol.workspace.store import Workspace, WorkspaceError, _hash, _string, _timestamp, _uuid
+from sol.workspace.time import parse_utc_timestamp
 
 
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
@@ -35,7 +36,7 @@ def _directory(directory: str | Path | None) -> Path:
 
 def _moment(value: str) -> datetime:
     _timestamp(value, "catalog activity time")
-    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+    return parse_utc_timestamp(value).astimezone(timezone.utc)
 
 
 def _summary(workspace: Workspace, name: str) -> tuple[datetime, dict]:

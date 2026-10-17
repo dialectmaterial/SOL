@@ -15,6 +15,9 @@ requirements are available. GitHub Actions runs the public suite on Python 3.10
 and 3.14. See [reader acceptance](docs/READER_ACCEPTANCE.md) for the additional
 terminal checks; passing unit tests is not evidence of manual reading quality.
 
+The Python 3.14 CI job also installs Zsh and ripgrep to exercise the native shell
+pipeline. That external-tool check skips explicitly when those programs are absent.
+
 ## Where behavior belongs
 
 | Area | Owner |
