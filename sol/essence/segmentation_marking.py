@@ -1,6 +1,6 @@
 """Blind text-editor forms over existing, private segmentation-review samples.
 
-Only inserted LF characters and the designated exclusion line are editable.
+Allow inserted LF characters, whitespace trimmed at those breaks, and exclusions.
 Canonical source whitespace and Unicode are never normalized or replaced.
 """
 from __future__ import annotations
@@ -95,19 +95,35 @@ def _sentences(source, body, *, form, body_start, label):
 
     Consume an original newline before considering inserted ones at that place.
     Thus an existing newline never becomes a sentence mark just by exporting.
+    After an inserted break, restore omitted source whitespace, never words or
+    original newlines. Retained whitespace on either side of the break is valid.
     """
     source_offset, start, sentences = 0, 0, []
+    trim_at_break = False
     for position, character in enumerate(body):
+        if trim_at_break and character != "\n":
+            while (source_offset < len(source) and source[source_offset].isspace()
+                   and source[source_offset] not in "\r\n" and source[source_offset] != character):
+                source_offset += 1
         if source_offset < len(source) and character == source[source_offset]:
             source_offset += 1
+            if character == "\n" or not character.isspace():
+                trim_at_break = False
         elif character == "\n":
             sentence = source[start:source_offset].strip()
             if sentence:
                 sentences.append(sentence)
             start = source_offset
+            trim_at_break = True
         else:
             raise ValueError(f"{label}: source mismatch at codepoint {source_offset + 1} "
-                             f"({_place(form, body_start + position)}); only added LF line breaks are allowed")
+                             f"({_place(form, body_start + position)}); only added LF breaks and trimmed "
+                             "whitespace at those breaks are allowed")
+    # The block's fixed end delimiter also starts with an added LF: an editor
+    # may trim source spaces there even when no final sentence mark was added.
+    while (source_offset < len(source) and source[source_offset].isspace()
+           and source[source_offset] not in "\r\n"):
+        source_offset += 1
     if source_offset != len(source):
         raise ValueError(f"{label}: source text missing at codepoint {source_offset + 1} "
                          f"({_place(form, body_start + len(body))}); retain all original characters")
@@ -127,7 +143,7 @@ def import_marking_form(snapshot, sample, form, *, reviewer):
     result["reviewer"] = reviewer
     for number, row in enumerate(result["passages"], 1):
         label = f"Passage {number} ({row['id']})"
-        position = _expect(form, position, _heading(number, row) + "EXCLUDE: ", label + " heading")
+        position = _expect(form, position, _heading(number, row) + "EXCLUDE:", label + " heading")
         end_reason = form.find("\n", position)
         if end_reason < 0:
             raise ValueError(f"{label}: missing exclusion line end at {_place(form, position)}")
