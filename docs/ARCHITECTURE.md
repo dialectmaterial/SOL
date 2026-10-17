@@ -83,6 +83,29 @@ Workstreams can overlap, but must stay bounded:
 
 Acceptance must include actual normal-terminal trials (Alacritty), failure cases, corpus freshness, resizes, Unicode, math preview, a complete research round trip, source return, and workspace integrity. Report automated pass/fail, integration behavior, manual visual assessment, and known limits **separately**.
 
+### Reader measurements — 18 October 2026
+
+[`scripts/reader_timings.py`](../scripts/reader_timings.py) is an opt-in developer
+diagnostic, not an installed reader command or another frontend. It defaults to
+invented text; a private corpus must be selected explicitly:
+
+```sh
+.venv/bin/python -B scripts/reader_timings.py --repeats 5 --warmups 1
+.venv/bin/python -B scripts/reader_timings.py --corpus /absolute/path/to/local-corpus --json
+```
+
+It reports `time.perf_counter` medians, min–max, quartiles and raw samples for
+load/verification, ordinary and note-heavy payloads, standalone typography,
+Python startup to first payload, and controller next/previous, search/open,
+history and section study. The controller is real; only its Neovim boundary is
+replaced. Workspaces, study artifacts and XDG state are temporary. Generation
+checks and persistence guards remain enabled; no cache or optimisation is added.
+These warm-process measurements exclude imports, Neovim launch, IPC, drawing and
+human key-to-screen latency. Stages overlap and differently sized sections are
+not a controlled estimate of footnote overhead. Keep real-book reports outside
+Git; [handoffs](coordination/HANDOFF.md) may quote measurements and candidates
+for later profiling, never adopt optimisations from timing differences alone.
+
 ## 7. Agentic development policy
 
 - Start by reading `git status`, `git diff`, recent commits, these four current documents, and the relevant code/tests. Never assume a prior handoff is the current state. Do not discard uncommitted work.
