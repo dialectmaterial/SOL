@@ -32,6 +32,33 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Keep dismissed marks dismissed and study the live paragraph — 18 October 2026
+
+**Task:** [CURRENT_TASK](CURRENT_TASK.md), "Claude Code: Keep dismissed marks dismissed and study the live paragraph" ([proposal stage 2](proposals/CODEX_READER_WORKSPACE_PLAN.md#2-stabilize-transient-reader-state), live-origin part of stage 7)
+**Branch / PR:** `claude/transient-reader-state` · opened with `gh pr create`
+**Last implementation commit:** `ca654fbe851e5769727d51dcc172a34c6fb23cdf`
+
+### Changed files
+- `sol/terminal/neovim.lua` — `Esc` also clears `data.search_marks`, so views rebuilt from the current one (`p`, `f`, paragraph-mode `b/n`) no longer redraw dismissed marks.
+- `sol/terminal/neovim_reader.py` — the study's origin is the request packet's reference (checked with `check_return_reference`), not Python's last accepted position.
+- `tests/test_reader_surface_neovim.py` — headless Neovim: dismissal survives `p`, `]p`/`[p`, `p`, `f`, resize and `T`, and a new result shows marks; exact selection and yank around callouts, multibyte/combining characters and emphasis, forward and reverse, both modes, widths 72 and 24.
+- `tests/test_neovim_reader.py` — the study origin follows the live packet, saves no visit, and Alt-Left from a result returns to the live cursor.
+- `docs/BEING.md` (§2 controls table and "Transient state"), `CHANGELOG.md`.
+
+### Tests performed
+- Reproduced first: marks returned after `p`, `]p`/`[p` and `f` (not after resize or `T`); the study named the previously saved paragraph as origin.
+- The selection/yank test passed before the change; it pins existing behaviour.
+- `.venv/bin/python -B scripts/check_docs.py` — OK.
+- `.venv/bin/python -B -m unittest discover -s tests` — 1568 tests, OK (11 skipped, 4 expected failures).
+- Real terminal: none by hand. The headless tests run the real Lua adapter in Neovim, not a terminal emulator.
+
+### Outstanding issues
+- `Esc` hides marks for the shown view only; history back to a search result reloads from Python without marks, as before (history never restored marks).
+- Visual checks in Alacritty/Kitty at 80x24 remain for the stage 5 reading pass.
+
+### Decisions requiring approval
+- **When marks return.** Implemented as the proposal suggested: only a newly opened search result (`/` then Enter, Ctrl-N/Ctrl-P) shows marks again; mode, focus, theme and layout changes never do.
+
 ## Sentence-segmentation error measurement — 18 October 2026
 
 **Task:** [Codex: Measure sentence-segmentation error](https://github.com/dialectmaterial/SOL/blob/b07fdffacaf9ac812d947b351bb7a309d6e4b966/docs/coordination/CURRENT_TASK.md#codex-measure-sentence-segmentation-error).
