@@ -515,6 +515,13 @@ end
   local order = {}
   for _ = 1, 3 do order[#order + 1] = reader.cycle_theme() end
   report.order = order
+  -- The live cursor keeps its source position through every preset.
+  local resting = reader.capture('n', nil, reader.source_point(data.records[1].id, 7))
+  reader.restore(resting)
+  for _ = 1, 3 do
+    vim.api.nvim_feedkeys('T', 'xt', false)
+    assert(vim.deep_equal(SOLNvimReader.capture(), resting), 'theme switch moved the reading position')
+  end
   -- Terminal hands foreground, background and palette back to the host.
   reader.cycle_theme()
   assert(reader.theme() == 'terminal' and not vim.o.termguicolors and next(normal()) == nil)
