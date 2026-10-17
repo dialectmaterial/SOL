@@ -34,7 +34,7 @@ Write "None." rather than deleting a heading.
 
 ## Editor-trimmed marking forms — 18 October 2026
 
-**Task:** [Codex: Make sentence marking practical by hand](CURRENT_TASK.md#codex-make-sentence-marking-practical-by-hand), maintainer-requested follow-up to [Claude's PR #8 review](https://github.com/dialectmaterial/SOL/pull/8#issuecomment-6242615575).
+**Task:** [Codex: Make sentence marking practical by hand](https://github.com/dialectmaterial/SOL/blob/11576774cadab3a9ad204128fae3abf1b44b9cc3/docs/coordination/CURRENT_TASK.md#codex-make-sentence-marking-practical-by-hand), maintainer-requested follow-up to [Claude's PR #8 review](https://github.com/dialectmaterial/SOL/pull/8#issuecomment-6242615575).
 **Branch / PR:** `codex/marking-form-trailing-space` · [PR #11](https://github.com/dialectmaterial/SOL/pull/11), opened with `gh pr create --base main`. Status: `In review`.
 **Last implementation commit:** `7d553efc66fcea8271a5afcb87b1f4b58e5a5df2` (fix and documentation; this report follows).
 
@@ -62,7 +62,7 @@ Write "None." rather than deleting a heading.
 
 ## Sentence marking in an ordinary text editor — 18 October 2026
 
-**Task:** [Codex: Make sentence marking practical by hand](CURRENT_TASK.md#codex-make-sentence-marking-practical-by-hand).
+**Task:** [Codex: Make sentence marking practical by hand](https://github.com/dialectmaterial/SOL/blob/11576774cadab3a9ad204128fae3abf1b44b9cc3/docs/coordination/CURRENT_TASK.md#codex-make-sentence-marking-practical-by-hand).
 **Branch / PR:** `codex/segmentation-marking-form` · [PR #8](https://github.com/dialectmaterial/SOL/pull/8), opened with `gh pr create --base main`. Task status: `In review`.
 **Last implementation commit:** `6e27ed1c58d6439e6b7ec46603a0884d39074f25` (implementation and documentation; the task-board merge and this report follow).
 
