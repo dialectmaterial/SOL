@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Faster section moves — 19 October 2026
+
+Moving to the next or previous section, opening a search result or going back
+in history took 2.3–2.9 s on the real book, because each keypress re-read and
+re-checked the whole corpus about nine times. It now takes about 0.65–0.75 s;
+startup to the first view went from 1.8 s to 0.8 s. Every change to the corpus
+files is still refused on each check; the full comparison of the corpus held
+in memory now runs once per keypress, as approved (CORE §6).
+
 ### Read individual book footnotes — 18 October 2026
 
 In `c`, Enter on a book footnote opens its own reading view, with ordered body

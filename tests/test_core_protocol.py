@@ -36,13 +36,13 @@ class CoreProtocolTests(unittest.TestCase):
         identifiers = [self.identifier, self.snapshot.records[0]["id"], self.identifier]
         with patch.object(contract, "load_snapshot", wraps=contract.load_snapshot) as load:
             payloads = core.capture_references(self.snapshot, identifiers)
-        self.assertEqual(load.call_count, 1)
+        self.assertLessEqual(load.call_count, 1)
         self.assertEqual([p["reference"]["requested_id"] for p in payloads], identifiers)
         self.assertEqual(payloads[0], self.payload)
         self.assertIsNot(payloads[0], payloads[2])
         with patch.object(contract, "load_snapshot", wraps=contract.load_snapshot) as load:
             refs = core.check_references(self.snapshot, payloads)
-        self.assertEqual(load.call_count, 1)
+        self.assertLessEqual(load.call_count, 1)
         self.assertEqual([r.requested_id for r in refs], identifiers)
 
     def test_batch_refuses_bad_last_packet_and_generation_changes(self):
@@ -201,6 +201,51 @@ class CoreProtocolTests(unittest.TestCase):
         with self.assertRaises(core.ProtocolError) as caught:
             core.capture_reference(self.snapshot, self.identifier)
         self.assertEqual(caught.exception.status, "stale")
+
+    def test_single_action_compares_memory_once_but_checks_files_on_every_call(self):
+        from sol.core.protocol import single_action
+
+        snapshot = copy.deepcopy(self.snapshot)
+        with single_action(snapshot):
+            core.capture_reference(snapshot, self.identifier)
+            # Within the action, an in-memory change is not compared again...
+            snapshot.records[1]["markdown"] = "Misleading memory"
+            payload = core.capture_reference(snapshot, self.identifier)
+            # ...but the result still comes from the verified files, not memory.
+            self.assertEqual(payload, self.payload)
+            # Another snapshot object inside the same action gets the full comparison.
+            other = copy.deepcopy(snapshot)
+            with self.assertRaises(core.ProtocolError) as caught:
+                core.capture_reference(other, self.identifier)
+            self.assertEqual(caught.exception.code, "snapshot_modified")
+        # The next action refuses the modified snapshot.
+        with single_action(snapshot), self.assertRaises(core.ProtocolError) as caught:
+            core.check_reference(snapshot, self.payload)
+        self.assertEqual(caught.exception.code, "snapshot_modified")
+        # A file changed between two calls of one action is refused at once.
+        with single_action(self.snapshot):
+            core.capture_reference(self.snapshot, self.identifier)
+            (self.corpus / "sample.md").write_text("Changed without reindexing", encoding="utf-8")
+            with self.assertRaises(core.ProtocolError) as caught:
+                core.check_reference(self.snapshot, self.payload)
+            self.assertEqual(caught.exception.code, "generation_changed")
+
+    def test_records_returned_inside_an_action_cannot_change_later_results(self):
+        # Reported by Codex's review of PR #16.
+        from sol.core.protocol import single_action
+
+        for check in (lambda payload: core.check_reference(self.snapshot, payload),
+                      lambda payload: core.check_references(self.snapshot, [payload, payload])[1]):
+            with self.subTest(check=check), single_action(self.snapshot):
+                returned = check(self.payload)
+                returned.record["attribution"]["author"] = "Invented injected author"
+                returned.record["sources"].append({"pdf_page": 999})
+                later = core.capture_reference(self.snapshot, self.identifier)
+                self.assertEqual(later, self.payload)
+                self.assertEqual(check(later).record["attribution"], self.snapshot.records[
+                    [row["id"] for row in self.snapshot.records].index(self.identifier)]["attribution"])
+            self.assertEqual(core.check_reference(self.snapshot, self.payload).record["attribution"]["author"],
+                             later["reference"]["attribution"]["author"])
 
     def test_changed_files_during_capture_or_check_are_refused(self):
         with patch.object(contract, "verify_snapshot_current", side_effect=contract.CorpusError("Invented race")):

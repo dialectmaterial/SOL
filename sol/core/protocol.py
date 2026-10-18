@@ -6,6 +6,10 @@ with that corpus generation, not authorship, authentication, or PDF accuracy.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+from copy import deepcopy
+from dataclasses import replace
 import hashlib
 import json
 import math
@@ -191,30 +195,108 @@ def encode_reference(payload):
     return text
 
 
+# The last few verified disk generations, kept only as immutable JSON text. A
+# match on every fingerprint means the files hold the same bytes that were fully
+# loaded and validated, so a reload would parse the same records. Each call still
+# gets new dictionaries, and still compares the caller's snapshot in full.
+_VERIFIED_GENERATIONS = {}
+_VERIFIED_LIMIT = 4
+
+
+def _generation_key(snapshot):
+    return (str(snapshot.corpus_directory), str(snapshot.index_file), snapshot.manifest_sha256,
+            snapshot.index_sha256, snapshot.index_metadata_sha256,
+            json.dumps(snapshot.documents, sort_keys=True, ensure_ascii=True))
+
+
+def _load_fresh(snapshot):
+    from sol.corpus.contract import CorpusError, CorpusSnapshot, load_snapshot, verify_snapshot_current
+
+    key = _generation_key(snapshot)
+    cached = _VERIFIED_GENERATIONS.get(key)
+    if cached is None:
+        try:
+            fresh = load_snapshot(snapshot.corpus_directory, index=snapshot.index_file)
+        except CorpusError as error:
+            raise ProtocolError("The selected corpus generation is no longer valid; reopen after correcting/reindexing it",
+                                status="stale", code="generation_changed") from error
+        if _generation_key(fresh) == key:
+            texts = (json.dumps(fresh.manifest, ensure_ascii=False, separators=(",", ":"), allow_nan=False),
+                     json.dumps(fresh.records, ensure_ascii=False, separators=(",", ":"), allow_nan=False),
+                     _json(fresh.manifest), _json(fresh.records))
+            while len(_VERIFIED_GENERATIONS) >= _VERIFIED_LIMIT:
+                _VERIFIED_GENERATIONS.pop(next(iter(_VERIFIED_GENERATIONS)))
+            _VERIFIED_GENERATIONS[key] = texts
+            return fresh, texts[2], texts[3]
+        return fresh, _json(fresh.manifest), _json(fresh.records)
+    manifest_text, records_text, manifest_canonical, records_canonical = cached
+    fresh = CorpusSnapshot(
+        corpus_directory=snapshot.corpus_directory, manifest=json.loads(manifest_text),
+        records=json.loads(records_text), manifest_sha256=snapshot.manifest_sha256,
+        index_sha256=snapshot.index_sha256, documents=dict(snapshot.documents),
+        index_file=snapshot.index_file, index_metadata_sha256=snapshot.index_metadata_sha256)
+    # The fingerprints are checked against the cached manifest, not the
+    # caller's possibly modified one; any change in the files refuses.
+    try:
+        verify_snapshot_current(fresh)
+    except CorpusError as error:
+        _VERIFIED_GENERATIONS.pop(key, None)
+        raise ProtocolError("The loaded corpus generation changed; reopen before transferring a reference",
+                            status="stale", code="generation_changed") from error
+    return fresh, manifest_canonical, records_canonical
+
+
+# One reader action: the snapshot it was entered for, and its verified copy.
+_ACTION = ContextVar("sol_reference_action", default=None)
+
+
+@contextmanager
+def single_action(snapshot):
+    """Compare the caller's in-memory snapshot in full once for one user action.
+
+    Inside the block, every capture or check still verifies the corpus files'
+    fingerprints, but the full comparison of the caller's snapshot and the
+    disk-verified copy run once, at the first call, and that copy is reused.
+    A modification of the in-memory snapshot during the block is refused by the
+    next action. Approved by the maintainer on 19 October 2026 (CORE §5).
+    """
+    token = _ACTION.set({"snapshot": snapshot, "fresh": None})
+    try:
+        yield
+    finally:
+        _ACTION.reset(token)
+
+
 def _fresh_snapshot(snapshot):
-    from sol.corpus.contract import CorpusError, CorpusSnapshot, load_snapshot
+    from sol.corpus.contract import CorpusError, CorpusSnapshot, verify_snapshot_current
 
     if not isinstance(snapshot, CorpusSnapshot):
         raise ProtocolError("References require a verified canonical CorpusSnapshot", code="unverified_snapshot")
-    try:
-        fresh = load_snapshot(snapshot.corpus_directory, index=snapshot.index_file)
-    except CorpusError as error:
-        raise ProtocolError("The selected corpus generation is no longer valid; reopen after correcting/reindexing it",
-                            status="stale", code="generation_changed") from error
+    action = _ACTION.get()
+    if action is not None and action["snapshot"] is snapshot and action["fresh"] is not None:
+        try:
+            verify_snapshot_current(action["fresh"])
+        except CorpusError as error:
+            raise ProtocolError("The loaded corpus generation changed; reopen before transferring a reference",
+                                status="stale", code="generation_changed") from error
+        return action["fresh"]
+    fresh, manifest_canonical, records_canonical = _load_fresh(snapshot)
     if (fresh.manifest_sha256 != snapshot.manifest_sha256 or fresh.index_sha256 != snapshot.index_sha256
             or fresh.index_metadata_sha256 != snapshot.index_metadata_sha256 or fresh.documents != snapshot.documents):
         raise ProtocolError("The loaded corpus generation changed; reopen before transferring a reference",
                             status="stale", code="generation_changed")
     # A frozen snapshot still contains mutable dictionaries. Do not describe
     # caller-modified records using the original disk-generation fingerprints.
-    if (_json(_json_value(snapshot.manifest)) != _json(fresh.manifest)
-            or _json(_json_value(snapshot.records)) != _json(fresh.records)):
+    if (_json(_json_value(snapshot.manifest)) != manifest_canonical
+            or _json(_json_value(snapshot.records)) != records_canonical):
         raise ProtocolError("The in-memory corpus snapshot was modified; reload canonical data",
                             status="stale", code="snapshot_modified")
     if fresh.corpus_id is None:
         raise ProtocolError("The corpus needs an explicitly initialized permanent identity; "
                             "use sol-corpus-check DIRECTORY --initialize-identity (never reconvert it)",
                             code="missing_corpus_identity")
+    if action is not None and action["snapshot"] is snapshot:
+        action["fresh"] = fresh
     return fresh
 
 
@@ -294,7 +376,9 @@ def check_references(snapshot, payloads):
     records = {record["id"]: record for record in fresh.records}
     references = [_check_on_snapshot(fresh, payload, records) for payload in payloads]
     _still_current(fresh)
-    return references
+    # The verified graph may serve the rest of a single action; a caller gets
+    # its own copy of each record, so changing it cannot alter later checks.
+    return [replace(reference, record=deepcopy(reference.record)) for reference in references]
 
 
 def _check_on_snapshot(fresh, payload, records):

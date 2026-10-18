@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass
 import sys
 import unicodedata
 
+from sol.core.protocol import single_action
 from sol.reader.actions import ReaderActions
 from sol.reader.surface import Sample
 from sol.reader.structure import structure_payload
@@ -203,7 +204,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                                "theme": payload["theme"], "personal": payload["personal"]})
         return payload, sample, extent
 
-    payload, sample, extent = prepare()
+    with single_action(book.corpus_snapshot):
+        payload, sample, extent = prepare()
 
     # Each action's extra fields, their checks and the refusals shown in Neovim.
     # Actions without an entry take no extra field.
@@ -348,6 +350,12 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
               "note_edit": note_edit_panel, "note_history": note_history_panel, "footnote_open": footnote_panel}
 
     def handle(request):
+        # One editor request is one user action: CORE compares the in-memory
+        # corpus once for it and still checks the files on every reference.
+        with single_action(book.corpus_snapshot):
+            return handle_action(request)
+
+    def handle_action(request):
         nonlocal payload, sample, extent, mode, start_tree, notice, focused, theme, search_marks
         operation = request.get("op")
         fields = {"op", "packet", "mode"}

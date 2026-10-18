@@ -821,6 +821,26 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 0)
 
+    def test_corpus_changed_between_two_requests_is_refused_without_saving(self):
+        self.extend(3)
+        service = self.service()
+        self.position(service, 4)
+
+        def native(payload, _, on_request):
+            shown = on_request({"op": "next", "packet": payload["restore"], "mode": "continuous"})["payload"]
+            saved = service.store.get_state()
+            source = self.corpus / "sample.md"
+            source.write_text(source.read_text() + "\nAn unindexed edit.\n")
+            for operation in ("next", "previous", "passage_next"):
+                with self.subTest(operation=operation), self.assertRaises(ValueError):
+                    on_request({"op": operation, "packet": shown["restore"], "mode": "continuous"})
+            self.assertEqual(service.store.get_state(), saved)
+            return 1, None
+
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 1)
+
     def test_cross_section_paragraph_previous_lands_at_beginning_and_keeps_focus(self):
         self.extend(3)
         def native(payload, _, on_request):
