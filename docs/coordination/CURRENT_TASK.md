@@ -47,7 +47,7 @@ reported separately.
 
 ## Codex: ESSENCE stage 3 engine, comparison measures and export
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `codex/essence-comparison`
 **Requested:** 19 October 2026, by the maintainer
 
