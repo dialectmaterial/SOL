@@ -73,6 +73,7 @@ Write "None." rather than deleting a heading.
 
 ### Outstanding issues
 - The nested-terminal arrangement (keys, alt-keys, resizing, launch latency) is unproven on this machine; the brief says so too.
+- Open alternative recorded at the maintainer's request (ESSENCE §4, referenced from Architecture §4): Textual as the outer host with Neovim embedded; not adopted; proposed test: an `nvim --embed` spike plus the reading-trial evidence.
 - Open decisions listed in ESSENCE §4: entry key and `S`; split side, widths, focus; investigation persistence and background jobs; provider/adapter API and package split; first tokenizer and scopes; encyclopedia source format and governance; Textual as base or optional dependency.
 
 ### Decisions requiring approval
