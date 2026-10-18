@@ -717,6 +717,34 @@ end
         self.assertIn("Revision 2 (edited), Invented reader, 2026-10-18T09:00:00Z\n  My revised\n  thought", history)
         self.assertLess(history.index("Revision 2"), history.index("Revision 1"))
 
+    def test_start_up_placeholder_asks_once_for_the_page_and_loads_it(self):
+        splash = self.root / "splash.json"
+        splash.write_text(json.dumps({"pending": True, "message": "Opening The Science of Logic…"}), encoding="utf-8")
+        report = self.run_lua(r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  _G.SOLNvimReader = nil
+  vim.env.SOL_NVIM_SPLASH, vim.env.SOL_NVIM_INPUT = '1', SPLASH_FILE_PATH
+  vim.api.nvim_set_current_buf(vim.api.nvim_create_buf(true, false))
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))()
+  local placeholder = vim.api.nvim_get_current_buf()
+  report.shown = table.concat(vim.api.nvim_buf_get_lines(placeholder, 0, -1, false), '\n')
+  report.requests = {}
+  for _, message in ipairs(sent) do report.requests[#report.requests + 1] = message.op end
+  report.reader_before = SOLNvimReader ~= nil
+  vim.env.SOL_NVIM_SPLASH = nil
+  _G.SOLReaderChannel.pending[sent[1].id]({payload = vim.deepcopy(data)})
+  report.reader_after = SOLNvimReader ~= nil and #SOLNvimReader.records == #data.records
+  report.cleared = table.concat(vim.api.nvim_buf_get_lines(placeholder, 0, -1, false), '')
+'''.replace("SPLASH_FILE_PATH", json.dumps(str(splash))), integrated=True)
+        self.assertIn("Opening The Science of Logic…", report["shown"])
+        self.assertNotIn(self.sample.passages[0].text[:20], report["shown"])
+        self.assertEqual(report["requests"], ["initial"])
+        self.assertFalse(report["reader_before"])
+        self.assertTrue(report["reader_after"])
+        self.assertEqual(report["cleared"], "")
+
     def test_footnote_callouts_show_inline_without_changing_source_text(self):
         report = self.run_lua(r'''
   local payload = vim.deepcopy(data)

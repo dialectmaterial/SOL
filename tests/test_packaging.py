@@ -231,6 +231,8 @@ def native(payload, executable, **options):
     assert payload['records'] and payload['restore']['cursor_offset'] == 0
     return 0, {'action': 'quit', 'packet': payload['restore']}
 neovim.launch_payload = native
+from sol.terminal import neovim_reader
+neovim_reader.EARLY_START = False  # This stub serves the first page directly.
 raise SystemExit(app.main(['-n', '--engine', 'neovim', '--corpus', sys.argv[2]]))
 """
         result = subprocess.run([sys.executable, "-I", "-B", "-c", program, str(installed), str(corpus)],

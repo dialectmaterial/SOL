@@ -20,6 +20,10 @@ from sol.terminal.theme import DEFAULT_THEME, THEMES
 
 
 SECTION_BUDGET = 64
+# Start Neovim with a placeholder while Python restores the position and builds
+# the first page in parallel; tests that stub Neovim set this to False.
+EARLY_START = True
+SPLASH = {"pending": True, "message": "Opening The Science of Logic…"}
 NOTE_LIMIT = 20000
 REVIEW_NOTES = {
     "needs_visual_review": "The typed text is an unreviewed transcription and may be wrong. "
@@ -113,10 +117,6 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     notice = ""
     # Match spans for the passage a search action just opened; other actions clear them.
     search_marks = None
-    if workspace_reader is not None and workspace_reader.store.get_state() is not None:
-        _, notice = actions.restore()
-    else:
-        actions.read((), first=True)
     transient_markers = {}
     # The latest sentence study shown in this session, for opening its rows.
     study = None
@@ -204,8 +204,33 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                                "theme": payload["theme"], "personal": payload["personal"]})
         return payload, sample, extent
 
-    with single_action(book.corpus_snapshot):
-        payload, sample, extent = prepare()
+    def first_view():
+        # Restore the saved position and build the first page, with every
+        # check, before anything is shown; possibly while Neovim starts.
+        nonlocal notice
+        with single_action(book.corpus_snapshot):
+            if workspace_reader is not None and workspace_reader.store.get_state() is not None:
+                _, notice = actions.restore()
+            else:
+                actions.read((), first=True)
+            return prepare()
+
+    # Start Neovim on a placeholder first, so its start-up overlaps with the
+    # work below; its request for the page waits until that work is done.
+    # Every request is still served on this thread, which owns the workspace.
+    session = neovim.start_payload(SPLASH, executable, on_request=lambda request: handle(request)) if EARLY_START else None
+    waiting, failure = session is not None, None
+    try:
+        payload, sample, extent = first_view()
+    except (ValueError, RuntimeError, OSError) as error:
+        if session is None:
+            raise
+        payload = sample = extent = None
+        failure = error
+    except BaseException:
+        if session is not None:
+            session.abort()
+        raise
 
     # Each action's extra fields, their checks and the refusals shown in Neovim.
     # Actions without an entry take no extra field.
@@ -350,6 +375,16 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
               "note_edit": note_edit_panel, "note_history": note_history_panel, "footnote_open": footnote_panel}
 
     def handle(request):
+        nonlocal waiting
+        if request.get("op") == "initial":
+            # The placeholder screen asks for the first page once. A start-up
+            # failure closes it and is raised again after Neovim has exited.
+            if set(request) != {"op"} or not waiting:
+                raise ValueError("invalid reader action")
+            waiting = False
+            if failure is not None:
+                raise ValueError(f"SOL could not open the book: {failure}")
+            return {"payload": payload}
         # One editor request is one user action: CORE compares the in-memory
         # corpus once for it and still checks the files on every reference.
         with single_action(book.corpus_snapshot):
@@ -449,7 +484,17 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         return {"payload": payload}
 
     while True:
-        status, result = neovim.launch_payload(payload, executable, on_request=handle)
+        if session is not None:
+            status, result = session.wait()
+            session = None
+        else:
+            status, result = neovim.launch_payload(payload, executable, on_request=handle)
+        if failure is not None:
+            raise failure
+        if waiting:
+            # Neovim closed before it took the first page: nothing was shown
+            # or saved.
+            return status
         if status or result is None:
             # :qa! / interruption / a crashed editor does not save an unchecked
             # current cursor. Earlier successful saves are retained.

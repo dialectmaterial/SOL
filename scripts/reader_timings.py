@@ -175,7 +175,9 @@ def controller_session(directory, root, number, width, measure):
     try:
         with patch.object(neovim, "validate_environment", return_value="not-launched"), \
                 patch.object(neovim, "launch_payload", side_effect=frontend):
-            neovim_reader.run_reader(book, service, width=width, emphasis="underline")
+            # Measures Python's work to the first page; Neovim's early start is not timed here.
+            with patch.object(neovim_reader, "EARLY_START", False):
+                neovim_reader.run_reader(book, service, width=width, emphasis="underline")
         if startup is None:
             raise ValueError("controller did not prepare its first payload")
         return startup

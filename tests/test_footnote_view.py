@@ -138,5 +138,6 @@ class FootnoteViewTests(CorpusFixture, unittest.TestCase):
 
         with patch.object(neovim, "validate_environment", return_value="/invented/nvim"), \
                 patch.object(neovim, "launch_payload", side_effect=native):
-            self.assertEqual(neovim_reader.run_reader(self.book, service), 1)
+            with patch.object(neovim_reader, "EARLY_START", False):
+                self.assertEqual(neovim_reader.run_reader(self.book, service), 1)
         self.assertEqual(before, self.files())

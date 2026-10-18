@@ -195,10 +195,11 @@ def encode_reference(payload):
     return text
 
 
-# The last few verified disk generations, kept only as immutable JSON text. A
-# match on every fingerprint means the files hold the same bytes that were fully
-# loaded and validated, so a reload would parse the same records. Each call still
-# gets new dictionaries, and still compares the caller's snapshot in full.
+# The last few verified disk generations: their canonical JSON text and a
+# private parsed copy. A match on every fingerprint means the files hold the
+# same bytes that were fully loaded and validated, so a reload would parse the
+# same records. The copy is never handed out (checks return deep copies,
+# captures are rebuilt), and each call still compares the caller's snapshot.
 _VERIFIED_GENERATIONS = {}
 _VERIFIED_LIMIT = 4
 
@@ -218,11 +219,10 @@ def _remember(fresh):
     """
     _json_value(fresh.manifest)
     _json_value(fresh.records)
-    manifest_text = json.dumps(fresh.manifest, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
-    records_text = json.dumps(fresh.records, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
-    # The parsed copies serve only comparisons; they are never returned.
-    cached = (manifest_text, records_text, _json(fresh.manifest), _json(fresh.records),
-              json.loads(manifest_text), json.loads(records_text))
+    # The private copies serve comparisons and, read-only, as each call's
+    # verified records; CORE never hands them out (checks return deep copies,
+    # captures are rebuilt). Copied from a snapshot nobody else holds yet.
+    cached = (_json(fresh.manifest), _json(fresh.records), deepcopy(fresh.manifest), deepcopy(fresh.records))
     while len(_VERIFIED_GENERATIONS) >= _VERIFIED_LIMIT:
         _VERIFIED_GENERATIONS.pop(next(iter(_VERIFIED_GENERATIONS)))
     _VERIFIED_GENERATIONS[_generation_key(fresh)] = cached
@@ -260,12 +260,11 @@ def _load_fresh(snapshot):
             raise ProtocolError("The selected corpus generation is no longer valid; reopen after correcting/reindexing it",
                                 status="stale", code="generation_changed") from error
         if _generation_key(fresh) == key:
-            return fresh, _remember(fresh)[2:]
+            return fresh, _remember(fresh)
         return fresh, None
-    manifest_text, records_text = cached[:2]
     fresh = CorpusSnapshot(
-        corpus_directory=snapshot.corpus_directory, manifest=json.loads(manifest_text),
-        records=json.loads(records_text), manifest_sha256=snapshot.manifest_sha256,
+        corpus_directory=snapshot.corpus_directory, manifest=cached[2],
+        records=cached[3], manifest_sha256=snapshot.manifest_sha256,
         index_sha256=snapshot.index_sha256, documents=dict(snapshot.documents),
         index_file=snapshot.index_file, index_metadata_sha256=snapshot.index_metadata_sha256)
     # The fingerprints are checked against the cached manifest, not the
@@ -276,7 +275,7 @@ def _load_fresh(snapshot):
         _VERIFIED_GENERATIONS.pop(key, None)
         raise ProtocolError("The loaded corpus generation changed; reopen before transferring a reference",
                             status="stale", code="generation_changed") from error
-    return fresh, cached[2:]
+    return fresh, cached
 
 
 def _unmodified(value, canonical, verified):

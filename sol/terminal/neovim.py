@@ -324,37 +324,74 @@ def _isolated_environment(root, input_path, output_path):
     return environment
 
 
-def launch_payload(payload, executable, *, on_request=None):
-    """One native, isolated terminal session; its result is still untrusted."""
-    adapter = Path(__file__).with_name("neovim.lua")
-    if not adapter.is_file():
-        raise RuntimeError("the optional Neovim reader adapter is unavailable; reinstall SOL")
-    encoded = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8")
-    if len(encoded) > 16 * 1024 * 1024:
-        raise ValueError("the reading section exceeds Neovim's 16 MiB presentation budget")
-    with tempfile.TemporaryDirectory(prefix="sol-neovim-reader-") as temporary:
-        root = Path(temporary)
-        root.chmod(0o700)
-        input_path, output_path = root / "input.json", root / "result.json"
-        environment = _isolated_environment(root, input_path, output_path)
-        _write_json(input_path, payload)
-        command = [executable, "--clean", "-u", "NONE", "-i", "NONE", "-n", "--noplugin",
-                   "--cmd", _READ_ONLY_OPTIONS, "-c", _STOP_SERVERS, "-c", _LOAD_ADAPTER]
+class NativeSession:
+    """One isolated Neovim process, started now and served later on this thread."""
+
+    def __init__(self, payload, executable, on_request):
+        adapter = Path(__file__).with_name("neovim.lua")
+        if not adapter.is_file():
+            raise RuntimeError("the optional Neovim reader adapter is unavailable; reinstall SOL")
+        encoded = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        if len(encoded) > 16 * 1024 * 1024:
+            raise ValueError("the reading section exceeds Neovim's 16 MiB presentation budget")
+        self._temporary = tempfile.TemporaryDirectory(prefix="sol-neovim-reader-")
         try:
+            root = Path(self._temporary.name)
+            root.chmod(0o700)
+            input_path, self._output = root / "input.json", root / "result.json"
+            environment = _isolated_environment(root, input_path, self._output)
+            if payload.get("pending") is True:
+                environment["SOL_NVIM_SPLASH"] = "1"
+            _write_json(input_path, payload)
+            command = [executable, "--clean", "-u", "NONE", "-i", "NONE", "-n", "--noplugin",
+                       "--cmd", _READ_ONLY_OPTIONS, "-c", _STOP_SERVERS, "-c", _LOAD_ADAPTER]
             # Inherit the real terminal: its screen is not embedded or piped.
             # Optional action pipes carry data only, with no shell or listener.
-            # Native startup briefly creates its own
-            # private RPC socket; the first -c immediately stops every listener.
-            if on_request is None:
-                code = subprocess.run(command, cwd=root, env=environment, check=False).returncode
-            else:
-                from sol.terminal.reader_channel import run_native
-                code = run_native(command, cwd=root, env=environment, handler=on_request)
-        except KeyboardInterrupt:
-            return 130, None
-        if code:
-            return (code if code > 0 else 128 - code), None
-        return 0, _read_packet(output_path) if output_path.exists() else None
+            # Native startup briefly creates its own private RPC socket; the
+            # first -c immediately stops every listener.
+            self._on_request, self._command, self._root, self._environment = on_request, command, root, environment
+            self._channel = None
+            if on_request is not None:
+                # Only a session with an action channel starts early; the plain
+                # research export runs Neovim when waited on, as before.
+                from sol.terminal.reader_channel import NativeChannel
+                self._channel = NativeChannel(command, cwd=root, env=environment)
+        except BaseException:
+            self._temporary.cleanup()
+            raise
+
+    def wait(self):
+        """Serve requests until Neovim exits; returns (status, packet or None)."""
+        try:
+            try:
+                code = (subprocess.run(self._command, cwd=self._root, env=self._environment, check=False).returncode
+                        if self._channel is None else self._channel.serve(self._on_request))
+            except KeyboardInterrupt:
+                return 130, None
+            if code:
+                return (code if code > 0 else 128 - code), None
+            return 0, _read_packet(self._output) if self._output.exists() else None
+        finally:
+            self._temporary.cleanup()
+
+
+    def abort(self):
+        """Stop a started session that will not be served."""
+        try:
+            if self._channel is not None:
+                self._channel.abort()
+        finally:
+            self._temporary.cleanup()
+
+
+def start_payload(payload, executable, *, on_request=None):
+    """Start Neovim now; call wait() on the result to serve it until it exits."""
+    return NativeSession(payload, executable, on_request)
+
+
+def launch_payload(payload, executable, *, on_request=None):
+    """One native, isolated terminal session; its result is still untrusted."""
+    return start_payload(payload, executable, on_request=on_request).wait()
 
 
 def run(sample: Sample, width=72, export=None, restore=None):

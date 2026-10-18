@@ -60,7 +60,9 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
 
     def run_view(self, service=None, **kwargs):
         with patch.object(neovim, "validate_environment", return_value="/invented/nvim"):
-            return neovim_reader.run_reader(self.book, service, **kwargs)
+            # These tests serve the first page directly; early start has its own tests.
+            with patch.object(neovim_reader, "EARLY_START", False):
+                return neovim_reader.run_reader(self.book, service, **kwargs)
 
     def test_adjacent_records_share_one_view_without_changing_canonical_text(self):
         self.extend()
@@ -840,6 +842,73 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 1)
+
+    def early_session(self, events, script):
+        """A stand-in for start_payload that records when Neovim would start."""
+        class Session:
+            def __init__(self, payload, executable, *, on_request):
+                events.append(("start", payload))
+                self.on_request = on_request
+            def wait(self):
+                return script(self.on_request)
+            def abort(self):
+                events.append(("abort", None))
+        return Session
+
+    def test_neovim_starts_on_a_placeholder_before_the_first_page_is_built(self):
+        self.extend(3)
+        service = self.service()
+        self.position(service, 4)
+        events = []
+        build = neovim.build_payload
+
+        def building(*args, **kwargs):
+            events.append(("build", None))
+            return build(*args, **kwargs)
+
+        def script(on_request):
+            page = on_request({"op": "initial"})["payload"]
+            with self.assertRaisesRegex(ValueError, "invalid reader action"):
+                on_request({"op": "initial"})
+            self.assertEqual(page["restore"]["cursor_offset"], 4)
+            return 0, {"action": "quit", "packet": page["restore"]}
+
+        with patch.object(neovim, "validate_environment", return_value="/invented/nvim"), \
+                patch.object(neovim, "start_payload", side_effect=self.early_session(events, script)), \
+                patch.object(neovim, "build_payload", side_effect=building):
+            self.assertEqual(neovim_reader.run_reader(self.book, service), 0)
+        self.assertEqual([kind for kind, _ in events][:2], ["start", "build"])
+        self.assertEqual(events[0][1], neovim_reader.SPLASH)
+        self.assertNotIn("records", events[0][1])
+
+    def test_a_start_up_failure_closes_the_placeholder_and_is_reported(self):
+        service = self.service()
+        self.position(service, 4)
+        events, replies = [], []
+
+        def script(on_request):
+            try:
+                on_request({"op": "initial"})
+            except ValueError as error:
+                replies.append(str(error))
+            return 3, None  # The placeholder quits with cquit 3.
+
+        source = self.corpus / "sample.md"
+        source.write_text(source.read_text() + "\nAn unindexed edit.\n")
+        with patch.object(neovim, "validate_environment", return_value="/invented/nvim"), \
+                patch.object(neovim, "start_payload", side_effect=self.early_session(events, script)), \
+                self.assertRaises(ValueError):
+            neovim_reader.run_reader(self.book, service)
+        self.assertIn("SOL could not open the book", replies[0])
+
+    def test_an_interrupted_start_stops_the_placeholder(self):
+        events = []
+        with patch.object(neovim, "validate_environment", return_value="/invented/nvim"), \
+                patch.object(neovim, "start_payload", side_effect=self.early_session(events, None)), \
+                patch.object(neovim, "build_payload", side_effect=KeyboardInterrupt), \
+                self.assertRaises(KeyboardInterrupt):
+            neovim_reader.run_reader(self.book)
+        self.assertEqual([kind for kind, _ in events], ["start", "abort"])
 
     def test_cross_section_paragraph_previous_lands_at_beginning_and_keeps_focus(self):
         self.extend(3)

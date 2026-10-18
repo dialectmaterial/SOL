@@ -14,6 +14,10 @@ reader.reload = function(payload)
   return assert(loadfile(directory .. '/neovim.lua'))(payload)
 end
 reader.text = load_module('neovim_text')
+if supplied == nil and vim.env.SOL_NVIM_SPLASH == '1' then
+  -- Start-up placeholder: the first page arrives over the action channel.
+  return load_module('neovim_splash')(reader)
+end
 reader.view = load_module('neovim_view')(reader, supplied)
 reader.panels = load_module('neovim_panels')(reader)
 reader.requests = load_module('neovim_requests')(reader)
