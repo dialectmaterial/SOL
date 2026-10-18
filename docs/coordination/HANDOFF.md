@@ -34,26 +34,31 @@ Write "None." rather than deleting a heading.
 
 ## Faster reader start-up — 19 October 2026
 
-**Task:** maintainer's request in the session ("sol starts super slow"), within Claude Code's CORE/reader lane.
-**Branch / PR:** `claude/faster-startup` · opened with `gh pr create`
+**Task:** ["Claude Code: Make start-up fast"](https://github.com/dialectmaterial/SOL/blob/claude/stage3-tasks/docs/coordination/CURRENT_TASK.md), requested by the maintainer; the route ("overlap and a smaller first page") was chosen by the maintainer on 19 October.
+**Branch / PR:** `claude/faster-startup` (#27) · opened with `gh pr create`
 **Last implementation commit:** see the PR (the commit before this report).
 
 ### Changed files
-- `sol/core/protocol.py` — `_remember` (cache entry from a verified snapshot, used by both paths) and `remember_verified` (only genuine `CorpusSnapshot`s; a snapshot outside the fast comparison's rules is not cached).
-- `sol/core/corpus.py` — `load_corpus_book` calls `remember_verified` right after `load_snapshot`.
-- `tests/test_core_protocol.py` — a freshly loaded book's first check reads no files, and a later in-memory change is still refused; a corpus beyond the nesting bound is not cached and is still refused.
-- `docs/CORE.md` (§6), `CHANGELOG.md`.
+- `sol/core/corpus.py`, `sol/core/protocol.py` — `load_corpus_book` hands the just-loaded snapshot to CORE's verified cache (`remember_verified`), so the first check does not read every file again; the cache keeps canonical JSON text plus a private parsed copy that serves calls directly (never handed out: checks return deep copies, captures are rebuilt).
+- `sol/terminal/reader_channel.py` — `NativeChannel` separates starting a process from serving it.
+- `sol/terminal/neovim.py` — `start_payload` / `NativeSession` (start now, `wait()` later; `set_handler`, `cancel`, `abort`); `launch_payload` unchanged in behaviour.
+- `sol/terminal/neovim_reader.py` — `begin_placeholder` / `end_placeholder`; the reader adopts a started placeholder or starts one (`EARLY_START`), builds the first view on its own thread, then serves; the placeholder's one `initial` request gets the page, or an error that closes it and is raised again.
+- `sol/terminal/neovim_splash.lua` (new), `neovim_channel.lua` (new, shared channel setup), `neovim.lua`, `neovim_requests.lua`.
+- `sol/reader/app.py`, `sol/reader/launch.py` — start the placeholder once a corpus is known in reader mode; close it before questions, error messages and non-reader outcomes.
+- Tests: CORE cache (no file read on first check; changes still refused; nesting bound), controller (placeholder before page, failure, interruption, adoption, close-before-print), headless Lua (placeholder requests once, loads, clears; quits on cancel); stubbed tests switch `EARLY_START` off.
+- `docs/BEING.md`, `docs/CORE.md` (§6), `CHANGELOG.md`, `scripts/reader_timings.py`.
 
 ### Tests performed
-- Real start-up in a pseudo-terminal (launch to drawn page), three runs each, same environment: `main` 0.95 s; this branch 0.86 s. Python-side phases before the change: imports 0.05 s, book load 0.2 s, workspace 0.05 s, first check 0.4 s, rest 0.25 s, Neovim about 0.1 s.
-- `.venv/bin/python -B scripts/check_docs.py` — OK; full suite — 1644 tests, OK (11 skipped, 4 expected failures).
+- Real launch in a pseudo-terminal, three runs each: `main` nothing shown until the page at 0.95 s; this branch placeholder at 0.06 s, page at 0.78 s.
+- Pseudo-terminal paths: a changed corpus closes the placeholder, leaves the alternate screen, then prints the error; an unknown actor closes it before the workspace question. No actor or workspace was created.
+- `.venv/bin/python -B scripts/check_docs.py` — OK; full suite — 1649 tests, OK (11 skipped, 4 expected failures).
 
 ### Outstanding issues
-- The estimate was 0.6 s; the gain is 0.1 s because the cache must still be built once (about 0.17 s). Remaining start-up is mostly verification itself (validating every record, about 0.11 s; the comparison and fingerprint checks) plus the first page.
-- The remembered workspace is still opened twice: first read-only to validate it before adoption (deliberate, about 25 ms), then for use. Left as is.
+- The page itself still takes about 0.78 s: loading and verifying the book (0.16 s), the verified cache (0.16 s), the first check (about 0.1 s), and the first page (0.2 s, much of it a guard copy of the corpus and repeated scope scans). A "visible passages first" page would help little: the saved section had only 11 paragraphs.
+- The remembered workspace is still opened twice (read-only validation first, about 25 ms), deliberately.
 
 ### Decisions requiring approval
-- None. Going further would mean trusting a previously validated generation across starts, or showing the first page before verification finishes; either relaxes a check and would be a reserved decision.
+- None open. The on-disk validation cache was considered and dropped by the maintainer (saves under 0.1 s).
 
 ## ESSENCE stage 2 engine: word frequencies — 18 October 2026
 
