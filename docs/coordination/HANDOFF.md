@@ -35,7 +35,7 @@ Write "None." rather than deleting a heading.
 ## Split the Lua reader into modules — 18 October 2026
 
 **Task:** [Codex: Split the Lua reader into modules](https://github.com/dialectmaterial/SOL/blob/f1bdaa6/docs/coordination/CURRENT_TASK.md#codex-split-the-lua-reader-into-modules).
-**Branch / PR:** `codex/lua-modules` · opening with `gh pr create --base main` after this report.
+**Branch / PR:** `codex/lua-modules` · [PR #21](https://github.com/dialectmaterial/SOL/pull/21), opened with `gh pr create --base main`. Status: `In review`.
 **Last implementation commit:** `552a769f09e0e747e5a0535bc758ba387310859c` (modules, packaging, tests and documentation; this report follows).
 
 ### Changed files
