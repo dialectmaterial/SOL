@@ -44,6 +44,16 @@ return function(reader)
     local current = rawget(_G, 'SOLNvimReader')
     return current and current.window and api.nvim_win_is_valid(current.window) and current.window or nil
   end
+  -- Back to the reader at the position and selection E captured, once.
+  local function return_to_reader()
+    local origin = state.origin
+    state.origin = nil
+    local window = reader_window()
+    if window then api.nvim_set_current_win(window) end
+    local current = rawget(_G, 'SOLNvimReader')
+    -- After a section change the origin may not be on screen; then stay put.
+    if origin and current then pcall(current.restore, origin) end
+  end
   local function enter()
     api.nvim_set_current_win(state.window)
     vim.cmd('startinsert')
@@ -80,8 +90,7 @@ return function(reader)
       relayout()
     end
     vim.cmd('stopinsert')
-    local window = reader_window()
-    if window then api.nvim_set_current_win(window) end
+    return_to_reader()
   end
 
   function state.closed(code, message)
@@ -91,8 +100,7 @@ return function(reader)
     if window and api.nvim_win_is_valid(window) then api.nvim_win_close(window, true) end
     if buffer and api.nvim_buf_is_valid(buffer) then api.nvim_buf_delete(buffer, { force = true }) end
     relayout()
-    local back = reader_window()
-    if back then api.nvim_set_current_win(back) end
+    return_to_reader()
     if message or code ~= 0 then
       vim.notify(message or ('ESSENCE ended with exit code ' .. tostring(code) .. '; the reader is unchanged'),
         vim.log.levels.WARN)
