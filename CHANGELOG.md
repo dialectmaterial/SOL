@@ -2,11 +2,15 @@
 
 ## Unreleased
 
-### Slightly faster start — 19 October 2026
+### SOL opens at once — 19 October 2026
 
-Starting `sol` read and checked the whole corpus twice in quick succession;
-it now does so once, with the same checks. A page appears after about 0.86 s
-instead of 0.95 s on the development machine.
+Typing `sol` used to show nothing for almost a second. Neovim now starts
+immediately with a quiet "Opening The Science of Logic…" and the page
+replaces it as soon as the book is loaded and checked: the placeholder shows
+after about 0.06 s and the page after about 0.78 s, instead of 0.95 s, on the
+development machine. Every check is unchanged. If SOL needs to ask you
+something first (who you are, which workspace) or reports an error, the
+placeholder closes before the question or message.
 
 ### Count words through CORE or ordinary files — 18 October 2026
 
