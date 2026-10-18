@@ -36,6 +36,9 @@ class ReadingSession:
     def current(self) -> Passage:
         if self.cursor is None:
             raise ValueError("no current paragraph; use first, read, or open")
+        if self.path == () and self.book.passages:
+            # The whole-book scope selects every passage, so index it directly.
+            return self.book.passages[self.cursor]
         return self.book.selection(self.path)[self.cursor]
 
     def open(self, identifier: str) -> Passage:

@@ -32,6 +32,42 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Finish the reader speed list — 19 October 2026
+
+**Task:** ["Claude Code: Finish the reader speed list"](https://github.com/dialectmaterial/SOL/blob/claude/assign-speed-and-lua/docs/coordination/CURRENT_TASK.md)
+**Branch / PR:** `claude/reader-speed-list`, stacked on #18 (task board) · opened with `gh pr create`
+**Last implementation commit:** `c49681fc0e4adae5516c4b864c24efbcb8a5ab18`
+
+### Changed files
+- `sol/core/protocol.py` — the in-memory comparison uses canonical JSON text plus structural equality with a private parsed copy (about 47 ms instead of 100 ms); the copy is never returned. Approved edge: an `int`/`float` subclass with an equal value is accepted.
+- Review fix (Codex, PR #19): the verified copy is checked once against every `_json_value` rule, including the 64-level nesting bound, before it is cached; a corpus with deeper metadata is refused on the first and every later call. Codex's reproduction is a regression test.
+- `sol/reader/surface.py` — `CaptureExport` has CORE check the reader's own snapshot instead of its deep copy, so a reader action compares once; the copy stays the export's private graph and `finish()` still proves they agree. (The deep copy itself stays: at 47 ms it beat a JSON round trip at 80 ms.)
+- `sol/core/models.py`, `sol/reader/actions.py` — `find_passage` finds an exact current ID without building an index; `ReadingSession.current` indexes the whole-book scope directly.
+- Tests: what the faster comparison still refuses (changed text, `2.0` for `2`, `true` for `1`, tuple for list, number key, extra field, lone surrogate) and the approved int-subclass case; both lookups against the old full scans on IDs, retired IDs, prefixes, unknown IDs and two scopes.
+- `docs/CORE.md` (§6 Decision), `CHANGELOG.md`.
+
+### Tests performed
+- `scripts/reader_timings.py --corpus local-corpus --repeats 5`, medians in ms; before = after #16:
+
+| Operation | Before | After |
+| --- | ---: | ---: |
+| Section next / previous | 683 / ~700 | 467 / 495 |
+| Search-result open | 615 | 446 |
+| History back | 597 | 415 |
+| Startup to first view | 670 | 515 |
+| Footnote-heavy view build | 637 | 484 |
+| Search | 172 | 124 |
+
+- `.venv/bin/python -B scripts/check_docs.py` — OK; `.venv/bin/python -B -m unittest discover -s tests` — 1604 tests, OK (11 skipped, 4 expected failures).
+
+### Outstanding issues
+- A changed in-memory value that is an `int` or `float` subclass of equal value is no longer refused (approved).
+- A refusal of a lone surrogate in memory now reports `snapshot_modified` instead of `invalid_utf8`; both refuse.
+- Remaining per-move cost is spread thin: nine file-fingerprint checks (kept on every call), view building and the SQLite save.
+
+### Decisions requiring approval
+- None open. The comparison edge case was approved by the maintainer on 19 October and recorded in CORE §6.
+
 ## Make reader moves fast without weakening checks — 19 October 2026
 
 **Task:** ["Claude Code: Make reader moves fast without weakening checks"](https://github.com/dialectmaterial/SOL/blob/claude/assign-speed-and-footnotes/docs/coordination/CURRENT_TASK.md)

@@ -117,7 +117,10 @@ class CaptureExport:
         self._closed = False
         self._packets = None if identifiers is None else {
             packet["reference"]["requested_id"]: packet
-            for packet in capture_references(self.snapshot, tuple(dict.fromkeys(identifiers)))
+            # CORE checks the reader's own snapshot, which this copy equals, so
+            # a single reader action compares it once; finish() still proves
+            # that the loaded graph and this copy agree at the end.
+            for packet in capture_references(book.corpus_snapshot, tuple(dict.fromkeys(identifiers)))
         }
 
     @classmethod
@@ -141,7 +144,7 @@ class CaptureExport:
             # Serialization validates the existing protocol's shape, not a new
             # export format. CORE remains the producer of every reference.
             if self._packets is None:
-                packet = capture_reference(self.snapshot, identifier)
+                packet = capture_reference(self.book.corpus_snapshot, identifier)
             else:
                 if key not in self._packets:
                     raise ValueError("record was not included in this checked export batch")

@@ -14,7 +14,7 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ## Claude Code: Finish the reader speed list
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `claude/reader-speed-list`
 **Requested:** 19 October 2026, by the maintainer
 
