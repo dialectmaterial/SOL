@@ -226,7 +226,7 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 - **Handoff:** entering ESSENCE carries the current source reference, the selection if any, and the exact reading position (UUID and codepoint). `S` already captures the position this way without saving a visit; it does not carry a selection.
 - **Return:** leaving ESSENCE restores the reader's cursor, selection and mode; opening a result's source and returning to the earlier position stay two distinct operations, as above.
 - **Focus:** one visible focus at a time; reader keys act only when the reader is focused, ESSENCE keys only in ESSENCE; Escape and quitting are never ambiguous across the two.
-- **Key compatibility:** no existing reader key is remapped to make room for ESSENCE. Which key opens it, and how that relates to `S`, is an open decision; candidates must be checked against the controls table and Neovim's terminal mode.
+- **Key compatibility:** no existing reader key is remapped to make room for ESSENCE. **Decided 18 October 2026:** `E` opens ESSENCE (it was unmapped); `S` stays the quick sentence study.
 - **Failure:** a launch failure, crash or refused result leaves the reader usable at the same place and shows the error.
 - **Lifetime:** the reader starts no Textual or model process by itself; closing ESSENCE ends its process without affecting the reader.
 

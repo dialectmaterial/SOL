@@ -73,7 +73,7 @@ In particular, avoid these errors:
 
 **Decisions (maintainer, 18 October 2026)**, from the [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf). They direct future work; none is implemented yet.
 
-1. **Hybrid surfaces.** Neovim remains the persistent BEING reader. ESSENCE gets its own interactive application, built with **Textual**, launched only when ESSENCE is requested. Textual becomes a dependency only with the first implementation; whether as a base or optional dependency is still open.
+1. **Hybrid surfaces.** Neovim remains the persistent BEING reader. ESSENCE gets its own interactive application, built with **Textual**, launched only when ESSENCE is requested. **Textual is an optional extra** (`sol-organizes-logic[essence]`, decided 18 October 2026): the reader installs and runs without it, and ESSENCE explains how to install it when it is missing.
 2. **On-demand lifecycle.** No Textual process exists while the reader is idle. Entering ESSENCE starts it in a Neovim terminal buffer; leaving ESSENCE saves the investigation state and ends the process. ESSENCE remains an ordinary application inside a terminal Neovim provides, not a terminal emulator.
 3. **Two presentations, one investigation.** ESSENCE appears either **beside** BEING (one split, the reader still visible) or **fullscreen**. Switching between them reuses the same process and investigation; it does not restart anything. Together with plain reading there are three visible states.
 4. **Outer versus inner layout.** Neovim owns the outer geometry (split or fullscreen); Textual owns the layout inside its terminal buffer. Textual screens are logical views *within* ESSENCE (encyclopedia, method, experiment, results), not the two outer presentations.
@@ -113,11 +113,11 @@ A result should distinguish **reproducing the exact experiment generation** (str
 
 **Open decisions** (each needs its own review before implementation):
 
-- the key that opens ESSENCE, and how it relates to the existing `S` sentence study ([BEING §6](BEING.md#6-being--essence-without-terminal-dogma));
+- ~~the key that opens ESSENCE~~ **decided 18 October 2026:** `E` in the reader (unmapped until now); `S` stays the quick sentence study ([BEING §6](BEING.md#6-being--essence-without-terminal-dogma));
 - the default split side, minimum widths and focus transitions;
 - the persistence format of an investigation, and what happens to explicitly started background jobs on exit;
 - the provider/adapter API, its versioning, and when (if ever) to publish separate distributions;
-- the tokenizer and scopes of the first milestone;
+- the tokenizer and scopes of the first milestone (default: the term study's tokenizer; scopes the corpus offers, plus plain-text files);
 - the encyclopedia's source format, editorial schema, provenance rules and initial coverage.
 
 **Open alternative (raised by the maintainer, 18 October 2026): Textual as the outer host.** Instead of Neovim hosting ESSENCE, a single Textual application could host both BEING and ESSENCE as modules, with Neovim embedded inside it for reading. *For:* Textual's widgets suit panels (footnotes, notes, search, results) better than hand-built Lua popups, and one process simplifies shared state. *Against:* Textual has no built-in terminal, so Neovim would run either in an experimental third-party terminal widget or through a Neovim UI client (`nvim --embed`, redrawing its grid and forwarding every key); reading would pass through a second rendering layer (italics, Unicode widths, latency, Ctrl/Alt keys at risk), split/fullscreen would have to be rebuilt, and a stable reader would be migrated again. Porting the reader to Textual *without* Neovim is a further variant that would give up the present motions and exact selection. **Not adopted:** the decision above stands. Keep the reader's logic in Python (`ReaderActions`) and ESSENCE's state independent of any interface, so the host can change later by replacing presentation. **Proposed test before reconsidering:** a one-session spike running the real reader inside Textual via `nvim --embed`, comparing key handling, italics and latency with Alacritty; and the evidence of the reading trial (if Neovim reads well, the case weakens; if it reads badly, revisit the host rather than nest it).
