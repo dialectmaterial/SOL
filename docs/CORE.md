@@ -1,6 +1,6 @@
 # SOL CORE — Canonical Corpus, Identity, Provenance, and Interchange
 
-**Status:** implemented contract and preservation rules, with explicitly marked future decisions; 17 October 2026.  
+**Status:** implemented contract and preservation rules, with explicitly marked future decisions; 17 October 2026, provider and collection decisions 18 October 2026.  
 **Repository baseline:** `dialectmaterial/SOL` `main` at `1d200e4fcbff1ca69f48b5dc96c55765f215f303`.  
 **Companions:** [Architecture](ARCHITECTURE.md) · [BEING](BEING.md) · [ESSENCE](ESSENCE.md).
 
@@ -9,6 +9,10 @@
 CORE is SOL's shared, noninteractive foundation. It gives a *specific text* stable identities and verifiable provenance across reading, annotation, correction, analysis and rendering. It is not an independent Hegelian phase, an operating-system kernel, a GUI, a workspace database or a model host. It must not depend on a terminal emulator, Neovim, a machine-learning framework, a real shell or internet access.
 
 **Present scope:** the existing verified canonical edition of Hegel's *Science of Logic*, Cambridge translation by George di Giovanni. General PDFs, scans, other works and multiple-translation alignment are **out of scope for this development cycle**. Do not remove current metadata or bake away future possibilities, but do not prematurely build a generic ingest architecture either.
+
+**CORE as a provider (decision, maintainer, 18 October 2026).** ESSENCE is to run on ordinary text files without CORE; when CORE is present it is the provider that adds verified identity, edition and generation binding, provenance and source return ([Architecture §2](ARCHITECTURE.md#2-component-responsibilities), [ESSENCE §4](ESSENCE.md#4-interaction-model-and-inquiry-contract)). That boundary is an adapter around today's public API; it changes neither API version 1 nor the reference protocol. Results from files carry a file digest instead of a CORE generation and cannot claim CORE's guarantees.
+
+**Future collections (proposed requirements, not a schema).** Later analyses may compare a target with an author's oeuvre, a bibliography or a thematic collection. When that arrives: a text may belong to several collections, so membership is not a single directory parent; edition, translator, source language and attribution stay attached to every record an analysis uses; and large collections need indexed, batched access. None of this is implemented, and any new corpus schema or protocol needs its own versioned proposal and approval.
 
 **Fundamental separation:** source PDF (evidence) → carefully attributed and reviewable canonical **Markdown** (human-maintained text and structure) → generated **JSONL index** (derived machine-readable view) → replaceable reading/analysis projections. Physical pages are retained as source locators; they do not define the book's logical ontology. Hierarchy and edited typography must be respected rather than treated as computationally meaningless noise.
 

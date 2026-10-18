@@ -1,6 +1,6 @@
 # SOL ESSENCE — Computational Inquiry and Reproducible Experiments
 
-**Status:** implemented foundation and bounded research roadmap, 17 October 2026.  
+**Status:** implemented foundation and bounded research roadmap, 17 October 2026; interface and long-term direction revised 18 October 2026 (supporting research: [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf)).  
 **Repository baseline:** `dialectmaterial/SOL` `main` at `1d200e4fcbff1ca69f48b5dc96c55765f215f303`.  
 **Companions:** [Architecture](ARCHITECTURE.md) · [BEING](BEING.md) · [CORE](CORE.md).
 
@@ -9,6 +9,8 @@
 ESSENCE investigates patterns, distinctions and relations in the present *Science of Logic* corpus, using established statistical, linguistic, and machine-learning tools. It must form **one reversible inquiry with BEING** rather than become a separate statistics application. The object is identifiable source text; the user chooses a question/method; the result can be checked and traced back to the text.
 
 **Guiding rule:** reuse mature software (Python scientific stack, spaCy/Stanza, scikit-learn, PyTorch, model libraries, TensorFlow Projector, command-line tools or R when justified) through stable inputs/outputs. Write SOL-specific adapters for provenance, state, reproducibility and return-to-reading. Do not reimplement algorithms simply to place the SOL name on them. Never make CORE load a model or runtime merely to inspect a book.
+
+**Decision (maintainer, 18 October 2026): ESSENCE orchestrates experiments; it is not an ML framework.** Simple, auditable transformations (tokenization, counts, sentence segmentation) may run in ESSENCE itself. Heavier methods run through task interfaces and adapters to existing libraries or models (spaCy, scikit-learn, PyTorch, Hugging Face, remote APIs), never as reimplementations. The long-term aim is an **investigative encyclopedia and laboratory** of computational methods: learn why a method was built, what its authors found inadequate in its predecessors, what trade-offs remain, and then put it to work on philosophical text ([§7](#7-model-history-encyclopedia-and-task-registry-proposed)). The immediate goal is much narrower: a reversible interface between reading in BEING and investigation in ESSENCE ([§4](#4-interaction-model-and-inquiry-contract)).
 
 The relation between Hegel's explicit argument and the output of an algorithm is always **a research question**. Model similarity and a visual cluster are not equivalent to the logical movement of a concept. Preserve the boundary between measurement, statistical inference, interpretive hypothesis and argued philosophical necessity.
 
@@ -23,7 +25,7 @@ ESSENCE is not currently a complete model environment. The inspected code contai
 - A narrow optional `sol-kitty` + Zsh handoff for a source passage, with an explicit proposed return to BEING. The handoff carries **references**, not an ML result database or unrestricted authority to save notes.
 - Checkout-only reading/rendering research, not an installed ESSENCE model suite.
 
-**Not implemented/verified:** a general experiment picker in the Neovim reader (only `S` exists); parameter dashboard; GPU/model registry; syntactic research panel; UltraBERT embedding pipeline; TensorFlow Projector launch as a SOL command; durable research context/experiment history; a terminal-independent BEING–ESSENCE UI. Do not describe these as shipping features until code and tests verify them.
+**Not implemented/verified:** the Textual ESSENCE interface and its split/fullscreen presentations ([§4](#4-interaction-model-and-inquiry-contract)); a general experiment picker (only `S` exists); target/reference scope selection; word-frequency comparison; parameter dashboard; GPU/model registry; task/capability registry and adapters; the model-history encyclopedia; ESSENCE on ordinary files without CORE (every study imports `sol.core` today); syntactic research panel; UltraBERT embedding pipeline; TensorFlow Projector launch as a SOL command; durable research context/experiment history; a terminal-independent BEING–ESSENCE UI. Do not describe these as shipping features until code and tests verify them.
 
 ### Existing commands
 
@@ -67,26 +69,73 @@ In particular, avoid these errors:
 5. Silently concatenating paragraphs, ignoring section boundaries, or truncating input beyond model limits.
 6. Calling distances or embeddings ontological relationships without an independent argument.
 
-## 4. The complete inquiry contract (proposed, not implemented)
+## 4. Interaction model and inquiry contract
 
-The unit of integration should be a **versioned research context**, transportable across terminals and external tools:
+**Decisions (maintainer, 18 October 2026)**, from the [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf). They direct future work; none is implemented yet.
+
+1. **Hybrid surfaces.** Neovim remains the persistent BEING reader. ESSENCE gets its own interactive application, built with **Textual**, launched only when ESSENCE is requested. Textual becomes a dependency only with the first implementation; whether as a base or optional dependency is still open.
+2. **On-demand lifecycle.** No Textual process exists while the reader is idle. Entering ESSENCE starts it in a Neovim terminal buffer; leaving ESSENCE saves the investigation state and ends the process. ESSENCE remains an ordinary application inside a terminal Neovim provides, not a terminal emulator.
+3. **Two presentations, one investigation.** ESSENCE appears either **beside** BEING (one split, the reader still visible) or **fullscreen**. Switching between them reuses the same process and investigation; it does not restart anything. Together with plain reading there are three visible states.
+4. **Outer versus inner layout.** Neovim owns the outer geometry (split or fullscreen); Textual owns the layout inside its terminal buffer. Textual screens are logical views *within* ESSENCE (encyclopedia, method, experiment, results), not the two outer presentations.
+5. **Interface before analytical breadth.** First prove launch, both presentations, focus, state preservation, close and return; then add the smallest real operation, a word tokenizer and frequency table ([§5](#5-prioritized-experiments)).
+6. **One capability, interactive and headless.** Every operation the interface offers also runs from the CLI with the same inputs and the same artifact, so results can be scripted, checked and reproduced without the UI.
+7. **CORE is optional for ESSENCE.** ESSENCE accepts ordinary text files; CORE is the provider that adds verified identity, provenance and source return when present. The path is staged in [Architecture §2](ARCHITECTURE.md#2-component-responsibilities); today every study requires CORE.
+
+**Proposed launch and return requirements:**
+
+| Event | Required behaviour |
+|---|---|
+| Open ESSENCE from BEING | Capture the reader's reference, cursor and any selection; start Textual asynchronously; load no model weights to open the UI. |
+| Switch presentation | Same process, same investigation; recompute outer and inner layout. |
+| Move focus | A visible focus indicator; keys act on the focused surface; Escape and quitting are never ambiguous. |
+| Leave ESSENCE | Save the investigation state, end only the Textual process, close its buffer, restore the BEING cursor. |
+| Crash or invalid result | The reader stays usable; logs survive; the error is visible; nothing claims completion. |
+| Long model job | An explicit policy: cancelled on exit, or run by a separate runner that does not depend on the UI process. |
+
+**Target and reference.** An analysis takes two independent choices: an **analysis target** and an optional **reference corpus** to compare it with. Scopes range from a selection, passage or section to a chapter or the book; author oeuvres, bibliographies and thematic collections are future scopes ([CORE §1](CORE.md#1-why-core-exists)). The first milestone supports only scopes the present corpus offers. Comparisons show absolute counts, normalized rates and their denominators, and warn that raw counts across unequal scopes are not comparable.
+
+**Proposed investigation record** (a conceptual schema, *not* a change to CORE's version-1 reference protocol; implementing it needs a separately approved, versioned format):
 
 ```text
-origin:       corpus ID + edition/source fingerprint + verified generation
-scope:        passage UUID(s) / bounded record span(s), possibly selected codepoint ranges
-question:     researcher-entered text; distinct from canonical text
-input:        named, versioned projection, ordered IDs, digest per input row
-method:       algorithm / model / checkpoint / software versions
-parameters:   declared hyperparameters, seed, batching, device and preprocessing policy
-result:       immutable artifact path + checksums + metrics/warnings + source-linked rows
-navigation:   result-to-source references and original BEING resume context
+origin:      provider (core | file); corpus, edition and generation, or file digest
+scope:       record UUIDs and codepoint ranges, or file spans
+comparison:  target scope and optional reference scope
+question:    researcher-entered text, distinct from canonical text
+input:       named, versioned projection, ordered IDs, digest per input row
+method:      task, tokenizer/algorithm/model, exact versions
+parameters:  projection, normalization, seed, thresholds, device
+execution:   runner, start/end time, outcome
+result:      artifact digest, warnings, source-linked rows
+return_to:   reader reference, cursor and selection, prior focus and presentation
 ```
 
-A result should distinguish **reproducing the exact experiment generation** (strict full-corpus snapshot agreement) from **resolving an unchanged passage later** (a possible weaker check, not yet implemented). CORE v1 currently takes the strict position; do not relax that protocol or overwrite stale artifacts without an explicit, separately versioned policy. The result artifact has **no authority** to edit canonical text or store author assertions in a personal workspace. Acceptance of a suggested relation should require deliberate scholarly authorship.
+A result should distinguish **reproducing the exact experiment generation** (strict full-corpus snapshot agreement) from **resolving an unchanged passage later** (a possible weaker check, not yet implemented). CORE v1 currently takes the strict position; do not relax that protocol or overwrite stale artifacts without an explicit, separately versioned policy. The result artifact has **no authority** to edit canonical text or store author assertions in a personal workspace. Acceptance of a suggested relation should require deliberate scholarly authorship. Browser visualization (for example the TensorFlow Embedding Projector) remains a legitimate output alongside the Textual interface.
 
-The process should work whether ESSENCE runs as a standalone CLI, in a Neovim-accessible pane, in ordinary Zsh, in Kitty, or opens a browser. Browser visualization is not a violation of the TUI-first direction; forcing browser-grade plots into a terminal would be unnecessary work. **ESSENCE is not a terminal emulator.**
+**Open decisions** (each needs its own review before implementation):
+
+- the key that opens ESSENCE, and how it relates to the existing `S` sentence study ([BEING §6](BEING.md#6-being--essence-without-terminal-dogma));
+- the default split side, minimum widths and focus transitions;
+- the persistence format of an investigation, and what happens to explicitly started background jobs on exit;
+- the provider/adapter API, its versioning, and when (if ever) to publish separate distributions;
+- the tokenizer and scopes of the first milestone;
+- the encyclopedia's source format, editorial schema, provenance rules and initial coverage.
 
 ## 5. Prioritized experiments
+
+**Decision (maintainer, 18 October 2026): a staged plan that does not build everything at once.** Each stage has an exit criterion; later stages wait for earlier ones.
+
+| Stage | Deliverable | Exit criterion |
+|---|---|---|
+| 0. Documentation | These decisions reconciled in the four authorities | Docs check passes; no application code changed; open decisions listed |
+| 1. Interface shell | Textual mock (Encyclopedia / Methods / Experiment / Results); entry from and return to Neovim; split and fullscreen | Launches on demand, resizes without restart, restores the reader position, keyboard focus is robust |
+| 2. Minimal experiment | Word tokenizer and frequency table over a selectable target; source-linked counts; plain-text file input | Same output from CLI and TUI; works on a plain-text file without CORE |
+| 3. Comparison | Reference-corpus selector; normalized lexical comparison; navigation and export | Explicit denominators; no false comparability; stale generations refused |
+| 4. Encyclopedia skeleton | Source-linked entries and a navigable model genealogy | History, critique and task descriptions readable without model downloads |
+| 5. Model adapters | Capability-driven registry; optional runtimes; comparison experiments (including Experiment B below) | Model versions, input limits, policies and reproducibility documented and tested |
+
+**The first new experiment stays elementary:** a deterministic, documented word tokenizer, with token count, type count and a frequency table for the selected scope. Its purpose is to test the whole research loop, not to settle what a word is. The term study's existing tokenizer (`sol.essence.terms`) is the natural candidate: it takes runs of letters with combining marks and internal apostrophes, applies NFC and case folding, excludes digits and punctuation, and splits hyphenated compounds; the final choice is open ([§4](#4-interaction-model-and-inquiry-contract)). Model-specific subword tokenization and morphology come later as **distinct analyses**, never as aliases of this one.
+
+The shipped sentence study (Experiment A, below) is not superseded; it remains the first complete reader-to-ESSENCE round trip and moves into the new interface once stage 1 exists.
 
 ### Experiment A — syntax and positionality (highest priority)
 
@@ -250,9 +299,21 @@ The shipped term study normalizes Unicode token spellings, counts full-word matc
 
 With the optional **existing** Kitty handoff, one can open an ESSENCE Zsh pane from the compatibility reader workflow, execute an analysis, publish a return UUID, and accept the proposed navigation back in BEING. This validates reference passing, **not** a full model-output/parameter/visualization pipeline. Preserve its safety and permissions model while researching a terminal-independent equivalent.
 
-## 7. ML roadmap: evidence, not a speculative catalog
+## 7. Model-history encyclopedia and task registry (proposed)
 
-The user described a newly created file about the historical development of machine/deep-learning models. **It was not visible in GitHub `main` at this baseline and was not available for review.** Therefore this document does **not** claim to integrate its contents. Preserve the possibility of adding a short, historically situated rationale for model families once the actual file is supplied. Avoid invented claims about a specific model's architecture, release date, parameter count or embedding quality.
+**Decision (maintainer, 18 October 2026):** the "synchronic/diachronic" interest concerns **the development of machine-learning methods themselves**, not historical change in the philosophical corpus. ESSENCE should eventually let a reader learn why a model was built, what inadequacy its authors identified, how later models responded and which trade-offs remain, and then run comparable tests. The encyclopedia and the laboratory are linked but not conflated. Nothing of this exists yet; the earlier model-history file mentioned in discussion has still not been supplied for review, so this section claims nothing about its contents.
+
+Three separate kinds of knowledge object:
+
+| Object | Minimum structure | What it is not |
+|---|---|---|
+| Historical entry | Publication year, origin paper, architecture, objective, claimed advance, limitations, evidence, relations to predecessors | Proof that newer methods are universally better |
+| Task/capability record | Tokenization, tagging, embedding, retrieval, classification, generation, evaluation; input/output contracts | A list of architectures or chronological ages |
+| Runnable adapter/checkpoint | Exact model or checkpoint, implementation package, license, version, expected device, limits, output shape | An encyclopedia claim or an interpretation |
+
+**The genealogy is a sourced graph, not a triumphalist timeline.** A relation such as "addresses a weakness of", "extends", "changes the training objective of" or "trades accuracy for speed" carries a citation and a status. An encoder and a decoder model may suit different tasks rather than occupy one ladder. **The model history is not the model picker:** the encyclopedia describes lineages and evidence; the task/capability registry supplies runnable implementations. Compare only **commensurable measures**: outputs of, say, Naive Bayes classification and embedding similarity may be shown side by side but are not labelled comparable without an explicit shared evaluation task.
+
+Store entries as source-linked structured Markdown (or an equally plain format) that the interface renders; do not build them as hard-coded Textual screens. This keeps them reviewable, versioned and readable without SOL.
 
 A good model inventory should distinguish:
 
@@ -268,6 +329,8 @@ A good model inventory should distinguish:
 
 This classification is a **provisional methods map**, not a statement that all are integrated in code or that model families follow a teleological historical progression.
 
+**Scaling constraints to keep from the start:** outputs retain edition, translator, source language, attribution and corpus generation; ordinary word tokens, model subword tokens, sentences and embeddings are distinct representations whose boundaries and algorithms are recorded; comparisons show denominators and uncertainty; large collections need batched, indexed access and caching by input/method digest, never a whole corpus loaded into widgets; external datasets and copyrighted corpora stay local or permissioned, and artifacts avoid embedding book text unless explicitly authorized.
+
 ## 8. Developer acceptance and prohibitions
 
 - Read current `sol/essence/`, `sol/core/`, docs/tests, and Git status first. Keep experiments opt-in and separate from ordinary reading/install.
@@ -278,5 +341,9 @@ This classification is a **provisional methods map**, not a statement that all a
 - Keep artifacts outside Git; include a method-specific verifier before treating generated files as reusable evidence.
 - Preserve original read position and source-linked result navigation as distinct operations.
 - Do not allow model output to create canonical records or philosophical workspace assertions automatically.
+- Keep imports lazy: opening the interface or a menu must not import an ML runtime, download a model or allocate a GPU. Discover capabilities from metadata.
+- Never let the interface become the owner of selection or analysis state; that state is serializable independently of widgets, with stable source references.
+
+**Manual acceptance for the first interface prototype (stage 1):** start `sol` in an ordinary terminal and confirm no Textual process exists; select a passage and enter ESSENCE, checking the shown source identity and that no model is imported or downloaded; switch fullscreen and split repeatedly, checking one process, an unchanged scope and sane behaviour at narrow widths; return focus to BEING, navigate, reopen ESSENCE with the expected context, then exit and confirm the original source offset is restored; force a launch failure, a UI exception and a job cancellation, and confirm BEING stays usable and the failure is visible; run the same tokenizer headlessly and in the interface on identical input and compare input digests, counts, parameters and output.
 
 **Source lineage:** consolidated from installed `sol.essence` implementation and tests, prose-input policy, term study, reference protocol, handoff, modularity/usage manuals, research discussions and the present 17 October priorities. Archived historical details should remain accessible under `docs/legacy/`.

@@ -221,6 +221,15 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 
 **Implemented (17 October), inside the reader process:** `S` runs ESSENCE's sentence study on the loaded section, with the current passage as its recorded origin, and shows the distribution, means by place in the paragraph and the twelve longest sentences. With a workspace the artifact is saved owner-only as `~/.local/share/sol/studies/sentences-*.sol-analysis.json` (never overwritten; temporary `-n` sessions save nothing). Enter opens a listed sentence at its first character through the ordinary guarded navigation — returning to the *result*; Alt-Left then restores the exact earlier position and selection — returning to the *reader*. The scope is the loaded section, not a free selection; the artifact can be checked later with `sol analyze check`. The Kitty exchange above is unchanged and remains the only cross-terminal path.
 
+**Decision (maintainer, 18 October 2026): ESSENCE opens beside or over the reader, on demand.** ESSENCE will become a separate Textual application in a Neovim terminal buffer, beside the reader or fullscreen, started only when requested ([ESSENCE §4](ESSENCE.md#4-interaction-model-and-inquiry-contract)). Requirements on the reader side, **proposed** and to be marked implemented only when tested on real terminals:
+
+- **Handoff:** entering ESSENCE carries the current source reference, the selection if any, and the exact reading position (UUID and codepoint). `S` already captures the position this way without saving a visit; it does not carry a selection.
+- **Return:** leaving ESSENCE restores the reader's cursor, selection and mode; opening a result's source and returning to the earlier position stay two distinct operations, as above.
+- **Focus:** one visible focus at a time; reader keys act only when the reader is focused, ESSENCE keys only in ESSENCE; Escape and quitting are never ambiguous across the two.
+- **Key compatibility:** no existing reader key is remapped to make room for ESSENCE. Which key opens it, and how that relates to `S`, is an open decision; candidates must be checked against the controls table and Neovim's terminal mode.
+- **Failure:** a launch failure, crash or refused result leaves the reader usable at the same place and shows the error.
+- **Lifetime:** the reader starts no Textual or model process by itself; closing ESSENCE ends its process without affecting the reader.
+
 ## 7. Boundaries and known limitations
 
 - Current normal reading is bounded by chapters/64-record sections, not a whole-book text buffer.
