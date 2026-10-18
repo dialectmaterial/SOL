@@ -14,7 +14,7 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ## Claude Code: Make reader moves fast without weakening checks
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `claude/fast-reader-moves`
 **Requested:** 19 October 2026, by the maintainer
 

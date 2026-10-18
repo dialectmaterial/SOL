@@ -32,6 +32,43 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Make reader moves fast without weakening checks — 19 October 2026
+
+**Task:** ["Claude Code: Make reader moves fast without weakening checks"](https://github.com/dialectmaterial/SOL/blob/claude/assign-speed-and-footnotes/docs/coordination/CURRENT_TASK.md)
+**Branch / PR:** `claude/fast-reader-moves`, stacked on #15 (task board), which is stacked on #13 · opened with `gh pr create`
+**Last implementation commit:** `b1250a40bb7fe6e5bcdc3c899a5c9e8fb878fda7`
+
+### Changed files
+- `sol/core/protocol.py` — (1) the last few fully verified generations are kept as immutable JSON text, keyed by every file fingerprint; a call whose fingerprints match builds new records from it after `verify_snapshot_current`, instead of `load_snapshot`. Exactly as strict as before. (2) `single_action(snapshot)`: within one user action the full in-memory comparison runs at the first call and the verified copy is reused; files are still checked on every call.
+- `sol/terminal/neovim_reader.py` — each editor request, and the first view, runs in one `single_action`.
+- `tests/test_core_protocol.py` — the scope: a file change between two calls of one action is refused; an in-memory change during an action is refused by the next; results come from the verified files; another snapshot object is compared in full. The batch test now allows zero reloads instead of exactly one.
+- `tests/test_neovim_reader.py` — a corpus changed between two requests refuses `next`, `previous` and `passage_next` without saving.
+- `docs/CORE.md` (§6, "Verification cost", with the approved Decision), `CHANGELOG.md`.
+
+### Tests performed
+- `scripts/reader_timings.py --corpus local-corpus --repeats 3` on the real book, medians in ms (before from the 18 October baseline):
+
+| Operation | Before | After |
+| --- | ---: | ---: |
+| Startup to first view | 1,792 | 767 |
+| Section next / previous | 2,852 / 2,866 | 746 / 734 |
+| Search-result open | 2,252 | 657 |
+| History back | 2,271 | 689 |
+| Sentence study `S` | 1,215 | 698 |
+| Search | 312 | 172 |
+
+- After step (1) alone, a section move was 1.6 s.
+- Existing changed-corpus, stale-reference, mutated-memory and conflict tests pass unchanged except the one batch-count assertion above.
+- `.venv/bin/python -B scripts/check_docs.py` — OK; `.venv/bin/python -B -m unittest discover -s tests` — 1594 tests, OK (11 skipped, 4 expected failures).
+
+### Outstanding issues
+- Target "well under half a second" missed: 0.65–0.75 s. What remains is the one full comparison per action (about 100 ms), nine fingerprint checks (about 13 ms each, kept deliberately), view building, and a deep copy of the sample in `sol/reader/surface.py` `__init__` (about 70 ms; Codex's file this round, a candidate for later).
+- The verified-generation texts hold about 24 MB per corpus generation in memory (at most four generations).
+
+### Decisions requiring approval
+- **Once-per-action comparison:** approved by the maintainer in the session on 19 October 2026 and recorded as a Decision in CORE §6; nothing left open.
+- **Default:** `single_action` lives in `sol.core.protocol` and is not exported from `sol.core`; the reader imports it from there.
+
 ## Edit and review personal notes in the reader — 18 October 2026
 
 **Task:** [CURRENT_TASK](CURRENT_TASK.md), "Claude Code: Edit and review personal notes in the reader" ([proposal stage 3](proposals/CODEX_READER_WORKSPACE_PLAN.md#3-complete-the-personal-note-workflow-inside-the-reader))
