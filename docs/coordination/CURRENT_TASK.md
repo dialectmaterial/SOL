@@ -12,80 +12,76 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: Make reader moves fast without weakening checks
+## Claude Code: Finish the reader speed list
 
-**Status:** In review
-**Branch:** `claude/fast-reader-moves`
+**Status:** Ready
+**Branch:** `claude/reader-speed-list`
 **Requested:** 19 October 2026, by the maintainer
 
 ### Goal
 
-A section move, search-result open or history step takes well under half a
-second on the real book (now about 2.3–2.9 s; see the
-[reader speed baseline](https://github.com/dialectmaterial/SOL/blob/c2eb068/docs/coordination/HANDOFF.md#reader-speed-baseline--18-october-2026)),
-with every corpus-freshness, reference and workspace guard still in force.
+Bring a section move from about 0.68 s towards 0.5 s on the real book, by the
+remaining items measured on 19 October.
 
 ### Scope
 
-`sol/core/protocol.py` (internals only), `sol/reader/actions.py`,
-`sol/terminal/neovim_reader.py`, their tests, CORE/BEING and CHANGELOG.
-Profiling shows about nine full corpus reloads and revalidations per move
-(`_fresh_snapshot`, about 0.65 s each), where `verify_snapshot_current` checks
-the same generation in about 14 ms. Measure with `scripts/reader_timings.py`.
-Authority: CORE §§5–7; Architecture §6.
+`sol/core/protocol.py`, `sol/core/models.py`, `sol/reader/actions.py`,
+`sol/reader/surface.py`, their tests, CORE and CHANGELOG:
+- a faster in-memory comparison in `_fresh_snapshot` (JSON text plus structural
+  equality). **Approved by the maintainer on 19 October:** it may accept an
+  in-memory value that is a subclass of `int` or `float` with the same value,
+  which the current comparison refuses; record this in CORE §6;
+- the deep copy of the section in `sol/reader/surface.py`;
+- repeated passage lookups (`Book.selection`, `find_passage`,
+  `ReadingSession.current`), with identical results.
+Measure with `scripts/reader_timings.py`. Authority: CORE §§4–6.
 
 ### Constraints
 
-No change to the CORE API, the reference protocol, the corpus contract or the
-workspace schema. A changed corpus is still refused on every request that reads
-or saves. No trust is cached across requests over caller-mutable collections.
-If a cheaper check would accept anything the full reload refuses, stop and list
-it as a reserved decision. Do not touch `sol/reader/surface.py`,
-`sol/reader/typography.py`, `sol/terminal/neovim.py` or `sol/terminal/neovim.lua`
-(Codex's task).
+File fingerprints are still checked on every call; no other relaxation. No
+change to the CORE API, reference protocol, corpus contract or workspace
+schema. Do not touch `sol/terminal/` (Codex's task).
 
 ### Acceptance
 
-Before/after timings from `scripts/reader_timings.py` on the real book in the
-handoff. Existing changed-corpus, stale-reference and conflict tests pass
-unchanged, and a new test shows a corpus changed between two requests is still
-refused. The documentation check and the full suite pass.
+Before/after timings in the handoff; existing refusal tests unchanged; a test
+for each relaxed or rewritten check showing what it still refuses. The
+documentation check and the full suite pass.
 
-## Codex: Footnote reading view
+## Codex: Split the Lua reader into modules
 
-**Status:** In review
-**Branch:** `codex/footnote-view`
+**Status:** Ready
+**Branch:** `codex/lua-modules`
 **Requested:** 19 October 2026, by the maintainer
 
 ### Goal
 
-From `c`, the reader opens a single footnote in its own calm view, follows a
-note's own note links, and returns to the exact cursor and selection.
+`sol/terminal/neovim.lua` (about 1,330 lines) becomes a small entry file plus
+cohesive modules (for example panels, the note editor, footnote view, search
+and markers), with no change in behaviour, so stage 6 and later work touch
+smaller files.
 
 ### Scope
 
-[Proposal stage 4](proposals/CODEX_READER_WORKSPACE_PLAN.md#4-give-book-footnotes-a-proper-reading-view):
-`sol/reader/surface.py`, `sol/reader/typography.py`, `sol/terminal/neovim.py`,
-`sol/terminal/neovim.lua`, their tests, BEING and CHANGELOG. Start after PR #13
-is merged; it changed the `c` popup. Authority: BEING §§2, 4, 7; CORE §§2, 5.
+[Proposal cleanup](proposals/CODEX_READER_WORKSPACE_PLAN.md#cleanup-alongside-the-stages):
+`sol/terminal/*.lua`, the Python code that locates and packages the Lua files
+(`sol/terminal/neovim.py`, packaging data, `scripts/install.py` if needed),
+tests, and Architecture or BEING only where they name files.
 
 ### Constraints
 
-Reuse the canonical `note_paragraph` records ordered by `order` and their
-existing IDs; callouts stay display marks; emphasis, attribution and review
-warnings are kept. Nested or unresolved links have explicit bounds and cycle
-handling. Book footnotes, personal notes and technical context stay visibly
-separate. No new IDs, no generated text. Do not touch `sol/core/`,
-`sol/reader/actions.py` or `sol/terminal/neovim_reader.py` beyond what a new
-panel request strictly needs (Claude Code's task); coordinate in the PR if so.
+No behaviour change: every existing headless Neovim and controller test passes
+unchanged, except where a test names a file path. Modules are loaded from the
+installed package directory only, never from the user's runtime path or
+configuration. The wheel and source archive still contain every Lua file, and
+the packaging checks prove it. Do not touch `sol/core/`, `sol/reader/` or
+`sol/terminal/neovim_reader.py` (Claude Code's task).
 
 ### Acceptance
 
-Multi-paragraph footnotes keep style offsets, numbering, attribution and
-warnings; nested and unresolved links have clear outcomes; opening and closing
-a footnote restores cursor, selection and reading mode, including at narrow
-widths. Headless Neovim and controller tests; the documentation check and the
-full suite pass.
+The documentation check and the full suite pass, including packaging checks;
+a reader started from an installed wheel in a temporary environment opens a
+passage headlessly. The handoff lists the modules and what each owns.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
