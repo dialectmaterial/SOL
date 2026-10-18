@@ -33,6 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
     check = commands.add_parser("check", help="recompute and verify a saved experiment against the local corpus")
     check.add_argument("file", metavar="FILE|-", help="saved result JSON, or - for piped input")
     add_arguments(check)
+    word_export = commands.add_parser("words-export", help="verify a saved target/reference study and export CSV or TSV")
+    word_export.add_argument("file", metavar="FILE|-", help="saved sol.word-frequencies v1 JSON, or piped input")
+    word_export.add_argument("--format", choices=("csv", "tsv"), default="csv", help="table format (default: csv)")
+    word_export.add_argument("--corpus", type=Path, metavar="DIRECTORY", help="explicit CORE target corpus")
+    word_export.set_defaults(json=False)
+    add_arguments(word_export)
     prose = commands.add_parser("prose", help="prepare prose-only analysis input, retaining headings as metadata")
     sample = commands.add_parser("segmentation-sample", help="prepare a blind private sample for human sentence marking")
     sample.add_argument("--per-doctrine", type=int, required=True, metavar="N", help="explicit number of whole passages from each doctrine")
@@ -167,6 +173,9 @@ def main(arguments: list[str] | None = None) -> int:
     """Analyze or verify without opening BEING, a workspace, or a source PDF."""
     options = build_parser().parse_args(arguments)
     try:
+        if options.action == "words-export":
+            from sol.essence.word_cli import run_export
+            return run_export(options)
         if options.action == "words":
             from sol.essence.word_cli import run
             return run(options)

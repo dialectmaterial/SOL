@@ -8,7 +8,7 @@ from importlib import import_module
 __all__ = ["MAX_RESULT_BYTES", "TermExperimentError", "analyze_term", "check_term_result",
            "encode_term_result", "decode_term_result", "prose_text", "export_prose",
            "CoreProvider", "FileProvider", "WordStudyError", "analyze_words", "check_word_result",
-           "encode_word_result", "decode_word_result"]
+           "encode_word_result", "decode_word_result", "compare_words", "export_word_comparison"]
 
 
 def __getattr__(name):
@@ -19,6 +19,8 @@ def __getattr__(name):
         module = "sol.essence.word_inputs"
     elif name in {"analyze_words", "check_word_result", "encode_word_result", "decode_word_result"}:
         module = "sol.essence.words"
+    elif name in {"compare_words", "export_word_comparison"}:
+        module = "sol.essence.comparison"
     value = getattr(import_module(module), name)
     globals()[name] = value
     return value

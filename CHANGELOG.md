@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Compare word rates and export verified tables — 19 October 2026
+
+The UI-independent `compare_words` function reports a rate difference and
+log₂ rate ratio for target/reference word frequencies, with explicit
+denominators and undefined-value reasons. `sol analyze words-export` verifies
+a saved study against its CORE/file inputs before emitting CSV or TSV with
+counts, rates, measures and provenance. There is no smoothing or significance
+claim; the existing `sol.word-frequencies` v1 artifact stays unchanged.
+
 ### Slightly faster start — 19 October 2026
 
 Starting `sol` read and checked the whole corpus twice in quick succession;

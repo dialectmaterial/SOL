@@ -45,40 +45,41 @@ Headless Neovim and Textual pilot tests for open, toggle, focus, close and
 failure; the reader position survives; a manual check on a real terminal is
 reported separately.
 
-## Codex: ESSENCE stage 2 engine, word frequencies without an interface
+## Codex: ESSENCE stage 3 engine, comparison measures and export
 
-**Status:** In review
-**Branch:** `codex/essence-word-frequencies`
-**Requested:** 18 October 2026, by the maintainer
+**Status:** In progress
+**Branch:** `codex/essence-comparison`
+**Requested:** 19 October 2026, by the maintainer
 
 ### Goal
 
-A headless, reproducible word-frequency analysis over a target scope and an
-optional reference scope, from the CORE corpus or a plain-text file, which the
-interface will later call.
+Comparing a target with a reference says more than two rates side by side:
+per-word comparison measures with explicit denominators, and an export that
+other tools can read, without book text.
 
 ### Scope
 
-[ESSENCE §4–§5 stage 2](../ESSENCE.md#5-prioritized-experiments): `sol/essence/`
-except `sol/essence/tui/`, tests, ESSENCE §5 and CHANGELOG. A provider boundary
-(`core` | `file`); the term study's tokenizer, shared rather than copied; token
-count, type count and a frequency table; absolute counts, rates and denominators
-for target and reference; a `sol analyze words` CLI; a versioned artifact with
-`sol analyze check` support, binding the CORE generation or the file digest.
+[ESSENCE §5 stage 3](../ESSENCE.md#5-prioritized-experiments): `sol/essence/`
+except `sol/essence/tui/`, tests, ESSENCE §5 and CHANGELOG. Propose and
+implement a small, documented set of measures (for example a rate difference
+and a log ratio with a stated handling of zero counts; a keyness statistic
+only with its formula and a note on what it does not show). Export the
+frequency table and measures as CSV/TSV from the CLI. A Python function the
+interface can call, documented in the handoff.
 
 ### Constraints
 
-No Textual import and no interface work; do not touch `sol/terminal/`,
-`sol/essence/tui/` or `pyproject.toml` (Claude Code's task). Existing
-`sol.term-study` and `sol.sentence-study` artifacts unchanged. File input is
-UTF-8 text the user names explicitly; artifacts keep no book text. No new
-dependency.
+No change to the shape of `sol.word-frequencies` v1 without a new version;
+existing artifacts still check. Measures never imply conceptual similarity or
+significance beyond what their method states. No book text in exports beyond
+the words themselves. No new dependency. Do not touch `sol/essence/tui/`,
+`sol/terminal/`, `sol/core/` or `sol/corpus/` (Claude Code's tasks).
 
 ### Acceptance
 
-Tests for both providers, unequal scopes (denominators shown, no false
-comparability), a changed corpus or file refused by `check`, Unicode and empty
-input. The handoff documents the Python function the interface will call.
+Tests for each measure (including zero counts and unequal denominators), export
+round trips, and refusal of stale inputs. Documentation check and full suite
+pass.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
