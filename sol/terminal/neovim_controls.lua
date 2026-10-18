@@ -192,6 +192,7 @@ return function(reader)
         "Ctrl-P / Ctrl-N  previous / next search-result passage",
         "Esc              hide the search-match marks",
         "S                sentence lengths in this section (ESSENCE study)",
+        "E                open ESSENCE beside the reader; in it Alt-F fullscreen, Alt-R back",
         "Alt-Left/Right   return / forward through reading history",
         "v                characterwise selection inside one passage",
         "c                source pages, attribution and linked notes",
@@ -311,6 +312,16 @@ return function(reader)
     vim.keymap.set('n', 'n', guarded(function() passage(1) end), {buffer = buffer, silent = true})
     vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
     vim.keymap.set('n', 'S', guarded(function() request('sentence_study') end), {buffer = buffer, silent = true})
+    vim.keymap.set({'n', 'x'}, 'E', guarded(function()
+      -- Capture the exact position and selection; ESSENCE returns to it with
+      -- Alt-R and on closing. Visual mode stays until ESSENCE actually opens
+      -- (its window change ends it), so a refused launch keeps the selection.
+      local packet = current_packet()
+      local essence = rawget(_G, 'SOLEssence')
+      essence.origin = packet
+      if essence.window and api.nvim_win_is_valid(essence.window) then essence.focus()
+      else request('essence_open', nil, nil, packet) end
+    end), {buffer = buffer, silent = true})
     -- Views rebuilt from this one (p, f, b/n) copy data, so forget the marks there too.
     vim.keymap.set('n', '<Esc>', function()
       api.nvim_buf_clear_namespace(buffer, search_namespace, 0, -1)
@@ -355,6 +366,9 @@ return function(reader)
     toggle_mode = toggle_mode, mode = mode, yank = yank, tree = tree, marker = marker, source = source,
     cycle_theme = cycle_theme, theme = function() return data.theme and data.theme.active end,
     quit = function() reading_request('quit') end,
+    relayout = function()
+      if api.nvim_win_is_valid(window) then api.nvim_win_set_config(window, window_config()) end
+    end,
     marker_slots = function() return vim.deepcopy(data.markers) end,
     update_markers = function(markers)
       data.markers = markers

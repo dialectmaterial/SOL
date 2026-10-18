@@ -8,6 +8,27 @@ Starting `sol` read and checked the whole corpus twice in quick succession;
 it now does so once, with the same checks. A page appears after about 0.86 s
 instead of 0.95 s on the development machine.
 
+
+### Word frequencies in ESSENCE — 18 October 2026
+
+In ESSENCE's Experiment screen, choose what to count (this passage, its
+section, the whole book or a text file) and, optionally, what to compare it
+with, then press Count words. Results lists the words with counts and rates
+per 10,000 words for both sides, says how many words each side has, and warns
+when the two are not directly comparable. With a workspace, each count is
+saved and can be checked later with `sol analyze check`.
+
+### ESSENCE opens beside the reader — 18 October 2026
+
+`E` in the reader opens ESSENCE, a new Textual application, on the right of
+the page; Alt-F makes it fullscreen and back, Alt-R returns to the reader, and
+`q` closes it, leaving you exactly where you were reading. Its four screens
+(Encyclopedia, Methods, Experiment, Results) are placeholders for now; the
+first real experiment, word frequencies, comes next. ESSENCE needs the new
+`essence` extra (`pip install 'sol-organizes-logic[essence]'`, or
+`pipx inject sol-organizes-logic textual`); without it the reader works as
+before and `E` says what to install.
+
 ### Count words through CORE or ordinary files — 18 October 2026
 
 `sol analyze words` and the UI-independent `analyze_words` function count a

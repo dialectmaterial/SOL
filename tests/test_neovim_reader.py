@@ -3,6 +3,7 @@ from copy import deepcopy
 from dataclasses import replace
 import json
 import os
+import sys
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -840,6 +841,53 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 1)
+
+    def test_essence_open_writes_a_private_context_without_book_text(self):
+        from sol.essence.tui.context import read_context
+
+        self.extend(3)
+        service = self.service()
+        self.position(service, 4)
+        state = service.store.get_state()
+        state_home = self.root / "state"
+
+        def native(payload, _, on_request):
+            packet = self.packet(3, 14)
+            launch = on_request({"op": "essence_open", "packet": packet, "mode": "continuous"})["essence"]
+            command = launch["command"]
+            self.assertEqual(command[:4], [sys.executable, "-m", "sol.essence.tui", "--context"])
+            path = Path(command[4])
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            context = read_context(path)
+            self.assertEqual(context["reference"], packet["reference"])
+            self.assertEqual(context["cursor_offset"], packet["cursor_offset"])
+            self.assertNotIn("text", context["selection"])
+            self.assertEqual(context["selection"]["start"], 3)
+            self.assertEqual(context["state_file"], str(state_home / "sol" / "essence" / "investigation.json"))
+            self.assertNotIn(self.book.passages[0].text[3:14], path.read_text())
+            with patch("sol.essence.tui.textual_available", return_value=False), \
+                    self.assertRaisesRegex(ValueError, "essence"):
+                on_request({"op": "essence_open", "packet": packet, "mode": "continuous"})
+            return 0, {"action": "quit", "packet": payload["restore"]}
+
+        with patch.dict(os.environ, XDG_STATE_HOME=str(state_home)), \
+                patch("sol.essence.tui.textual_available", return_value=True), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+        # Opening ESSENCE moved nothing and saved nothing.
+        self.assertEqual(service.store.get_state()["current_id"], state["current_id"])
+
+    def test_temporary_session_gives_essence_no_state_file(self):
+        from sol.essence.tui.context import read_context
+
+        def native(payload, _, on_request):
+            launch = on_request({"op": "essence_open", "packet": payload["restore"], "mode": "continuous"})
+            self.assertIsNone(read_context(launch["essence"]["command"][4])["state_file"])
+            return 0, None
+
+        with patch("sol.essence.tui.textual_available", return_value=True), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(), 0)
 
     def test_cross_section_paragraph_previous_lands_at_beginning_and_keeps_focus(self):
         self.extend(3)

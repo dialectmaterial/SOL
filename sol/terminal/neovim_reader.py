@@ -345,9 +345,43 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         target = request["packet"]["reference"]["reference"]["target_id"]
         return {"footnote": neovim.build_footnote_payload(sample, target, request["trail"])}
 
+    essence_directory = None
+
+    def essence_panel(request, identifier):
+        # ESSENCE opens beside the reader with where the reader is: a checked
+        # reference, cursor and selection. The context file holds no book text;
+        # nothing here moves the cursor or writes the workspace.
+        nonlocal essence_directory
+        from sol.essence.tui import TEXTUAL_HINT, textual_available
+        from sol.essence.tui.context import write_context
+        if not textual_available():
+            raise ValueError(TEXTUAL_HINT)
+        origin = request["packet"]["reference"]
+        actions.check_return_reference(origin)
+        passage = book.find_passage(origin["reference"]["target_id"])
+        if essence_directory is None:
+            import atexit
+            import shutil
+            import tempfile
+            essence_directory = tempfile.mkdtemp(prefix="sol-essence-")
+            atexit.register(shutil.rmtree, essence_directory, True)
+        state_file = None
+        if workspace_reader is not None:
+            from pathlib import Path
+            import os
+            state_home = os.environ.get("XDG_STATE_HOME") or str(Path.home() / ".local" / "state")
+            state_file = Path(state_home) / "sol" / "essence" / "investigation.json"
+        selection = request["packet"]["selection"]
+        context = write_context(
+            essence_directory, reference=origin, cursor_offset=request["packet"]["cursor_offset"],
+            selection=None if selection is None else {key: value for key, value in selection.items() if key != "text"},
+            label=safe_label(f"{passage.heading or passage.node.title} | p. {passage.printed_page}"),
+            corpus=str(book.corpus_directory or ""), state_file=state_file)
+        return {"essence": {"command": [sys.executable, "-m", "sol.essence.tui", "--context", str(context)]}}
+
     panels = {"search": search_panel, "source_preview": source_panel, "marker_set": marker_panel,
               "marker_clear": marker_panel, "note_add": note_panel, "sentence_study": study_panel,
-              "note_edit": note_edit_panel, "note_history": note_history_panel, "footnote_open": footnote_panel}
+              "note_edit": note_edit_panel, "note_history": note_history_panel, "footnote_open": footnote_panel, "essence_open": essence_panel}
 
     def handle(request):
         # One editor request is one user action: CORE compares the in-memory
