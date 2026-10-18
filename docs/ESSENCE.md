@@ -141,6 +141,93 @@ A result should distinguish **reproducing the exact experiment generation** (str
 
 The shipped sentence study (Experiment A, below) is not superseded; it remains the first complete reader-to-ESSENCE round trip and moves into the new interface once stage 1 exists.
 
+### Stage 2 engine — word frequencies (implemented, 18 October)
+
+The headless engine is available independently of the interface shell. The
+tokenizer was moved unchanged to `sol.essence.tokenization.word_tokens`; the
+term study still uses that exact function and its v1 output is unchanged. It
+yields normalized words and original, half-open Python codepoint offsets:
+letter runs with combining marks and internal straight/curly apostrophes,
+NFC then case folding then curly-to-straight apostrophes; punctuation and
+digits excluded, hyphens split. The artifact records the runtime Unicode
+version. These are ordinary word tokens, not morphological or model subwords.
+
+The interface-facing function is
+`sol.essence.words.analyze_words(target, *, reference=None) -> dict`.
+Each argument is a `CoreProvider(snapshot, scope=None)` or
+`FileProvider(path, scope=None)` from `sol.essence.word_inputs` (also exported
+from `sol.essence`). Providers can differ; no Textual import is involved.
+
+- CORE consumes a verified `CorpusSnapshot` with permanent identity. Default
+  scope is `{"kind":"corpus"}`; alternatives are
+  `{"kind":"within","path":"/BEING/..."}`,
+  `{"kind":"passages","ids":["FULL_UUID",...]}`, or
+  `{"kind":"span","id":"FULL_UUID","start":0,"end":20}`.
+  IDs must be exact and distinct; inputs retain canonical order. Reader paths
+  match whole path components. The existing term-study projection selects
+  Hegel main-text paragraphs, quotations and list items in the three doctrines,
+  excludes generated/pending-review records, and masks converter facsimile
+  labels. Exclusion reasons and masked token counts are explicit.
+- File input is a caller-selected regular UTF-8 file, with default scope
+  `{"kind":"file"}` or `{"kind":"span","start":0,"end":20}`.
+  It requires no CORE imports, configuration or corpus. Bytes, line endings
+  and BOM are preserved for hashing; offsets address decoded text. Symlinks,
+  special files, invalid UTF-8 and inputs over 64 MiB are refused.
+- A span counts only tokens wholly contained in its half-open bounds; cutting
+  a word does not invent a partial token. An empty span/input is valid. The
+  reference is independently selected and optional; both sides use the same
+  tokenizer. Different projections/source bindings and unequal token totals
+  produce warnings. Rates describe these inputs, without a significance or
+  conceptual-similarity claim.
+
+`sol.word-frequencies` v1 is a separate, deterministic result artifact, not a
+persisted investigation record or a change to CORE's protocol. Its top-level
+fields are `protocol`, `version`, `method`, `target`, optional `reference`
+(`null` when absent), `frequencies` and `warnings`. Each side contains its
+provider, binding, scope, text-free `inputs`, `summary` (`token_count`,
+`type_count`, `input_count`) and `exclusions`. CORE bindings retain corpus,
+edition/source digests and full manifest/index generation; file bindings retain
+the full byte digest and byte count, never a path to open automatically.
+
+The frequency table is the union vocabulary, ordered by descending target
+count then normalized word. Every row has `word`, `target` and `reference`.
+Each non-null cell contains `count`, `denominator` (all included tokens on
+that side), `rate_per_10000_tokens` (six decimal places) and `locations`.
+Locations are `[input_index, count_in_input, first_start, first_end]` tuples
+encoded as JSON arrays. CORE input rows provide exact IDs, content/text digests,
+reader paths, pages, attribution and selected spans for source return; file
+rows provide text digests and spans. No passage text, contexts or token
+sequences are stored; normalized vocabulary is intrinsic to the table. Keep
+these artifacts private and outside Git.
+
+```sh
+sol analyze words --corpus /absolute/path/to/corpus --within /BEING --compare
+sol analyze words --corpus /absolute/path/to/corpus --passage FULL_UUID --span 0 20
+sol analyze words --file /private/target.txt --reference-file /private/reference.txt
+sol analyze words --file /private/target.txt --span 0 20 --compare --json > /private/words.json
+sol analyze check /private/words.json --input-file /private/target.txt
+```
+
+`--compare` uses the whole target source as reference. `--reference-within`,
+repeatable `--reference-passage`, `--reference-span`, `--reference-corpus`
+and `--reference-provider core|file` select an independent reference; target
+`--provider` defaults to `file` with `--file`/`--input-file`, otherwise `core`.
+Use `--json` for the complete table and source locations. Human output shows
+absolute counts, denominators and rates; zero-token rates are `null` in JSON
+and `n/a` in text, including the missing side of a union-vocabulary row.
+
+`encode_word_result`/`decode_word_result` validate bounded (16 MiB), strict
+UTF-8 JSON with no duplicate keys, nonfinite numbers, unknown fields or method
+versions. `check_word_result(target, result, *, reference=None)` recomputes
+with caller-supplied providers and matching scopes. `sol analyze check`
+reuses validated artifact scopes, but file paths must be supplied explicitly;
+CORE sources come from `--corpus`/discovery and `--reference-corpus`. It emits
+a verification receipt, not another study. Any changed corpus generation or
+file bytes, including unselected material, invalidate the result; input
+changes during execution are refused too. Rechecking does not overwrite the
+artifact or change canonical/workspace data. Interface integration and its
+CLI/TUI equivalence trial remain separate work.
+
 ### Experiment A — syntax and positionality (highest priority)
 
 **Research question:** how do sentence lengths and selected grammatical constructions vary across paragraphs and across positions within a passage or chapter of Hegel's *Science of Logic* in the current **English translation**?

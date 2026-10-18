@@ -15,6 +15,7 @@ import unicodedata
 import uuid
 
 from sol import core
+from sol.essence.tokenization import word_tokens as _tokens
 
 
 MAX_RESULT_BYTES = 1048576
@@ -97,27 +98,6 @@ def _validate_binding(result):
     for value in [corpus["edition_sha256"], corpus["source"]["sha256"], *generation.values()]:
         if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
             raise TermExperimentError("Term-study fingerprints must be lowercase SHA-256", code="invalid_digest")
-
-
-def _tokens(text):
-    """Yield normalized tokens and untouched, half-open plain-text offsets."""
-    position = 0
-    while position < len(text):
-        if not unicodedata.category(text[position]).startswith("L"):
-            position += 1
-            continue
-        start = position
-        position += 1
-        while position < len(text):
-            category = unicodedata.category(text[position])
-            if category.startswith(("L", "M")):
-                position += 1
-            elif (text[position] in "'’" and position + 1 < len(text)
-                  and unicodedata.category(text[position + 1]).startswith("L")):
-                position += 2
-            else:
-                break
-        yield unicodedata.normalize("NFC", text[start:position]).casefold().replace("’", "'"), start, position
 
 
 def _query(value):

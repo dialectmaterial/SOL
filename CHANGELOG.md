@@ -13,6 +13,16 @@ first real experiment, word frequencies, comes next. ESSENCE needs the new
 `pipx inject sol-organizes-logic textual`); without it the reader works as
 before and `E` says what to install.
 
+### Count words through CORE or ordinary files — 18 October 2026
+
+`sol analyze words` and the UI-independent `analyze_words` function count a
+target and optional reference with the term study's shared, unchanged Unicode
+tokenizer. Results show tokens, types, absolute frequencies, explicit token
+denominators and rates, with source IDs/pages/offsets and unequal-scope warnings.
+Plain UTF-8 files work without CORE. The text-free `sol.word-frequencies` v1
+artifact is checked by recomputation with `sol analyze check`; changed corpus
+generations or file bytes are refused. No interface or dependency is added.
+
 ### Split the Lua reader implementation — 18 October 2026
 
 The Neovim entry now composes package-local text/view, panel, request, footnote,
