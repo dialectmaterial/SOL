@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Prepare private formula reviews — 18 October 2026
+
+Checkout-only `scripts/formula_review_sheet.py` writes an offline HTML sheet
+outside Git for math records needing visual review, including notes. Each item
+shows exact typed text and all printed-page crops through the existing verified
+source renderer. Interactive or individual human verdicts append to a private,
+source-bound history; skip/resume, correction notes and integrity checks are
+included. Nothing marks a record reviewed or changes canonical Markdown.
+
 ### Faster section moves — 19 October 2026
 
 Moving to the next or previous section, opening a search result or going back
