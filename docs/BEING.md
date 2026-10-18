@@ -161,6 +161,54 @@ The corpus contract supports separate `formula` records and prose passages with 
 
 **Implemented (17 October):** `s` in the reader shows the printed source of the current passage. Python captures the record against the verified corpus generation and a private, fingerprint-checked PDF snapshot, then renders the record's recorded bounding box on each source page at 144 dpi with a 6-point margin; a page entry without a box is rendered whole and labelled as such. A separate image viewer shows it (`xdg-open` or `open`, or the command in `SOL_IMAGE_VIEWER`), detached from the terminal, so it works in Alacritty and does not depend on Kitty. Without a graphical display, SOL shows the file path instead of guessing a viewer. The popup names PDF and printed pages and the transcription status, and says plainly that the printed source is authoritative for records flagged `needs_visual_review` or `needs_review`; number keys show further pages. Nothing moves the cursor, clears a selection or writes to the workspace. The converter's own `assets/*.png` facsimiles are not used, because the corpus manifest does not fingerprint them. The first-run import now remembers the verified PDF; existing setups use `sol --set-source-pdf PATH`. **Acceptance run (17 October, scratch import of the audited PDF):** the corpus has **no `formula` records**; the converter's short-block rule never fires on this book. Mathematics appears in 46 mixed main-text paragraphs, all `needs_visual_review`, 25 of them spanning two pages, and every source entry has a bounding box. Crops were checked by eye against the PDF for a mixed passage over two pages (polynomials, inline dy/dx), the Newton product passage (stacked fractions the typed text scrambles into `xd y y d x d xd y x y − − + 2 2 4`) and `−a · −a = +a²` (superscript lost in the typed text); all matched the print. A capture from a changed corpus generation is refused, and a missing PDF names `sol --set-source-pdf`. The whole-page fallback is exercised only by synthetic tests, since no real record lacks a box. The popup and viewer were then used in a real terminal session (17 October). **Retyped mathematics (17 October):** in the local corpus (main text and one footnote, 47 records with `contains_math`), 30 records whose typed mathematics was scrambled were retyped in canonical Markdown as linear Unicode (`a²`, `dy/dx`, `(x + dx/2)`), checked against the PDF crops; prose was untouched and record IDs, metadata and pages are unchanged. The corpus audit file `audit/math-retyping-2026-10-17.json` lists each change. They keep `needs_visual_review`, since no person has confirmed them yet; the edition's apparent misprint `f(x+1)` (for `f(x+i)`) is kept as printed. **Not demonstrable yet:** a human-reviewed formula, and native 2-D rendering of stacked notation.
 
+### Private formula review sheet
+
+Checkout-only `scripts/formula_review_sheet.py` prepares a private offline HTML
+sheet beside its source-bound `sheet.json` and initially empty `verdicts.jsonl`.
+It selects all canonical records with `contains_math: true` and
+`transcription_status: needs_visual_review`, including note paragraphs, in
+canonical order. This includes more than the 30 retyped records; repeat
+`--record FULL_UUID` to select an explicit eligible subset. Each item shows its
+ID, attribution, exact typed text and canonical Markdown, plus every recorded
+source page, with PDF/printed labels. The script calls the existing
+`SourceService.capture` and `render_region`: recorded regions are cropped, and
+entries lacking a bounding box are explicitly labelled whole pages. Missing or
+changed PDF/corpus data refuse generation; no guessed formula is supplied.
+
+```sh
+.venv/bin/python -B scripts/formula_review_sheet.py create \
+  --corpus /absolute/path/to/local-corpus --output /private/path/formula-review
+# Add --pdf /absolute/path/to/original.pdf if normal source discovery needs it.
+# Open /private/path/formula-review/review.html, then record each human verdict:
+.venv/bin/python -B scripts/formula_review_sheet.py review \
+  --sheet /private/path/formula-review --reviewer "Your name"
+.venv/bin/python -B scripts/formula_review_sheet.py record \
+  --sheet /private/path/formula-review --record 1 --reviewer "Your name" \
+  --verdict needs-correction --note "The exponent differs from the print."
+.venv/bin/python -B scripts/formula_review_sheet.py check \
+  --sheet /private/path/formula-review --corpus /absolute/path/to/local-corpus
+```
+
+The output's parent must already exist outside every Git checkout and the
+canonical corpus; an existing sheet is never replaced. Directories are private
+(700), files 600, and the temporary verified PDF/cache is removed. The sheet
+does not load remote resources. `review` offers confirmed, needs correction,
+skip and quit, and resumes pending items. Needs correction requires a note;
+`record` can revisit an item by number or full ID. Every verdict is appended,
+retaining earlier testimony, reviewer and UTC time, bound to the sheet's hash
+and record text/metadata digests. The last verdict on an item supplies progress
+counts; it is not approval to apply it. HTML/crop changes or malformed history
+refuse further recording. `check --corpus` additionally refuses a different
+canonical generation. Historical verdicts may still be recorded against the
+unchanged sheet, without asserting that it matches a later corpus.
+
+**This is a review aid only.** All verdicts start absent. Confirmed means the
+named human recorded that verdict; it never sets canonical status to
+`reviewed`, certifies a formula, or rewrites text. Applying testimony or changing
+`transcription_status` in canonical Markdown remains a separate human-approved
+step, followed by reindexing and checking. The private artifact format belongs
+to this checkout script, not the CORE reference protocol or workspace schema.
+
 Acceptance: demonstrate one reviewed simple formula, one complex or unreviewed Newton-related formula, a mixed prose/math passage, a missing source image, a corrected formula, and a stale reference; compare actual rendering against original PDF evidence.
 
 ## 6. BEING ↔ ESSENCE without terminal dogma
