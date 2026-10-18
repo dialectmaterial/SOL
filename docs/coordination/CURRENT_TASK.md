@@ -14,7 +14,7 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ## Claude Code: ESSENCE stage 1, the interface shell
 
-**Status:** Ready (after this PR, #22, is merged)
+**Status:** In review
 **Branch:** `claude/essence-shell`
 **Requested:** 18 October 2026, by the maintainer
 
