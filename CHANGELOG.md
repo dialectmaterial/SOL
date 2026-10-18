@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### ESSENCE opens beside the reader — 18 October 2026
+
+`E` in the reader opens ESSENCE, a new Textual application, on the right of
+the page; Alt-F makes it fullscreen and back, Alt-R returns to the reader, and
+`q` closes it, leaving you exactly where you were reading. Its four screens
+(Encyclopedia, Methods, Experiment, Results) are placeholders for now; the
+first real experiment, word frequencies, comes next. ESSENCE needs the new
+`essence` extra (`pip install 'sol-organizes-logic[essence]'`, or
+`pipx inject sol-organizes-logic textual`); without it the reader works as
+before and `E` says what to install.
+
 ### Count words through CORE or ordinary files — 18 October 2026
 
 `sol analyze words` and the UI-independent `analyze_words` function count a

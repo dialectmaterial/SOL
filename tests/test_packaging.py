@@ -108,8 +108,11 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(metadata["Requires-Python"], ">=3.10")
         self.assertEqual(dict(entry_points["console_scripts"]), ENTRY_POINTS)
         requirements = metadata.get_all("Requires-Dist") or []
-        self.assertEqual(set(metadata.get_all("Provides-Extra") or []), {"corpus", "shell", "extraction"})
-        self.assertEqual(len(requirements), 3)
+        self.assertEqual(set(metadata.get_all("Provides-Extra") or []), {"corpus", "shell", "extraction", "essence"})
+        self.assertEqual(len(requirements), 4)
+        # ESSENCE's interface is the only optional dependency, and never a base one.
+        essence = [requirement for requirement in requirements if 'extra == "essence"' in requirement]
+        self.assertEqual([requirement.split(";")[0].strip() for requirement in essence], ["textual<9,>=8"])
         base = [requirement for requirement in requirements if ";" not in requirement]
         corpus = [requirement for requirement in requirements if 'extra == "corpus"' in requirement]
         shell = [requirement for requirement in requirements if 'extra == "shell"' in requirement]
