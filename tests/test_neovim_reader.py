@@ -478,6 +478,83 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         with patch.object(neovim, "launch_payload", side_effect=reopened):
             self.assertEqual(self.run_view(service), 0)
 
+    def test_note_edit_keeps_identity_and_history_and_refuses_unsafe_edits(self):
+        service = self.service()
+        self.position(service, 4)
+        state = service.store.get_state()
+        digest = self.book.canonical_records[self.identifier]["content_sha256"]
+        mine = service.store.add_annotation(self.identifier, "First thought", digest)
+        older = service.store.add_annotation(self.identifier, "Written on an older text", "0" * 64)
+        with Workspace(service.store.path, self.book.corpus_manifest["corpus_id"],
+                       {key: self.book.corpus_manifest[key] for key in ("edition", "source")},
+                       actor="Another reader") as other:
+            theirs = other.add_annotation(self.identifier, "Someone else's note", digest)
+
+        def native(payload, _, on_request):
+            packet = payload["restore"]
+            listed = {row["id"]: row for row in payload["personal"]["notes"][self.identifier]}
+            self.assertEqual((listed[mine["id"]]["revision"], listed[mine["id"]]["edit_refusal"],
+                              listed[mine["id"]]["body"], listed[mine["id"]]["changed_source"]),
+                             (1, "", "First thought", False))
+            self.assertTrue(listed[older["id"]]["changed_source"])
+            self.assertEqual(listed[theirs["id"]]["edit_refusal"], "only the note's author can edit it")
+            self.assertIsNone(listed[theirs["id"]]["body"])
+
+            def edit(note, revision, body):
+                return on_request({"op": "note_edit", "note": note, "revision": revision, "body": body,
+                                   "packet": packet, "mode": "continuous"})
+
+            saved = edit(mine["id"], 1, "First thought, revised")
+            self.assertEqual(saved["note_saved"], {"id": mine["id"], "revision": 2, "changed": True})
+            # Saving the same text again adds no revision.
+            self.assertEqual(edit(mine["id"], 2, "First thought, revised")["note_saved"]["changed"], False)
+            # A stale revision, another author's note, and an empty body are refused.
+            with self.assertRaisesRegex(ValueError, "changed in another session"):
+                edit(mine["id"], 1, "Overwriting from an old editor")
+            with self.assertRaisesRegex(ValueError, "author"):
+                edit(theirs["id"], 1, "Not mine to change")
+            for bad in ({"note": str(UUID(int=99)), "revision": 1, "body": "x"},
+                        {"note": mine["id"], "revision": 0, "body": "x"},
+                        {"note": mine["id"], "revision": 2, "body": "  "}):
+                with self.subTest(bad=bad), self.assertRaises(ValueError):
+                    on_request({"op": "note_edit", **bad, "packet": packet, "mode": "continuous"})
+            history = on_request({"op": "note_history", "note": mine["id"], "packet": packet,
+                                  "mode": "continuous"})["note_history"]
+            self.assertEqual([(row["revision"], row["kind"], row["lines"]) for row in history["revisions"]],
+                             [(2, "edited", ["First thought, revised"]), (1, "created", ["First thought"])])
+            # A corpus changed while editing refuses the save.
+            source = self.corpus / "sample.md"
+            source.write_text(source.read_text() + "\nAn unindexed edit.\n")
+            with self.assertRaises(ValueError):
+                edit(mine["id"], 2, "After the corpus changed")
+            return 1, None
+
+        with patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 1)
+        note = service.store.get_annotation(mine["id"])
+        self.assertEqual((note["body"], note["revision"], note["target_id"], note["content_sha256"]),
+                         ("First thought, revised", 2, self.identifier, digest))
+        self.assertEqual(service.store.get_annotation(theirs["id"])["body"], "Someone else's note")
+        self.assertEqual(service.store.get_state(), state)
+
+    def test_note_with_invisible_characters_is_shown_but_not_editable_in_the_reader(self):
+        service = self.service()
+        self.position(service, 0)
+        digest = self.book.canonical_records[self.identifier]["content_sha256"]
+        note = service.store.add_annotation(self.identifier, "Joined‍word", digest)
+
+        def native(payload, _, on_request):
+            [row] = payload["personal"]["notes"][self.identifier]
+            self.assertEqual((row["lines"], row["body"]), (["Joined\\u200dword"], None))
+            self.assertIn("sol --shell", row["edit_refusal"])
+            with self.assertRaisesRegex(ValueError, "sol --shell"):
+                on_request({"op": "note_edit", "note": note["id"], "revision": 1, "body": "Joined word",
+                            "packet": payload["restore"], "mode": "continuous"})
+            return 0, None
+
+        with patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+
     def test_temporary_session_refuses_notes_and_writes_nothing(self):
         before = self.files()
         def native(payload, _, on_request):

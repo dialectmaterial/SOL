@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Edit your notes in the reader — 18 October 2026
+
+In `c`, press `e` on one of your notes to revise it in the same editor as `a`,
+or `r` to see its earlier versions. Each note now shows its revision and warns
+when the passage has changed since you wrote it. Only a note's author can edit
+it, a newer version saved elsewhere is never overwritten, and a save that
+changes nothing adds no version. Before, editing needed `sol --shell`.
+
 ### Measure reader speed before optimising — 18 October 2026
 
 `scripts/reader_timings.py` reports repeated Python reader timings with medians

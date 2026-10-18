@@ -32,6 +32,32 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Edit and review personal notes in the reader — 18 October 2026
+
+**Task:** [CURRENT_TASK](CURRENT_TASK.md), "Claude Code: Edit and review personal notes in the reader" ([proposal stage 3](proposals/CODEX_READER_WORKSPACE_PLAN.md#3-complete-the-personal-note-workflow-inside-the-reader))
+**Branch / PR:** `claude/reader-note-editing` · opened with `gh pr create`
+**Last implementation commit:** `d46e3520971bf33d9e2ddd8f2b1b61e5110fca0c`
+
+### Changed files
+- `sol/terminal/neovim_reader.py` — `note_edit` (note, revision, body) and `note_history` (note) panel requests, limited to notes listed on the sent passage; edits go through `prepare_annotation_edit` / `save_annotation_edit` from the revision the editor opened. Each listed note gains `revision`, `edit_refusal`, `changed_source`, `retired_target` and, when safe to send raw, `body`. Extra request fields may now be several per action.
+- `sol/terminal/neovim.lua` — the `a` editor also revises (`note(edit)`, drafts keyed per note); `c` shows revision and status lines, `e` edits and `r` shows versions of the note under the cursor (or the only note); a version panel; personal-note payloads are validated.
+- `tests/test_neovim_reader.py` — edit keeps ID/target/digest, a no-op save adds no revision, stale revision, another author, unknown note, bad revision, empty body and a changed corpus are refused; history newest first; a note with invisible characters is shown but not editable.
+- `tests/test_reader_surface_neovim.py` — headless Neovim: `e` on the heading with two notes refuses to guess, on another author's note refuses, on yours opens the text; save sends the revision; a refused save keeps the draft; `r` shows versions. The existing note test's sample payload gained the new fields.
+- `docs/BEING.md` (§2 controls and "Editing notes", §7), `CHANGELOG.md`.
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — OK.
+- `.venv/bin/python -B -m unittest discover -s tests` — 1588 tests, OK (11 skipped, 4 expected failures).
+- Real terminal: none by hand.
+
+### Outstanding issues
+- A note containing invisible control characters (for example a zero-width joiner from older shell input) is shown escaped and must be edited with `sol --shell`; the reader will not send such text raw to Neovim.
+- Notes on a retired record ID are listed under the successor and are editable; the edit keeps the retired ID as the note's target.
+- No deletion, hiding or retraction: that is a future reserved decision (a retention policy, possibly a schema change). Nothing here depends on it.
+
+### Decisions requiring approval
+- **Key bindings (default):** `e` and `r` inside the `c` popup, acting on the note under the cursor or the only note. `a` still adds. Alternatives: numbered notes, or keys in the reading view.
+
 ## Reader speed baseline — 18 October 2026
 
 **Task:** [Codex: Measure reader speed before optimising](CURRENT_TASK.md#codex-measure-reader-speed-before-optimising).

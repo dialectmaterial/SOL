@@ -14,7 +14,7 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ## Claude Code: Edit and review personal notes in the reader
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `claude/reader-note-editing`
 **Requested:** 18 October 2026, by the maintainer
 

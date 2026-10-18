@@ -98,6 +98,16 @@ if integrated and (not exact_keys(data.navigation, { "previous", "next" })
   or type(data.notice) ~= "string") then fail("invalid reading navigation") end
 if data.personal ~= nil and (type(data.personal) ~= "table" or type(data.personal.persistent) ~= "boolean"
   or type(data.personal.notes) ~= "table") then fail("invalid personal notes") end
+local function check_personal(personal)
+  for _, items in pairs(personal.notes) do
+    for _, item in ipairs(items) do
+      if type(item.id) ~= "string" or type(item.lines) ~= "table" or type(item.edit_refusal) ~= "string"
+        or (item.edit_refusal == "" and type(item.body) ~= "string")
+        or (item.revision ~= vim.NIL and not integer(item.revision)) then fail("invalid personal note") end
+    end
+  end
+end
+if data.personal ~= nil then check_personal(data.personal) end
 -- Presentation presets are inert highlight data from Python, never sourced files.
 local theme_groups = {}
 for _, name in ipairs({ "Normal", "SOLPanel", "SOLPanelBorder", "SOLSourceHeading", "SOLSourceWarning",
@@ -565,7 +575,7 @@ if not channel and vim.env.SOL_NVIM_REQUEST_FD and vim.env.SOL_NVIM_RESPONSE_FD 
   end))
   _G.SOLReaderChannel = channel
 end
-local show_search, show_source, show_study
+local show_search, show_source, show_study, show_note_history
 local function request(operation, fields, callback)
   if not channel then fail('this action needs the installed SOL reader, not a research export') end
   if channel.navigation_pending then return end
@@ -585,6 +595,7 @@ local function request(operation, fields, callback)
       elseif result.search then show_search(result.search)
       elseif result.source then show_source(result.source)
       elseif result.study then show_study(result.study)
+      elseif result.note_history then show_note_history(result.note_history)
       elseif result.personal then _G.SOLNvimReader.update_personal(result.personal)
       elseif result.markers then
         _G.SOLNvimReader.update_markers(result.markers)
@@ -716,12 +727,15 @@ end
 -- A personal note binds the whole passage through the workspace service. A
 -- selection is shown as context above the editor and is not stored. Drafts
 -- survive any close except an explicit discard, and an unacknowledged save.
+-- With `edit`, the same editor revises an existing note from the revision shown.
 local note_namespace = api.nvim_create_namespace('sol-note')
-local function note()
+local function note(edit)
   if not data.personal then fail('notes need the installed SOL reader') end
   if not data.personal.persistent then fail('notes need a workspace; this temporary -n session saves nothing') end
+  if edit and edit.edit_refusal ~= '' then fail(edit.edit_refusal) end
   local packet = current_packet()
   local record = by_id[packet.reference.reference.target_id]
+  local key = edit and ('edit:' .. edit.id) or record.id
   if vim.fn.mode(1) ~= 'n' then normal_escape() end
   close_popup()
   local channel_state = rawget(_G, 'SOLReaderChannel')
@@ -730,8 +744,9 @@ local function note()
   local editor = api.nvim_create_buf(false, true)
   vim.bo[editor].buftype, vim.bo[editor].bufhidden = 'acwrite', 'wipe'
   api.nvim_buf_set_name(editor, 'sol://note/' .. record.id .. '/' .. editor)
-  if drafts[record.id] then
-    api.nvim_buf_set_lines(editor, 0, -1, false, vim.split(drafts[record.id], '\n', { plain = true }))
+  local initial = drafts[key] or (edit and edit.body)
+  if initial then
+    api.nvim_buf_set_lines(editor, 0, -1, false, vim.split(initial, '\n', { plain = true }))
   end
   vim.bo[editor].modified = false
   local width = math.max(20, math.min(data.width, vim.o.columns - 6))
@@ -750,7 +765,8 @@ local function note()
   popup = api.nvim_open_win(editor, true, { relative = 'editor', row = 3,
     col = math.max(0, math.floor((vim.o.columns - width) / 2)), width = width,
     height = math.max(3, math.min(12 + #quote, vim.o.lines - 10)), style = 'minimal', border = 'single', zindex = 50,
-    title = ' Note on: ' .. vim.fn.strcharpart(record.heading, 0, width - 14) .. ' ', title_pos = 'left',
+    title = edit and (' Edit your note (revision ' .. tostring(edit.revision) .. ') ')
+      or (' Note on: ' .. vim.fn.strcharpart(record.heading, 0, width - 14) .. ' '), title_pos = 'left',
     footer = ' Ctrl-S or :w saves · Ctrl-C discards ', footer_pos = 'right' })
   vim.wo[popup].wrap, vim.wo[popup].linebreak = true, true
   vim.wo[popup].winhighlight = 'NormalFloat:SOLPanel,FloatBorder:SOLPanelBorder'
@@ -766,26 +782,36 @@ local function note()
     return table.concat(api.nvim_buf_get_lines(editor, 0, -1, false), '\n')
   end
   api.nvim_create_autocmd('BufWipeout', { buffer = editor, once = true, callback = function()
-    if not finished and body():match('%S') then
-      drafts[record.id] = body()
-      vim.schedule(function() api.nvim_echo({ { 'Note draft kept; press a on this passage to continue it', 'WarningMsg' } }, false, {}) end)
+    if not finished and body():match('%S') and (not edit or body() ~= edit.body) then
+      drafts[key] = body()
+      local again = edit and 'e on the note in c' or 'a on this passage'
+      vim.schedule(function() api.nvim_echo({ { 'Note draft kept; press ' .. again .. ' to continue it', 'WarningMsg' } }, false, {}) end)
     end
   end })
   local function save()
     local text = body()
     if not text:match('%S') then fail('empty note; nothing saved') end
     -- Keep the draft until Python acknowledges the save.
-    drafts[record.id], finished = text, true
+    drafts[key], finished = text, true
     vim.cmd('stopinsert')
     close_popup()
     restore(packet)
-    request('note_add', { body = text }, function()
-      drafts[record.id] = nil
-      api.nvim_echo({ { 'Note saved in your workspace', 'None' } }, false, {})
-    end)
+    if edit then
+      request('note_edit', { note = edit.id, revision = edit.revision, body = text }, function(result)
+        drafts[key] = nil
+        local saved = result.note_saved
+        api.nvim_echo({ { saved.changed and ('Note revised (revision ' .. tostring(saved.revision) .. ')')
+          or 'Note unchanged; no new revision', 'None' } }, false, {})
+      end)
+    else
+      request('note_add', { body = text }, function()
+        drafts[key] = nil
+        api.nvim_echo({ { 'Note saved in your workspace', 'None' } }, false, {})
+      end)
+    end
   end
   local function discard()
-    drafts[record.id], finished = nil, true
+    drafts[key], finished = nil, true
     vim.cmd('stopinsert')
     close_popup()
     restore(packet)
@@ -803,6 +829,18 @@ local function note()
   end
   vim.cmd('startinsert')
   return editor
+end
+show_note_history = function(history)
+  local lines = { "Versions of a note by " .. history.author .. ", newest first", "" }
+  for _, item in ipairs(history.revisions) do
+    lines[#lines + 1] = "Revision " .. tostring(item.revision) .. " (" .. item.kind .. "), " ..
+      item.editor .. ", " .. item.recorded_at
+    for _, line in ipairs(item.lines) do lines[#lines + 1] = "  " .. line end
+    lines[#lines + 1] = ""
+  end
+  if #history.revisions == 0 then lines[#lines + 1] = "This older workspace keeps no versions." end
+  lines[#lines + 1] = "Esc returns to reading."
+  show_lines(lines)
 end
 local function search()
   -- Standard command-line input works in any Neovim-capable terminal. A cancelled
@@ -849,6 +887,7 @@ local function context()
   local packet = current_packet()
   local record = by_id[packet.reference.reference.target_id]
   local lines = { record.heading, "", "Source context (not selectable passage text)", "" }
+  local note_rows = {}
   local function add(text)
     for _, line in ipairs(vim.split(tostring(text), "\n", { plain = true })) do lines[#lines + 1] = line end
   end
@@ -880,16 +919,42 @@ local function context()
       add("Personal notes need a workspace; this temporary session saves nothing.")
     else
       local mine = data.personal.notes[record.id] or {}
-      add("Your workspace notes on this passage (" .. #mine .. "); a adds one")
+      add("Workspace notes on this passage (" .. #mine .. "); a adds one" ..
+        (#mine > 0 and ", e edits the note under the cursor, r shows its versions" or ""))
       for _, item in ipairs(mine) do
-        add("— " .. item.author .. ", " .. item.created_at)
+        local first = #lines + 1
+        add("— " .. item.author .. ", " .. item.created_at ..
+          (item.revision ~= vim.NIL and (", revision " .. tostring(item.revision)) or ""))
+        if item.changed_source then add("  (the passage has changed since this note was written)") end
+        if item.retired_target then add("  (written on a retired record ID; shown here through its successor)") end
+        if item.edit_refusal ~= "" then add("  (" .. item.edit_refusal .. ")") end
         for _, line in ipairs(item.lines) do add(line) end
+        note_rows[#note_rows + 1] = { first = first, last = #lines, item = item }
       end
     end
   end
   add(""); add("Esc returns to reading. Notes and context have no passage-selection identity.")
   show_lines(lines)
   popup_context = true
+  local panel = api.nvim_get_current_buf()
+  -- The note under the cursor, or the only one; never a guess between several.
+  local function chosen()
+    local row = api.nvim_win_get_cursor(0)[1]
+    for _, span in ipairs(note_rows) do
+      if row >= span.first and row <= span.last then return span.item end
+    end
+    if #note_rows == 1 then return note_rows[1].item end
+    fail(#note_rows == 0 and 'there are no workspace notes on this passage'
+      or 'move the cursor onto one of the notes first')
+  end
+  vim.keymap.set('n', 'e', function()
+    local ok, problem = pcall(function() note(chosen()) end)
+    if not ok then vim.notify(tostring(problem), vim.log.levels.ERROR) end
+  end, { buffer = panel, silent = true })
+  vim.keymap.set('n', 'r', function()
+    local ok, problem = pcall(function() request('note_history', { note = chosen().id }) end)
+    if not ok then vim.notify(tostring(problem), vim.log.levels.ERROR) end
+  end, { buffer = panel, silent = true })
   if data.markers then
     for slot = 1, 3 do
       local number = slot
@@ -931,6 +996,7 @@ local function help()
       "c                source pages, attribution and linked notes",
       "s                show the printed source of this passage (formulas)",
       "a                write a personal note on this passage (workspace)",
+      "c, then e / r    edit your note under the cursor / show its earlier versions",
       "f                toggle quiet focus mode",
       "T                cycle Terminal / Dark / Paper theme for this session",
       "q / Ctrl-q       save the semantic position and quit",
@@ -1092,6 +1158,7 @@ _G.SOLNvimReader = { records = records, buffer = buffer, window = window, positi
     if popup_context then context() end
   end,
   update_personal = function(personal)
+    check_personal(personal)
     data.personal = personal
     if popup_context then context() end
   end,

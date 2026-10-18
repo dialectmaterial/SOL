@@ -606,7 +606,9 @@ end
   report.after_failure = vim.api.nvim_buf_get_lines(0, 0, -1, false)
   vim.api.nvim_feedkeys(vim.keycode('<C-s>'), 'xt', false)
   _G.SOLReaderChannel.pending[sent[2].id]({personal = {persistent = true, notes = {[id] = {
-    {id = 'n1', author = 'Invented reader', created_at = '2026-10-17T12:00:00Z', lines = {'A thought', 'on two lines'}}}}}})
+    {id = 'n1', author = 'Invented reader', created_at = '2026-10-17T12:00:00Z', revision = 1, edit_refusal = '',
+     changed_source = false, retired_target = false, body = 'A thought\non two lines',
+     lines = {'A thought', 'on two lines'}}}}}})
   vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
   reader.note()
   report.after_save = vim.api.nvim_buf_get_lines(0, 0, -1, false)
@@ -635,9 +637,85 @@ end
         self.assertEqual(report["after_quit"], ["Half a thought"])
         self.assertEqual(report["after_discard"], [""])
         context = "\n".join(report["context"])
-        self.assertIn("Your workspace notes on this passage (1); a adds one", context)
-        self.assertIn("— Invented reader, 2026-10-17T12:00:00Z\nA thought\non two lines", context)
+        self.assertIn("Workspace notes on this passage (1); a adds one, e edits", context)
+        self.assertIn("— Invented reader, 2026-10-17T12:00:00Z, revision 1\nA thought\non two lines", context)
         self.assertIn("notes need a workspace", report["temporary"])
+
+    def test_context_edits_the_note_under_the_cursor_and_shows_its_versions(self):
+        report = self.run_lua(r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  local id = data.records[1].id
+  local function item(note, author, refusal, body, changed)
+    return {id = note, author = author, created_at = '2026-10-17T12:00:00Z', revision = 1,
+      edit_refusal = refusal, changed_source = changed, retired_target = false,
+      body = body or vim.NIL, lines = vim.split(body or 'Hidden text', '\n')}
+  end
+  local payload = vim.deepcopy(data)
+  payload.personal = {persistent = true, notes = {[id] = {
+    item('mine', 'Invented reader', '', 'My first\nthought', true),
+    item('theirs', 'Another reader', "only the note's author can edit it", nil, false)}}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(payload)
+  reader = SOLNvimReader
+  local function row_of(text)
+    for row, line in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, false)) do
+      if line:find(text, 1, true) then return row end
+    end
+  end
+  local errors = {}
+  vim.notify = function(message) errors[#errors + 1] = message end
+  reader.context()
+  report.context = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  -- On the heading, with two notes, nothing is guessed.
+  vim.api.nvim_win_set_cursor(0, {1, 0})
+  vim.api.nvim_feedkeys('e', 'xt', false)
+  report.ambiguous = errors[#errors]
+  vim.api.nvim_win_set_cursor(0, {row_of('Another reader'), 0})
+  vim.api.nvim_feedkeys('e', 'xt', false)
+  report.foreign = errors[#errors]
+  vim.api.nvim_win_set_cursor(0, {row_of('thought'), 0})
+  vim.api.nvim_feedkeys('e', 'xt', false)
+  report.title = vim.api.nvim_win_get_config(0).title[1][1]
+  report.opened = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, {'My revised', 'thought'})
+  vim.api.nvim_feedkeys(vim.keycode('<C-s>'), 'xt', false)
+  report.request = {sent[1].op, sent[1].note, sent[1].revision, sent[1].body}
+  -- A refused save keeps the revised draft for the next e.
+  _G.SOLReaderChannel.pending[sent[1].id](nil, 'invented conflict')
+  vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  reader.context()
+  vim.api.nvim_win_set_cursor(0, {row_of('thought'), 0})
+  vim.api.nvim_feedkeys('e', 'xt', false)
+  report.after_failure = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  vim.api.nvim_feedkeys(vim.keycode('<C-c>'), 'xt', false)
+  reader.context()
+  vim.api.nvim_win_set_cursor(0, {row_of('thought'), 0})
+  vim.api.nvim_feedkeys('r', 'xt', false)
+  report.history_request = {sent[#sent].op, sent[#sent].note}
+  _G.SOLReaderChannel.pending[sent[#sent].id]({note_history = {id = 'mine', author = 'Invented reader',
+    revisions = {{revision = 2, kind = 'edited', editor = 'Invented reader', recorded_at = '2026-10-18T09:00:00Z',
+                  lines = {'My revised', 'thought'}},
+                 {revision = 1, kind = 'created', editor = 'Invented reader', recorded_at = '2026-10-17T12:00:00Z',
+                  lines = {'My first', 'thought'}}}}})
+  report.history = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+''', integrated=True)
+        context = "\n".join(report["context"])
+        self.assertIn("Workspace notes on this passage (2); a adds one, e edits the note under the cursor", context)
+        self.assertIn("— Invented reader, 2026-10-17T12:00:00Z, revision 1\n"
+                      "  (the passage has changed since this note was written)\nMy first\nthought", context)
+        self.assertIn("— Another reader, 2026-10-17T12:00:00Z, revision 1\n"
+                      "  (only the note's author can edit it)", context)
+        self.assertIn("move the cursor onto one of the notes", report["ambiguous"])
+        self.assertIn("only the note's author", report["foreign"])
+        self.assertEqual(report["title"], " Edit your note (revision 1) ")
+        self.assertEqual(report["opened"], ["My first", "thought"])
+        self.assertEqual(report["request"], ["note_edit", "mine", 1, "My revised\nthought"])
+        self.assertEqual(report["after_failure"], ["My revised", "thought"])
+        self.assertEqual(report["history_request"], ["note_history", "mine"])
+        history = "\n".join(report["history"])
+        self.assertIn("Revision 2 (edited), Invented reader, 2026-10-18T09:00:00Z\n  My revised\n  thought", history)
+        self.assertLess(history.index("Revision 2"), history.index("Revision 1"))
 
     def test_footnote_callouts_show_inline_without_changing_source_text(self):
         report = self.run_lua(r'''
