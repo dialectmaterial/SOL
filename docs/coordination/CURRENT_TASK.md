@@ -12,69 +12,73 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: Reconcile the ESSENCE interface decisions in the documentation
+## Claude Code: ESSENCE stage 1, the interface shell
 
-**Status:** In review
-**Branch:** `claude/essence-interface-docs`
-**Requested:** 18 October 2026, by the maintainer, with the
-[ESSENCE interface brief](proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf)
-
-### Goal
-
-The four authorities record the brief's decisions (hybrid Neovim/Textual
-surfaces, on-demand lifecycle, two presentations, CORE-optional ESSENCE,
-staged plan, model-history encyclopedia) as Decision or Proposed, reconciled
-with current code.
-
-### Scope
-
-`docs/ARCHITECTURE.md`, `docs/BEING.md`, `docs/ESSENCE.md`, `docs/CORE.md`; the
-brief stored under `docs/coordination/proposals/`.
-
-### Constraints
-
-Documentation only: no Textual UI, model or corpus schema. `docs/legacy/` and
-all existing contracts unchanged.
-
-### Acceptance
-
-Documentation check and full suite pass; the handoff maps each decision to the
-edited sections and lists open questions.
-
-## Codex: Split the Lua reader into modules
-
-**Status:** In review
-**Branch:** `codex/lua-modules`
-**Requested:** 19 October 2026, by the maintainer
+**Status:** Ready (after this PR, #22, is merged)
+**Branch:** `claude/essence-shell`
+**Requested:** 18 October 2026, by the maintainer
 
 ### Goal
 
-`sol/terminal/neovim.lua` (about 1,330 lines) becomes a small entry file plus
-cohesive modules (for example panels, the note editor, footnote view, search
-and markers), with no change in behaviour, so stage 6 and later work touch
-smaller files.
+From the reader, `E` opens ESSENCE as a Textual application in a Neovim
+terminal buffer beside the reader; a key toggles fullscreen and back without
+restarting it; focus moves predictably; leaving ESSENCE ends its process and
+restores the exact reading position. Screens are mock content for now.
 
 ### Scope
 
-[Proposal cleanup](proposals/CODEX_READER_WORKSPACE_PLAN.md#cleanup-alongside-the-stages):
-`sol/terminal/*.lua`, the Python code that locates and packages the Lua files
-(`sol/terminal/neovim.py`, packaging data, `scripts/install.py` if needed),
-tests, and Architecture or BEING only where they name files.
+[ESSENCE §4–§5 stage 1](../ESSENCE.md#4-interaction-model-and-inquiry-contract),
+[BEING §6](../BEING.md#6-being--essence-without-terminal-dogma): `sol/terminal/`
+(Neovim side and controller), a new `sol/essence/tui/` package (the Textual app),
+`pyproject.toml` (the `essence` optional extra), tests, BEING/ESSENCE §4 and
+CHANGELOG.
 
 ### Constraints
 
-No behaviour change: every existing headless Neovim and controller test passes
-unchanged, except where a test names a file path. Modules are loaded from the
-installed package directory only, never from the user's runtime path or
-configuration. The wheel and source archive still contain every Lua file, and
-the packaging checks prove it. Do not touch `sol/core/`, `sol/reader/` or
-`sol/terminal/neovim_reader.py` (Claude Code's task).
+Textual only as the optional extra; without it, `E` explains how to install
+it and the reader is unaffected. No existing key remapped. No model imports.
+Do not touch the rest of `sol/essence/` (Codex's task).
 
 ### Acceptance
 
-The documentation check and the full suite pass, including packaging checks;
-a reader started from an installed wheel in a temporary environment opens a
-passage headlessly. The handoff lists the modules and what each owns.
+Headless Neovim and Textual pilot tests for open, toggle, focus, close and
+failure; the reader position survives; a manual check on a real terminal is
+reported separately.
+
+## Codex: ESSENCE stage 2 engine, word frequencies without an interface
+
+**Status:** Ready (after #22 is merged)
+**Branch:** `codex/essence-word-frequencies`
+**Requested:** 18 October 2026, by the maintainer
+
+### Goal
+
+A headless, reproducible word-frequency analysis over a target scope and an
+optional reference scope, from the CORE corpus or a plain-text file, which the
+interface will later call.
+
+### Scope
+
+[ESSENCE §4–§5 stage 2](../ESSENCE.md#5-prioritized-experiments): `sol/essence/`
+except `sol/essence/tui/`, tests, ESSENCE §5 and CHANGELOG. A provider boundary
+(`core` | `file`); the term study's tokenizer, shared rather than copied; token
+count, type count and a frequency table; absolute counts, rates and denominators
+for target and reference; a `sol analyze words` CLI; a versioned artifact with
+`sol analyze check` support, binding the CORE generation or the file digest.
+
+### Constraints
+
+No Textual import and no interface work; do not touch `sol/terminal/`,
+`sol/essence/tui/` or `pyproject.toml` (Claude Code's task). Existing
+`sol.term-study` and `sol.sentence-study` artifacts unchanged. File input is
+UTF-8 text the user names explicitly; artifacts keep no book text. No new
+dependency.
+
+### Acceptance
+
+Tests for both providers, unequal scopes (denominators shown, no false
+comparability), a changed corpus or file refused by `check`, Unicode and empty
+input. The handoff documents the Python function the interface will call.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
