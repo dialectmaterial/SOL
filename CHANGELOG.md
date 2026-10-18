@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Comparison and sources in ESSENCE — 18 October 2026
+
+When ESSENCE compares a target with a reference, Results shows how much more
+or less often each word occurs (a difference per 10,000 words and a log₂
+ratio), says why a measure is undefined, and can export the table as CSV or
+TSV. Below the table, the passages where the highlighted word occurs are
+listed; Enter opens one in the reader, and Alt-Left there returns to where you
+were. A running count can be cancelled. Quitting the reader while ESSENCE is
+open now saves ESSENCE's state, and the reader's popups stay in the reader's
+columns instead of covering ESSENCE.
+
 ### Compare word rates and export verified tables — 19 October 2026
 
 The UI-independent `compare_words` function reports a rate difference and
