@@ -12,78 +12,80 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: Edit and review personal notes in the reader
+## Claude Code: Make reader moves fast without weakening checks
 
-**Status:** In review
-**Branch:** `claude/reader-note-editing`
-**Requested:** 18 October 2026, by the maintainer
-
-### Goal
-
-From `c`, the reader picks one of their notes on the passage, edits it in the
-same editor as `a`, and sees its earlier versions, without the compatibility
-shell.
-
-### Scope
-
-[Proposal stage 3](proposals/CODEX_READER_WORKSPACE_PLAN.md#3-complete-the-personal-note-workflow-inside-the-reader):
-`sol/terminal/neovim.lua`, `sol/terminal/neovim_reader.py`, `sol/terminal/neovim.py`
-where needed, their tests, BEING and CHANGELOG, using the existing
-`WorkspaceReader.prepare_annotation_edit` / `save_annotation_edit` and
-`list_annotation_history`. Authority: BEING §§3, 7–8; CORE §7.
-
-### Constraints
-
-`a` still adds a note; edits keep the note's ID, target and original source
-digest. Only the original author may edit; a competing revision or changed
-source is refused; a save that changes nothing adds no revision. Deleting,
-hiding or retracting notes is a reserved decision and out of scope. No
-workspace schema change. Temporary sessions refuse durable notes. Do not touch
-`sol/essence/` or Codex's measurement files.
-
-### Acceptance
-
-Edit, history and refusals are covered by controller and headless Neovim
-tests: another actor, a competing revision, a changed source, a no-op save and
-a failed save that keeps the draft. Each note in `c` shows its author, revision
-and whether its passage changed since it was written. The handoff lists the
-key bindings chosen, as defaults the maintainer may overrule.
-
-## Codex: Measure reader speed before optimising
-
-**Status:** In review
-**Branch:** `codex/reader-timings`
-**Requested:** 18 October 2026, by the maintainer
+**Status:** Ready
+**Branch:** `claude/fast-reader-moves`
+**Requested:** 19 October 2026, by the maintainer
 
 ### Goal
 
-Know how long the reader's main operations take, so that any later
-optimisation is chosen from evidence ([CONTRIBUTING, scope of the cleanup](../../CONTRIBUTING.md#scope-of-the-cleanup);
-[proposal cleanup](proposals/CODEX_READER_WORKSPACE_PLAN.md#cleanup-alongside-the-stages)).
+A section move, search-result open or history step takes well under half a
+second on the real book (now about 2.3–2.9 s; see the
+[reader speed baseline](https://github.com/dialectmaterial/SOL/blob/c2eb068/docs/coordination/HANDOFF.md#reader-speed-baseline--18-october-2026)),
+with every corpus-freshness, reference and workspace guard still in force.
 
 ### Scope
 
-A measurement script under `scripts/` (or `experiments/`) and its tests:
-corpus load and verification, building a view (`build_payload`) for an
-ordinary and a footnote-heavy section, a section transition through the
-controller, search, and `S` on a section. It reports medians and spread over
-repeated runs, on a synthetic corpus by default and on a corpus given
-explicitly by path. Results from the real book stay out of Git; the handoff
-may quote the numbers.
+`sol/core/protocol.py` (internals only), `sol/reader/actions.py`,
+`sol/terminal/neovim_reader.py`, their tests, CORE/BEING and CHANGELOG.
+Profiling shows about nine full corpus reloads and revalidations per move
+(`_fresh_snapshot`, about 0.65 s each), where `verify_snapshot_current` checks
+the same generation in about 14 ms. Measure with `scripts/reader_timings.py`.
+Authority: CORE §§5–7; Architecture §6.
 
 ### Constraints
 
-Read and call the reader code; do not change `sol/terminal/`, `sol/reader/`,
-`sol/core/` or `sol/workspace/` (Claude Code's lane and shared contracts). No
-new dependency; use `time.perf_counter`. No personal workspace is opened;
-temporary ones only.
+No change to the CORE API, the reference protocol, the corpus contract or the
+workspace schema. A changed corpus is still refused on every request that reads
+or saves. No trust is cached across requests over caller-mutable collections.
+If a cheaper check would accept anything the full reload refuses, stop and list
+it as a reserved decision. Do not touch `sol/reader/surface.py`,
+`sol/reader/typography.py`, `sol/terminal/neovim.py` or `sol/terminal/neovim.lua`
+(Codex's task).
 
 ### Acceptance
 
-The script runs in the normal suite on the synthetic corpus within a few
-seconds, with a test that it reports every operation. The handoff quotes
-real-book timings on this machine and names the slowest operation, without
-proposing a cache as decided.
+Before/after timings from `scripts/reader_timings.py` on the real book in the
+handoff. Existing changed-corpus, stale-reference and conflict tests pass
+unchanged, and a new test shows a corpus changed between two requests is still
+refused. The documentation check and the full suite pass.
+
+## Codex: Footnote reading view
+
+**Status:** Ready
+**Branch:** `codex/footnote-view`
+**Requested:** 19 October 2026, by the maintainer
+
+### Goal
+
+From `c`, the reader opens a single footnote in its own calm view, follows a
+note's own note links, and returns to the exact cursor and selection.
+
+### Scope
+
+[Proposal stage 4](proposals/CODEX_READER_WORKSPACE_PLAN.md#4-give-book-footnotes-a-proper-reading-view):
+`sol/reader/surface.py`, `sol/reader/typography.py`, `sol/terminal/neovim.py`,
+`sol/terminal/neovim.lua`, their tests, BEING and CHANGELOG. Start after PR #13
+is merged; it changed the `c` popup. Authority: BEING §§2, 4, 7; CORE §§2, 5.
+
+### Constraints
+
+Reuse the canonical `note_paragraph` records ordered by `order` and their
+existing IDs; callouts stay display marks; emphasis, attribution and review
+warnings are kept. Nested or unresolved links have explicit bounds and cycle
+handling. Book footnotes, personal notes and technical context stay visibly
+separate. No new IDs, no generated text. Do not touch `sol/core/`,
+`sol/reader/actions.py` or `sol/terminal/neovim_reader.py` beyond what a new
+panel request strictly needs (Claude Code's task); coordinate in the PR if so.
+
+### Acceptance
+
+Multi-paragraph footnotes keep style offsets, numbering, attribution and
+warnings; nested and unresolved links have clear outcomes; opening and closing
+a footnote restores cursor, selection and reading mode, including at narrow
+widths. Headless Neovim and controller tests; the documentation check and the
+full suite pass.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
