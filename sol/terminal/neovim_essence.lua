@@ -1,0 +1,137 @@
+-- ESSENCE beside or over the reader: one Textual process in a terminal float.
+-- Neovim owns this outer layout (split, fullscreen, hidden); the app owns its
+-- inside. State lives in _G.SOLEssence so the process and its window survive
+-- reader reloads. Closing ESSENCE refocuses the reader, whose cursor and
+-- selection were never touched.
+return function(reader)
+  local api = vim.api
+  local fail = reader.text.fail
+  local state = rawget(_G, 'SOLEssence')
+  if not state then
+    state = {}
+    _G.SOLEssence = state
+  end
+  -- Below this many columns ESSENCE cannot sit beside a readable page.
+  local SPLIT_MINIMUM = 100
+
+  local function alive()
+    return state.window ~= nil and api.nvim_win_is_valid(state.window)
+  end
+  local function split_width()
+    return math.max(40, math.floor(vim.o.columns * 0.45))
+  end
+  -- Columns the reader leaves free on the right: only while ESSENCE is beside it.
+  function state.reserved()
+    return (state.layout == 'split' and alive()) and split_width() + 1 or 0
+  end
+  local function config()
+    local height = math.max(1, vim.o.lines - 2)
+    if state.layout == 'full' then
+      return { relative = 'editor', row = 0, col = 0, width = vim.o.columns, height = height,
+        style = 'minimal', border = 'none', zindex = 40, hide = false }
+    end
+    local width = split_width()
+    return { relative = 'editor', row = 0, col = math.max(0, vim.o.columns - width - 1), width = width,
+      height = height, style = 'minimal', border = { '', '', '', '', '', '', '', '│' }, zindex = 40,
+      hide = state.layout == 'hidden' }
+  end
+  local function relayout()
+    if alive() then api.nvim_win_set_config(state.window, config()) end
+    local current = rawget(_G, 'SOLNvimReader')
+    if current and current.relayout then current.relayout() end
+  end
+  local function reader_window()
+    local current = rawget(_G, 'SOLNvimReader')
+    return current and current.window and api.nvim_win_is_valid(current.window) and current.window or nil
+  end
+  local function enter()
+    api.nvim_set_current_win(state.window)
+    vim.cmd('startinsert')
+  end
+
+  function state.focus()
+    if not alive() then return end
+    if state.layout == 'hidden' then
+      state.layout = vim.o.columns >= SPLIT_MINIMUM and 'split' or 'full'
+      relayout()
+    end
+    enter()
+  end
+
+  function state.toggle()
+    if not alive() then return end
+    if state.layout == 'full' then
+      if vim.o.columns < SPLIT_MINIMUM then
+        vim.notify('The terminal is too narrow to show ESSENCE beside the reader', vim.log.levels.WARN)
+        return
+      end
+      state.layout = 'split'
+    else
+      state.layout = 'full'
+    end
+    relayout()
+    enter()
+  end
+
+  function state.back_to_reader()
+    if not alive() then return end
+    if state.layout == 'full' then
+      state.layout = vim.o.columns >= SPLIT_MINIMUM and 'split' or 'hidden'
+      relayout()
+    end
+    vim.cmd('stopinsert')
+    local window = reader_window()
+    if window then api.nvim_set_current_win(window) end
+  end
+
+  function state.closed(code, message)
+    local window, buffer = state.window, state.buffer
+    state.job, state.window, state.buffer, state.layout = nil, nil, nil, nil
+    vim.cmd('stopinsert')
+    if window and api.nvim_win_is_valid(window) then api.nvim_win_close(window, true) end
+    if buffer and api.nvim_buf_is_valid(buffer) then api.nvim_buf_delete(buffer, { force = true }) end
+    relayout()
+    local back = reader_window()
+    if back then api.nvim_set_current_win(back) end
+    if message or code ~= 0 then
+      vim.notify(message or ('ESSENCE ended with exit code ' .. tostring(code) .. '; the reader is unchanged'),
+        vim.log.levels.WARN)
+    end
+  end
+
+  function state.open(spec)
+    if alive() then return state.focus() end
+    if type(spec) ~= 'table' or type(spec.command) ~= 'table' or #spec.command == 0 then
+      fail('invalid ESSENCE launch')
+    end
+    for _, part in ipairs(spec.command) do
+      if type(part) ~= 'string' then fail('invalid ESSENCE launch') end
+    end
+    state.layout = vim.o.columns >= SPLIT_MINIMUM and 'split' or 'full'
+    local buffer = api.nvim_create_buf(false, true)
+    state.buffer = buffer
+    state.window = api.nvim_open_win(buffer, true, config())
+    vim.wo[state.window].winhighlight = 'NormalFloat:Normal,FloatBorder:WinSeparator'
+    local started, job = pcall(vim.fn.jobstart, spec.command, { term = true,
+      on_exit = function(_, code) vim.schedule(function() if state.buffer == buffer then state.closed(code) end end) end })
+    if not started or type(job) ~= 'number' or job <= 0 then
+      state.closed(-1, 'ESSENCE could not start: ' .. tostring(job))
+      return
+    end
+    state.job = job
+    -- Layout keys belong to Neovim; every other key goes to ESSENCE.
+    for _, key_mode in ipairs({ 't', 'n' }) do
+      vim.keymap.set(key_mode, '<M-f>', state.toggle, { buffer = buffer, silent = true })
+      vim.keymap.set(key_mode, '<M-r>', state.back_to_reader, { buffer = buffer, silent = true })
+    end
+    relayout()
+    enter()
+  end
+
+  local group = api.nvim_create_augroup('SOLEssence', { clear = true })
+  api.nvim_create_autocmd('VimResized', { group = group, callback = function()
+    if alive() and state.layout == 'split' and vim.o.columns < SPLIT_MINIMUM then state.layout = 'full' end
+    relayout()
+  end })
+  return state
+end

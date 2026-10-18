@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -716,6 +717,99 @@ end
         history = "\n".join(report["history"])
         self.assertIn("Revision 2 (edited), Invented reader, 2026-10-18T09:00:00Z\n  My revised\n  thought", history)
         self.assertLess(history.index("Revision 2"), history.index("Revision 1"))
+
+    def test_essence_opens_beside_toggles_returns_and_closes_without_moving_the_reader(self):
+        stub = self.root / "essence_stub.py"
+        stub.write_text("import sys\nprint('ESSENCE STUB READY', flush=True)\nsys.stdin.readline()\n", encoding="utf-8")
+        paths = f"local PYTHON, STUB = {json.dumps(sys.executable)}, {json.dumps(str(stub))}\n"
+        report = self.run_lua(paths + r'''
+  vim.o.columns, vim.o.lines = 140, 40
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local id = data.records[1].id
+  reader.restore(reader.capture('n', reader.source_point(id, 9), reader.source_point(id, 9)))
+  local before = reader.capture()
+  local full_reader = vim.api.nvim_win_get_config(reader.window)
+  local function geometry(window)
+    local config = vim.api.nvim_win_get_config(window)
+    return {col = config.col, width = config.width, hide = config.hide or false}
+  end
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  report.request = sent[1].op
+  report.request_target = sent[1].packet.reference.reference.target_id
+  _G.SOLReaderChannel.pending[sent[1].id]({essence = {command = {PYTHON, STUB}}})
+  local essence = assert(SOLEssence)
+  assert(vim.wait(5000, function()
+    return table.concat(vim.api.nvim_buf_get_lines(essence.buffer, 0, -1, false), '\n'):find('ESSENCE STUB READY') ~= nil
+  end, 10), 'ESSENCE did not start in its terminal')
+  report.split = {layout = essence.layout, essence = geometry(essence.window), reader = geometry(reader.window),
+                  focused = vim.api.nvim_get_current_win() == essence.window, reader_full = full_reader.width}
+  local keys = {}
+  for _, map in ipairs(vim.api.nvim_buf_get_keymap(essence.buffer, 't')) do keys[#keys + 1] = map.lhs end
+  table.sort(keys); report.terminal_keys = keys
+  essence.toggle()
+  report.full = {layout = essence.layout, essence = geometry(essence.window), reader = geometry(reader.window)}
+  essence.back_to_reader()
+  report.back = {layout = essence.layout, focused_reader = vim.api.nvim_get_current_win() == reader.window}
+  -- A section reload replaces the reader window; ESSENCE keeps its process and place.
+  reader.toggle_mode(); reader = SOLNvimReader
+  report.after_reload = {alive = vim.api.nvim_win_is_valid(essence.window), reader = geometry(reader.window)}
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  report.refocus = {requests = #sent, focused = vim.api.nvim_get_current_win() == essence.window}
+  local job = essence.job
+  vim.fn.chansend(job, 'q\n')
+  assert(vim.wait(5000, function() return SOLEssence.window == nil end, 10), 'ESSENCE did not close')
+  report.closed = {focused_reader = vim.api.nvim_get_current_win() == SOLNvimReader.window,
+                   reader = geometry(SOLNvimReader.window), mode = vim.fn.mode()}
+  reader = SOLNvimReader
+  reader.toggle_mode(); reader = SOLNvimReader
+  report.position_kept = vim.deep_equal(reader.capture().reference, before.reference)
+    and reader.capture().cursor_offset == before.cursor_offset
+  -- A narrow terminal opens fullscreen; back to the reader hides ESSENCE, E shows it again.
+  vim.o.columns = 80
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  _G.SOLReaderChannel.pending[sent[#sent].id]({essence = {command = {PYTHON, STUB}}})
+  report.narrow = {layout = SOLEssence.layout}
+  SOLEssence.back_to_reader()
+  report.narrow.after_back = SOLEssence.layout
+  report.narrow.hidden = geometry(SOLEssence.window).hide
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  report.narrow.after_e = SOLEssence.layout
+  vim.fn.chansend(SOLEssence.job, 'q\n')
+  assert(vim.wait(5000, function() return SOLEssence.window == nil end, 10))
+  -- A command that cannot start leaves the reader usable and says why.
+  local warnings = {}
+  vim.notify = function(message) warnings[#warnings + 1] = message end
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  _G.SOLReaderChannel.pending[sent[#sent].id]({essence = {command = {'/nonexistent/sol-essence'}}})
+  report.failure = {warning = warnings[#warnings], window = SOLEssence.window == nil,
+                    focused_reader = vim.api.nvim_get_current_win() == SOLNvimReader.window}
+''', integrated=True)
+        self.assertEqual(report["request"], "essence_open")
+        self.assertEqual(report["request_target"], self.sample.passages[0].identifier)
+        split = report["split"]
+        self.assertEqual(split["layout"], "split")
+        self.assertTrue(split["focused"])
+        self.assertLess(split["reader"]["col"] + split["reader"]["width"], split["essence"]["col"])
+        self.assertEqual(report["terminal_keys"], ["<M-f>", "<M-r>"])
+        self.assertEqual((report["full"]["layout"], report["full"]["essence"]["width"]), ("full", 140))
+        self.assertEqual(report["back"], {"layout": "split", "focused_reader": True})
+        self.assertTrue(report["after_reload"]["alive"])
+        self.assertLess(report["after_reload"]["reader"]["col"] + report["after_reload"]["reader"]["width"],
+                        split["essence"]["col"])
+        self.assertEqual(report["refocus"], {"requests": 1, "focused": True})
+        self.assertTrue(report["closed"]["focused_reader"])
+        self.assertEqual(report["closed"]["mode"], "n")
+        self.assertEqual(report["closed"]["reader"]["width"], split["reader_full"])
+        self.assertTrue(report["position_kept"])
+        self.assertEqual(report["narrow"], {"layout": "full", "after_back": "hidden", "hidden": True,
+                                            "after_e": "full"})
+        self.assertIn("could not start", report["failure"]["warning"])
+        self.assertTrue(report["failure"]["window"])
+        self.assertTrue(report["failure"]["focused_reader"])
 
     def test_footnote_callouts_show_inline_without_changing_source_text(self):
         report = self.run_lua(r'''
