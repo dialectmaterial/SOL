@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Slightly faster start — 19 October 2026
+
+Starting `sol` read and checked the whole corpus twice in quick succession;
+it now does so once, with the same checks. A page appears after about 0.86 s
+instead of 0.95 s on the development machine.
+
 ### Count words through CORE or ordinary files — 18 October 2026
 
 `sol analyze words` and the UI-independent `analyze_words` function count a

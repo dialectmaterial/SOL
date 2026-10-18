@@ -32,6 +32,29 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Faster reader start-up — 19 October 2026
+
+**Task:** maintainer's request in the session ("sol starts super slow"), within Claude Code's CORE/reader lane.
+**Branch / PR:** `claude/faster-startup` · opened with `gh pr create`
+**Last implementation commit:** see the PR (the commit before this report).
+
+### Changed files
+- `sol/core/protocol.py` — `_remember` (cache entry from a verified snapshot, used by both paths) and `remember_verified` (only genuine `CorpusSnapshot`s; a snapshot outside the fast comparison's rules is not cached).
+- `sol/core/corpus.py` — `load_corpus_book` calls `remember_verified` right after `load_snapshot`.
+- `tests/test_core_protocol.py` — a freshly loaded book's first check reads no files, and a later in-memory change is still refused; a corpus beyond the nesting bound is not cached and is still refused.
+- `docs/CORE.md` (§6), `CHANGELOG.md`.
+
+### Tests performed
+- Real start-up in a pseudo-terminal (launch to drawn page), three runs each, same environment: `main` 0.95 s; this branch 0.86 s. Python-side phases before the change: imports 0.05 s, book load 0.2 s, workspace 0.05 s, first check 0.4 s, rest 0.25 s, Neovim about 0.1 s.
+- `.venv/bin/python -B scripts/check_docs.py` — OK; full suite — 1644 tests, OK (11 skipped, 4 expected failures).
+
+### Outstanding issues
+- The estimate was 0.6 s; the gain is 0.1 s because the cache must still be built once (about 0.17 s). Remaining start-up is mostly verification itself (validating every record, about 0.11 s; the comparison and fingerprint checks) plus the first page.
+- The remembered workspace is still opened twice: first read-only to validate it before adoption (deliberate, about 25 ms), then for use. Left as is.
+
+### Decisions requiring approval
+- None. Going further would mean trusting a previously validated generation across starts, or showing the first page before verification finishes; either relaxes a check and would be a reserved decision.
+
 ## ESSENCE stage 2 engine: word frequencies — 18 October 2026
 
 **Task:** [Codex: ESSENCE stage 2 engine, word frequencies without an interface](https://github.com/dialectmaterial/SOL/blob/c1dd916bfdb8bb054b3a99d5c01fc92950cdbf0c/docs/coordination/CURRENT_TASK.md#codex-essence-stage-2-engine-word-frequencies-without-an-interface).
