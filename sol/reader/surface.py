@@ -38,6 +38,48 @@ def note_paragraph_ids(book: Book) -> dict[str, list[str]]:
             for parent, rows in bodies.items()}
 
 
+FOOTNOTE_DEPTH = 8
+FOOTNOTE_PARAGRAPHS = 64
+FOOTNOTE_LINKS = 128
+
+
+def footnote_links(records) -> list[str]:
+    """Canonical links, including those on body paragraphs, in source order."""
+    return list(dict.fromkeys(identifier for record in records for identifier in record.get("note_ids", [])))
+
+
+def footnote_scope(book: Book, passage_id: str, trail: list[str]) -> tuple[str, ...]:
+    """Fence a disposable note path to the shown passage and bound its work.
+
+    This chooses records for a checked CaptureExport, never accepts a reading
+    position or invents identities. The caller still captures and finishes the
+    export, so a detached graph or a changed corpus cannot supply panel text.
+    """
+    if (not isinstance(trail, list) or not 1 <= len(trail) <= FOOTNOTE_DEPTH
+            or any(not isinstance(identifier, str) for identifier in trail)):
+        raise ValueError(f"a footnote path needs 1–{FOOTNOTE_DEPTH} canonical note IDs")
+    bodies = note_paragraph_ids(book)
+    current = book.canonical_records.get(passage_id)
+    if current is None:
+        raise ValueError("the footnote's passage is unavailable")
+    parts, identifiers, seen = [current], [passage_id], set()
+    for identifier in trail:
+        if identifier in seen:
+            raise ValueError("footnote cycle: that note is already open in this path")
+        if identifier not in footnote_links(parts):
+            raise ValueError("that footnote is not linked from the shown passage or note")
+        note = book.canonical_records.get(identifier)
+        if note is None or note.get("type") != "note":
+            raise ValueError("unresolved canonical footnote; source text was not substituted")
+        body_ids = bodies.get(identifier, [])
+        if len(body_ids) > FOOTNOTE_PARAGRAPHS:
+            raise ValueError(f"footnote view is limited to {FOOTNOTE_PARAGRAPHS} body paragraphs; source is unchanged")
+        parts = [note, *(book.canonical_records[body] for body in body_ids)]
+        identifiers.extend(part["id"] for part in parts)
+        seen.add(identifier)
+    return tuple(dict.fromkeys(identifiers))
+
+
 def sample_from_book(book: Book, start: str | None = None, count: int = 24) -> Sample:
     """Choose a bounded sequential view, never a new canonical combined record."""
     if type(count) is not int or not 1 <= count <= 64:

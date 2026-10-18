@@ -23,7 +23,8 @@ from sol.terminal.text import emphasis_style
 from sol.terminal.runtime import managed_neovim
 from sol.terminal.theme import theme_payload
 
-from sol.reader.surface import CaptureExport, Sample, note_paragraph_ids, record_payload, validate_packet
+from sol.reader.surface import (CaptureExport, Sample, FOOTNOTE_DEPTH, FOOTNOTE_LINKS,
+                                footnote_links, footnote_scope, note_paragraph_ids, record_payload, validate_packet)
 
 
 MAX_PACKET_BYTES = 1024 * 1024
@@ -109,6 +110,65 @@ def _check_sample_packet(sample, packet, records=None):
         if packet["reference"] != record["reference"]:
             raise ValueError("research packet must use this sample's exact checked reference")
     return selected
+
+
+def build_footnote_payload(sample: Sample, passage_id: str, trail: list[str]) -> dict:
+    """One source-checked book note; opening it never moves or saves a visit."""
+    if passage_id not in {passage.identifier for passage in sample.passages}:
+        raise ValueError("footnote origin is outside the shown reading section")
+    identifiers = footnote_scope(sample.book, passage_id, trail)
+    capture = CaptureExport(sample.book, identifiers=identifiers)
+    checked = {identifier: capture.capture(identifier) for identifier in identifiers}
+    reference, resolved = checked[trail[-1]]
+    note = resolved.record
+    bodies = note_paragraph_ids(sample.book).get(note["id"], [])
+    parts = [checked[identifier][1].record for identifier in bodies] or [note]
+    links = []
+    linked = footnote_links([note, *parts])
+    for identifier in linked[:FOOTNOTE_LINKS]:
+        target = capture.records.get(identifier)
+        label = str(target.get("label") or "?") if target else "?"
+        if target is None or target.get("type") != "note":
+            refusal = "Unresolved canonical footnote; source text was not substituted."
+        elif identifier in trail:
+            refusal = "Cycle: this footnote is already open; use Backspace to return to it."
+        elif len(trail) >= FOOTNOTE_DEPTH:
+            refusal = f"Footnote nesting is limited to {FOOTNOTE_DEPTH} notes; return before following another."
+        else:
+            refusal = ""
+        links.append({"id": identifier, "label": label, "refusal": refusal})
+    labels = {row["id"]: row["label"] for row in links}
+    paragraphs = []
+    text_bytes = 0
+    for part in parts:
+        text = part["plain_text"]
+        text_bytes += len(text.encode("utf-8"))
+        if text_bytes > MAX_PACKET_BYTES:
+            raise ValueError("footnote text exceeds the 1 MiB view limit; source is unchanged")
+        _safe_source(text)
+        styles, warnings = _styles(part["markdown"], text)
+        if part.get("transcription_status") in {"needs_review", "needs_visual_review"}:
+            warnings.insert(0, "Note transcription needs review.")
+        if any(0x80 <= ord(char) <= 0x9f for char in text):
+            warnings.append("Nonprinting source characters are shown as hexadecimal markers.")
+        callouts = [{"offset": offset, "label": labels.get(identifier, "?")}
+                    for offset, identifier in map_typography(part["markdown"], text).callouts]
+        paragraphs.append({"id": part["id"], "reference": checked[part["id"]][0],
+                           "plain_text": text, "styles": styles, "warnings": warnings,
+                           "attribution": deepcopy(part["attribution"]), "callouts": callouts})
+    warnings = []
+    if note.get("transcription_status") in {"needs_review", "needs_visual_review"}:
+        warnings.append("Note transcription needs review.")
+    if len(linked) > FOOTNOTE_LINKS:
+        warnings.append(f"Only the first {FOOTNOTE_LINKS} linked notes are listed in this view.")
+    result = {"id": note["id"], "label": str(note.get("label") or "?"), "reference": reference,
+              "attribution": deepcopy(note["attribution"]), "warnings": warnings,
+              "paragraphs": paragraphs, "links": links, "trail": list(trail)}
+    _safe_metadata(result)
+    if len(json.dumps(result, ensure_ascii=False).encode("utf-8")) > 4 * MAX_PACKET_BYTES:
+        raise ValueError("footnote presentation exceeds the 4 MiB view limit; source is unchanged")
+    capture.finish()
+    return result
 
 
 def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None, emphasis="auto", theme=None):
