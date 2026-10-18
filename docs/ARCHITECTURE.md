@@ -4,7 +4,7 @@
 **Repository baseline:** [`dialectmaterial/SOL`](https://github.com/dialectmaterial/SOL), `main` at `1d200e4fcbff1ca69f48b5dc96c55765f215f303`.  
 **Companion documents:** [BEING](BEING.md) · [ESSENCE](ESSENCE.md) · [CORE](CORE.md).
 
-**Implementation reviewed through:** `577166b` (17 October 2026). The baseline above records the original documentation adoption, not the latest feature state.
+**Implementation reviewed through:** `577166b` (17 October 2026); ESSENCE interface and component decisions added 18 October 2026 against `main` at `524878d` (supporting research: [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf)). The baseline above records the original documentation adoption, not the latest feature state.
 
 > **Interpretation rule.** A statement marked **Implemented** describes the inspected baseline. A statement marked **Decision** expresses the present design direction; it may require code changes. **Proposed** features are not available merely because they appear here. Code, tests, and the relevant schema control the precise behavior of an implemented function. The Git working tree may be ahead of this snapshot: inspect it before making changes.
 
@@ -39,9 +39,18 @@ CORE is **not** a fourth Hegelian stage; it is a shared engineering substrate. B
 
 **Implemented:** single repository, `sol.core` public API version 1, canonical corpus contract, reader/action boundary, Neovim frontend, optional Kitty handoff, basic ESSENCE exports and lexical experiment. **Not implemented:** independent published `sol-core`/`sol-being` distributions, generic integrated investigation desk, model registry, NixOS system, fully graphical typeset reader.
 
+**Decision (maintainer, 18 October 2026): independent components without premature packaging.** BEING reads, ESSENCE investigates, CORE provides verified text; each should become usable without the others where that makes sense, but SOL stays **one installable package** until the seams are proven. The path:
+
+1. **Now:** one repository; extract pure-text analysis functions whose tests need neither CORE nor a running interface; specify interface boundaries and optional providers.
+2. **Next:** ESSENCE's CLI and interface open ordinary text files; CORE integration becomes an adapter that adds UUID-backed corpus operations.
+3. **Later:** BEING opens ordinary Markdown without a prebuilt CORE corpus; audit dependencies before proposing separate distributions.
+4. **Only after stable seams:** split into separately installable `sol-being`, `sol-essence` and `sol-core` packages, if the maintenance cost is justified.
+
+Do not describe SOL as "independently installable" before step 4.
+
 ### Dependency direction
 
-`sol.corpus` and `sol.core` provide verified snapshots and references; `sol.reader.actions` mediates reading; `sol.terminal` adapts to a host; `sol.workspace` persists attributed work; `sol.essence` uses CORE directly. CORE must be importable without starting a reader, shell, interactive prompt, workspace, model download, or network request. Views do not invent IDs. ESSENCE does not import BEING's command loop to obtain data. Reader adapters call the same actions rather than creating parallel navigation semantics.
+`sol.corpus` and `sol.core` provide verified snapshots and references; `sol.reader.actions` mediates reading; `sol.terminal` adapts to a host; `sol.workspace` persists attributed work; `sol.essence` uses CORE directly today (every study imports `sol.core`), and by the decision above CORE becomes an optional provider for it. CORE must be importable without starting a reader, shell, interactive prompt, workspace, model download, or network request. Views do not invent IDs. ESSENCE does not import BEING's command loop to obtain data. Reader adapters call the same actions rather than creating parallel navigation semantics.
 
 ## 3. One book, not every PDF
 
@@ -58,6 +67,8 @@ The default `sol` enters the **isolated Neovim reader** in an ordinary capable t
 The terminal's cell grid cannot render every typographic feature faithfully. **Mathematical passages are a test case:** retain source evidence and show the best verified representation; allow a browser/source image preview where necessary. Do not force mathematical notation into compromised text drawings solely to keep everything inside Alacritty. A temporary auxiliary window is compatible with a unified research workflow.
 
 **Decision:** `sol-kitty` remains an optional compatibility/integration host, not the main SOL interface and not an argument for making ESSENCE a terminal emulator. Preserve working Kitty features; the *semantic* BEING–ESSENCE contract must ultimately be terminal-independent. Terminal splits, browsers, TUI dashboards, CLI output, and TensorFlow Embedding Projector are interchangeable presentation mechanisms, not competing knowledge stores.
+
+**Decision (maintainer, 18 October 2026): hybrid surfaces for reading and investigation.** Neovim stays the persistent BEING reader. ESSENCE gets a separate **Textual** application, started only when ESSENCE is requested, inside a Neovim terminal buffer, either beside the reader or fullscreen; leaving ESSENCE saves the investigation and ends that process. **Neovim owns the outer layout** (split or fullscreen); **Textual owns the layout inside its buffer.** This applies the Kitty decision above: the BEING–ESSENCE contract stays semantic, and the Textual application is a presentation of it, not a terminal emulator. Details, lifecycle and open questions: [ESSENCE §4](ESSENCE.md#4-interaction-model-and-inquiry-contract); reader-side requirements: [BEING §6](BEING.md#6-being--essence-without-terminal-dogma). Nested-terminal keys, alt-key capture, resizing and launch latency must be proven on real terminals before this is called implemented. The reverse arrangement, Textual hosting both modules with Neovim embedded, is recorded as an **open alternative** with a proposed test in [ESSENCE §4](ESSENCE.md#4-interaction-model-and-inquiry-contract).
 
 The former artificial book shell is an optional compatibility experiment (`sol --shell`), not the core mental model. The **dynamic structure tree** within the reader is the useful surviving spatial/navigation idea. Keep it subordinate to uninterrupted reading.
 
@@ -77,7 +88,7 @@ Workstreams can overlap, but must stay bounded:
 
 **C. First complete inquiry.** From a chapter or passage context in BEING, launch a **sentence-length / syntactic distribution** experiment in ESSENCE; produce a versioned and source-bound artifact; inspect findings; return to a referenced sentence/passage without losing the reader's prior location. Do this before adding a model zoo. *Status, 17 October:* the sentence-length half is implemented end to end — `S` in the reader, `sol analyze sentences` and `sol analyze check`; see [ESSENCE §5](ESSENCE.md#experiment-a--syntax-and-positionality-highest-priority). Syntactic (POS/dependency) annotation and a human-checked segmentation sample remain open.
 
-**D. Embeddings as a second experiment.** Use the existing prose-only export, select and benchmark an embedding model, record model/checkpoint/input settings, attach UUID metadata, and export vectors + metadata for TensorFlow Embedding Projector. Browser visualization is appropriate; apparent distances do not establish logical categories.
+**D. ESSENCE interface, then breadth (revised 18 October).** Build the investigation interface in the stages of [ESSENCE §5](ESSENCE.md#5-prioritized-experiments): interface shell, a minimal word-frequency experiment, target/reference comparison, an encyclopedia skeleton, then model adapters. **Embeddings move to the model-adapter stage**: when reached, use the existing prose-only export, select and benchmark an embedding model, record model/checkpoint/input settings, attach UUID metadata, and export vectors + metadata for TensorFlow Embedding Projector. Browser visualization is appropriate; apparent distances do not establish logical categories. *Why the change:* until the reversible interface and the smallest experiment work end to end, a second model would add breadth to a loop that is not yet proven.
 
 **E. Later.** Richer annotation spans and research-context restoration, typeset-reader decision, persistent investigations, additional NLP methods, multilingual/edition handling, and only eventually reproducible Nix-based environment composition. Do not implement an operating-system distribution during this cycle.
 
@@ -117,6 +128,6 @@ for later profiling, never adopt optimisations from timing differences alone.
 
 ## 8. Documentation policy
 
-**Only four documents govern the intended product:** this Architecture charter, [BEING](BEING.md), [ESSENCE](ESSENCE.md), [CORE](CORE.md). Retain a short repository root `README.md` as a navigation/setup gateway if GitHub packaging requires it; it is **not** a fifth architectural source. Keep chronological history, experiment notes and old documents in `docs/legacy/`, still searchable but clearly non-authoritative. A code-level invariant belongs in tests and code as well as a concise statement in CORE. Never erase history to simplify navigation.
+**Only four documents govern the intended product:** this Architecture charter, [BEING](BEING.md), [ESSENCE](ESSENCE.md), [CORE](CORE.md). Research briefs and proposals kept under `docs/coordination/proposals/` (for example the [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf)) are supporting evidence: their decisions apply only as recorded in these four documents. Retain a short repository root `README.md` as a navigation/setup gateway if GitHub packaging requires it; it is **not** a fifth architectural source. Keep chronological history, experiment notes and old documents in `docs/legacy/`, still searchable but clearly non-authoritative. A code-level invariant belongs in tests and code as well as a concise statement in CORE. Never erase history to simplify navigation.
 
 **Reconciliation record:** this charter synthesizes the current GitHub README, modularity contract, reader action and view documentation, reference/handoff contracts, corpus and extraction documentation, historical reader-engine experiments, and discussion decisions through 17 October. Model-history notes described as existing only locally were **not inspected** and must not be invented; add them after they are actually available and reviewed.
