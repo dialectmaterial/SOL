@@ -35,7 +35,7 @@ Write "None." rather than deleting a heading.
 ## Footnote reading view — 18 October 2026
 
 **Task:** [Codex: Footnote reading view](https://github.com/dialectmaterial/SOL/blob/5fad439ebfa27756b0c2fd127511e6483501f0e6/docs/coordination/CURRENT_TASK.md#codex-footnote-reading-view).
-**Branch / PR:** `codex/footnote-view` · to be opened with `gh pr create --base main` after this report is committed.
+**Branch / PR:** `codex/footnote-view` · [PR #17](https://github.com/dialectmaterial/SOL/pull/17), opened with `gh pr create --base main`. Status: `In review`.
 **Last implementation commit:** `650e7d17ce625e58a66c887b39395d451298d927` (projection/controller `e207f0d`, then panels/tests/documentation; this report follows).
 
 ### Changed files
