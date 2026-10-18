@@ -44,6 +44,7 @@ return function(reader)
         elseif result.source then reader.panels.show_source(result.source)
         elseif result.study then reader.panels.show_study(result.study)
         elseif result.note_history then reader.notes.show_history(result.note_history)
+        elseif result.essence then reader.essence.open(result.essence)
         elseif result.personal then _G.SOLNvimReader.update_personal(result.personal)
         elseif result.markers then
           _G.SOLNvimReader.update_markers(result.markers)

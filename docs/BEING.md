@@ -55,6 +55,7 @@ The current implementation also includes literal book search, source-positioned 
 | `a` | Write a personal note on this passage, saved in the workspace (`Ctrl-S` or `:w` saves, `Ctrl-C` discards) |
 | `s` | Printed source of this passage (formulas), cropped from the verified PDF, in a separate image viewer |
 | `S` | Sentence lengths in the loaded section (ESSENCE study); Enter reads a listed sentence, Alt-Left returns |
+| `E` | Open ESSENCE beside the reader (needs the `essence` extra); in ESSENCE, Alt-F toggles fullscreen and Alt-R returns to the reader |
 | `f` | Quiet focus mode; keep important warnings |
 | `T` | Cycle Terminal / Dark / Paper theme for this session |
 | `?`, `q` | Help / save position and quit |
@@ -231,6 +232,8 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 - **Key compatibility:** no existing reader key is remapped to make room for ESSENCE. **Decided 18 October 2026:** `E` opens ESSENCE (it was unmapped); `S` stays the quick sentence study.
 - **Failure:** a launch failure, crash or refused result leaves the reader usable at the same place and shows the error.
 - **Lifetime:** the reader starts no Textual or model process by itself; closing ESSENCE ends its process without affecting the reader.
+
+**Implemented (18 October 2026), stage 1 shell:** `E` (in normal or visual mode) captures the reader's exact position and selection first, then asks Python to check the reader's position against the corpus and write a private context file (reference, cursor, the selection's offsets and digests, a heading label; no book text), then opens ESSENCE in a Neovim terminal float on the right, the page re-centring in the remaining columns. Below 100 columns it opens fullscreen. In ESSENCE, Alt-F toggles fullscreen and beside, Alt-R returns to the reader (leaving ESSENCE beside it, or hiding it when there is no room), and `E` in the reader returns to ESSENCE; these are Neovim terminal-mode mappings, and every other key goes to ESSENCE. ESSENCE survives section changes in the reader. Alt-R and leaving (`q`) return to that captured position and selection, endpoints and direction included (once; after a section change the reader stays where it is). Leaving ends the process, closes its window and re-widens the page; a process that fails to start or exits with an error is reported and the reader stays where it was. Without Textual, `E` explains how to install the extra. Tested in headless Neovim with a real terminal process; the real app was also run inside Neovim's terminal, with keys typed through terminal mode. **Not yet tried by hand** in Alacritty or Kitty.
 
 ## 7. Boundaries and known limitations
 

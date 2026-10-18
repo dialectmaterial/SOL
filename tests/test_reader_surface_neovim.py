@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -754,6 +755,163 @@ end
         self.assertTrue(report["reader_after"])
         self.assertEqual(report["cleared"], "")
         self.assertIn("qa!", report["cancel_commands"])
+
+    def test_essence_opens_beside_toggles_returns_and_closes_without_moving_the_reader(self):
+        stub = self.root / "essence_stub.py"
+        stub.write_text("import sys\nprint('ESSENCE STUB READY', flush=True)\nsys.stdin.readline()\n", encoding="utf-8")
+        paths = f"local PYTHON, STUB = {json.dumps(sys.executable)}, {json.dumps(str(stub))}\n"
+        report = self.run_lua(paths + r'''
+  vim.o.columns, vim.o.lines = 140, 40
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local id = data.records[1].id
+  reader.restore(reader.capture('n', reader.source_point(id, 9), reader.source_point(id, 9)))
+  local before = reader.capture()
+  local full_reader = vim.api.nvim_win_get_config(reader.window)
+  local function geometry(window)
+    local config = vim.api.nvim_win_get_config(window)
+    return {col = config.col, width = config.width, hide = config.hide or false}
+  end
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  report.request = sent[1].op
+  report.request_target = sent[1].packet.reference.reference.target_id
+  _G.SOLReaderChannel.pending[sent[1].id]({essence = {command = {PYTHON, STUB}}})
+  local essence = assert(SOLEssence)
+  assert(vim.wait(5000, function()
+    return table.concat(vim.api.nvim_buf_get_lines(essence.buffer, 0, -1, false), '\n'):find('ESSENCE STUB READY') ~= nil
+  end, 10), 'ESSENCE did not start in its terminal')
+  report.split = {layout = essence.layout, essence = geometry(essence.window), reader = geometry(reader.window),
+                  focused = vim.api.nvim_get_current_win() == essence.window, reader_full = full_reader.width}
+  local keys = {}
+  for _, map in ipairs(vim.api.nvim_buf_get_keymap(essence.buffer, 't')) do keys[#keys + 1] = map.lhs end
+  table.sort(keys); report.terminal_keys = keys
+  essence.toggle()
+  report.full = {layout = essence.layout, essence = geometry(essence.window), reader = geometry(reader.window)}
+  essence.back_to_reader()
+  report.back = {layout = essence.layout, focused_reader = vim.api.nvim_get_current_win() == reader.window}
+  -- A section reload replaces the reader window; ESSENCE keeps its process and place.
+  reader.toggle_mode(); reader = SOLNvimReader
+  report.after_reload = {alive = vim.api.nvim_win_is_valid(essence.window), reader = geometry(reader.window)}
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  report.refocus = {requests = #sent, focused = vim.api.nvim_get_current_win() == essence.window}
+  local job = essence.job
+  vim.fn.chansend(job, 'q\n')
+  assert(vim.wait(5000, function() return SOLEssence.window == nil end, 10), 'ESSENCE did not close')
+  report.closed = {focused_reader = vim.api.nvim_get_current_win() == SOLNvimReader.window,
+                   reader = geometry(SOLNvimReader.window), mode = vim.fn.mode()}
+  reader = SOLNvimReader
+  reader.toggle_mode(); reader = SOLNvimReader
+  report.position_kept = vim.deep_equal(reader.capture().reference, before.reference)
+    and reader.capture().cursor_offset == before.cursor_offset
+  -- A narrow terminal opens fullscreen; back to the reader hides ESSENCE, E shows it again.
+  vim.o.columns = 80
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  _G.SOLReaderChannel.pending[sent[#sent].id]({essence = {command = {PYTHON, STUB}}})
+  report.narrow = {layout = SOLEssence.layout}
+  SOLEssence.back_to_reader()
+  report.narrow.after_back = SOLEssence.layout
+  report.narrow.hidden = geometry(SOLEssence.window).hide
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  report.narrow.after_e = SOLEssence.layout
+  vim.fn.chansend(SOLEssence.job, 'q\n')
+  assert(vim.wait(5000, function() return SOLEssence.window == nil end, 10))
+  -- A command that cannot start leaves the reader usable and says why.
+  local warnings = {}
+  vim.notify = function(message) warnings[#warnings + 1] = message end
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  _G.SOLReaderChannel.pending[sent[#sent].id]({essence = {command = {'/nonexistent/sol-essence'}}})
+  report.failure = {warning = warnings[#warnings], window = SOLEssence.window == nil,
+                    focused_reader = vim.api.nvim_get_current_win() == SOLNvimReader.window}
+''', integrated=True)
+        self.assertEqual(report["request"], "essence_open")
+        self.assertEqual(report["request_target"], self.sample.passages[0].identifier)
+        split = report["split"]
+        self.assertEqual(split["layout"], "split")
+        self.assertTrue(split["focused"])
+        self.assertLess(split["reader"]["col"] + split["reader"]["width"], split["essence"]["col"])
+        self.assertEqual(report["terminal_keys"], ["<M-f>", "<M-r>"])
+        self.assertEqual((report["full"]["layout"], report["full"]["essence"]["width"]), ("full", 140))
+        self.assertEqual(report["back"], {"layout": "split", "focused_reader": True})
+        self.assertTrue(report["after_reload"]["alive"])
+        self.assertLess(report["after_reload"]["reader"]["col"] + report["after_reload"]["reader"]["width"],
+                        split["essence"]["col"])
+        self.assertEqual(report["refocus"], {"requests": 1, "focused": True})
+        self.assertTrue(report["closed"]["focused_reader"])
+        self.assertEqual(report["closed"]["mode"], "n")
+        self.assertEqual(report["closed"]["reader"]["width"], split["reader_full"])
+        self.assertTrue(report["position_kept"])
+        self.assertEqual(report["narrow"], {"layout": "full", "after_back": "hidden", "hidden": True,
+                                            "after_e": "full"})
+        self.assertIn("could not start", report["failure"]["warning"])
+        self.assertTrue(report["failure"]["window"])
+        self.assertTrue(report["failure"]["focused_reader"])
+
+    def test_essence_from_a_selection_returns_to_the_exact_selection(self):
+        # Reported by Codex's review of PR #24.
+        stub = self.root / "essence_stub.py"
+        stub.write_text("import sys\nprint('ESSENCE STUB READY', flush=True)\nsys.stdin.readline()\n", encoding="utf-8")
+        text = self.sample.passages[0].text
+        start, end = text.index("𝔸"), text.index("ground") + len("ground")
+        paths = f"local PYTHON, STUB, FIRST, LAST = {json.dumps(sys.executable)}, {json.dumps(str(stub))}, {start}, {end - 1}\n"
+        report = self.run_lua(paths + r'''
+  vim.o.columns, vim.o.lines = 140, 40
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local id = data.records[1].id
+  report.cases = {}
+  for _, direction in ipairs({'forward', 'reverse'}) do
+    local a, b = reader.source_point(id, FIRST), reader.source_point(id, LAST)
+    if direction == 'reverse' then a, b = b, a end
+    local selected = reader.capture('v', a, b)
+    reader.restore(selected)
+    local case = {mode = vim.fn.mode()}
+    vim.api.nvim_feedkeys('E', 'xt', false)
+    local request = sent[#sent]
+    case.op, case.selection = request.op, request.packet.selection ~= vim.NIL
+    case.sent_matches = vim.deep_equal(request.packet, selected)
+    request = request.id
+    _G.SOLReaderChannel.pending[request]({essence = {command = {PYTHON, STUB}}})
+    assert(vim.wait(5000, function() return SOLEssence.job ~= nil end, 10))
+    SOLEssence.back_to_reader()
+    case.after_back = vim.deep_equal(SOLNvimReader.capture(), selected)
+    -- E from the restored selection refocuses ESSENCE without a new request.
+    local before = #sent
+    vim.api.nvim_feedkeys('E', 'xt', false)
+    case.refocused = #sent == before and vim.api.nvim_get_current_win() == SOLEssence.window
+    vim.fn.chansend(SOLEssence.job, 'q\n')
+    assert(vim.wait(5000, function() return SOLEssence.window == nil end, 10))
+    case.after_close = vim.deep_equal(SOLNvimReader.capture(), selected)
+    case.cursor = SOLNvimReader.capture().cursor_offset
+    report.cases[direction] = case
+    vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  end
+  -- Reported by Codex's re-review: a refused launch keeps the selection.
+  local warnings = {}
+  vim.notify = function(message) warnings[#warnings + 1] = message end
+  local selected = SOLNvimReader.capture('v', SOLNvimReader.source_point(id, FIRST), SOLNvimReader.source_point(id, LAST))
+  SOLNvimReader.restore(selected)
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  _G.SOLReaderChannel.pending[sent[#sent].id](nil, 'ESSENCE needs Textual')
+  report.refused = {mode = vim.fn.mode(), exact = vim.deep_equal(SOLNvimReader.capture(), selected),
+                    warning = warnings[#warnings], window = SOLEssence.window == nil}
+''', integrated=True)
+        for direction, cursor in (("forward", end), ("reverse", start)):
+            with self.subTest(direction=direction):
+                case = report["cases"][direction]
+                self.assertEqual(case["mode"], "v")
+                self.assertEqual((case["op"], case["selection"], case["sent_matches"]), ("essence_open", True, True))
+                self.assertTrue(case["after_back"])
+                self.assertTrue(case["refocused"])
+                self.assertTrue(case["after_close"])
+                self.assertEqual(case["cursor"], cursor)
+        self.assertEqual(report["refused"], {"mode": "v", "exact": True, "warning": "ESSENCE needs Textual",
+                                             "window": True})
 
     def test_footnote_callouts_show_inline_without_changing_source_text(self):
         report = self.run_lua(r'''

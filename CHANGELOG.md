@@ -12,6 +12,27 @@ development machine. Every check is unchanged. If SOL needs to ask you
 something first (who you are, which workspace) or reports an error, the
 placeholder closes before the question or message.
 
+
+### Word frequencies in ESSENCE — 18 October 2026
+
+In ESSENCE's Experiment screen, choose what to count (this passage, its
+section, the whole book or a text file) and, optionally, what to compare it
+with, then press Count words. Results lists the words with counts and rates
+per 10,000 words for both sides, says how many words each side has, and warns
+when the two are not directly comparable. With a workspace, each count is
+saved and can be checked later with `sol analyze check`.
+
+### ESSENCE opens beside the reader — 18 October 2026
+
+`E` in the reader opens ESSENCE, a new Textual application, on the right of
+the page; Alt-F makes it fullscreen and back, Alt-R returns to the reader, and
+`q` closes it, leaving you exactly where you were reading. Its four screens
+(Encyclopedia, Methods, Experiment, Results) are placeholders for now; the
+first real experiment, word frequencies, comes next. ESSENCE needs the new
+`essence` extra (`pip install 'sol-organizes-logic[essence]'`, or
+`pipx inject sol-organizes-logic textual`); without it the reader works as
+before and `E` says what to install.
+
 ### Count words through CORE or ordinary files — 18 October 2026
 
 `sol analyze words` and the UI-independent `analyze_words` function count a

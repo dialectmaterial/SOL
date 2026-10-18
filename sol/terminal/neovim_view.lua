@@ -184,9 +184,12 @@ return function(reader, supplied)
   vim.bo[buffer].modifiable, vim.bo[buffer].readonly = false, true
 
   local function window_config()
-    local width = math.max(1, math.min(data.width, vim.o.columns - 4))
+    -- ESSENCE beside the reader takes the right-hand columns; the page centres in the rest.
+    local essence = rawget(_G, "SOLEssence")
+    local columns = vim.o.columns - (essence and essence.reserved and essence.reserved() or 0)
+    local width = math.max(1, math.min(data.width, columns - 4))
     return { relative = "editor", row = math.min(2, math.max(0, vim.o.lines - 4)),
-      col = math.max(0, math.floor((vim.o.columns - width) / 2)), width = width,
+      col = math.max(0, math.floor((columns - width) / 2)), width = width,
       height = math.max(1, vim.o.lines - 6), style = "minimal", border = "none", zindex = 20 }
   end
   local window = api.nvim_open_win(buffer, true, window_config())
