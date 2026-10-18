@@ -32,6 +32,35 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Formula review sheet — 18 October 2026
+
+**Task:** Codex: Formula review sheet, assigned directly by the maintainer in the Codex session; recorded in [CURRENT_TASK at c7e0181](https://github.com/dialectmaterial/SOL/blob/c7e01819a51f3c6650def3e2f36e1c695154db1b/docs/coordination/CURRENT_TASK.md#codex-formula-review-sheet).
+**Branch / PR:** `codex/formula-review-sheet` · opening with `gh pr create --base main` after this report.
+**Last implementation commit:** `db5ab104240d32edadbb04d285c17fa89d88dd33` (script, tests and behavior documentation; task assignment `c7e0181` and this report follow).
+
+### Changed files
+
+- `scripts/formula_review_sheet.py` — checkout-only `create`, interactive `review`, individual `record` and `check`. All flagged math records, including note paragraphs, or an explicit eligible-ID subset; exact typed text and every page/crop through unchanged `SourceService.capture` / `render_region`. Private HTML/JSON/assets, no replacement of existing sheets, temporary PDF/cache removed. Append-only JSONL human verdicts retain reviewer/time, correction notes and sheet/text/metadata bindings; changed displays/crops, malformed history and competing writers refuse. No canonical or workspace writes.
+- `tests/test_formula_review_sheet.py` — nine synthetic tests: full record/page coverage, escaping, source failures, privacy and nonmutation, same-item history, skip/resume, invalid and competing input, tampering and a real Poppler/CLI round trip. The PDF/PNG builder functions are reused without borrowing another TestCase's setup.
+- `docs/BEING.md` §5, `CHANGELOG.md` — usage, historical-source semantics and the separate human-approved application step. Codex's slot records the direct formula assignment; Claude's task remains as on merged main.
+
+### Tests performed
+
+- Documentation check passed. Full suite after rebasing onto #18: 1,612 tests, OK (11 skipped, 4 existing expected failures). Focused suite: nine tests, including actual Poppler crop/full-page output and CLI create → record → check. XDG/Neovim state was isolated.
+- Real local book: 47 eligible flagged math records. The retyping audit contains 70 replacements across 30 distinct records; passed those existing IDs explicitly. Generated the private 30-record sheet with 49 source crops; every verdict remains pending, no testimony was inferred, no PDF copy remains in the output, and the canonical snapshot before/after is identical. Output location is disclosed privately in the session, not committed. Inspected a generated crop; HTML structure is tested, but no browser was available for a rendered layout check.
+- Re-reviewed fixed [#16](https://github.com/dialectmaterial/SOL/pull/16#issuecomment-6247294242): deep-copied returned records and the single/batch mutation regression; docs, 1,603 tests and every GitHub check passed. It merged on the maintainer's instruction while review checks ran.
+- Reviewed/merged [#18](https://github.com/dialectmaterial/SOL/pull/18#issuecomment-6247385054): task board only; separate worktree docs/1,603 tests and all GitHub checks passed. Rebasing retained Claude's updated slot. Reviewed [#19](https://github.com/dialectmaterial/SOL/pull/19#issuecomment-6247384407) separately: docs/1,605 tests and CI pass, but a synthetic canonical record with 70-level extra metadata is newly accepted instead of refused with `nesting_limit`. Posted the reproduction and left it for the author; the approved numeric-subclass exception does not cover this additional relaxation.
+
+### Outstanding issues
+
+- The private sheet is a fixed copy; the terminal command records progress. `check --corpus` requires exact generation agreement. Recording against the unchanged historical sheet remains possible after corpus changes; this declares only what the human saw there. Keep `sheet.json`, HTML/crops and the verdict history together for any later application step.
+- There is deliberately no apply operation and no automatic `reviewed` status, correction or reindex. Human formula verification remains outstanding. The maintainer's subsequent Lua-module request is a separate task/branch; it is not implemented here.
+- No changes to `sol/terminal/source.py`, Claude's speed files, dependencies, CORE/reference/corpus/workspace contracts, synced `sources/`, source PDF or canonical corpus. No private text, crops or verdicts are staged or committed.
+
+### Decisions requiring approval
+
+- None reserved. Defaults: offline HTML plus immutable JSON/crops, terminal skip/resume, append-only verdict events with the last per-item event used only for progress, explicit reviewer, required correction note, private 700/600 permissions, 16 MiB metadata/history reads, and explicit full-ID subset selection. Applying verdicts remains separately human-approved.
+
 ## Make reader moves fast without weakening checks — 19 October 2026
 
 **Task:** ["Claude Code: Make reader moves fast without weakening checks"](https://github.com/dialectmaterial/SOL/blob/claude/assign-speed-and-footnotes/docs/coordination/CURRENT_TASK.md)

@@ -50,7 +50,7 @@ documentation check and the full suite pass.
 
 ## Codex: Formula review sheet
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `codex/formula-review-sheet`
 **Requested:** 18 October 2026, by the maintainer in the Codex session
 
