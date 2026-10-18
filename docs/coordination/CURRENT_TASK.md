@@ -47,7 +47,7 @@ reported separately.
 
 ## Codex: ESSENCE stage 2 engine, word frequencies without an interface
 
-**Status:** Ready (after #22 is merged)
+**Status:** In progress
 **Branch:** `codex/essence-word-frequencies`
 **Requested:** 18 October 2026, by the maintainer
 
