@@ -89,6 +89,79 @@ Write "None." rather than deleting a heading.
 ### Decisions requiring approval
 - **Defaults:** ESSENCE on the right, 45% of the columns (at least 40); fullscreen below 100 columns; Alt-F and Alt-R as layout keys; `1`–`4` and `q` inside ESSENCE; state only for workspace sessions. The dependency and `E` were decided by the maintainer (#23).
 
+## ESSENCE stage 2 engine: word frequencies — 18 October 2026
+
+**Task:** [Codex: ESSENCE stage 2 engine, word frequencies without an interface](https://github.com/dialectmaterial/SOL/blob/c1dd916bfdb8bb054b3a99d5c01fc92950cdbf0c/docs/coordination/CURRENT_TASK.md#codex-essence-stage-2-engine-word-frequencies-without-an-interface).
+**Branch / PR:** `codex/essence-word-frequencies` · opened with `gh pr create --base main`. Status: `In review`.
+**Last implementation commit:** `c1dd916bfdb8bb054b3a99d5c01fc92950cdbf0c` (this report follows).
+
+### Changed files
+
+- `sol/essence/tokenization.py`, `terms.py` — move the existing tokenizer unchanged into a CORE-free module; the old `_tokens` name remains an alias to that exact function. Existing term and sentence artifacts/methods are unchanged.
+- `sol/essence/word_inputs.py` — explicit `CoreProvider` / `FileProvider` boundary, independent scopes, strict snapshot/file freshness, existing corpus projection and facsimile masks. File input never imports CORE or discovers application data.
+- `sol/essence/words.py` — deterministic token/type counts and union frequency table; absolute counts, explicit per-side token denominators, rates and source locations; versioned `sol.word-frequencies` v1 codec and exact recomputation verifier. Only vocabulary, aggregates and provenance are serialized, never passage text, contexts or token sequences.
+- `sol/essence/word_cli.py`, `cli.py`, `__init__.py` — headless/API exports, `sol analyze words`, source/scope options and `sol analyze check` dispatch. Artifact paths never select input files; callers provide those explicitly. Check emits a receipt without rewriting the artifact.
+- `tests/test_word_frequencies.py` — 26 tests with invented inputs, including CORE-free imports, unequal/mixed providers, Unicode, empty scopes, source changes, raced reads, untrusted JSON and artifacts larger than the legacy 1 MiB bound.
+- `docs/ESSENCE.md` §5, `CHANGELOG.md`, `CURRENT_TASK.md` — implementation, API/artifact semantics and status. Rebased onto the merged task board; only Codex's status differs there.
+
+### Python contract for the interface
+
+```python
+from sol.essence import CoreProvider, FileProvider, analyze_words
+
+analyze_words(
+    target: CoreProvider | FileProvider,
+    *, reference: CoreProvider | FileProvider | None = None,
+) -> dict
+```
+
+Each provider owns its independently chosen source and scope:
+`CoreProvider(snapshot, scope=None)` takes a verified `CorpusSnapshot`; scopes
+are `corpus`, `within` with `path`, `passages` with exact `ids`, or `span` with
+exact `id`, `start`, `end`. `FileProvider(path, scope=None)` takes an explicit
+regular UTF-8 file; scopes are `file` or `span` with `start`, `end`. Defaults
+select the whole eligible source. Spans are half-open codepoints in original
+text; only wholly contained tokens count. CORE inputs retain canonical order
+and the term study's attribution/type/review filters. Reference is optional
+and may use another provider/source. No widget, persistence or workspace input
+is required. Refusals are `WordStudyError` (`status`, `code`) or filesystem
+`OSError`; no partial artifact is returned on a failed freshness check.
+
+The returned serializable dict is the artifact, with `protocol`, `version`,
+`method`, `target`, `reference` (or null), `frequencies`, `warnings`. Each side
+has `provider`, `binding`, `scope`, text-free `inputs`, `summary` containing
+`token_count`, `type_count`, `input_count`, and `exclusions`. A frequency row
+has normalized `word` and one cell per side: `count`, `denominator`,
+`rate_per_10000_tokens`, `locations`. Each location is
+`[input_index, count_in_input, first_start, first_end]`; CORE input metadata
+supplies exact UUID, reader path, pages, attribution and digests for return to
+source. Zero denominators give null rates. Rows sort by descending target
+count, then word; words unique to the reference remain visible.
+
+`encode_word_result(result)` and `decode_word_result(data)` transport the
+artifact. `check_word_result(target, result, *, reference=None)` requires
+caller-supplied providers with matching scopes, verifies full generation/file
+bindings and recomputes every field. The CLI calls these same functions.
+Neither decode nor an artifact's locations authorize source navigation without
+the normal CORE checks. See ESSENCE §5 for exact scope objects and CLI examples.
+
+### Tests performed
+
+- Focused: 26 new word-study tests, plus the unchanged 24 CLI, 26 term and 9 sentence tests passed.
+- Shared `.venv/bin/python -B scripts/check_docs.py` — passed. Shared `.venv/bin/python -B -m unittest discover -s tests` after rebase — **1,642 tests, OK (11 skipped, 4 existing expected failures)**, with isolated XDG state and Neovim log path. `git diff --check` passed.
+- Byte-for-byte stdout/stderr/JSON comparison of the term command against main on an invented corpus — identical. `python -m sol analyze words --file ... --json` also passed with an explicitly absent configured corpus.
+- Read-only private whole-book trial: **312,481 tokens, 7,317 types, 1,757 input rows**; encoded artifact **4,288,905 bytes**, strictly recomputed successfully in memory. No book text or artifact was written to Git or saved by this trial.
+- Reviewed newly opened [interface PR #24](https://github.com/dialectmaterial/SOL/pull/24#issuecomment-6251361426) before publishing: docs and GitHub checks pass, but visual `E` sends no ESSENCE request and changes the selected span. Posted the headless reproduction and left it open for Claude's fix. Its separate local full run was interrupted after hanging in the first Textual pilot's asyncio teardown (also reproduced under a timed focused run); no local full-suite pass is claimed for #24.
+
+### Outstanding issues
+
+- Interface integration and a CLI/TUI equivalence trial belong to the later interface work; no interface acceptance is claimed here. No file under `sol/terminal/`, `sol/essence/tui/` or `pyproject.toml` was touched.
+- File inputs are bounded at 64 MiB and artifacts at 16 MiB. This is a synchronous, in-memory lightweight experiment, not a collection index or background-job runner. Locations retain the first occurrence per contributing input, with its aggregate count.
+
+### Decisions requiring approval
+
+- None reserved. Reviewable defaults: the unchanged term tokenizer/projection; whole-token span containment; independent CORE/file providers; union vocabulary; per-10,000 rates rounded to six decimals; undefined zero-token rates; strict whole-source binding; explicit file paths at check time; bounded ASCII JSON. This is an ESSENCE result format, not the proposed investigation-persistence schema or a change to any CORE/workspace contract.
+
 ## Reconcile the ESSENCE interface decisions in the documentation — 18 October 2026
 
 **Task:** ["Claude Code: Reconcile the ESSENCE interface decisions in the documentation"](https://github.com/dialectmaterial/SOL/blob/claude/essence-interface-docs/docs/coordination/CURRENT_TASK.md), requested by the maintainer with the [ESSENCE interface brief](proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf)
