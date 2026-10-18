@@ -48,40 +48,41 @@ Before/after timings in the handoff; existing refusal tests unchanged; a test
 for each relaxed or rewritten check showing what it still refuses. The
 documentation check and the full suite pass.
 
-## Codex: Split the Lua reader into modules
+## Codex: Formula review sheet
 
-**Status:** Ready
-**Branch:** `codex/lua-modules`
-**Requested:** 19 October 2026, by the maintainer
+**Status:** In progress
+**Branch:** `codex/formula-review-sheet`
+**Requested:** 18 October 2026, by the maintainer in the Codex session
 
 ### Goal
 
-`sol/terminal/neovim.lua` (about 1,330 lines) becomes a small entry file plus
-cohesive modules (for example panels, the note editor, footnote view, search
-and markers), with no change in behaviour, so stage 6 and later work touch
-smaller files.
+Help the maintainer check 30 retyped formulas against the printed source.
+Create a private review sheet for canonical records with `contains_math` and
+`needs_visual_review`, and record human verdicts for a later application step.
 
 ### Scope
 
-[Proposal cleanup](proposals/CODEX_READER_WORKSPACE_PLAN.md#cleanup-alongside-the-stages):
-`sol/terminal/*.lua`, the Python code that locates and packages the Lua files
-(`sol/terminal/neovim.py`, packaging data, `scripts/install.py` if needed),
-tests, and Architecture or BEING only where they name files.
+A checkout-only script under `scripts/`, its tests, BEING and CHANGELOG. Show
+each record's ID, page labels, exact typed text and every printed-source crop,
+calling the existing `sol/terminal/source.py` capture/render functions without
+changing them. Authority: BEING §5; CORE §§2, 3, 5 and 7.
 
 ### Constraints
 
-No behaviour change: every existing headless Neovim and controller test passes
-unchanged, except where a test names a file path. Modules are loaded from the
-installed package directory only, never from the user's runtime path or
-configuration. The wheel and source archive still contain every Lua file, and
-the packaging checks prove it. Do not touch `sol/core/`, `sol/reader/` or
-`sol/terminal/neovim_reader.py` (Claude Code's task).
+No new dependencies. Book text, crops and verdicts stay outside Git. The sheet
+never marks a record reviewed: changing canonical `transcription_status` is a
+separate human-approved step. Do not touch `sol/core/protocol.py`,
+`sol/core/models.py`, `sol/reader/actions.py`, `sol/reader/surface.py`,
+`sol/terminal/neovim.py` or `sol/terminal/neovim_reader.py` (Claude Code's speed
+work), or `sol/terminal/source.py`.
 
 ### Acceptance
 
-The documentation check and the full suite pass, including packaging checks;
-a reader started from an installed wheel in a temporary environment opens a
-passage headlessly. The handoff lists the modules and what each owns.
+Synthetic end-to-end generation covers flagged math in main text and notes,
+all source pages, crops and the explicit whole-page fallback. Verdicts record
+`confirmed` or `needs correction` with a note, reviewer and source binding in
+a private file. Test privacy, nonmutation, stale/missing source, invalid input
+and refusal to overwrite an existing sheet. Documentation and full checks pass.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
