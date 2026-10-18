@@ -14,7 +14,7 @@ Write "None." rather than deleting a heading.
 
 ## <Task title> — <date>
 
-**Task:** <link to the CURRENT_TASK version or its title>
+**Task:** <its title, linked to CURRENT_TASK.md at a commit (blob/<sha>/…), since the heading disappears when the task is replaced>
 **Branch / PR:** `claude/<name>` · <PR link or "not opened: reason">
 **Last implementation commit:** `<full SHA>` (this report is committed after it)
 
@@ -60,7 +60,7 @@ Write "None." rather than deleting a heading.
 
 ## Reader speed baseline — 18 October 2026
 
-**Task:** [Codex: Measure reader speed before optimising](CURRENT_TASK.md#codex-measure-reader-speed-before-optimising).
+**Task:** [Codex: Measure reader speed before optimising](https://github.com/dialectmaterial/SOL/blob/c2eb068/docs/coordination/CURRENT_TASK.md#codex-measure-reader-speed-before-optimising).
 **Branch / PR:** `codex/reader-timings` · [PR #14](https://github.com/dialectmaterial/SOL/pull/14), opened with `gh pr create --base main`. Status: `In review`.
 **Last implementation commit:** `fbba797fe4a9e22807712e060d86d207ba8e8923` (script/tests and documentation; this report follows).
 
