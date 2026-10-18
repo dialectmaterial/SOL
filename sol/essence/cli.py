@@ -27,8 +27,12 @@ def build_parser() -> argparse.ArgumentParser:
     sentences.add_argument("--within", metavar="PATH",
                            help="only passages under this reader path, e.g. /BEING/i-determinateness-quality")
     sentences.add_argument("--reference", metavar="FILE|-", help="optional CORE reference anchor; it does not restrict the scope")
+    words = commands.add_parser("words", help="count normalized words with explicit target/reference denominators")
+    from sol.essence.word_cli import add_arguments
+    add_arguments(words, words=True)
     check = commands.add_parser("check", help="recompute and verify a saved experiment against the local corpus")
     check.add_argument("file", metavar="FILE|-", help="saved result JSON, or - for piped input")
+    add_arguments(check)
     prose = commands.add_parser("prose", help="prepare prose-only analysis input, retaining headings as metadata")
     sample = commands.add_parser("segmentation-sample", help="prepare a blind private sample for human sentence marking")
     sample.add_argument("--per-doctrine", type=int, required=True, metavar="N", help="explicit number of whole passages from each doctrine")
@@ -44,7 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
     marking_import.add_argument("form", metavar="FORM_TXT|-", help="marked UTF-8 text form; only one input may be piped")
     marking_import.add_argument("--reviewer", required=True, metavar="NAME", help="declared human reviewer label")
     marking_import.add_argument("--output", type=Path, required=True, metavar="REVIEW_JSON", help="new private review file outside Git")
-    for command in (term, sentences, check, prose, sample, review, marking_export, marking_import):
+    for command in (term, sentences, words, check, prose, sample, review, marking_export, marking_import):
         command.add_argument("--corpus", type=Path, metavar="DIRECTORY",
                              help="use this local canonical corpus instead of discovery")
         command.add_argument("--json", action="store_true", help="print machine-readable JSON instead of a human summary")
@@ -163,6 +167,23 @@ def main(arguments: list[str] | None = None) -> int:
     """Analyze or verify without opening BEING, a workspace, or a source PDF."""
     options = build_parser().parse_args(arguments)
     try:
+        if options.action == "words":
+            from sol.essence.word_cli import run
+            return run(options)
+        raw = None
+        if options.action == "check":
+            from sol.essence.word_cli import read_artifact, run
+            from sol.essence.words import decode_word_result
+            raw = read_artifact(options.file)
+            data = raw.encode("utf-8") if isinstance(raw, str) else raw
+            # Decode JSON for dispatch: whitespace and escaped protocol names
+            # must not route a word artifact through a corpus-only study.
+            try:
+                header = json.loads(data)
+            except (ValueError, UnicodeError, RecursionError):
+                header = None
+            if isinstance(header, dict) and header.get("protocol") == "sol.word-frequencies":
+                return run(options, decode_word_result(data))
         from sol.core import MAX_REFERENCE_BYTES, decode_reference, discover_corpus, load_snapshot
         from sol.core.wire import read_json_input
         from sol.essence.terms import (
@@ -183,7 +204,6 @@ def main(arguments: list[str] | None = None) -> int:
                 from sol.essence.segmentation_marking import decode_marking_form
                 form = decode_marking_form(read_json_input(options.form, MAX_REVIEW_BYTES))
         elif options.action == "check":
-            raw = read_json_input(options.file, MAX_RESULT_BYTES)
             data = raw.encode("utf-8") if isinstance(raw, str) else raw
             decode = (sentence_study.decode_sentence_result if b'"sol.sentence-study"' in data
                       else decode_term_result)
