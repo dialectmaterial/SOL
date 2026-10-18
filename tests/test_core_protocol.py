@@ -277,6 +277,20 @@ class CoreProtocolTests(unittest.TestCase):
         snapshot = changed(lambda row: row.update(order=Number(row["order"])))
         self.assertEqual(core.capture_reference(snapshot, self.identifier), self.payload)
 
+    def test_corpus_metadata_nested_beyond_64_levels_is_refused_on_every_call(self):
+        # Reported by Codex's review of PR #19.
+        def deep(manifest, rows):
+            nested = "end"
+            for _ in range(70):
+                nested = {"next": nested}
+            rows[1]["invented_nesting"] = nested
+
+        snapshot = self.rewrite(deep)
+        for attempt in range(2):  # The first call loads; the second would use the cache.
+            with self.subTest(attempt=attempt), self.assertRaises(core.ProtocolError) as caught:
+                core.capture_reference(snapshot, self.identifier)
+            self.assertEqual(caught.exception.code, "nesting_limit")
+
     def test_changed_files_during_capture_or_check_are_refused(self):
         with patch.object(contract, "verify_snapshot_current", side_effect=contract.CorpusError("Invented race")):
             for operation in (lambda: core.capture_reference(self.snapshot, self.identifier),

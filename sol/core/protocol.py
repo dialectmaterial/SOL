@@ -221,6 +221,11 @@ def _load_fresh(snapshot):
             raise ProtocolError("The selected corpus generation is no longer valid; reopen after correcting/reindexing it",
                                 status="stale", code="generation_changed") from error
         if _generation_key(fresh) == key:
+            # The fast comparison requires the caller's data to equal this
+            # verified copy, so the copy must meet every rule of _json_value,
+            # including the 64-level nesting bound; a refusal is not cached.
+            _json_value(fresh.manifest)
+            _json_value(fresh.records)
             manifest_text = json.dumps(fresh.manifest, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
             records_text = json.dumps(fresh.records, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
             # The parsed copies serve only comparisons; they are never returned.

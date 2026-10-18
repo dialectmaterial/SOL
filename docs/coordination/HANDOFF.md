@@ -40,6 +40,7 @@ Write "None." rather than deleting a heading.
 
 ### Changed files
 - `sol/core/protocol.py` — the in-memory comparison uses canonical JSON text plus structural equality with a private parsed copy (about 47 ms instead of 100 ms); the copy is never returned. Approved edge: an `int`/`float` subclass with an equal value is accepted.
+- Review fix (Codex, PR #19): the verified copy is checked once against every `_json_value` rule, including the 64-level nesting bound, before it is cached; a corpus with deeper metadata is refused on the first and every later call. Codex's reproduction is a regression test.
 - `sol/reader/surface.py` — `CaptureExport` has CORE check the reader's own snapshot instead of its deep copy, so a reader action compares once; the copy stays the export's private graph and `finish()` still proves they agree. (The deep copy itself stays: at 47 ms it beat a JSON round trip at 80 ms.)
 - `sol/core/models.py`, `sol/reader/actions.py` — `find_passage` finds an exact current ID without building an index; `ReadingSession.current` indexes the whole-book scope directly.
 - Tests: what the faster comparison still refuses (changed text, `2.0` for `2`, `true` for `1`, tuple for list, number key, extra field, lone surrogate) and the approved int-subclass case; both lookups against the old full scans on IDs, retired IDs, prefixes, unknown IDs and two scopes.
