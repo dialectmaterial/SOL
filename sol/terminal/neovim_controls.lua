@@ -313,10 +313,10 @@ return function(reader)
     vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
     vim.keymap.set('n', 'S', guarded(function() request('sentence_study') end), {buffer = buffer, silent = true})
     vim.keymap.set({'n', 'x'}, 'E', guarded(function()
-      -- Capture the exact position and selection before any mode or window
-      -- change; ESSENCE returns to it with Alt-R and on closing.
+      -- Capture the exact position and selection; ESSENCE returns to it with
+      -- Alt-R and on closing. Visual mode stays until ESSENCE actually opens
+      -- (its window change ends it), so a refused launch keeps the selection.
       local packet = current_packet()
-      if vim.fn.mode(1) ~= 'n' then normal_escape() end
       local essence = rawget(_G, 'SOLEssence')
       essence.origin = packet
       if essence.window and api.nvim_win_is_valid(essence.window) then essence.focus()

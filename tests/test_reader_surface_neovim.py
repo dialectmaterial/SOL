@@ -853,6 +853,15 @@ end
     report.cases[direction] = case
     vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
   end
+  -- Reported by Codex's re-review: a refused launch keeps the selection.
+  local warnings = {}
+  vim.notify = function(message) warnings[#warnings + 1] = message end
+  local selected = SOLNvimReader.capture('v', SOLNvimReader.source_point(id, FIRST), SOLNvimReader.source_point(id, LAST))
+  SOLNvimReader.restore(selected)
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  _G.SOLReaderChannel.pending[sent[#sent].id](nil, 'ESSENCE needs Textual')
+  report.refused = {mode = vim.fn.mode(), exact = vim.deep_equal(SOLNvimReader.capture(), selected),
+                    warning = warnings[#warnings], window = SOLEssence.window == nil}
 ''', integrated=True)
         for direction, cursor in (("forward", end), ("reverse", start)):
             with self.subTest(direction=direction):
@@ -863,6 +872,8 @@ end
                 self.assertTrue(case["refocused"])
                 self.assertTrue(case["after_close"])
                 self.assertEqual(case["cursor"], cursor)
+        self.assertEqual(report["refused"], {"mode": "v", "exact": True, "warning": "ESSENCE needs Textual",
+                                             "window": True})
 
     def test_footnote_callouts_show_inline_without_changing_source_text(self):
         report = self.run_lua(r'''
