@@ -43,4 +43,4 @@ include = ["sol", "sol.*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-"sol.terminal" = ["neovim.lua", "neovim_tree.lua"]
+"sol.terminal" = ["*.lua"]

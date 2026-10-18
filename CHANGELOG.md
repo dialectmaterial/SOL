@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Split the Lua reader implementation — 18 October 2026
+
+The Neovim entry now composes package-local text/view, panel, request, footnote,
+personal-note and control modules. Reader behavior and controls are unchanged.
+Modules load only beside the installed entry, and packaging checks cover every
+Lua file plus a headless read from an installed wheel.
+
 ### Faster section moves — 19 October 2026
 
 Moving to the next or previous section, opening a search result or going back
