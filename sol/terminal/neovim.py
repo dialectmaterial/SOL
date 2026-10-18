@@ -351,7 +351,7 @@ class NativeSession:
             # first -c immediately stops every listener.
             self._on_request, self._command, self._root, self._environment = on_request, command, root, environment
             self._channel = None
-            if on_request is not None:
+            if on_request is not None or payload.get("pending") is True:
                 # Only a session with an action channel starts early; the plain
                 # research export runs Neovim when waited on, as before.
                 from sol.terminal.reader_channel import NativeChannel
@@ -374,6 +374,19 @@ class NativeSession:
         finally:
             self._temporary.cleanup()
 
+
+    def set_handler(self, on_request):
+        """Choose who answers requests, before wait()."""
+        self._on_request = on_request
+
+    def cancel(self):
+        """Close a placeholder cleanly: its page request is answered 'cancel'."""
+        def cancel(request):
+            if request.get("op") == "initial":
+                return {"cancel": True}
+            raise ValueError("the reader is closing")
+        self.set_handler(cancel)
+        self.wait()
 
     def abort(self):
         """Stop a started session that will not be served."""

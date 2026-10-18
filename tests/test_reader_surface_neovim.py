@@ -737,6 +737,15 @@ end
   _G.SOLReaderChannel.pending[sent[1].id]({payload = vim.deepcopy(data)})
   report.reader_after = SOLNvimReader ~= nil and #SOLNvimReader.records == #data.records
   report.cleared = table.concat(vim.api.nvim_buf_get_lines(placeholder, 0, -1, false), '')
+  -- A second start that SOL cancels (a question or an error comes first) quits.
+  local commands, real_cmd = {}, vim.cmd
+  vim.cmd = function(command) commands[#commands + 1] = command end
+  vim.env.SOL_NVIM_SPLASH = '1'
+  vim.api.nvim_set_current_buf(vim.api.nvim_create_buf(true, false))
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))()
+  _G.SOLReaderChannel.pending[sent[#sent].id]({cancel = true})
+  vim.cmd = real_cmd
+  report.cancel_commands = commands
 '''.replace("SPLASH_FILE_PATH", json.dumps(str(splash))), integrated=True)
         self.assertIn("Opening The Science of Logic…", report["shown"])
         self.assertNotIn(self.sample.passages[0].text[:20], report["shown"])
@@ -744,6 +753,7 @@ end
         self.assertFalse(report["reader_before"])
         self.assertTrue(report["reader_after"])
         self.assertEqual(report["cleared"], "")
+        self.assertIn("qa!", report["cancel_commands"])
 
     def test_footnote_callouts_show_inline_without_changing_source_text(self):
         report = self.run_lua(r'''

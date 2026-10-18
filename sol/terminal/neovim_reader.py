@@ -24,6 +24,34 @@ SECTION_BUDGET = 64
 # the first page in parallel; tests that stub Neovim set this to False.
 EARLY_START = True
 SPLASH = {"pending": True, "message": "Opening The Science of Logic…"}
+# A placeholder started by the command line before the book was loaded.
+_placeholder = None
+
+
+def begin_placeholder(executable):
+    """Show the placeholder now, in a real terminal; otherwise do nothing.
+
+    The command line calls this as soon as a corpus is known, so Neovim's
+    start overlaps with loading the book. Whatever happens next either hands
+    the placeholder to the reader or closes it cleanly with end_placeholder().
+    """
+    global _placeholder
+    if not EARLY_START or _placeholder is not None or not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return
+    try:
+        _placeholder = neovim.start_payload(SPLASH, executable, on_request=lambda request: None)
+    except (OSError, ValueError, RuntimeError):
+        _placeholder = None
+
+
+def end_placeholder():
+    """Close a placeholder nobody took over, before a prompt, error or exit."""
+    global _placeholder
+    session, _placeholder = _placeholder, None
+    if session is not None:
+        session.cancel()
+
+
 NOTE_LIMIT = 20000
 REVIEW_NOTES = {
     "needs_visual_review": "The typed text is an unreviewed transcription and may be wrong. "
@@ -218,7 +246,13 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     # Start Neovim on a placeholder first, so its start-up overlaps with the
     # work below; its request for the page waits until that work is done.
     # Every request is still served on this thread, which owns the workspace.
-    session = neovim.start_payload(SPLASH, executable, on_request=lambda request: handle(request)) if EARLY_START else None
+    global _placeholder
+    session = None
+    if EARLY_START:
+        session, _placeholder = _placeholder, None
+        if session is None:
+            session = neovim.start_payload(SPLASH, executable, on_request=None)
+        session.set_handler(lambda request: handle(request))
     waiting, failure = session is not None, None
     try:
         payload, sample, extent = first_view()

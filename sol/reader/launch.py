@@ -11,6 +11,13 @@ def interactive_input_available() -> bool:
     return bool(sys.stdin.isatty())
 
 
+def _end_placeholder() -> None:
+    # Questions need the plain terminal: close the reader's start-up placeholder.
+    module = sys.modules.get("sol.terminal.neovim_reader")
+    if module is not None:
+        module.end_placeholder()
+
+
 def shell_identity(book: Book, args) -> None:
     """Resolve explicit launch choices, then ask only when no remembered choice exists.
 
@@ -35,6 +42,7 @@ def shell_identity(book: Book, args) -> None:
         if not interactive_input_available():
             raise ValueError("actor setup needs interactive input. Supply --actor NAME --workspace NAME, "
                              "use sol -n for a temporary reader, or sol -r for a random passage.")
+        _end_placeholder()
         if known:
             print('Known actors: ' + ', '.join(profile['name'] for profile in known[-10:]))
         while True:
@@ -68,6 +76,7 @@ def shell_identity(book: Book, args) -> None:
     if not interactive_input_available():
         raise ValueError("workspace setup needs interactive input. Supply --workspace NAME --actor NAME, "
                          "use sol -n for a temporary reader, or sol -r for a random passage.")
+    _end_placeholder()
     from sol.workspace.catalog import discover_workspaces
     recent = discover_workspaces(book.corpus_manifest['corpus_id'], source_digest, args.workspace_dir)
     if recent:

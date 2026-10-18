@@ -849,6 +849,8 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             def __init__(self, payload, executable, *, on_request):
                 events.append(("start", payload))
                 self.on_request = on_request
+            def set_handler(self, on_request):
+                self.on_request = on_request
             def wait(self):
                 return script(self.on_request)
             def abort(self):
@@ -909,6 +911,50 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
                 self.assertRaises(KeyboardInterrupt):
             neovim_reader.run_reader(self.book)
         self.assertEqual([kind for kind, _ in events], ["start", "abort"])
+
+    def test_the_command_line_placeholder_is_adopted_or_closed_before_text_is_printed(self):
+        events = []
+
+        class Session:
+            def __init__(self, payload, executable, *, on_request):
+                events.append(("start", payload.get("pending")))
+                self.on_request = on_request
+            def set_handler(self, on_request):
+                self.on_request = on_request
+            def wait(self):
+                page = self.on_request({"op": "initial"})["payload"]
+                events.append(("page", bool(page["records"])))
+                return 0, {"action": "quit", "packet": page["restore"]}
+            def cancel(self):
+                events.append(("cancel", None))
+
+        def tty(answer):
+            return patch("sys.stdin.isatty", return_value=answer), patch("sys.stdout.isatty", return_value=answer)
+
+        stdin, stdout = tty(False)
+        with stdin, stdout, patch.object(neovim, "start_payload", side_effect=Session):
+            neovim_reader.begin_placeholder("/invented/nvim")
+        self.assertEqual(events, [])  # No terminal, no placeholder.
+        stdin, stdout = tty(True)
+        with stdin, stdout, patch.object(neovim, "start_payload", side_effect=Session), \
+                patch.object(neovim, "validate_environment", return_value="/invented/nvim"):
+            neovim_reader.begin_placeholder("/invented/nvim")
+            # The reader adopts the started placeholder instead of starting another.
+            self.assertEqual(neovim_reader.run_reader(self.book), 0)
+        self.assertEqual(events, [("start", True), ("page", True)])
+        events.clear()
+        # An error before the reader closes the placeholder before printing.
+        from sol.reader import app
+        printed = []
+        with stdin, stdout, patch.object(neovim, "start_payload", side_effect=Session), \
+                patch.object(neovim, "validate_environment", return_value="/invented/nvim"), \
+                patch.object(app, "load_corpus_book", side_effect=ValueError("Invented corpus failure")), \
+                patch.object(app, "discover_corpus", return_value=self.corpus), \
+                patch("sys.stderr.write", side_effect=lambda text: printed.append(text) or events.append(("print", None))):
+            self.assertEqual(app.main(["-n"]), 2)
+        self.assertEqual([kind for kind, _ in events][:3], ["start", "cancel", "print"])
+        self.assertIn("Invented corpus failure", "".join(printed))
+        self.assertIsNone(neovim_reader._placeholder)
 
     def test_cross_section_paragraph_previous_lands_at_beginning_and_keeps_focus(self):
         self.extend(3)

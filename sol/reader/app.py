@@ -241,7 +241,7 @@ def main(argv: list[str] | None = None) -> int:
             # Refuse an unavailable view before corpus discovery, onboarding,
             # actor registration or opening/creating a personal workspace.
             from sol.terminal.neovim import validate_environment
-            validate_environment(args.width or DEFAULT_READER_WIDTH)
+            executable = validate_environment(args.width or DEFAULT_READER_WIDTH)
             args.theme = args.theme or configured_theme(READER_THEMES) or DEFAULT_READER_THEME
         if mode is ExecutionMode.SET_THEME:
             configuration = save_theme(args.set_theme, READER_THEMES)
@@ -270,6 +270,11 @@ def main(argv: list[str] | None = None) -> int:
             print(render_guide(book, width, 1 if args.depth is None else args.depth))
             return 0
         corpus = None if args.pdf is not None else discover_corpus(args.corpus)
+        if corpus is not None and mode is ExecutionMode.READER:
+            # Neovim starts on a placeholder while the book loads; any question,
+            # error or other outcome below closes it before using the terminal.
+            from sol.terminal.neovim_reader import begin_placeholder
+            begin_placeholder(executable)
         if corpus is not None:
             book = load_corpus_book(corpus)
         elif args.pdf is not None:
@@ -387,14 +392,26 @@ def main(argv: list[str] | None = None) -> int:
                 print(render_passage(passage, width, args.plain, color))
         return 0
     except ValueError as error:
+        _end_placeholder()
         print("sol: " + safe_output(error), file=sys.stderr)
         return 2
     except RuntimeError as error:
+        _end_placeholder()
         print("sol: " + safe_output(error), file=sys.stderr)
         return 1
     except EOFError:
+        _end_placeholder()
         print("\nsol: setup cancelled; no workspace or actor was created", file=sys.stderr)
         return 0
+    finally:
+        _end_placeholder()
+
+
+def _end_placeholder():
+    """Close the reader's start-up placeholder if one was opened and not used."""
+    module = sys.modules.get("sol.terminal.neovim_reader")
+    if module is not None:
+        module.end_placeholder()
 
 
 def cli(argv: list[str] | None = None) -> int:

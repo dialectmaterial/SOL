@@ -33,6 +33,11 @@ return function(reader)
   channel.navigation_pending = id
   channel.pending[id] = function(result, problem)
     channel.navigation_pending = nil
+    if result and result.cancel == true then
+      -- SOL needs the plain terminal first (a question or an error message).
+      vim.cmd('qa!')
+      return
+    end
     if not result or type(result.payload) ~= 'table' then
       -- Python prints the reason once Neovim has closed.
       vim.cmd('cquit 3')
