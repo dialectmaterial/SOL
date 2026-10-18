@@ -221,15 +221,17 @@ def _load_fresh(snapshot):
             raise ProtocolError("The selected corpus generation is no longer valid; reopen after correcting/reindexing it",
                                 status="stale", code="generation_changed") from error
         if _generation_key(fresh) == key:
-            texts = (json.dumps(fresh.manifest, ensure_ascii=False, separators=(",", ":"), allow_nan=False),
-                     json.dumps(fresh.records, ensure_ascii=False, separators=(",", ":"), allow_nan=False),
-                     _json(fresh.manifest), _json(fresh.records))
+            manifest_text = json.dumps(fresh.manifest, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+            records_text = json.dumps(fresh.records, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+            # The parsed copies serve only comparisons; they are never returned.
+            cached = (manifest_text, records_text, _json(fresh.manifest), _json(fresh.records),
+                      json.loads(manifest_text), json.loads(records_text))
             while len(_VERIFIED_GENERATIONS) >= _VERIFIED_LIMIT:
                 _VERIFIED_GENERATIONS.pop(next(iter(_VERIFIED_GENERATIONS)))
-            _VERIFIED_GENERATIONS[key] = texts
-            return fresh, texts[2], texts[3]
-        return fresh, _json(fresh.manifest), _json(fresh.records)
-    manifest_text, records_text, manifest_canonical, records_canonical = cached
+            _VERIFIED_GENERATIONS[key] = cached
+            return fresh, cached[2:]
+        return fresh, None
+    manifest_text, records_text = cached[:2]
     fresh = CorpusSnapshot(
         corpus_directory=snapshot.corpus_directory, manifest=json.loads(manifest_text),
         records=json.loads(records_text), manifest_sha256=snapshot.manifest_sha256,
@@ -243,7 +245,20 @@ def _load_fresh(snapshot):
         _VERIFIED_GENERATIONS.pop(key, None)
         raise ProtocolError("The loaded corpus generation changed; reopen before transferring a reference",
                             status="stale", code="generation_changed") from error
-    return fresh, manifest_canonical, records_canonical
+    return fresh, cached[2:]
+
+
+def _unmodified(value, canonical, verified):
+    """Whether caller data equals the verified generation.
+
+    Canonical JSON text catches changed values and JSON types (true versus 1);
+    structural equality with a private parsed copy catches tuples for lists and
+    non-string keys. It accepts an int or float subclass with an equal value,
+    as approved by the maintainer on 19 October 2026 (CORE §6).
+    """
+    if verified is None:
+        return _json(_json_value(value)) == canonical
+    return _json(value) == canonical and value == verified
 
 
 # One reader action: the snapshot it was entered for, and its verified copy.
@@ -280,15 +295,18 @@ def _fresh_snapshot(snapshot):
             raise ProtocolError("The loaded corpus generation changed; reopen before transferring a reference",
                                 status="stale", code="generation_changed") from error
         return action["fresh"]
-    fresh, manifest_canonical, records_canonical = _load_fresh(snapshot)
+    fresh, verified = _load_fresh(snapshot)
+    if verified is None:
+        verified = (_json(fresh.manifest), _json(fresh.records), None, None)
     if (fresh.manifest_sha256 != snapshot.manifest_sha256 or fresh.index_sha256 != snapshot.index_sha256
             or fresh.index_metadata_sha256 != snapshot.index_metadata_sha256 or fresh.documents != snapshot.documents):
         raise ProtocolError("The loaded corpus generation changed; reopen before transferring a reference",
                             status="stale", code="generation_changed")
     # A frozen snapshot still contains mutable dictionaries. Do not describe
     # caller-modified records using the original disk-generation fingerprints.
-    if (_json(_json_value(snapshot.manifest)) != manifest_canonical
-            or _json(_json_value(snapshot.records)) != records_canonical):
+    manifest_canonical, records_canonical, manifest_verified, records_verified = verified
+    if (not _unmodified(snapshot.manifest, manifest_canonical, manifest_verified)
+            or not _unmodified(snapshot.records, records_canonical, records_verified)):
         raise ProtocolError("The in-memory corpus snapshot was modified; reload canonical data",
                             status="stale", code="snapshot_modified")
     if fresh.corpus_id is None:

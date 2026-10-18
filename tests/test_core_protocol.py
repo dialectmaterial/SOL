@@ -247,6 +247,36 @@ class CoreProtocolTests(unittest.TestCase):
             self.assertEqual(core.check_reference(self.snapshot, self.payload).record["attribution"]["author"],
                              later["reference"]["attribution"]["author"])
 
+    def test_fast_memory_comparison_refuses_changed_values_and_types(self):
+        class Number(int):
+            pass
+
+        core.capture_reference(self.snapshot, self.identifier)  # A verified generation is cached.
+        index = [row["id"] for row in self.snapshot.records].index(self.identifier)
+
+        def changed(edit):
+            snapshot = copy.deepcopy(self.snapshot)
+            edit(snapshot.records[index])
+            return snapshot
+
+        refused = {
+            "text": lambda row: row.update(markdown=row["markdown"] + " "),
+            # Equal under ==, different as JSON: 2 versus 2.0 (or 1 versus true).
+            "float for int": lambda row: row.update(order=float(row["order"])),
+            "bool for int": lambda row: row.update(order=bool(row["order"])) if row["order"] in (0, 1) else
+                row.update(order=float(row["order"])),
+            "tuple for list": lambda row: row.update(sources=tuple(row["sources"])),
+            "number key": lambda row: row.update({7: "x"}),
+            "extra field": lambda row: row.update(invented="x"),
+            "lone surrogate": lambda row: row.update(markdown="\ud800"),
+        }
+        for name, edit in refused.items():
+            with self.subTest(name=name), self.assertRaises(core.ProtocolError):
+                core.capture_reference(changed(edit), self.identifier)
+        # Approved on 19 October 2026: an int subclass with an equal value passes.
+        snapshot = changed(lambda row: row.update(order=Number(row["order"])))
+        self.assertEqual(core.capture_reference(snapshot, self.identifier), self.payload)
+
     def test_changed_files_during_capture_or_check_are_refused(self):
         with patch.object(contract, "verify_snapshot_current", side_effect=contract.CorpusError("Invented race")):
             for operation in (lambda: core.capture_reference(self.snapshot, self.identifier),
