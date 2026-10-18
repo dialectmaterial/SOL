@@ -32,6 +32,38 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Footnote reading view — 18 October 2026
+
+**Task:** [Codex: Footnote reading view](https://github.com/dialectmaterial/SOL/blob/5fad439ebfa27756b0c2fd127511e6483501f0e6/docs/coordination/CURRENT_TASK.md#codex-footnote-reading-view).
+**Branch / PR:** `codex/footnote-view` · to be opened with `gh pr create --base main` after this report is committed.
+**Last implementation commit:** `650e7d17ce625e58a66c887b39395d451298d927` (projection/controller `e207f0d`, then panels/tests/documentation; this report follows).
+
+### Changed files
+
+- `sol/reader/surface.py` — canonical note/body link paths, bounded by eight distinct notes and 64 body paragraphs per note; no navigation or workspace operation.
+- `sol/terminal/neovim.py` — one checked, on-demand footnote projection through `CaptureExport`, retaining each ordered paragraph's ID, CORE reference, exact text, local style/callout offsets, attribution and warnings. Links disclose cycles/depth bounds; text and presentation budgets refuse oversized views.
+- `sol/terminal/neovim_reader.py` — only seven added/changed lines for `footnote_open` (`trail`) validation and dispatch. This shared-file exception was coordinated in [the task-board review](https://github.com/dialectmaterial/SOL/pull/15#issuecomment-6247113306); navigation and persistence are unchanged.
+- `sol/terminal/neovim.lua` — separate book-note list in `c`, individual styled note panels, nested links and panel backtracking; popup return packets preserve the passage selection through close/resize/native `:q`. Personal notes and technical context have separate headings. Replies after a panel closes are ignored.
+- `tests/fixtures_footnotes.py`, `tests/test_footnote_view.py`, `tests/test_reader_surface_neovim.py` — invented multi-paragraph and cyclic canonical notes; projection/controller refusals and real headless Neovim return/style/clipboard checks.
+- `docs/BEING.md`, `CHANGELOG.md` — implemented controls, bounds and limits. Only Codex's task status changes in `CURRENT_TASK.md`; existing reports are retained.
+
+### Tests performed
+
+- Reviewed and merged [PR #13](https://github.com/dialectmaterial/SOL/pull/13#issuecomment-6247103589) and [task-board PR #15](https://github.com/dialectmaterial/SOL/pull/15#issuecomment-6247113306), each in a separate worktree: documentation and 1,592 tests passed (11 skipped, 4 expected failures); `gh pr checks --watch` finished with every check passing.
+- Focused projection/controller suite: six tests. Headless/host suite: 69 tests, one skipped. Footnote scenarios cover widths 72/20, both reading modes, forward/reverse selections and exact yank, ordered multibyte/styled body records, per-paragraph attribution/review flags, nested links, cycles, backtracking, failed requests, late replies, resize and native window close.
+- Documentation check passed. Full suite: 1,600 tests, OK (11 skipped, 4 existing expected failures), using the checkout's `.venv/bin/python -B` with isolated XDG state and Neovim logs. Source changes between controller requests and during projection are refused; panel requests leave the saved position/selection and workspace bytes unchanged.
+- Reviewed newly opened [PR #16](https://github.com/dialectmaterial/SOL/pull/16#issuecomment-6247193239) in another worktree: its docs/1,594 existing tests pass, but a returned `Reference.record` aliases the action's trusted graph. Mutating its attribution makes a later capture/check accept the changed author within the same action. Posted an invented-corpus reproduction and left it unmerged for the author, per CLAUDE.md.
+
+### Outstanding issues
+
+- No manual Alacritty/Kitty session or sustained real-book reading trial was performed; headless tests establish mechanics, not reading comfort. Backspace revisits the already checked panel; following a link makes a fresh checked request. Note panels do not create a persistent note-reading position or offer personal annotations on note paragraphs.
+- The corpus contract already rejects unresolved canonical note links on load. Unlinked/missing requests and changed generations refuse without substituted text; no relaxed corpus validation is introduced.
+- PR #16 is not part of this branch. Main was refreshed at `5fad439`; if its corrected speed changes merge first, rebase this branch and retain both changelog/handoff entries. No source PDF, private corpus, personal workspace, synced project source or `AGENTS.md` was edited or committed.
+
+### Decisions requiring approval
+
+- None reserved. Defaults the maintainer may overrule: Enter on an explicit book-note/link row; Backspace one panel; Esc/`q` directly to the passage; resize closes the panel. Bounds: eight notes per path, 64 body paragraphs, 128 listed links, 1 MiB source text and 4 MiB presentation. Paragraph/text/presentation overflow refuses; excess links are explicitly disclosed, with source text unchanged.
+
 ## Edit and review personal notes in the reader — 18 October 2026
 
 **Task:** [CURRENT_TASK](CURRENT_TASK.md), "Claude Code: Edit and review personal notes in the reader" ([proposal stage 3](proposals/CODEX_READER_WORKSPACE_PLAN.md#3-complete-the-personal-note-workflow-inside-the-reader))
