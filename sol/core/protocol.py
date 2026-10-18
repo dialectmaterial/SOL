@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from contextvars import ContextVar
+from copy import deepcopy
+from dataclasses import replace
 import hashlib
 import json
 import math
@@ -374,7 +376,9 @@ def check_references(snapshot, payloads):
     records = {record["id"]: record for record in fresh.records}
     references = [_check_on_snapshot(fresh, payload, records) for payload in payloads]
     _still_current(fresh)
-    return references
+    # The verified graph may serve the rest of a single action; a caller gets
+    # its own copy of each record, so changing it cannot alter later checks.
+    return [replace(reference, record=deepcopy(reference.record)) for reference in references]
 
 
 def _check_on_snapshot(fresh, payload, records):

@@ -230,6 +230,23 @@ class CoreProtocolTests(unittest.TestCase):
                 core.check_reference(self.snapshot, self.payload)
             self.assertEqual(caught.exception.code, "generation_changed")
 
+    def test_records_returned_inside_an_action_cannot_change_later_results(self):
+        # Reported by Codex's review of PR #16.
+        from sol.core.protocol import single_action
+
+        for check in (lambda payload: core.check_reference(self.snapshot, payload),
+                      lambda payload: core.check_references(self.snapshot, [payload, payload])[1]):
+            with self.subTest(check=check), single_action(self.snapshot):
+                returned = check(self.payload)
+                returned.record["attribution"]["author"] = "Invented injected author"
+                returned.record["sources"].append({"pdf_page": 999})
+                later = core.capture_reference(self.snapshot, self.identifier)
+                self.assertEqual(later, self.payload)
+                self.assertEqual(check(later).record["attribution"], self.snapshot.records[
+                    [row["id"] for row in self.snapshot.records].index(self.identifier)]["attribution"])
+            self.assertEqual(core.check_reference(self.snapshot, self.payload).record["attribution"]["author"],
+                             later["reference"]["attribution"]["author"])
+
     def test_changed_files_during_capture_or_check_are_refused(self):
         with patch.object(contract, "verify_snapshot_current", side_effect=contract.CorpusError("Invented race")):
             for operation in (lambda: core.capture_reference(self.snapshot, self.identifier),
