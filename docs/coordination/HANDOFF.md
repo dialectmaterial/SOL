@@ -53,7 +53,7 @@ Write "None." rather than deleting a heading.
 - Not done: a manual run in Alacritty.
 
 ### Outstanding issues
-- Depends on Codex's engine PR; until it is merged the Experiment screen reports that the engine is missing.
+- Codex's engine (#26) is merged; the real-engine test now runs in the normal suite.
 - Opening a word's source passage in the reader (stage 3) is not implemented.
 - Long counts cannot be cancelled yet; a new count replaces a running one.
 
