@@ -1,6 +1,7 @@
 """ESSENCE's Textual shell: screens, leaving, saved state and the context file."""
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -157,6 +158,10 @@ class WordChoiceTests(unittest.TestCase):
         patcher = patch.object(tui_words, "engine", return_value=(FakeWords, FakeInputs))
         patcher.start()
         self.addCleanup(patcher.stop)
+        # These tests cover choices, not the reference check, which has its own test.
+        checker = patch("sol.core.check_reference", return_value=None)
+        checker.start()
+        self.addCleanup(checker.stop)
         temporary = tempfile.TemporaryDirectory(prefix="sol-essence-words-")
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
@@ -280,3 +285,72 @@ class RealEngineTests(unittest.TestCase):
                 self.assertEqual(result["reference"] is None, reference == "none")
                 shown, total = tui_words.rows(result)
                 self.assertEqual(len(shown), total)
+
+
+@unittest.skipUnless(_engine_installed(), "the ESSENCE stage 2 engine is not merged yet")
+class StaleContextTests(unittest.TestCase):
+    def test_a_corpus_changed_since_the_reader_opened_is_refused(self):
+        # Reported by Codex's review of PR #25.
+        from fixtures_corpus import write_runtime_corpus
+        from sol import core
+        from sol.corpus import contract
+
+        temporary = tempfile.TemporaryDirectory(prefix="sol-essence-stale-")
+        self.addCleanup(temporary.cleanup)
+        corpus = Path(temporary.name) / "corpus"
+        identifier, _ = write_runtime_corpus(corpus)
+        contract.initialize_corpus_identity(corpus)
+        reference = core.capture_reference(core.load_snapshot(corpus), identifier)
+        source = corpus / "sample.md"
+        # The same passage, now with different words: its ID is unchanged.
+        source.write_text(source.read_text(encoding="utf-8").replace("An invented passage", "A replaced text", 1),
+                          encoding="utf-8")
+        contract.reindex(corpus)
+        stale = {**context(), "corpus": str(corpus), "reference": reference}
+        for target in ("passage", "section", "book"):
+            with self.subTest(target=target), self.assertRaises(core.ProtocolError) as caught:
+                tui_words.run(stale, target, "none")
+            self.assertEqual(caught.exception.code, "generation_changed")
+
+
+@unittest.skipUnless(tui.textual_available(), "the essence extra (Textual) is not installed")
+class CountOrderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_an_older_count_never_replaces_a_newer_one(self):
+        # Reported by Codex's review of PR #25: delayed A, fast B.
+        import threading
+        from sol.essence.tui.app import EssenceApp
+
+        release = threading.Event()
+        def run(context, target, reference, **files):
+            if files["target_file"] == "a":
+                release.wait(5)
+                return {"label": "a"}
+            return {"label": "b"}
+        shown, saved = [], []
+        with patch.object(tui_words, "run", side_effect=run), \
+                patch.object(tui_words, "save", side_effect=lambda result: saved.append(result) or None), \
+                patch.object(EssenceApp, "show_result", lambda self, result, path: shown.append(result["label"])):
+            app = EssenceApp(context(Path(tempfile.mkdtemp(prefix="sol-essence-order-")) / "state.json"))
+            async with app.run_test() as pilot:
+                await pilot.press("3")
+                field = app.query_one("#target-file")
+                field.value = "a"
+                await pilot.click("#run")
+                await pilot.pause(0.4)  # A button ignores presses while it shows the last one.
+                field.value = "b"
+                await pilot.click("#run")
+                await pilot.pause(0.2)
+                release.set()
+                await pilot.pause(0.3)
+                self.assertEqual(shown, ["b"])
+                self.assertEqual([result["label"] for result in saved], ["b"])
+                # A count still running when ESSENCE is left publishes nothing.
+                release.clear()
+                field.value = "a"
+                await pilot.pause(0.4)
+                await pilot.click("#run")
+                await pilot.press("q")
+            release.set()
+            await asyncio.sleep(0.3)
+            self.assertEqual(shown, ["b"])
+            self.assertEqual(len(saved), 1)

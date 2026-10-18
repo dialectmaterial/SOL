@@ -63,6 +63,10 @@ def run(context, target_choice, reference_choice, *, target_file=None, reference
         load = loader or (lambda directory: core.load_corpus_book(Path(directory)))
         book = load(context["corpus"])
         snapshot = book.corpus_snapshot
+        # The reader's position belongs to the corpus generation it was read
+        # in; a changed corpus is refused rather than counted as if unchanged.
+        from sol import core
+        core.check_reference(snapshot, context["reference"])
     target = provider(target_choice, context, book=book, snapshot=snapshot, path=target_file, inputs=inputs)
     reference = provider(reference_choice, context, book=book, snapshot=snapshot, path=reference_file, inputs=inputs)
     return words.analyze_words(target, reference=reference)

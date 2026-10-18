@@ -106,24 +106,45 @@ class EssenceApp(App):
         pressed = self.query_one(f"#{name}", RadioSet).pressed_button
         return pressed.name if pressed is not None else ("passage" if name == "target" else "none")
 
+    count_serial = 0
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "run":
-            self.count_words()
+            # Read the choices here, on the interface thread; each count has a
+            # number, and only the latest one may save or show anything.
+            self.count_serial += 1
+            self.query_one("#status", Static).update("Counting…")
+            self.count_words(self.count_serial, self.choice("target"), self.choice("reference"),
+                             self.query_one("#target-file", Input).value,
+                             self.query_one("#reference-file", Input).value)
 
     @work(thread=True, exclusive=True)
-    def count_words(self) -> None:
+    def count_words(self, serial, target, reference, target_file, reference_file) -> None:
         # The engine reads the corpus or files; keep the interface responsive.
-        status = self.query_one("#status", Static)
-        self.call_from_thread(status.update, "Counting…")
         try:
-            result = words.run(self.context, self.choice("target"), self.choice("reference"),
-                               target_file=self.query_one("#target-file", Input).value,
-                               reference_file=self.query_one("#reference-file", Input).value)
-            saved = words.save(result) if self.state_file else None
+            outcome = words.run(self.context, target, reference, target_file=target_file,
+                                reference_file=reference_file)
         except (words.EngineMissing, ValueError, OSError) as error:
-            self.call_from_thread(status.update, f"Not counted: {error}")
+            outcome = error
+        try:
+            self.call_from_thread(self.finish_count, serial, outcome)
+        except RuntimeError:
+            pass  # ESSENCE has closed; nothing is left to update.
+
+    def finish_count(self, serial, outcome) -> None:
+        # A replaced or abandoned count saves nothing and shows nothing.
+        if serial != self.count_serial:
             return
-        self.call_from_thread(self.show_result, result, saved)
+        status = self.query_one("#status", Static)
+        if isinstance(outcome, Exception):
+            status.update(f"Not counted: {outcome}")
+            return
+        try:
+            saved = words.save(outcome) if self.state_file else None
+        except (words.EngineMissing, ValueError, OSError) as error:
+            status.update(f"Counted, but not saved: {error}")
+            saved = None
+        self.show_result(outcome, saved)
 
     def show_result(self, result, saved) -> None:
         table = self.query_one("#frequencies", DataTable)
@@ -149,6 +170,7 @@ class EssenceApp(App):
         self.query_one("#screens", TabbedContent).active = name
 
     def action_leave(self) -> None:
+        self.count_serial += 1  # A count still running is abandoned.
         if self.state_file:
             save_state(self.state_file, {
                 "version": 1, "screen": self.query_one("#screens", TabbedContent).active,
