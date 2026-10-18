@@ -228,11 +228,16 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                                 "the note's revision is required"), note_body],
         "note_history": [note_id],
         "footnote_open": [("trail", lambda trail: isinstance(trail, list), "choose a linked book footnote")],
+        "essence_source": [("source", lambda source: isinstance(source, dict)
+                            and set(source) == {"id", "start", "content_sha256"}
+                            and isinstance(source["id"], str) and isinstance(source["content_sha256"], str)
+                            and type(source["start"]) is int and source["start"] >= 0,
+                            "choose a source passage listed in ESSENCE")],
     }
     extra_fields["marker_clear"] = extra_fields["marker_open"] = extra_fields["marker_set"]
     navigation_actions = {"next", "previous", "passage_next", "passage_previous", "node_open", "marker_open",
                           "search_open", "search_next", "search_previous", "history_back", "history_forward",
-                          "study_open"}
+                          "study_open", "essence_source"}
 
     def study_panel(request, identifier):
         # ESSENCE measures the loaded section; BEING only shows the result and
@@ -440,6 +445,11 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         elif operation == "study_open":
             passage_index, offset = study["sentences"][study["longest"][request["row"] - 1]][:2]
             target = study["passages"][passage_index]["id"]
+        elif operation == "essence_source":
+            # A word's source from an ESSENCE result: CORE captures the record
+            # below, and the passage must still be the text that was counted.
+            source = request["source"]
+            target, offset = source["id"], source["start"]
         elif operation in ("search_open", "search_next", "search_previous", "history_back", "history_forward"):
             target = None
         else:
@@ -450,6 +460,12 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         if target is not None:
             from sol.core.protocol import capture_reference
             reference = capture_reference(book.corpus_snapshot, target)
+            if operation == "essence_source":
+                if (reference["reference"]["target_id"] != target
+                        or reference["reference"]["content_sha256"] != request["source"]["content_sha256"]):
+                    raise ValueError("this passage changed after ESSENCE counted it; count again")
+                if offset > len(book.find_passage(target).text):
+                    raise ValueError("this source position is outside its passage")
         # Retain the actual outgoing semantic location first, not Python's last
         # loaded cursor or Neovim's disposable buffer jumplist. The editor shows
         # it, so it may be saved even if the move below is refused.

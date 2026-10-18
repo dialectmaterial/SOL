@@ -9,6 +9,7 @@ from __future__ import annotations
 from copy import deepcopy
 import hashlib
 import importlib.util
+import base64
 import json
 import os
 from pathlib import Path
@@ -810,6 +811,78 @@ end
         self.assertIn("could not start", report["failure"]["warning"])
         self.assertTrue(report["failure"]["window"])
         self.assertTrue(report["failure"]["focused_reader"])
+
+    def test_essence_asks_the_reader_to_open_a_source_and_saves_when_the_reader_quits(self):
+        # A stand-in for ESSENCE in a raw terminal: on "g" it sends a foreign
+        # OSC, a malformed SOL request and a valid one; on Ctrl-Q it saves and leaves.
+        saved = self.root / "essence_saved"
+        request = {"version": 1, "op": "open_source",
+                   "source": {"id": self.sample.passages[1].identifier, "start": 5, "content_sha256": "a" * 64}}
+        encoded = base64.b64encode(json.dumps(request).encode()).decode()
+        stub = self.root / "essence_stub.py"
+        stub.write_text(f"""import os, sys, tty
+tty.setraw(0)
+print('ESSENCE STUB READY', end='', flush=True)
+while True:
+    key = os.read(0, 1)
+    if key == b'g':
+        os.write(1, b'\\x1b]0;a title\\x07\\x1b]5379;sol-essence;not-json\\x07')
+        os.write(1, b'\\x1b]5379;sol-essence;{encoded}\\x07')
+    elif key in (b'\\x11', b''):
+        open({str(saved)!r}, 'w').write('saved')
+        break
+""", encoding="utf-8")
+        paths = f"local PYTHON, STUB = {json.dumps(sys.executable)}, {json.dumps(str(stub))}\n"
+        report = self.run_lua(paths + r'''
+  vim.o.columns, vim.o.lines = 140, 40
+  local sent, warnings = {}, {}
+  vim.notify = function(message) warnings[#warnings + 1] = message end
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  local reader = SOLNvimReader
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  _G.SOLReaderChannel.pending[sent[1].id]({essence = {command = {PYTHON, STUB}}})
+  local essence = assert(SOLEssence)
+  assert(vim.wait(5000, function()
+    return table.concat(vim.api.nvim_buf_get_lines(essence.buffer, 0, -1, false), '\n'):find('ESSENCE STUB READY') ~= nil
+  end, 10), 'ESSENCE did not start in its terminal')
+  essence.toggle()
+  report.before = essence.layout
+  vim.fn.chansend(essence.job, 'g')
+  assert(vim.wait(5000, function() return #sent > 1 end, 10), 'no source request reached the reader')
+  vim.wait(200)
+  report.requests = {}
+  for index = 2, #sent do report.requests[#report.requests + 1] = {op = sent[index].op, source = sent[index].source} end
+  report.after = {layout = essence.layout, focused_reader = vim.api.nvim_get_current_win() == SOLNvimReader.window,
+                  alive = vim.api.nvim_win_is_valid(essence.window)}
+  report.warnings = warnings
+  _G.SOLReaderChannel.pending[sent[#sent].id] = nil
+  _G.SOLReaderChannel.navigation_pending = nil
+  -- Popups keep to the reader's columns while ESSENCE is beside it.
+  vim.api.nvim_feedkeys('c', 'xt', false)
+  local popup
+  for _, window in ipairs(vim.api.nvim_list_wins()) do
+    local config = vim.api.nvim_win_get_config(window)
+    if config.relative ~= '' and config.zindex == 50 then popup = config end
+  end
+  local beside = vim.api.nvim_win_get_config(essence.window)
+  report.popup = {right = popup.col + popup.width + 2, essence = beside.col}
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'xt', false)
+  -- Quitting the reader lets ESSENCE save first.
+  report.autocmds = #vim.api.nvim_get_autocmds({group = 'SOLEssence', event = 'VimLeavePre'})
+  local job = essence.job
+  essence.save_before_exit()
+  report.exited = vim.fn.jobwait({job}, 0)[1] ~= -1
+''', integrated=True)
+        self.assertEqual(report["before"], "full")
+        self.assertEqual(report["requests"], [{"op": "essence_source", "source": request["source"]}])
+        self.assertEqual(report["after"], {"layout": "split", "focused_reader": True, "alive": True})
+        self.assertEqual(report["warnings"], ["ESSENCE sent an invalid source request"])
+        self.assertLessEqual(report["popup"]["right"], report["popup"]["essence"])
+        self.assertEqual(report["autocmds"], 1)
+        self.assertTrue(report["exited"])
+        self.assertEqual(saved.read_text(), "saved")
 
     def test_essence_from_a_selection_returns_to_the_exact_selection(self):
         # Reported by Codex's review of PR #24.

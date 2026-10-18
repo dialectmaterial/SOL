@@ -26,9 +26,10 @@ return function(reader)
     local panel = api.nvim_create_buf(false, true)
     api.nvim_buf_set_lines(panel, 0, -1, false, lines)
     vim.bo[panel].modifiable, vim.bo[panel].readonly, vim.bo[panel].bufhidden = false, true, "wipe"
-    local width, height = math.max(1, math.min(data.width, vim.o.columns - 6)), math.max(1, vim.o.lines - 8)
+    local columns = reader.view.reader_columns()
+    local width, height = math.max(1, math.min(data.width, columns - 6)), math.max(1, vim.o.lines - 8)
     panels.window = api.nvim_open_win(panel, true, { relative = "editor", row = 3,
-      col = math.max(0, math.floor((vim.o.columns - width) / 2)), width = width,
+      col = math.max(0, math.floor((columns - width) / 2)), width = width,
       height = math.min(height, math.max(1, #lines)), style = "minimal", border = "single", zindex = 50 })
     vim.wo[panels.window].wrap, vim.wo[panels.window].linebreak = true, true
     vim.wo[panels.window].winhighlight = "NormalFloat:SOLPanel,FloatBorder:SOLPanelBorder"

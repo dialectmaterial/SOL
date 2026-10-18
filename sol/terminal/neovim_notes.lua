@@ -37,7 +37,8 @@ return function(reader)
       api.nvim_buf_set_lines(editor, 0, -1, false, vim.split(initial, '\n', { plain = true }))
     end
     vim.bo[editor].modified = false
-    local width = math.max(20, math.min(data.width, vim.o.columns - 6))
+    local columns = reader.view.reader_columns()
+    local width = math.max(20, math.min(data.width, columns - 6))
     local quote = {}
     if packet.selection ~= vim.NIL then
       local text, line = packet.selection.text:gsub('%s+', ' '), ''
@@ -51,7 +52,7 @@ return function(reader)
       if #quote < 3 and line ~= '' then quote[#quote + 1] = line end
     end
     panels.window = api.nvim_open_win(editor, true, { relative = 'editor', row = 3,
-      col = math.max(0, math.floor((vim.o.columns - width) / 2)), width = width,
+      col = math.max(0, math.floor((columns - width) / 2)), width = width,
       height = math.max(3, math.min(12 + #quote, vim.o.lines - 10)), style = 'minimal', border = 'single', zindex = 50,
       title = edit and (' Edit your note (revision ' .. tostring(edit.revision) .. ') ')
         or (' Note on: ' .. vim.fn.strcharpart(record.heading, 0, width - 14) .. ' '), title_pos = 'left',

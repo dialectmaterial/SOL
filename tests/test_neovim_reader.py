@@ -877,6 +877,43 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         # Opening ESSENCE moved nothing and saved nothing.
         self.assertEqual(service.store.get_state()["current_id"], state["current_id"])
 
+    def test_essence_source_opens_a_counted_passage_and_history_returns(self):
+        self.extend(3)
+        service = self.service()
+        self.position(service, 4)
+        passage = self.book.passages[2]
+        counted = core.capture_reference(self.book.corpus_snapshot, passage.identifier)["reference"]["content_sha256"]
+
+        def source(**changes):
+            return {"id": passage.identifier, "start": 9, "content_sha256": counted, **changes}
+
+        def native(payload, _, on_request):
+            origin = payload["restore"]
+            refusals = {"changed after ESSENCE counted": source(content_sha256="0" * 64),
+                        "outside its passage": source(start=len(passage.text) + 1),
+                        "choose a source passage": {"id": passage.identifier, "start": 9}}
+            for message, refused in refusals.items():
+                with self.subTest(refusal=message), self.assertRaisesRegex(ValueError, message):
+                    on_request({"op": "essence_source", "source": refused, "packet": origin, "mode": "continuous"})
+            with self.assertRaises(core.ProtocolError):
+                on_request({"op": "essence_source", "source": source(id=str(UUID(int=99))), "packet": origin,
+                            "mode": "continuous"})
+            # The refusals moved nothing: the next request still starts from the origin.
+            opened = on_request({"op": "essence_source", "source": source(), "packet": origin,
+                                 "mode": "continuous"})["payload"]
+            self.assertEqual(opened["restore"]["reference"]["reference"]["target_id"], passage.identifier)
+            self.assertEqual(opened["restore"]["cursor_offset"], 9)
+            back = on_request({"op": "history_back", "packet": opened["restore"], "mode": "continuous"})["payload"]
+            self.assertEqual(back["restore"]["reference"]["reference"]["target_id"],
+                             origin["reference"]["reference"]["target_id"])
+            self.assertEqual(back["restore"]["cursor_offset"], origin["cursor_offset"])
+            return 0, {"action": "quit", "packet": back["restore"]}
+
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+        self.assertEqual(service.store.get_state()["current_id"], self.book.passages[0].identifier)
+
     def test_temporary_session_gives_essence_no_state_file(self):
         from sol.essence.tui.context import read_context
 

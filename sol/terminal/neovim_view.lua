@@ -183,10 +183,14 @@ return function(reader, supplied)
   vim.bo[buffer].swapfile, vim.bo[buffer].undofile = false, false
   vim.bo[buffer].modifiable, vim.bo[buffer].readonly = false, true
 
-  local function window_config()
-    -- ESSENCE beside the reader takes the right-hand columns; the page centres in the rest.
+  -- ESSENCE beside the reader takes the right-hand columns; the page and its
+  -- popups centre in the rest.
+  local function reader_columns()
     local essence = rawget(_G, "SOLEssence")
-    local columns = vim.o.columns - (essence and essence.reserved and essence.reserved() or 0)
+    return math.max(1, vim.o.columns - (essence and essence.reserved and essence.reserved() or 0))
+  end
+  local function window_config()
+    local columns = reader_columns()
     local width = math.max(1, math.min(data.width, columns - 4))
     return { relative = "editor", row = math.min(2, math.max(0, vim.o.lines - 4)),
       col = math.max(0, math.floor((columns - width) / 2)), width = width,
@@ -460,6 +464,7 @@ return function(reader, supplied)
     search_namespace = search_namespace,
     superscript = superscript,
     window_config = window_config,
+    reader_columns = reader_columns,
     cycle_theme = cycle_theme,
   }
 end

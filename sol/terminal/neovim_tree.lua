@@ -21,7 +21,10 @@ function M.open(structure, callbacks)
   vim.bo[buffer].buftype, vim.bo[buffer].bufhidden = 'nofile', 'wipe'
   local window
   local function config()
-    return {relative = 'editor', row = 1, col = 1, width = math.max(1, vim.o.columns - 4),
+    -- Beside ESSENCE, the outline keeps to the reader's columns.
+    local essence = rawget(_G, 'SOLEssence')
+    local columns = vim.o.columns - (essence and essence.reserved and essence.reserved() or 0)
+    return {relative = 'editor', row = 1, col = 1, width = math.max(1, columns - 4),
       height = math.max(1, vim.o.lines - 4), style = 'minimal', border = 'single', zindex = 60}
   end
   local function draw()
