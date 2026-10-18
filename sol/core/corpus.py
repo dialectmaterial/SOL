@@ -21,6 +21,10 @@ def load_corpus_book(corpus: Path) -> Book:
 
     try:
         snapshot = load_snapshot(corpus)
+        # Untouched until now: CORE may keep it as the verified copy, so the
+        # reader's first reference check does not read every file again.
+        from sol.core.protocol import remember_verified
+        remember_verified(snapshot)
         records = snapshot.records
     except CorpusError as error:
         if not (corpus / "corpus.json").is_file():

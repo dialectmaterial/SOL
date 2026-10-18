@@ -32,6 +32,87 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Faster reader start-up — 19 October 2026
+
+**Task:** maintainer's request in the session ("sol starts super slow"), within Claude Code's CORE/reader lane.
+**Branch / PR:** `claude/faster-startup` · opened with `gh pr create`
+**Last implementation commit:** see the PR (the commit before this report).
+
+### Changed files
+- `sol/core/protocol.py` — `_remember` (cache entry from a verified snapshot, used by both paths) and `remember_verified` (only genuine `CorpusSnapshot`s; a snapshot outside the fast comparison's rules is not cached).
+- `sol/core/corpus.py` — `load_corpus_book` calls `remember_verified` right after `load_snapshot`.
+- `tests/test_core_protocol.py` — a freshly loaded book's first check reads no files, and a later in-memory change is still refused; a corpus beyond the nesting bound is not cached and is still refused.
+- `docs/CORE.md` (§6), `CHANGELOG.md`.
+
+### Tests performed
+- Real start-up in a pseudo-terminal (launch to drawn page), three runs each, same environment: `main` 0.95 s; this branch 0.86 s. Python-side phases before the change: imports 0.05 s, book load 0.2 s, workspace 0.05 s, first check 0.4 s, rest 0.25 s, Neovim about 0.1 s.
+- `.venv/bin/python -B scripts/check_docs.py` — OK; full suite — 1644 tests, OK (11 skipped, 4 expected failures).
+
+### Outstanding issues
+- The estimate was 0.6 s; the gain is 0.1 s because the cache must still be built once (about 0.17 s). Remaining start-up is mostly verification itself (validating every record, about 0.11 s; the comparison and fingerprint checks) plus the first page.
+- The remembered workspace is still opened twice: first read-only to validate it before adoption (deliberate, about 25 ms), then for use. Left as is.
+
+### Decisions requiring approval
+- None. Going further would mean trusting a previously validated generation across starts, or showing the first page before verification finishes; either relaxes a check and would be a reserved decision.
+
+
+## ESSENCE stage 2, interface side: word frequencies on screen — 18 October 2026
+
+**Task:** the maintainer's go on 18 October to take the interface side of stage 2 while Codex builds the engine (["Codex: ESSENCE stage 2 engine"](https://github.com/dialectmaterial/SOL/blob/main/docs/coordination/CURRENT_TASK.md)); continues "Claude Code: ESSENCE stage 1, the interface shell".
+**Branch / PR:** `claude/essence-words-ui`, stacked on #24 · opened with `gh pr create`
+**Last implementation commit:** `942f67243959f6f10403b67ff40d50a44b796787`
+
+### Changed files
+- `sol/essence/tui/words.py` (new): choices → `CoreProvider`/`FileProvider` scopes (passage = `passages`, section = `within` the passage's parent reader path, book = whole corpus, file = `FileProvider`); `run`, `rows` (top 2,000), `summary`, owner-only `save`; lazy engine import with `EngineMissing`.
+- `sol/essence/tui/app.py`: Experiment screen (target and reference choices, file inputs, Count words, background worker, status); Results screen (summary lines and a word table).
+- `tests/test_essence_tui.py`: scopes from choices, files without a corpus, rows/summary/saving, missing engine, the screen flow with a stand-in engine, and a real-engine test that skips until the engine is merged.
+- `docs/ESSENCE.md` (§4 implemented note), `CHANGELOG.md`.
+
+### Interface contract used (Codex's engine, in progress)
+`sol.essence.words.analyze_words(target, *, reference=None)`, `encode_word_result(result)`; `sol.essence.word_inputs.CoreProvider(snapshot, scope)` and `FileProvider(path, scope)`; scopes `{"kind": "passages", "ids": [...]}`, `{"kind": "within", "path": "/..."}`, `None` for the corpus. Read from Codex's working tree without modifying it; any change there needs a matching change in `words.py`.
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — OK; full suite — 1632 tests, OK (12 skipped, 4 expected failures).
+- With Codex's in-progress engine files laid over a throwaway copy: all 13 ESSENCE interface tests pass, including the real-engine test; on the real book, passage 0.5 s, section vs book 1.4 s, whole book 1.1 s.
+- Not done: a manual run in Alacritty.
+
+### Outstanding issues
+- Codex's engine (#26) is merged; the real-engine test now runs in the normal suite.
+- Opening a word's source passage in the reader (stage 3) is not implemented.
+- Long counts cannot be cancelled yet; a new count replaces a running one.
+
+### Decisions requiring approval
+- **Defaults:** the four target choices and three reference choices; "this section" is the passage's parent reader path; 2,000 rows shown; artifacts saved only for workspace sessions.
+
+## ESSENCE stage 1, the interface shell — 18 October 2026
+
+**Task:** ["Claude Code: ESSENCE stage 1, the interface shell"](https://github.com/dialectmaterial/SOL/blob/main/docs/coordination/CURRENT_TASK.md)
+**Branch / PR:** `claude/essence-shell` · opened with `gh pr create`
+**Last implementation commit:** `9f5c723788fdb519e4d928016b42fc9ba6b21969`
+
+### Changed files
+- `sol/essence/tui/` (new): `context.py` (private handoff file and investigation state; no Textual import), `app.py` (Textual app, four placeholder screens, palette off), `__main__.py` (`python -m sol.essence.tui --context FILE`; without Textual, a clear message and exit 2), `__init__.py` (install hint, availability check).
+- `sol/terminal/neovim_essence.lua` (new): the terminal float, split/fullscreen/hidden layouts, Alt-F and Alt-R terminal-mode mappings, close and failure handling; state in `_G.SOLEssence` across reader reloads.
+- `sol/terminal/neovim_reader.py`: `essence_open` request (checks the packet, writes the context in a private temporary directory removed at exit, state file only with a workspace, selection without its text).
+- `sol/terminal/neovim.lua`, `neovim_view.lua` (page centres in the columns ESSENCE leaves), `neovim_requests.lua` (`essence` result), `neovim_controls.lua` (`E`, help, `relayout`).
+- `pyproject.toml`: optional extra `essence = ["textual>=8,<9"]`; `.github/workflows/tests.yml` installs `.[essence]` so the Textual tests run in CI.
+- Tests: `tests/test_essence_tui.py` (new; context round trip and refusals, no Textual import, missing-Textual message, screens, saved/restored state, temporary sessions, palette off); `test_reader_surface_neovim.py` (headless Neovim with a real terminal process: open beside, toggle, back to reader, survive a reload, `E` refocus, close, unchanged position, narrow terminal, launch failure); `test_neovim_reader.py` (context contents and privacy, missing Textual, temporary session); `test_packaging.py` (the new extra, never a base dependency).
+- `docs/BEING.md` (§2 controls, §6 implemented note), `docs/ESSENCE.md` (§4 implemented note with measurements), `CHANGELOG.md`.
+
+### Tests performed
+- Spike in a headless Neovim server with keys typed through terminal mode: start-up about 110 ms (three runs); 40→120 columns reflow without restart; Escape, Alt-Left/Right, Alt-X, Ctrl-S/N, Tab, Shift-Tab, F1, arrows, Ctrl-Left intact; Ctrl-\ Ctrl-N returns control to Neovim. Escape-then-letter reads as Alt+letter; Ctrl-Q quits and Ctrl-P opens the palette in Textual by default.
+- The real app inside Neovim's terminal at split width: renders the origin and screens; `3` switches screen.
+- `.venv/bin/python -B scripts/check_docs.py` — OK; `.venv/bin/python -B -m unittest discover -s tests` — 1626 tests, OK (11 skipped, 4 expected failures).
+- Not done: a manual session in Alacritty or Kitty.
+
+### Outstanding issues
+- Quitting the reader while ESSENCE is open ends ESSENCE without saving its state (Neovim stops the job); stage 1 saves state only on `q`.
+- Popups from the reader (`c`, search) still centre on the whole screen and draw over ESSENCE.
+- The screens are placeholders; the engine is Codex's stage 2, to be connected afterwards.
+
+### Decisions requiring approval
+- **Defaults:** ESSENCE on the right, 45% of the columns (at least 40); fullscreen below 100 columns; Alt-F and Alt-R as layout keys; `1`–`4` and `q` inside ESSENCE; state only for workspace sessions. The dependency and `E` were decided by the maintainer (#23).
+
 ## ESSENCE stage 2 engine: word frequencies — 18 October 2026
 
 **Task:** [Codex: ESSENCE stage 2 engine, word frequencies without an interface](https://github.com/dialectmaterial/SOL/blob/c1dd916bfdb8bb054b3a99d5c01fc92950cdbf0c/docs/coordination/CURRENT_TASK.md#codex-essence-stage-2-engine-word-frequencies-without-an-interface).

@@ -291,6 +291,38 @@ class CoreProtocolTests(unittest.TestCase):
                 core.capture_reference(snapshot, self.identifier)
             self.assertEqual(caught.exception.code, "nesting_limit")
 
+    def test_a_freshly_loaded_book_is_checked_without_reading_the_files_again(self):
+        from sol.core import protocol
+
+        protocol._VERIFIED_GENERATIONS.clear()
+        book = core.load_corpus_book(self.corpus)
+        with patch.object(contract, "load_snapshot", wraps=contract.load_snapshot) as load:
+            self.assertEqual(core.capture_reference(book.corpus_snapshot, self.identifier), self.payload)
+        self.assertEqual(load.call_count, 0)
+        # The cached copy is still a guard: a later change in memory is refused.
+        book.corpus_snapshot.records[1]["markdown"] = "Misleading memory"
+        with self.assertRaises(core.ProtocolError) as caught:
+            core.capture_reference(book.corpus_snapshot, self.identifier)
+        self.assertEqual(caught.exception.code, "snapshot_modified")
+
+    def test_a_book_beyond_the_nesting_bound_is_not_cached_and_still_refused(self):
+        from sol.core import protocol
+
+        def deep(manifest, rows):
+            nested = "end"
+            for _ in range(70):
+                nested = {"next": nested}
+            rows[1]["invented_nesting"] = nested
+
+        self.rewrite(deep)
+        protocol._VERIFIED_GENERATIONS.clear()
+        snapshot = contract.load_snapshot(self.corpus)
+        protocol.remember_verified(snapshot)
+        self.assertEqual(protocol._VERIFIED_GENERATIONS, {})
+        with self.assertRaises(core.ProtocolError) as caught:
+            core.capture_reference(snapshot, self.identifier)
+        self.assertEqual(caught.exception.code, "nesting_limit")
+
     def test_changed_files_during_capture_or_check_are_refused(self):
         with patch.object(contract, "verify_snapshot_current", side_effect=contract.CorpusError("Invented race")):
             for operation in (lambda: core.capture_reference(self.snapshot, self.identifier),

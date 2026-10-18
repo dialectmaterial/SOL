@@ -19,9 +19,6 @@ The present foundation is careful reading: a dependable corpus, clear navigation
 
 Computational linguistics, classification, concordances, topic modeling, machine learning, and deep learning can investigate explicit and discovered organizations of the text. Every method should answer a research question and retain its connection to the passages that produced it.
 
-For model input, `sol analyze prose --json` exports prose separately from headings,
-canonical ancestry, and source metadata. See the [prose input policy](docs/legacy/PROSE_INPUTS.md).
-
 ### CONCEPT: an operating system (organization of the inquiry)
 
 The long-term ambition is a NixOS distribution with a distinctive philosophical and computational purpose. A useful reader and reproducible applications come first; a curated environment is the bridge toward the operating system. 
@@ -68,4 +65,4 @@ These four documents distinguish implemented behavior from decisions and proposa
 This README is a gateway, not another design authority. See
 [CONTRIBUTING](CONTRIBUTING.md) for development checks,
 [CHANGELOG](CHANGELOG.md) for changes, and the [legacy archive](docs/legacy/README.md)
-for preserved earlier documentation and the original README.
+for preserved earlier documentation.
