@@ -35,7 +35,7 @@ Write "None." rather than deleting a heading.
 ## Formula review sheet — 18 October 2026
 
 **Task:** Codex: Formula review sheet, assigned directly by the maintainer in the Codex session; recorded in [CURRENT_TASK at c7e0181](https://github.com/dialectmaterial/SOL/blob/c7e01819a51f3c6650def3e2f36e1c695154db1b/docs/coordination/CURRENT_TASK.md#codex-formula-review-sheet).
-**Branch / PR:** `codex/formula-review-sheet` · opening with `gh pr create --base main` after this report.
+**Branch / PR:** `codex/formula-review-sheet` · [PR #20](https://github.com/dialectmaterial/SOL/pull/20), opened with `gh pr create --base main`. Status: `In review`.
 **Last implementation commit:** `db5ab104240d32edadbb04d285c17fa89d88dd33` (script, tests and behavior documentation; task assignment `c7e0181` and this report follow).
 
 ### Changed files
