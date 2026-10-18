@@ -50,7 +50,7 @@ documentation check and the full suite pass.
 
 ## Codex: Split the Lua reader into modules
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/lua-modules`
 **Requested:** 19 October 2026, by the maintainer
 
