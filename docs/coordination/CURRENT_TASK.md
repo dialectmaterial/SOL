@@ -12,7 +12,7 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: Remember validated corpus generations on disk
+## Claude Code: Make start-up fast
 
 **Status:** In progress
 **Branch:** `claude/faster-startup` (PR #27)
@@ -20,28 +20,27 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ### Goal
 
-`sol` starts faster by not re-validating every corpus record when the exact
-same files were already fully validated by the same validator code.
+`sol` opens noticeably faster in the maintainer's real use. Start from what
+the maintainer actually experiences, not only the measured 0.86–0.95 s.
 
 ### Scope
 
-`sol/corpus/contract.py` and `sol/core/` (internals), tests, CORE and
-CHANGELOG. A private cache file keyed by the SHA-256 of every corpus file and
-by the validator code; then, after this, ESSENCE stage 3's interface side.
+`sol/core/`, `sol/corpus/`, `sol/reader/`, `sol/terminal/`, tests, CORE/BEING
+and CHANGELOG. Measure the real launch path end to end (shell, Python start,
+corpus, workspace, Neovim, first page) on this machine and remove waste.
 
 ### Constraints
 
-**Approved by the maintainer on 19 October 2026 (reserved):** trusting a
-previous full validation of byte-identical files across starts. File
-fingerprints are still read and checked on every start; any change, or a
-different validator version, means full validation. The cache holds hashes
-only, owner-only. Do not touch `sol/essence/` outside `sol/essence/tui/`.
+Trusting an earlier validation across starts was considered and dropped on
+19 October (it saves under 0.1 s). Any other relaxation of a check, or showing
+text before it is verified, is a reserved decision. Do not touch `sol/essence/`
+outside `sol/essence/tui/`.
 
 ### Acceptance
 
-Start-up measured before and after; a changed byte, a changed validator, a
-missing or corrupt cache and a cache written by someone else each lead to full
-validation. Documentation check and full suite pass.
+Before/after timings of the real launch in a terminal; existing refusal tests
+unchanged. Documentation check and full suite pass. Then: ESSENCE stage 3's
+interface side.
 
 ## Codex: ESSENCE stage 3 engine, comparison measures and export
 
