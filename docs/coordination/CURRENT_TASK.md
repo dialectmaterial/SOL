@@ -12,41 +12,34 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: Finish the reader speed list
+## Claude Code: Reconcile the ESSENCE interface decisions in the documentation
 
 **Status:** In review
-**Branch:** `claude/reader-speed-list`
-**Requested:** 19 October 2026, by the maintainer
+**Branch:** `claude/essence-interface-docs`
+**Requested:** 18 October 2026, by the maintainer, with the
+[ESSENCE interface brief](proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf)
 
 ### Goal
 
-Bring a section move from about 0.68 s towards 0.5 s on the real book, by the
-remaining items measured on 19 October.
+The four authorities record the brief's decisions (hybrid Neovim/Textual
+surfaces, on-demand lifecycle, two presentations, CORE-optional ESSENCE,
+staged plan, model-history encyclopedia) as Decision or Proposed, reconciled
+with current code.
 
 ### Scope
 
-`sol/core/protocol.py`, `sol/core/models.py`, `sol/reader/actions.py`,
-`sol/reader/surface.py`, their tests, CORE and CHANGELOG:
-- a faster in-memory comparison in `_fresh_snapshot` (JSON text plus structural
-  equality). **Approved by the maintainer on 19 October:** it may accept an
-  in-memory value that is a subclass of `int` or `float` with the same value,
-  which the current comparison refuses; record this in CORE §6;
-- the deep copy of the section in `sol/reader/surface.py`;
-- repeated passage lookups (`Book.selection`, `find_passage`,
-  `ReadingSession.current`), with identical results.
-Measure with `scripts/reader_timings.py`. Authority: CORE §§4–6.
+`docs/ARCHITECTURE.md`, `docs/BEING.md`, `docs/ESSENCE.md`, `docs/CORE.md`; the
+brief stored under `docs/coordination/proposals/`.
 
 ### Constraints
 
-File fingerprints are still checked on every call; no other relaxation. No
-change to the CORE API, reference protocol, corpus contract or workspace
-schema. Do not touch `sol/terminal/` (Codex's task).
+Documentation only: no Textual UI, model or corpus schema. `docs/legacy/` and
+all existing contracts unchanged.
 
 ### Acceptance
 
-Before/after timings in the handoff; existing refusal tests unchanged; a test
-for each relaxed or rewritten check showing what it still refuses. The
-documentation check and the full suite pass.
+Documentation check and full suite pass; the handoff maps each decision to the
+edited sections and lists open questions.
 
 ## Codex: Split the Lua reader into modules
 

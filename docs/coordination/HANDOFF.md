@@ -32,6 +32,52 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Reconcile the ESSENCE interface decisions in the documentation — 18 October 2026
+
+**Task:** ["Claude Code: Reconcile the ESSENCE interface decisions in the documentation"](https://github.com/dialectmaterial/SOL/blob/claude/essence-interface-docs/docs/coordination/CURRENT_TASK.md), requested by the maintainer with the [ESSENCE interface brief](proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf)
+**Branch / PR:** `claude/essence-interface-docs` · opened with `gh pr create`
+**Last implementation commit:** `0a6bceb20aa673552b086c2e20458323d67b5a6b`
+
+### Changed files
+- `docs/ESSENCE.md` — §1 orchestrator/encyclopedia purpose; §2 not-implemented list; §4 rewritten as the interaction model (seven decisions, launch/return table, target/reference, investigation record merged with the old inquiry contract, open decisions); §5 staged plan and the word-frequency first experiment; §7 rewritten as the model-history encyclopedia and task registry (methods map kept); §8 lazy imports, state ownership, manual acceptance for the prototype.
+- `docs/ARCHITECTURE.md` — §2 staged path to independent components, ESSENCE's current CORE dependency; §4 hybrid surfaces and outer/inner layout; §6 D revised (interface stages first, embeddings at the model-adapter stage, with the reason); §8 research briefs are evidence, not authorities.
+- `docs/BEING.md` — §6 reader-side requirements (handoff, return, focus, key compatibility, failure, lifetime).
+- `docs/CORE.md` — §1 CORE as an optional provider (API v1 and protocol unchanged); future collections as requirements, not a schema.
+- `docs/coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf` — the brief, unchanged.
+
+### Decisions mapped to sections
+| Brief decision | Recorded in |
+| --- | --- |
+| Hybrid: persistent Neovim BEING, on-demand Textual ESSENCE | Architecture §4; ESSENCE §4 (1–2); BEING §6 |
+| Two presentations, one investigation; outer vs inner layout | ESSENCE §4 (3–4); Architecture §4 |
+| Interface before breadth; word tokenizer first | ESSENCE §4 (5), §5 |
+| One capability, interactive and headless | ESSENCE §4 (6) |
+| CORE optional; independent components, staged packaging | ESSENCE §4 (7); Architecture §2; CORE §1 |
+| Model history ≠ model picker; three knowledge objects; sourced genealogy | ESSENCE §7 |
+| Target vs reference; scaling constraints | ESSENCE §4, §7 |
+| Staged plan 0–5 with exit criteria | ESSENCE §5; Architecture §6 D |
+
+### Claims checked against code
+- One distribution (`sol-organizes-logic`); Textual is not a dependency (`pyproject.toml`).
+- Every ESSENCE study imports `sol.core` (5 imports in `sol/essence/`), so CORE-optional is stated as a decision with a path, not a fact.
+- `S` runs the sentence study and captures the live paragraph without saving a visit, but carries no selection (`neovim_reader.py` `study_panel`).
+- The term study's tokenizer (`sol.essence.terms._tokens`): letters plus combining marks and internal apostrophes, NFC, case-folded; digits and punctuation excluded; hyphenated compounds split.
+
+### Semantic changes from the previous text
+- Architecture §6 D: embeddings were the "second experiment"; they now wait for the interface and word-frequency stages.
+- ESSENCE §4: the "complete inquiry contract" gained a provider (`core | file`), a comparison scope, an execution block and the return layout; it stays a conceptual schema.
+- ESSENCE §7: the "ML roadmap" is now the encyclopedia/registry design; the earlier model-history file is still not available and nothing is claimed about it.
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — OK (links and anchors); `.venv/bin/python -B -m unittest discover -s tests` — 1616 tests, OK (11 skipped, 4 expected failures). No code changed.
+
+### Outstanding issues
+- The nested-terminal arrangement (keys, alt-keys, resizing, launch latency) is unproven on this machine; the brief says so too.
+- Open decisions listed in ESSENCE §4: entry key and `S`; split side, widths, focus; investigation persistence and background jobs; provider/adapter API and package split; first tokenizer and scopes; encyclopedia source format and governance; Textual as base or optional dependency.
+
+### Decisions requiring approval
+- **(reserved, approved by the maintainer on 18 October 2026)** New **Decision** statements in Architecture §§2, 4, 6, ESSENCE §§1, 4, 5, 7, BEING §6 and CORE §1, taken from the maintainer's brief. Because they change authority Decision statements, the maintainer merges this PR.
+
 ## Split the Lua reader into modules — 18 October 2026
 
 **Task:** [Codex: Split the Lua reader into modules](https://github.com/dialectmaterial/SOL/blob/f1bdaa6/docs/coordination/CURRENT_TASK.md#codex-split-the-lua-reader-into-modules).
