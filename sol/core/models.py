@@ -68,8 +68,13 @@ class Book:
         identifier = identifier.strip().casefold()
         if not identifier:
             raise ValueError("a passage identifier is required")
-        by_id = {passage.identifier.casefold(): passage for passage in self.passages}
         redirects = {key.casefold(): value.casefold() for key, value in self.redirects.items()}
+        if identifier not in redirects:
+            # The common case, an exact current ID, needs no index of the book.
+            for passage in self.passages:
+                if passage.identifier.casefold() == identifier:
+                    return passage
+        by_id = {passage.identifier.casefold(): passage for passage in self.passages}
         if identifier in by_id or identifier in redirects:
             target = identifier
         else:

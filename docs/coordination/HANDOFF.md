@@ -32,6 +32,77 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Split the Lua reader into modules — 18 October 2026
+
+**Task:** [Codex: Split the Lua reader into modules](https://github.com/dialectmaterial/SOL/blob/f1bdaa6/docs/coordination/CURRENT_TASK.md#codex-split-the-lua-reader-into-modules).
+**Branch / PR:** `codex/lua-modules` · [PR #21](https://github.com/dialectmaterial/SOL/pull/21), opened with `gh pr create --base main`. Status: `In review`.
+**Last implementation commit:** `552a769f09e0e747e5a0535bc758ba387310859c` (modules, packaging, tests and documentation; this report follows).
+
+### Changed files
+
+- `sol/terminal/neovim.lua` — 22-line entry, down from 1,332. Loads only explicit files beside its own installed path, with no `require`, user runtime search or `package.loaded` cache. View reloads start the same packaged entry.
+- `neovim_text.lua` — exact Unicode/codepoint helpers and inert payload validation.
+- `neovim_view.lua` — bounded page projection, source/cursor/selection mapping, packet capture/restore/export, typography and themes.
+- `neovim_panels.lua` — shared popup state/lifecycle and search, sentence-study and printed-source result panels.
+- `neovim_requests.lua` — persistent action channel, response dispatch and view mode/focus reloads.
+- `neovim_footnotes.lua` — book-note panels, nested links and panel backtracking.
+- `neovim_notes.lua` — personal-note editor, draft recovery and revision history.
+- `neovim_controls.lua` — actions, source/personal-note context, outline integration, bindings and lifecycle. The existing `neovim_tree.lua` is unchanged; it now loads through the same package-local loader.
+- `pyproject.toml`, `tests/test_packaging.py` — ship/check all `sol.terminal/*.lua` assets in wheel and source archive; actual headless passage from a wheel pip-installed without dependencies/network into a temporary venv. Misleading runtime/package paths and preloads cannot replace modules; a missing packaged module refuses without falling back.
+- `docs/BEING.md`, `CHANGELOG.md` — implementation file ownership and unchanged behavior. Only Codex's status changes in `CURRENT_TASK.md`.
+
+### Tests performed
+
+- Existing controller/headless tests are unchanged. Focused suites: 69 surface/host tests (one existing skip) and 37 controller tests passed. Packaging: 20 tests passed, including the actual installed-wheel/headless scenario. The missing-module check also ran in the final full suite.
+- Documentation check passed. Full suite: 1,607 tests, OK (11 skipped, 4 existing expected failures), with isolated XDG state/Neovim logs and wheel/source-archive tests. Headless checks cover source identity, both reading modes, note drafts/history, nested footnotes, selections/yank, theme/resize, navigation and action-channel lifecycle.
+- Reviewed and merged [task board #18](https://github.com/dialectmaterial/SOL/pull/18#issuecomment-6247385054), after separate worktree docs/1,603 tests and all GitHub checks passed. Latest maintainer sequencing was to open the completed [formula sheet PR #20](https://github.com/dialectmaterial/SOL/pull/20), then take this Lua task; #20's GitHub checks pass and its private 30-record sheet has no verdicts recorded.
+- Re-reviewed corrected [speed PR #19](https://github.com/dialectmaterial/SOL/pull/19#issuecomment-6247719999) in a fresh worktree: the reported 70-level metadata reproduction now refuses before caching, preserving the existing nesting bound; docs/1,606 tests and every GitHub check passed. Merged it and rebased this branch before implementation.
+
+### Outstanding issues
+
+- No manual terminal-reading trial was performed; this is a behavior-preserving implementation split, verified through unchanged tests and the installed artifact. No new control, packet field, dependency, schema, source status or workspace behavior is introduced.
+- Formula review work remains in separate PR #20. No source PDF, canonical book text, private crop/verdict artifact, synced project file or `AGENTS.md` is included here. No file under `sol/core/`, `sol/reader/` or `sol/terminal/neovim_reader.py` was edited.
+
+### Decisions requiring approval
+
+- None reserved. Defaults: seven cohesive factory modules plus the existing tree; one private per-view context with explicit connections, and direct module loading from the installed entry's directory. Python retains all source verification and persistence authority.
+
+## Finish the reader speed list — 19 October 2026
+
+**Task:** ["Claude Code: Finish the reader speed list"](https://github.com/dialectmaterial/SOL/blob/claude/assign-speed-and-lua/docs/coordination/CURRENT_TASK.md)
+**Branch / PR:** `claude/reader-speed-list`, stacked on #18 (task board) · opened with `gh pr create`
+**Last implementation commit:** `c49681fc0e4adae5516c4b864c24efbcb8a5ab18`
+
+### Changed files
+- `sol/core/protocol.py` — the in-memory comparison uses canonical JSON text plus structural equality with a private parsed copy (about 47 ms instead of 100 ms); the copy is never returned. Approved edge: an `int`/`float` subclass with an equal value is accepted.
+- Review fix (Codex, PR #19): the verified copy is checked once against every `_json_value` rule, including the 64-level nesting bound, before it is cached; a corpus with deeper metadata is refused on the first and every later call. Codex's reproduction is a regression test.
+- `sol/reader/surface.py` — `CaptureExport` has CORE check the reader's own snapshot instead of its deep copy, so a reader action compares once; the copy stays the export's private graph and `finish()` still proves they agree. (The deep copy itself stays: at 47 ms it beat a JSON round trip at 80 ms.)
+- `sol/core/models.py`, `sol/reader/actions.py` — `find_passage` finds an exact current ID without building an index; `ReadingSession.current` indexes the whole-book scope directly.
+- Tests: what the faster comparison still refuses (changed text, `2.0` for `2`, `true` for `1`, tuple for list, number key, extra field, lone surrogate) and the approved int-subclass case; both lookups against the old full scans on IDs, retired IDs, prefixes, unknown IDs and two scopes.
+- `docs/CORE.md` (§6 Decision), `CHANGELOG.md`.
+
+### Tests performed
+- `scripts/reader_timings.py --corpus local-corpus --repeats 5`, medians in ms; before = after #16:
+
+| Operation | Before | After |
+| --- | ---: | ---: |
+| Section next / previous | 683 / ~700 | 467 / 495 |
+| Search-result open | 615 | 446 |
+| History back | 597 | 415 |
+| Startup to first view | 670 | 515 |
+| Footnote-heavy view build | 637 | 484 |
+| Search | 172 | 124 |
+
+- `.venv/bin/python -B scripts/check_docs.py` — OK; `.venv/bin/python -B -m unittest discover -s tests` — 1604 tests, OK (11 skipped, 4 expected failures).
+
+### Outstanding issues
+- A changed in-memory value that is an `int` or `float` subclass of equal value is no longer refused (approved).
+- A refusal of a lone surrogate in memory now reports `snapshot_modified` instead of `invalid_utf8`; both refuse.
+- Remaining per-move cost is spread thin: nine file-fingerprint checks (kept on every call), view building and the SQLite save.
+
+### Decisions requiring approval
+- None open. The comparison edge case was approved by the maintainer on 19 October and recorded in CORE §6.
+
 ## Formula review sheet — 18 October 2026
 
 **Task:** Codex: Formula review sheet, assigned directly by the maintainer in the Codex session; recorded in [CURRENT_TASK at c7e0181](https://github.com/dialectmaterial/SOL/blob/c7e01819a51f3c6650def3e2f36e1c695154db1b/docs/coordination/CURRENT_TASK.md#codex-formula-review-sheet).

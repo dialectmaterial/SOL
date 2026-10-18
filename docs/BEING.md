@@ -18,6 +18,19 @@ BEING is the place to **read Hegel's *Science of Logic***, locate source evidenc
 
 Python/CORE owns source verification, IDs, lineage, actions and workspace persistence. Neovim owns disposable buffers, layout, input, motions and visual styling. A view contains **at most 64 canonical paragraphs**, divided into bounded reading sections; the reading position is a UUID plus source-codepoint offset, *never* a Neovim buffer address or screen row. Reloading a section in the same native Neovim process preserves the semantic contract. The reader can display adjacent passages continuously or one passage at a time. The book is **not** one unbounded editor buffer.
 
+The Lua implementation is split into package-local modules behind the small
+`sol/terminal/neovim.lua` entry: `neovim_text.lua` validates Unicode/spans,
+`neovim_view.lua` builds the page and maps exact source positions,
+`neovim_panels.lua` owns popup lifecycle and result/source panels,
+`neovim_requests.lua` owns the action channel and reloads,
+`neovim_footnotes.lua` reads book notes, `neovim_notes.lua` edits personal notes,
+and `neovim_controls.lua` wires actions, context, bindings and lifecycle.
+`neovim_tree.lua` remains the outline. All are loaded by explicit paths beside
+the installed entry, without searching personal Lua/runtime paths. This is an
+implementation split only; controls, packets, drafts and reading behavior are
+unchanged. Wheel and source-archive checks include every Lua asset, with a
+headless reading check from a wheel installed in a temporary environment.
+
 The reader presently uses a centered maximum width of **72 terminal columns** (configurable), native word-aware wrap, semantic emphasis/strong/code spans, headings, a source-context display and review warnings. It is a character-cell presentation, not proportional typesetting. It runs in capable terminal hosts including Alacritty and Kitty; terminal capability heuristics can choose italic or underline fallback. Three presentation presets (Terminal, Dark, Paper) are implemented; see section 4.
 
 The current implementation also includes literal book search, source-positioned results, a dynamic outline/tree, selection and copy, markers, focus/paragraph modes, a session navigation trail, saved reading position, annotated workspaces, comparisons, notes and source-review operations. The most mature workspace operations are additionally exposed via `sol --shell`; not every operation has an equally convenient Neovim keybinding. Avoid claiming full GUI/TUI parity.

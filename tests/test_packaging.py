@@ -8,18 +8,20 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
 import tarfile
 import tempfile
 import unittest
+import venv
 import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_FILES = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol").rglob("*.py")}
-PACKAGE_ASSETS = {"sol/terminal/neovim.lua", "sol/terminal/neovim_tree.lua"}
+PACKAGE_ASSETS = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol" / "terminal").glob("*.lua")}
 ENTRY_POINTS = {
     "sol": "sol:cli",
     "sol-kitty": "sol.terminal.kitty:main",
@@ -233,6 +235,86 @@ raise SystemExit(app.main(['-n', '--engine', 'neovim', '--corpus', sys.argv[2]])
 """
         result = subprocess.run([sys.executable, "-I", "-B", "-c", program, str(installed), str(corpus)],
                                 cwd=self.temporary.name, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    @unittest.skipUnless(shutil.which("nvim"), "installed Neovim is required for the wheel module smoke test")
+    def test_installed_wheel_opens_headlessly_without_user_lua_modules(self):
+        """Run all packaged Lua modules, not a mocked native launch boundary."""
+        from sol.terminal import neovim
+        version_root = Path(self.temporary.name) / "lua-wheel-version"
+        version_root.mkdir()
+        version_env = neovim._isolated_environment(version_root, version_root / "input", version_root / "output")
+        version = subprocess.run([shutil.which("nvim"), "--version"], env=version_env,
+                                 capture_output=True, text=True, timeout=10)
+        match = re.match(r"NVIM v(\d+)\.(\d+)", version.stdout)
+        if version.returncode or match is None or tuple(map(int, match.groups())) < (0, 11):
+            self.skipTest("Neovim 0.11 or newer is required")
+        directory = Path(self.temporary.name) / "lua-wheel-headless"
+        directory.mkdir()
+        environment = directory / "environment"
+        venv.EnvBuilder(with_pip=True, system_site_packages=True).create(environment)
+        python = environment / "bin" / "python"
+        install = subprocess.run([str(python), "-I", "-m", "pip", "install", "--no-index", "--no-deps",
+                                  "--no-compile", "--ignore-installed", str(self.wheel)],
+                                 capture_output=True, text=True, timeout=60)
+        self.assertEqual(install.returncode, 0, install.stdout + install.stderr)
+        corpus = directory / "corpus"
+        write_runtime_corpus(corpus)
+        from sol.corpus.contract import initialize_corpus_identity
+        initialize_corpus_identity(corpus)
+        program = r'''
+import json, os, subprocess, sys
+from pathlib import Path
+import sol
+from sol import core
+from sol.reader.surface import sample_from_book
+from sol.terminal import neovim
+root = Path(sys.argv[1])
+assert Path(sol.__file__).is_relative_to(Path(sys.prefix)), 'reader came from outside the installed wheel'
+book = core.load_corpus_book(root / 'corpus')
+payload = neovim.build_payload(sample_from_book(book, count=1))
+input_path, output_path = root / 'input.json', root / 'output.json'
+input_path.write_text(json.dumps(payload), encoding='utf-8')
+env = neovim._isolated_environment(root, input_path, output_path)
+module_directory = Path(neovim.__file__).parent
+fake = root / 'untrusted'
+fake.mkdir()
+for module in module_directory.glob('neovim_*.lua'):
+    (fake / module.name).write_text("error('loaded untrusted user Lua module')\n")
+env['SOL_FAKE_LUA'] = str(fake)
+scenario = root / 'headless.lua'
+scenario.write_text(r"""
+local fake = assert(vim.env.SOL_FAKE_LUA)
+vim.opt.runtimepath:prepend(fake)
+package.path = fake .. '/?.lua;' .. package.path
+for _, name in ipairs({'neovim_text', 'neovim_view', 'neovim_panels', 'neovim_requests',
+  'neovim_footnotes', 'neovim_notes', 'neovim_controls', 'neovim_tree'}) do
+  package.preload[name] = function() error('loaded user package.preload') end
+end
+dofile(vim.env.SOL_NVIM_ADAPTER)
+local reader = assert(SOLNvimReader)
+assert(#reader.records == 1)
+assert(reader.capture().reference.reference.target_id == reader.records[1].id)
+local expected = vim.fn.fnamemodify(vim.env.SOL_NVIM_ADAPTER, ':h') .. '/neovim_view.lua'
+assert(debug.getinfo(reader.capture, 'S').source == '@' .. expected)
+reader.context()
+vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+reader.export()
+-- A missing package module fails instead of falling back to any user loader.
+assert(os.rename(expected, expected .. '.saved'))
+local ok, problem = pcall(dofile, vim.env.SOL_NVIM_ADAPTER)
+assert(os.rename(expected .. '.saved', expected))
+assert(not ok and tostring(problem):find('neovim_view.lua', 1, true))
+assert(not tostring(problem):find('untrusted', 1, true))
+vim.cmd('qa!')
+""", encoding='utf-8')
+result = subprocess.run([sys.argv[2], '-u', 'NONE', '--noplugin', '-i', 'NONE', '-n', '--headless', '-l', str(scenario)],
+                        cwd=root, env=env, capture_output=True, text=True, timeout=15)
+assert result.returncode == 0, result.stdout + result.stderr
+assert json.loads(output_path.read_text())['reference']['reference']['target_id'] == book.passages[0].identifier
+'''
+        result = subprocess.run([str(python), "-I", "-B", "-c", program, str(directory), shutil.which("nvim")],
+                                cwd=directory, capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_installed_default_reader_and_temporary_reader_route_without_a_tui(self):

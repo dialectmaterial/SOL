@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Split the Lua reader implementation — 18 October 2026
+
+The Neovim entry now composes package-local text/view, panel, request, footnote,
+personal-note and control modules. Reader behavior and controls are unchanged.
+Modules load only beside the installed entry, and packaging checks cover every
+Lua file plus a headless read from an installed wheel.
+
 ### Prepare private formula reviews — 18 October 2026
 
 Checkout-only `scripts/formula_review_sheet.py` writes an offline HTML sheet
@@ -15,8 +22,8 @@ included. Nothing marks a record reviewed or changes canonical Markdown.
 
 Moving to the next or previous section, opening a search result or going back
 in history took 2.3–2.9 s on the real book, because each keypress re-read and
-re-checked the whole corpus about nine times. It now takes about 0.65–0.75 s;
-startup to the first view went from 1.8 s to 0.8 s. Every change to the corpus
+re-checked the whole corpus about nine times. It now takes about 0.4–0.5 s;
+startup to the first view went from 1.8 s to 0.5 s. Every change to the corpus
 files is still refused on each check; the full comparison of the corpus held
 in memory now runs once per keypress, as approved (CORE §6).
 

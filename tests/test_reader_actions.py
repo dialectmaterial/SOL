@@ -131,6 +131,50 @@ class ReaderActionsTests(unittest.TestCase):
             self.assertEqual(before, (self.actions.cwd, self.actions.previous_cwd,
                                       self.session.path, self.session.cursor))
 
+    def test_fast_lookups_answer_exactly_as_the_full_scans(self):
+        def find_by_full_index(book, identifier):
+            # The algorithm before 19 October 2026, kept as the reference.
+            identifier = identifier.strip().casefold()
+            if not identifier:
+                raise ValueError("a passage identifier is required")
+            by_id = {passage.identifier.casefold(): passage for passage in book.passages}
+            redirects = {key.casefold(): value.casefold() for key, value in book.redirects.items()}
+            if identifier in by_id or identifier in redirects:
+                target = identifier
+            else:
+                candidates = [key for key in (*by_id, *redirects) if key.startswith(identifier)]
+                if len(candidates) != 1:
+                    raise ValueError("ambiguous or unknown")
+                target = candidates[0]
+            seen = set()
+            while target in redirects:
+                if target in seen:
+                    raise ValueError("cycle")
+                seen.add(target)
+                target = redirects[target]
+            if target not in by_id:
+                raise ValueError("not readable")
+            return by_id[target]
+
+        self.book.redirects[RETIRED] = IDS[1]
+        # A current ID that is also listed as retired follows its redirect.
+        self.book.redirects[IDS[2]] = IDS[0]
+        for identifier in (*IDS, RETIRED, RETIRED.upper(), " " + IDS[0], "aaaaaaaa", "eeee", "",
+                           "ffffffff-0000-4000-8000-000000000009"):
+            with self.subTest(identifier=identifier):
+                try:
+                    expected = find_by_full_index(self.book, identifier)
+                except ValueError:
+                    with self.assertRaises(ValueError):
+                        self.book.find_passage(identifier)
+                else:
+                    self.assertIs(self.book.find_passage(identifier), expected)
+        for path in ((), ("BEING",)):
+            session = ReadingSession(self.book, path=path)
+            for cursor in range(len(self.book.selection(path))):
+                session.cursor = cursor
+                self.assertIs(session.current(), self.book.selection(path)[cursor])
+
     def test_legacy_application_symbols_remain_reexports(self):
         from sol.reader import app
         self.assertIs(app.ReadingSession, ReadingSession)
