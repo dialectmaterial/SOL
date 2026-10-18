@@ -811,6 +811,59 @@ end
         self.assertTrue(report["failure"]["window"])
         self.assertTrue(report["failure"]["focused_reader"])
 
+    def test_essence_from_a_selection_returns_to_the_exact_selection(self):
+        # Reported by Codex's review of PR #24.
+        stub = self.root / "essence_stub.py"
+        stub.write_text("import sys\nprint('ESSENCE STUB READY', flush=True)\nsys.stdin.readline()\n", encoding="utf-8")
+        text = self.sample.passages[0].text
+        start, end = text.index("𝔸"), text.index("ground") + len("ground")
+        paths = f"local PYTHON, STUB, FIRST, LAST = {json.dumps(sys.executable)}, {json.dumps(str(stub))}, {start}, {end - 1}\n"
+        report = self.run_lua(paths + r'''
+  vim.o.columns, vim.o.lines = 140, 40
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local id = data.records[1].id
+  report.cases = {}
+  for _, direction in ipairs({'forward', 'reverse'}) do
+    local a, b = reader.source_point(id, FIRST), reader.source_point(id, LAST)
+    if direction == 'reverse' then a, b = b, a end
+    local selected = reader.capture('v', a, b)
+    reader.restore(selected)
+    local case = {mode = vim.fn.mode()}
+    vim.api.nvim_feedkeys('E', 'xt', false)
+    local request = sent[#sent]
+    case.op, case.selection = request.op, request.packet.selection ~= vim.NIL
+    case.sent_matches = vim.deep_equal(request.packet, selected)
+    request = request.id
+    _G.SOLReaderChannel.pending[request]({essence = {command = {PYTHON, STUB}}})
+    assert(vim.wait(5000, function() return SOLEssence.job ~= nil end, 10))
+    SOLEssence.back_to_reader()
+    case.after_back = vim.deep_equal(SOLNvimReader.capture(), selected)
+    -- E from the restored selection refocuses ESSENCE without a new request.
+    local before = #sent
+    vim.api.nvim_feedkeys('E', 'xt', false)
+    case.refocused = #sent == before and vim.api.nvim_get_current_win() == SOLEssence.window
+    vim.fn.chansend(SOLEssence.job, 'q\n')
+    assert(vim.wait(5000, function() return SOLEssence.window == nil end, 10))
+    case.after_close = vim.deep_equal(SOLNvimReader.capture(), selected)
+    case.cursor = SOLNvimReader.capture().cursor_offset
+    report.cases[direction] = case
+    vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  end
+''', integrated=True)
+        for direction, cursor in (("forward", end), ("reverse", start)):
+            with self.subTest(direction=direction):
+                case = report["cases"][direction]
+                self.assertEqual(case["mode"], "v")
+                self.assertEqual((case["op"], case["selection"], case["sent_matches"]), ("essence_open", True, True))
+                self.assertTrue(case["after_back"])
+                self.assertTrue(case["refocused"])
+                self.assertTrue(case["after_close"])
+                self.assertEqual(case["cursor"], cursor)
+
     def test_footnote_callouts_show_inline_without_changing_source_text(self):
         report = self.run_lua(r'''
   local payload = vim.deepcopy(data)

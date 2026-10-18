@@ -312,10 +312,15 @@ return function(reader)
     vim.keymap.set('n', 'n', guarded(function() passage(1) end), {buffer = buffer, silent = true})
     vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
     vim.keymap.set('n', 'S', guarded(function() request('sentence_study') end), {buffer = buffer, silent = true})
-    vim.keymap.set('n', 'E', guarded(function()
+    vim.keymap.set({'n', 'x'}, 'E', guarded(function()
+      -- Capture the exact position and selection before any mode or window
+      -- change; ESSENCE returns to it with Alt-R and on closing.
+      local packet = current_packet()
+      if vim.fn.mode(1) ~= 'n' then normal_escape() end
       local essence = rawget(_G, 'SOLEssence')
-      if essence and essence.window and api.nvim_win_is_valid(essence.window) then essence.focus()
-      else request('essence_open') end
+      essence.origin = packet
+      if essence.window and api.nvim_win_is_valid(essence.window) then essence.focus()
+      else request('essence_open', nil, nil, packet) end
     end), {buffer = buffer, silent = true})
     -- Views rebuilt from this one (p, f, b/n) copy data, so forget the marks there too.
     vim.keymap.set('n', '<Esc>', function()
