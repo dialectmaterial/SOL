@@ -6,6 +6,8 @@ with that corpus generation, not authorship, authentication, or PDF accuracy.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 import hashlib
 import json
 import math
@@ -242,11 +244,40 @@ def _load_fresh(snapshot):
     return fresh, manifest_canonical, records_canonical
 
 
+# One reader action: the snapshot it was entered for, and its verified copy.
+_ACTION = ContextVar("sol_reference_action", default=None)
+
+
+@contextmanager
+def single_action(snapshot):
+    """Compare the caller's in-memory snapshot in full once for one user action.
+
+    Inside the block, every capture or check still verifies the corpus files'
+    fingerprints, but the full comparison of the caller's snapshot and the
+    disk-verified copy run once, at the first call, and that copy is reused.
+    A modification of the in-memory snapshot during the block is refused by the
+    next action. Approved by the maintainer on 19 October 2026 (CORE §5).
+    """
+    token = _ACTION.set({"snapshot": snapshot, "fresh": None})
+    try:
+        yield
+    finally:
+        _ACTION.reset(token)
+
+
 def _fresh_snapshot(snapshot):
-    from sol.corpus.contract import CorpusSnapshot
+    from sol.corpus.contract import CorpusError, CorpusSnapshot, verify_snapshot_current
 
     if not isinstance(snapshot, CorpusSnapshot):
         raise ProtocolError("References require a verified canonical CorpusSnapshot", code="unverified_snapshot")
+    action = _ACTION.get()
+    if action is not None and action["snapshot"] is snapshot and action["fresh"] is not None:
+        try:
+            verify_snapshot_current(action["fresh"])
+        except CorpusError as error:
+            raise ProtocolError("The loaded corpus generation changed; reopen before transferring a reference",
+                                status="stale", code="generation_changed") from error
+        return action["fresh"]
     fresh, manifest_canonical, records_canonical = _load_fresh(snapshot)
     if (fresh.manifest_sha256 != snapshot.manifest_sha256 or fresh.index_sha256 != snapshot.index_sha256
             or fresh.index_metadata_sha256 != snapshot.index_metadata_sha256 or fresh.documents != snapshot.documents):
@@ -262,6 +293,8 @@ def _fresh_snapshot(snapshot):
         raise ProtocolError("The corpus needs an explicitly initialized permanent identity; "
                             "use sol-corpus-check DIRECTORY --initialize-identity (never reconvert it)",
                             code="missing_corpus_identity")
+    if action is not None and action["snapshot"] is snapshot:
+        action["fresh"] = fresh
     return fresh
 
 

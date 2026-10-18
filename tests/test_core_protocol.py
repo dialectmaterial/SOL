@@ -202,6 +202,34 @@ class CoreProtocolTests(unittest.TestCase):
             core.capture_reference(self.snapshot, self.identifier)
         self.assertEqual(caught.exception.status, "stale")
 
+    def test_single_action_compares_memory_once_but_checks_files_on_every_call(self):
+        from sol.core.protocol import single_action
+
+        snapshot = copy.deepcopy(self.snapshot)
+        with single_action(snapshot):
+            core.capture_reference(snapshot, self.identifier)
+            # Within the action, an in-memory change is not compared again...
+            snapshot.records[1]["markdown"] = "Misleading memory"
+            payload = core.capture_reference(snapshot, self.identifier)
+            # ...but the result still comes from the verified files, not memory.
+            self.assertEqual(payload, self.payload)
+            # Another snapshot object inside the same action gets the full comparison.
+            other = copy.deepcopy(snapshot)
+            with self.assertRaises(core.ProtocolError) as caught:
+                core.capture_reference(other, self.identifier)
+            self.assertEqual(caught.exception.code, "snapshot_modified")
+        # The next action refuses the modified snapshot.
+        with single_action(snapshot), self.assertRaises(core.ProtocolError) as caught:
+            core.check_reference(snapshot, self.payload)
+        self.assertEqual(caught.exception.code, "snapshot_modified")
+        # A file changed between two calls of one action is refused at once.
+        with single_action(self.snapshot):
+            core.capture_reference(self.snapshot, self.identifier)
+            (self.corpus / "sample.md").write_text("Changed without reindexing", encoding="utf-8")
+            with self.assertRaises(core.ProtocolError) as caught:
+                core.check_reference(self.snapshot, self.payload)
+            self.assertEqual(caught.exception.code, "generation_changed")
+
     def test_changed_files_during_capture_or_check_are_refused(self):
         with patch.object(contract, "verify_snapshot_current", side_effect=contract.CorpusError("Invented race")):
             for operation in (lambda: core.capture_reference(self.snapshot, self.identifier),
