@@ -32,6 +32,34 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## ESSENCE stage 2, interface side: word frequencies on screen — 18 October 2026
+
+**Task:** the maintainer's go on 18 October to take the interface side of stage 2 while Codex builds the engine (["Codex: ESSENCE stage 2 engine"](https://github.com/dialectmaterial/SOL/blob/main/docs/coordination/CURRENT_TASK.md)); continues "Claude Code: ESSENCE stage 1, the interface shell".
+**Branch / PR:** `claude/essence-words-ui`, stacked on #24 · opened with `gh pr create`
+**Last implementation commit:** `942f67243959f6f10403b67ff40d50a44b796787`
+
+### Changed files
+- `sol/essence/tui/words.py` (new): choices → `CoreProvider`/`FileProvider` scopes (passage = `passages`, section = `within` the passage's parent reader path, book = whole corpus, file = `FileProvider`); `run`, `rows` (top 2,000), `summary`, owner-only `save`; lazy engine import with `EngineMissing`.
+- `sol/essence/tui/app.py`: Experiment screen (target and reference choices, file inputs, Count words, background worker, status); Results screen (summary lines and a word table).
+- `tests/test_essence_tui.py`: scopes from choices, files without a corpus, rows/summary/saving, missing engine, the screen flow with a stand-in engine, and a real-engine test that skips until the engine is merged.
+- `docs/ESSENCE.md` (§4 implemented note), `CHANGELOG.md`.
+
+### Interface contract used (Codex's engine, in progress)
+`sol.essence.words.analyze_words(target, *, reference=None)`, `encode_word_result(result)`; `sol.essence.word_inputs.CoreProvider(snapshot, scope)` and `FileProvider(path, scope)`; scopes `{"kind": "passages", "ids": [...]}`, `{"kind": "within", "path": "/..."}`, `None` for the corpus. Read from Codex's working tree without modifying it; any change there needs a matching change in `words.py`.
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — OK; full suite — 1632 tests, OK (12 skipped, 4 expected failures).
+- With Codex's in-progress engine files laid over a throwaway copy: all 13 ESSENCE interface tests pass, including the real-engine test; on the real book, passage 0.5 s, section vs book 1.4 s, whole book 1.1 s.
+- Not done: a manual run in Alacritty.
+
+### Outstanding issues
+- Depends on Codex's engine PR; until it is merged the Experiment screen reports that the engine is missing.
+- Opening a word's source passage in the reader (stage 3) is not implemented.
+- Long counts cannot be cancelled yet; a new count replaces a running one.
+
+### Decisions requiring approval
+- **Defaults:** the four target choices and three reference choices; "this section" is the passage's parent reader path; 2,000 rows shown; artifacts saved only for workspace sessions.
+
 ## ESSENCE stage 1, the interface shell — 18 October 2026
 
 **Task:** ["Claude Code: ESSENCE stage 1, the interface shell"](https://github.com/dialectmaterial/SOL/blob/main/docs/coordination/CURRENT_TASK.md)
