@@ -209,6 +209,45 @@ def _generation_key(snapshot):
             json.dumps(snapshot.documents, sort_keys=True, ensure_ascii=True))
 
 
+def _remember(fresh):
+    """Cache a snapshot that is exactly its verified files; returns the entry.
+
+    The fast comparison requires the caller's data to equal this verified
+    copy, so the copy must meet every rule of _json_value, including the
+    64-level nesting bound; a refusal raises and is not cached.
+    """
+    _json_value(fresh.manifest)
+    _json_value(fresh.records)
+    manifest_text = json.dumps(fresh.manifest, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    records_text = json.dumps(fresh.records, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    # The parsed copies serve only comparisons; they are never returned.
+    cached = (manifest_text, records_text, _json(fresh.manifest), _json(fresh.records),
+              json.loads(manifest_text), json.loads(records_text))
+    while len(_VERIFIED_GENERATIONS) >= _VERIFIED_LIMIT:
+        _VERIFIED_GENERATIONS.pop(next(iter(_VERIFIED_GENERATIONS)))
+    _VERIFIED_GENERATIONS[_generation_key(fresh)] = cached
+    return cached
+
+
+def remember_verified(snapshot):
+    """Record a snapshot load_snapshot has just returned, before anyone else
+    holds it, so the first reference check need not read the files again.
+
+    Only call this on a snapshot nobody could have changed yet. Every later
+    check still verifies the files' fingerprints and compares the caller's
+    data with this copy. A snapshot outside the fast comparison's rules is
+    simply not cached; checks then take the full path and refuse it as before.
+    """
+    from sol.corpus.contract import CorpusSnapshot
+
+    if not isinstance(snapshot, CorpusSnapshot):
+        return
+    try:
+        _remember(snapshot)
+    except ProtocolError:
+        pass
+
+
 def _load_fresh(snapshot):
     from sol.corpus.contract import CorpusError, CorpusSnapshot, load_snapshot, verify_snapshot_current
 
@@ -221,20 +260,7 @@ def _load_fresh(snapshot):
             raise ProtocolError("The selected corpus generation is no longer valid; reopen after correcting/reindexing it",
                                 status="stale", code="generation_changed") from error
         if _generation_key(fresh) == key:
-            # The fast comparison requires the caller's data to equal this
-            # verified copy, so the copy must meet every rule of _json_value,
-            # including the 64-level nesting bound; a refusal is not cached.
-            _json_value(fresh.manifest)
-            _json_value(fresh.records)
-            manifest_text = json.dumps(fresh.manifest, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
-            records_text = json.dumps(fresh.records, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
-            # The parsed copies serve only comparisons; they are never returned.
-            cached = (manifest_text, records_text, _json(fresh.manifest), _json(fresh.records),
-                      json.loads(manifest_text), json.loads(records_text))
-            while len(_VERIFIED_GENERATIONS) >= _VERIFIED_LIMIT:
-                _VERIFIED_GENERATIONS.pop(next(iter(_VERIFIED_GENERATIONS)))
-            _VERIFIED_GENERATIONS[key] = cached
-            return fresh, cached[2:]
+            return fresh, _remember(fresh)[2:]
         return fresh, None
     manifest_text, records_text = cached[:2]
     fresh = CorpusSnapshot(
