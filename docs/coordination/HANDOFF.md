@@ -41,6 +41,7 @@ Write "None." rather than deleting a heading.
 ### Changed files
 - `sol/core/protocol.py` — (1) the last few fully verified generations are kept as immutable JSON text, keyed by every file fingerprint; a call whose fingerprints match builds new records from it after `verify_snapshot_current`, instead of `load_snapshot`. Exactly as strict as before. (2) `single_action(snapshot)`: within one user action the full in-memory comparison runs at the first call and the verified copy is reused; files are still checked on every call.
 - `sol/terminal/neovim_reader.py` — each editor request, and the first view, runs in one `single_action`.
+- Review fix (Codex, PR #16): `check_reference(s)` returns a deep copy of each record, so a caller changing a returned record cannot alter what later calls in the same action treat as verified; Codex's reproduction is a regression test for single and batch checks.
 - `tests/test_core_protocol.py` — the scope: a file change between two calls of one action is refused; an in-memory change during an action is refused by the next; results come from the verified files; another snapshot object is compared in full. The batch test now allows zero reloads instead of exactly one.
 - `tests/test_neovim_reader.py` — a corpus changed between two requests refuses `next`, `previous` and `passage_next` without saving.
 - `docs/CORE.md` (§6, "Verification cost", with the approved Decision), `CHANGELOG.md`.
@@ -68,6 +69,38 @@ Write "None." rather than deleting a heading.
 ### Decisions requiring approval
 - **Once-per-action comparison:** approved by the maintainer in the session on 19 October 2026 and recorded as a Decision in CORE §6; nothing left open.
 - **Default:** `single_action` lives in `sol.core.protocol` and is not exported from `sol.core`; the reader imports it from there.
+
+## Footnote reading view — 18 October 2026
+
+**Task:** [Codex: Footnote reading view](https://github.com/dialectmaterial/SOL/blob/5fad439ebfa27756b0c2fd127511e6483501f0e6/docs/coordination/CURRENT_TASK.md#codex-footnote-reading-view).
+**Branch / PR:** `codex/footnote-view` · [PR #17](https://github.com/dialectmaterial/SOL/pull/17), opened with `gh pr create --base main`. Status: `In review`.
+**Last implementation commit:** `650e7d17ce625e58a66c887b39395d451298d927` (projection/controller `e207f0d`, then panels/tests/documentation; this report follows).
+
+### Changed files
+
+- `sol/reader/surface.py` — canonical note/body link paths, bounded by eight distinct notes and 64 body paragraphs per note; no navigation or workspace operation.
+- `sol/terminal/neovim.py` — one checked, on-demand footnote projection through `CaptureExport`, retaining each ordered paragraph's ID, CORE reference, exact text, local style/callout offsets, attribution and warnings. Links disclose cycles/depth bounds; text and presentation budgets refuse oversized views.
+- `sol/terminal/neovim_reader.py` — only seven added/changed lines for `footnote_open` (`trail`) validation and dispatch. This shared-file exception was coordinated in [the task-board review](https://github.com/dialectmaterial/SOL/pull/15#issuecomment-6247113306); navigation and persistence are unchanged.
+- `sol/terminal/neovim.lua` — separate book-note list in `c`, individual styled note panels, nested links and panel backtracking; popup return packets preserve the passage selection through close/resize/native `:q`. Personal notes and technical context have separate headings. Replies after a panel closes are ignored.
+- `tests/fixtures_footnotes.py`, `tests/test_footnote_view.py`, `tests/test_reader_surface_neovim.py` — invented multi-paragraph and cyclic canonical notes; projection/controller refusals and real headless Neovim return/style/clipboard checks.
+- `docs/BEING.md`, `CHANGELOG.md` — implemented controls, bounds and limits. Only Codex's task status changes in `CURRENT_TASK.md`; existing reports are retained.
+
+### Tests performed
+
+- Reviewed and merged [PR #13](https://github.com/dialectmaterial/SOL/pull/13#issuecomment-6247103589) and [task-board PR #15](https://github.com/dialectmaterial/SOL/pull/15#issuecomment-6247113306), each in a separate worktree: documentation and 1,592 tests passed (11 skipped, 4 expected failures); `gh pr checks --watch` finished with every check passing.
+- Focused projection/controller suite: six tests. Headless/host suite: 69 tests, one skipped. Footnote scenarios cover widths 72/20, both reading modes, forward/reverse selections and exact yank, ordered multibyte/styled body records, per-paragraph attribution/review flags, nested links, cycles, backtracking, failed requests, late replies, resize and native window close.
+- Documentation check passed. Full suite: 1,600 tests, OK (11 skipped, 4 existing expected failures), using the checkout's `.venv/bin/python -B` with isolated XDG state and Neovim logs. Source changes between controller requests and during projection are refused; panel requests leave the saved position/selection and workspace bytes unchanged.
+- Reviewed newly opened [PR #16](https://github.com/dialectmaterial/SOL/pull/16#issuecomment-6247193239) in another worktree: its docs/1,594 existing tests pass, but a returned `Reference.record` aliases the action's trusted graph. Mutating its attribution makes a later capture/check accept the changed author within the same action. Posted an invented-corpus reproduction and left it unmerged for the author, per CLAUDE.md.
+
+### Outstanding issues
+
+- No manual Alacritty/Kitty session or sustained real-book reading trial was performed; headless tests establish mechanics, not reading comfort. Backspace revisits the already checked panel; following a link makes a fresh checked request. Note panels do not create a persistent note-reading position or offer personal annotations on note paragraphs.
+- The corpus contract already rejects unresolved canonical note links on load. Unlinked/missing requests and changed generations refuse without substituted text; no relaxed corpus validation is introduced.
+- PR #16 is not part of this branch. Main was refreshed at `5fad439`; if its corrected speed changes merge first, rebase this branch and retain both changelog/handoff entries. No source PDF, private corpus, personal workspace, synced project source or `AGENTS.md` was edited or committed.
+
+### Decisions requiring approval
+
+- None reserved. Defaults the maintainer may overrule: Enter on an explicit book-note/link row; Backspace one panel; Esc/`q` directly to the passage; resize closes the panel. Bounds: eight notes per path, 64 body paragraphs, 128 listed links, 1 MiB source text and 4 MiB presentation. Paragraph/text/presentation overflow refuses; excess links are explicitly disclosed, with source text unchanged.
 
 ## Edit and review personal notes in the reader — 18 October 2026
 

@@ -227,6 +227,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         "note_edit": [note_id, ("revision", lambda revision: type(revision) is int and revision >= 1,
                                 "the note's revision is required"), note_body],
         "note_history": [note_id],
+        "footnote_open": [("trail", lambda trail: isinstance(trail, list), "choose a linked book footnote")],
     }
     extra_fields["marker_clear"] = extra_fields["marker_open"] = extra_fields["marker_set"]
     navigation_actions = {"next", "previous", "passage_next", "passage_previous", "node_open", "marker_open",
@@ -340,9 +341,13 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
              "lines": [display_line(line) for line in item["body"].split("\n")]}
             for item in reversed(revisions)]}}
 
+    def footnote_panel(request, identifier):
+        target = request["packet"]["reference"]["reference"]["target_id"]
+        return {"footnote": neovim.build_footnote_payload(sample, target, request["trail"])}
+
     panels = {"search": search_panel, "source_preview": source_panel, "marker_set": marker_panel,
               "marker_clear": marker_panel, "note_add": note_panel, "sentence_study": study_panel,
-              "note_edit": note_edit_panel, "note_history": note_history_panel}
+              "note_edit": note_edit_panel, "note_history": note_history_panel, "footnote_open": footnote_panel}
 
     def handle(request):
         # One editor request is one user action: CORE compares the in-memory

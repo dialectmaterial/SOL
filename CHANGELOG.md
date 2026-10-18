@@ -11,6 +11,16 @@ startup to the first view went from 1.8 s to 0.8 s. Every change to the corpus
 files is still refused on each check; the full comparison of the corpus held
 in memory now runs once per keypress, as approved (CORE §6).
 
+### Read individual book footnotes — 18 October 2026
+
+In `c`, Enter on a book footnote opens its own reading view, with ordered body
+paragraphs, emphasis, attribution and review warnings. Enter follows a listed
+further footnote; Backspace returns one panel, and Esc or `q` restores the exact
+passage cursor and selection in either reading mode. Book notes, personal notes
+and source context have separate headings. Each new note open checks the corpus;
+cycles, missing links and presentation bounds have explicit refusals. No reading
+visit or workspace data is saved by viewing a footnote.
+
 ### Edit your notes in the reader — 18 October 2026
 
 In `c`, press `e` on one of your notes to revise it in the same editor as `a`,

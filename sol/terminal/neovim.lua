@@ -426,6 +426,16 @@ local function apply_theme()
   for name in pairs(theme_groups) do api.nvim_set_hl(0, name, vim.deepcopy(presets[active].groups[name] or {})) end
 end
 apply_theme()
+local function semantic_group(styles)
+  local enabled, names = {}, {}
+  for _, name in ipairs(styles) do enabled[name], names[#names + 1] = true, name end
+  table.sort(names)
+  local group = "SOLSemantic_" .. table.concat(names, "_")
+  api.nvim_set_hl(0, group, { italic = enabled.emphasis and not not italic_capable or false,
+    underline = (enabled.emphasis and not italic_capable) or enabled.code or false,
+    bold = enabled.strong or enabled.heading or false })
+  return group
+end
 for _, row in ipairs(heading_rows) do
   api.nvim_buf_set_extmark(buffer, namespace, row - 1, 0,
     { end_row = row - 1, end_col = #projection[row], hl_group = "SOLSourceHeading" })
@@ -437,13 +447,7 @@ end
 for _, record in ipairs(records) do
   if positions[record.id] then
     for _, span in ipairs(record.styles) do
-      local enabled, names = {}, {}
-      for _, name in ipairs(span.styles) do enabled[name], names[#names + 1] = true, name end
-      table.sort(names)
-      local group = "SOLSemantic_" .. table.concat(names, "_")
-      api.nvim_set_hl(0, group, { italic = enabled.emphasis and not not italic_capable or false,
-        underline = (enabled.emphasis and not italic_capable) or enabled.code or false,
-        bold = enabled.strong or enabled.heading or false })
+      local group = semantic_group(span.styles)
       local first, last = source_point(record.id, span.start), source_point(record.id, span["end"])
       api.nvim_buf_set_extmark(buffer, namespace, first.row - 1, first.byte,
         { end_row = last.row - 1, end_col = last.byte, hl_group = group, priority = 100 })
@@ -487,15 +491,18 @@ for _, record in ipairs(records) do
   end
 end
 
-local popup, popup_context = nil, false
+local popup, popup_context, popup_return = nil, false, nil
 local function close_popup()
-  if popup and api.nvim_win_is_valid(popup) then api.nvim_win_close(popup, true) end
-  popup = nil
-  popup_context = false
+  local closing, packet = popup, popup_return
+  popup, popup_context, popup_return = nil, false, nil
+  if closing and api.nvim_win_is_valid(closing) then api.nvim_win_close(closing, true) end
   if api.nvim_win_is_valid(window) then api.nvim_set_current_win(window) end
+  if packet then restore(packet) end
 end
-local function show_lines(lines)
+local function show_lines(lines, return_packet)
+  return_packet = return_packet or popup_return
   close_popup()
+  if vim.fn.mode(1) ~= 'n' then normal_escape() end
   local panel = api.nvim_create_buf(false, true)
   api.nvim_buf_set_lines(panel, 0, -1, false, lines)
   vim.bo[panel].modifiable, vim.bo[panel].readonly, vim.bo[panel].bufhidden = false, true, "wipe"
@@ -505,6 +512,11 @@ local function show_lines(lines)
     height = math.min(height, math.max(1, #lines)), style = "minimal", border = "single", zindex = 50 })
   vim.wo[popup].wrap, vim.wo[popup].linebreak = true, true
   vim.wo[popup].winhighlight = "NormalFloat:SOLPanel,FloatBorder:SOLPanelBorder"
+  popup_return = return_packet
+  local opened = popup
+  api.nvim_create_autocmd('WinClosed', {pattern = tostring(opened), once = true, callback = function()
+    if popup == opened then close_popup() end
+  end})
   for _, key in ipairs({ "<Esc>", "q", "c" }) do
     vim.keymap.set("n", key, close_popup, { buffer = panel, silent = true })
   end
@@ -512,6 +524,7 @@ local function show_lines(lines)
   vim.keymap.set("n", "k", "gk", { buffer = panel, silent = true })
 end
 local function current_packet()
+  if popup_return then return vim.deepcopy(popup_return) end
   local cursor = native_cursor()
   if vim.fn.mode(1) == "n" and not source_rows[cursor.row] then
     local nearest, distance
@@ -576,12 +589,12 @@ if not channel and vim.env.SOL_NVIM_REQUEST_FD and vim.env.SOL_NVIM_RESPONSE_FD 
   _G.SOLReaderChannel = channel
 end
 local show_search, show_source, show_study, show_note_history
-local function request(operation, fields, callback)
+local function request(operation, fields, callback, packet)
   if not channel then fail('this action needs the installed SOL reader, not a research export') end
   if channel.navigation_pending then return end
   local message = vim.deepcopy(fields or {})
   channel.serial = channel.serial + 1
-  message.id, message.op, message.packet, message.mode = channel.serial, operation, current_packet(), mode
+  message.id, message.op, message.packet, message.mode = channel.serial, operation, packet or current_packet(), mode
   message.focus = data.focus == true
   if data.theme then message.theme = data.theme.active end
   if operation ~= 'marker_set' and operation ~= 'marker_clear' then
@@ -724,6 +737,137 @@ end
 local function source()
   request('source_preview', {page = 1})
 end
+-- Book notes are disposable reading panels. Their canonical paragraphs keep
+-- independent IDs and codepoint spans; no panel position becomes a book visit.
+local context, show_footnote
+local footnote_session
+local footnote_namespace = api.nvim_create_namespace('sol-footnote')
+local function open_footnote(trail, origin)
+  local from = popup
+  request('footnote_open', {trail = trail}, function(result)
+    -- Closing the panel while Python works cancels the presentation, not a save.
+    if from and api.nvim_win_is_valid(from) then show_footnote(result.footnote, origin) end
+  end, origin)
+end
+local function attribution_line(attribution)
+  if type(attribution) ~= 'table' then fail('invalid footnote attribution') end
+  local values = {}
+  for _, key in ipairs({'role', 'status', 'author'}) do
+    local value = attribution[key]
+    if type(value) == 'string' and value ~= '' then boundaries(value); values[#values + 1] = value end
+  end
+  return table.concat(values, ' · ')
+end
+show_footnote = function(note, origin, returning)
+  if type(note) ~= 'table' or type(note.id) ~= 'string' or type(note.label) ~= 'string'
+    or type(note.paragraphs) ~= 'table' or #note.paragraphs < 1 or #note.paragraphs > 64
+    or type(note.links) ~= 'table' or #note.links > 128 or type(note.trail) ~= 'table'
+    or #note.trail < 1 or #note.trail > 8 or note.trail[#note.trail] ~= note.id then
+    fail('invalid bounded footnote view')
+  end
+  boundaries(note.label); valid_strings(note.warnings)
+  local lines, warning_lines, body_rows, link_rows = {}, {}, {}, {}
+  local function add(text)
+    for _, line in ipairs(vim.split(text, '\n', {plain = true})) do lines[#lines + 1] = line end
+  end
+  local function warnings(items)
+    valid_strings(items)
+    for _, warning in ipairs(items) do
+      add('Warning: ' .. warning); warning_lines[#warning_lines + 1] = #lines
+    end
+  end
+  add('Book footnote [' .. note.label .. ']')
+  add(attribution_line(note.attribution)); warnings(note.warnings); add('')
+  for _, part in ipairs(note.paragraphs) do
+    if type(part.id) ~= 'string' then fail('invalid footnote paragraph identity') end
+    local length = #boundaries(part.plain_text) - 1
+    valid_styles(part.styles, length)
+    if not vim.deep_equal(part.attribution, note.attribution) then add(attribution_line(part.attribution)) end
+    warnings(part.warnings)
+    body_rows[#body_rows + 1] = {part = part, first = #lines + 1}
+    add(part.plain_text); add('')
+    if type(part.callouts) ~= 'table' then fail('invalid footnote callouts') end
+    for _, mark in ipairs(part.callouts) do
+      if not integer(mark.offset) or mark.offset < 0 or mark.offset > length
+        or type(mark.label) ~= 'string' then fail('invalid footnote callout') end
+      boundaries(mark.label)
+    end
+  end
+  if #note.links > 0 then
+    add('Further book footnotes · Enter opens the link under the cursor')
+    for _, link in ipairs(note.links) do
+      if type(link.id) ~= 'string' or type(link.label) ~= 'string' or type(link.refusal) ~= 'string' then
+        fail('invalid footnote link')
+      end
+      boundaries(link.label); boundaries(link.refusal)
+      add('[' .. link.label .. ']' .. (link.refusal ~= '' and (' · ' .. link.refusal) or ''))
+      link_rows[#lines] = link
+    end
+    add('')
+  end
+  add('Backspace: back · Esc/q: reading')
+  local state = footnote_session
+  if not returning then
+    if #note.trail == 1 or not state then
+      state = {origin = origin, frames = {}, context_cursor = api.nvim_win_get_cursor(popup),
+        context_view = vim.fn.winsaveview()}
+    else
+      local previous = state.frames[#state.frames]
+      previous.cursor, previous.view = api.nvim_win_get_cursor(popup), vim.fn.winsaveview()
+    end
+    state.frames[#state.frames + 1] = {note = note}
+  end
+  show_lines(lines, origin)
+  footnote_session = state
+  local panel = api.nvim_get_current_buf()
+  api.nvim_buf_set_extmark(panel, footnote_namespace, 0, 0,
+    {end_row = 0, end_col = #lines[1], hl_group = 'SOLSourceHeading'})
+  for _, row in ipairs(warning_lines) do
+    api.nvim_buf_set_extmark(panel, footnote_namespace, row - 1, 0,
+      {end_row = row - 1, end_col = #lines[row], hl_group = 'SOLSourceWarning'})
+  end
+  for _, body in ipairs(body_rows) do
+    local function location(offset)
+      local prefix = slice(body.part.plain_text, 0, offset)
+      local _, newlines = prefix:gsub('\n', '')
+      return body.first + newlines - 1, #(prefix:match('[^\n]*$'))
+    end
+    for _, span in ipairs(body.part.styles) do
+      local row, byte = location(span.start)
+      local last_row, last_byte = location(span['end'])
+      api.nvim_buf_set_extmark(panel, footnote_namespace, row, byte,
+        {end_row = last_row, end_col = last_byte, hl_group = semantic_group(span.styles)})
+    end
+    for _, callout in ipairs(body.part.callouts) do
+      local row, byte = location(callout.offset)
+      local mark = callout.label:match('^%d+$') and callout.label:gsub('%d', superscript) or '[' .. callout.label .. ']'
+      api.nvim_buf_set_extmark(panel, footnote_namespace, row, byte,
+        {virt_text = {{mark, 'NonText'}}, virt_text_pos = 'inline', right_gravity = false})
+    end
+  end
+  local function finish() footnote_session = nil; close_popup() end
+  for _, key in ipairs({'<Esc>', 'q', 'c'}) do
+    vim.keymap.set('n', key, finish, {buffer = panel, silent = true})
+  end
+  vim.keymap.set('n', '<CR>', function()
+    local link = link_rows[api.nvim_win_get_cursor(popup)[1]]
+    if not link then vim.notify('Move onto a further footnote link first.', vim.log.levels.INFO); return end
+    if link.refusal ~= '' then vim.notify(link.refusal, vim.log.levels.WARN); return end
+    local trail = vim.deepcopy(note.trail); trail[#trail + 1] = link.id
+    open_footnote(trail, origin)
+  end, {buffer = panel, silent = true})
+  vim.keymap.set('n', '<BS>', function()
+    table.remove(state.frames)
+    local previous = state.frames[#state.frames]
+    if previous then
+      show_footnote(previous.note, origin, true)
+      api.nvim_win_set_cursor(popup, previous.cursor); vim.fn.winrestview(previous.view)
+    else
+      footnote_session = nil; context(origin)
+      api.nvim_win_set_cursor(popup, state.context_cursor); vim.fn.winrestview(state.context_view)
+    end
+  end, {buffer = panel, silent = true})
+end
 -- A personal note binds the whole passage through the workspace service. A
 -- selection is shown as context above the editor and is not stored. Drafts
 -- survive any close except an explicit discard, and an unacknowledged save.
@@ -738,6 +882,7 @@ local function note(edit)
   local key = edit and ('edit:' .. edit.id) or record.id
   if vim.fn.mode(1) ~= 'n' then normal_escape() end
   close_popup()
+  if vim.fn.mode(1) ~= 'n' then normal_escape() end
   local channel_state = rawget(_G, 'SOLReaderChannel')
   local drafts = channel_state and channel_state.drafts or {}
   if channel_state then channel_state.drafts = drafts end
@@ -883,35 +1028,21 @@ local function tree()
   })
   return tree_view
 end
-local function context()
-  local packet = current_packet()
+context = function(origin)
+  local packet = origin or current_packet()
   local record = by_id[packet.reference.reference.target_id]
-  local lines = { record.heading, "", "Source context (not selectable passage text)", "" }
-  local note_rows = {}
+  local lines = { record.heading, "" }
+  local note_rows, book_rows = {}, {}
   local function add(text)
     for _, line in ipairs(vim.split(tostring(text), "\n", { plain = true })) do lines[#lines + 1] = line end
   end
-  add(record.context.path)
-  add('Reading scope: loaded section (' .. #records .. ' paragraphs); gg/G stay here.')
-  add("Printed pages: " .. vim.json.encode(record.context.printed_pages))
-  add("PDF pages: " .. vim.json.encode(record.context.pdf_pages))
-  add("Attribution: " .. vim.json.encode(record.context.attribution))
-  add("Record: " .. record.id)
-  if data.markers then
-    add(''); add('Paragraph markers' .. (data.markers.persistent and ' (saved in workspace)' or ' (temporary session only)'))
-    for _, slot in ipairs(data.markers.slots) do
-      add(tostring(slot.slot) .. '. ' .. slot.label .. (slot.resolved == record.id and '  [here]' or ''))
-    end
-    add("m1/m2/m3 place; '1/'2/'3 return; dm1/dm2/dm3 clear")
-  end
   for _, warning in ipairs(record.warnings) do add("Warning: " .. warning) end
-  if #record.notes > 0 then add(""); add("Footnotes on this passage (" .. #record.notes .. ")") end
+  add("Book footnotes on this passage (" .. #record.notes .. ") · Enter opens one")
   for _, note in ipairs(record.notes) do
-    local author = note.attribution.author
-    add(""); add("[" .. (note.label ~= "" and note.label or "?") .. "] " .. tostring(note.attribution.role)
-      .. ", " .. tostring(note.attribution.status) .. (type(author) == "string" and ", " .. author or ""))
+    local first = #lines + 1
+    add("[" .. (note.label ~= "" and note.label or "?") .. "] " .. attribution_line(note.attribution))
     for _, warning in ipairs(note.warnings) do add("Warning: " .. warning) end
-    add(note.plain_text)
+    book_rows[#book_rows + 1] = {first = first, last = #lines, id = note.reference.reference.target_id}
   end
   if data.personal then
     add("")
@@ -933,10 +1064,34 @@ local function context()
       end
     end
   end
+  add(""); add("Source context (not selectable passage text)"); add("")
+  add(record.context.path)
+  add('Reading scope: loaded section (' .. #records .. ' paragraphs); gg/G stay here.')
+  add("Printed pages: " .. vim.json.encode(record.context.printed_pages))
+  add("PDF pages: " .. vim.json.encode(record.context.pdf_pages))
+  add("Attribution: " .. vim.json.encode(record.context.attribution))
+  add("Record: " .. record.id)
+  if data.markers then
+    add(''); add('Paragraph markers' .. (data.markers.persistent and ' (saved in workspace)' or ' (temporary session only)'))
+    for _, slot in ipairs(data.markers.slots) do
+      add(tostring(slot.slot) .. '. ' .. slot.label .. (slot.resolved == record.id and '  [here]' or ''))
+    end
+    add("m1/m2/m3 place; '1/'2/'3 return; dm1/dm2/dm3 clear")
+  end
   add(""); add("Esc returns to reading. Notes and context have no passage-selection identity.")
-  show_lines(lines)
+  show_lines(lines, packet)
   popup_context = true
   local panel = api.nvim_get_current_buf()
+  vim.keymap.set('n', '<CR>', function()
+    local row, chosen = api.nvim_win_get_cursor(popup)[1], nil
+    for _, span in ipairs(book_rows) do
+      if row >= span.first and row <= span.last then chosen = span.id end
+    end
+    if not chosen then
+      vim.notify('Move onto a book footnote first.', vim.log.levels.INFO); return
+    end
+    open_footnote({chosen}, packet)
+  end, {buffer = panel, silent = true})
   -- The note under the cursor, or the only one; never a guess between several.
   local function chosen()
     local row = api.nvim_win_get_cursor(0)[1]
@@ -994,6 +1149,8 @@ local function help()
       "Alt-Left/Right   return / forward through reading history",
       "v                characterwise selection inside one passage",
       "c                source pages, attribution and linked notes",
+      "c, then Enter    read one book footnote; Enter follows a further link",
+      "Backspace / Esc  in a footnote: previous panel / exact passage selection",
       "s                show the printed source of this passage (formulas)",
       "a                write a personal note on this passage (workspace)",
       "c, then e / r    edit your note under the cursor / show its earlier versions",
@@ -1128,7 +1285,7 @@ if integrated then
 end
 vim.keymap.set("n", "[p", guarded(function() passage(-1) end), { buffer = buffer, silent = true })
 vim.keymap.set("n", "]p", guarded(function() passage(1) end), { buffer = buffer, silent = true })
-vim.keymap.set("n", "c", guarded(context), { buffer = buffer, silent = true })
+vim.keymap.set({"n", "x"}, "c", guarded(context), { buffer = buffer, silent = true })
 vim.keymap.set("n", "?", help, { buffer = buffer, silent = true })
 if data.theme then vim.keymap.set("n", "T", guarded(cycle_theme), { buffer = buffer, silent = true }) end
 if not integrated then api.nvim_create_user_command("SOLExport", guarded(function() export() end), {}) end
@@ -1162,6 +1319,7 @@ _G.SOLNvimReader = { records = records, buffer = buffer, window = window, positi
     data.personal = personal
     if popup_context then context() end
   end,
+  footnote = show_footnote,
   note = note,
   dispose = function()
     close_popup()

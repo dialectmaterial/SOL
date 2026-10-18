@@ -53,7 +53,7 @@ refused. The documentation check and the full suite pass.
 
 ## Codex: Footnote reading view
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/footnote-view`
 **Requested:** 19 October 2026, by the maintainer
 

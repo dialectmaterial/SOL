@@ -744,6 +744,157 @@ end
         self.assertEqual(sorted(report["marks"]), expected)
         self.assertTrue(report["refused"])
 
+    def prepare_footnote_panels(self):
+        from fixtures_footnotes import add_footnote_corpus
+        from sol.terminal import neovim
+        identifier = self.sample.passages[0].identifier
+        notes, _ = add_footnote_corpus(self.corpus, identifier)
+        self.sample = sample_from_book(load_corpus_book(self.corpus), count=3)
+        panels = {"root": neovim.build_footnote_payload(self.sample, identifier, notes[:1]),
+                  "nested": neovim.build_footnote_payload(self.sample, identifier, notes[:2])}
+        (self.root / "footnotes.json").write_text(json.dumps(panels, ensure_ascii=False), encoding="utf-8")
+        self.before = {path.name: path.read_bytes() for path in self.corpus.iterdir()}
+
+    def test_book_footnotes_keep_styles_nested_links_and_exact_selection_in_both_modes(self):
+        self.prepare_footnote_panels()
+        report = self.run_lua(r'''
+  local file = assert(io.open('footnotes.json')); local panels = vim.json.decode(file:read('*a')); file:close()
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  local errors = {}
+  vim.notify = function(message) errors[#errors + 1] = message end
+  local function row_of(text)
+    for row, line in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, false)) do
+      if line:find(text, 1, true) then return row end
+    end
+    error('no panel row: ' .. text)
+  end
+  local function choose(text)
+    vim.api.nvim_win_set_cursor(0, {row_of(text), 0})
+    vim.api.nvim_feedkeys(vim.keycode('<CR>'), 'xt', false)
+  end
+  local function respond(name)
+    local last = sent[#sent]
+    assert(last.op == 'footnote_open')
+    SOLReaderChannel.pending[last.id]({footnote = panels[name]})
+  end
+  report.checks, report.marks = 0, 0
+  for _, width in ipairs({72, 20}) do
+    for _, mode in ipairs({'continuous', 'paragraph'}) do
+      for _, reverse in ipairs({false, true}) do
+        vim.o.columns, vim.o.lines = width + 6, 24
+        local payload = vim.deepcopy(data)
+        payload.mode, payload.width = mode, width
+        assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(payload)
+        reader = SOLNvimReader
+        local id = data.records[1].id
+        local a, b = reader.source_point(id, 5), reader.source_point(id, 36)
+        local origin = reader.capture('v', reverse and b or a, reverse and a or b)
+        reader.restore(origin)
+        -- The actual visual-mode c mapping accepts and remembers the selection.
+        vim.api.nvim_feedkeys('c', 'xt', false)
+        assert(vim.fn.mode(1) == 'n')
+        local listing = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
+        assert(listing:find('Book footnotes', 1, true))
+        assert(not listing:find('first thought', 1, true), 'book text should be read in its own panel')
+        choose('[12]')
+        assert(vim.deep_equal(sent[#sent].packet, origin) and sent[#sent].mode == mode)
+        respond('root')
+        local root_lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+        assert(root_lines[1] == 'Book footnote [12]')
+        local text = table.concat(root_lines, '\n')
+        assert(text:find('Invented translator', 1, true) and text:find('Another editor', 1, true))
+        assert(text:find('Note transcription needs review.', 1, true))
+        assert(text:find('α first thought é.', 1, true))
+        local marks = vim.api.nvim_buf_get_extmarks(0, -1, 0, -1, {details = true})
+        local styled, callout = {}, false
+        for _, mark in ipairs(marks) do
+          local detail = mark[4]
+          if detail.hl_group and detail.hl_group:find('SOLSemantic_', 1, true) then
+            local line = root_lines[mark[2] + 1]
+            styled[#styled + 1] = line:sub(mark[3] + 1, detail.end_col)
+          elseif detail.virt_text_pos == 'inline' then
+            assert(detail.virt_text[1][1] == '⁷')
+            callout = true
+          end
+        end
+        assert(vim.deep_equal(styled, {'first', 'second', 'line'}))
+        assert(callout)
+        report.marks = report.marks + #styled
+        choose('[7]'); respond('nested')
+        assert(#sent[#sent].trail == 2)
+        assert(vim.api.nvim_buf_get_lines(0, 0, 1, false)[1] == 'Book footnote [7]')
+        local count = #sent
+        choose('[12]')
+        assert(#sent == count and errors[#errors]:find('Cycle', 1, true))
+        vim.api.nvim_feedkeys(vim.keycode('<BS>'), 'xt', false)
+        assert(vim.api.nvim_buf_get_lines(0, 0, 1, false)[1] == 'Book footnote [12]')
+        assert(vim.api.nvim_win_get_cursor(0)[1] == row_of('[7]'))
+        vim.api.nvim_feedkeys(vim.keycode('<BS>'), 'xt', false)
+        assert(vim.api.nvim_win_get_cursor(0)[1] == row_of('[12]'))
+        choose('[12]'); respond('root')
+        vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+        assert(vim.deep_equal(reader.capture(), origin))
+        assert(reader.mode == mode)
+        -- The passage's native yank remains exact around the inline callout.
+        reader.yank()
+        assert(vim.fn.getreg('"') == origin.selection.text)
+        report.checks = report.checks + 1
+        vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+      end
+    end
+  end
+''', integrated=True)
+        self.assertEqual(report["checks"], 8)
+        self.assertEqual(report["marks"], 24)
+
+    def test_footnote_failure_late_reply_and_resize_preserve_the_reading_origin(self):
+        self.prepare_footnote_panels()
+        report = self.run_lua(r'''
+  local file = assert(io.open('footnotes.json')); local panels = vim.json.decode(file:read('*a')); file:close()
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data)); reader = SOLNvimReader
+  local id = data.records[1].id
+  local origin = reader.capture('v', reader.source_point(id, 5), reader.source_point(id, 13))
+  local errors = {}; vim.notify = function(message) errors[#errors + 1] = message end
+  local function open()
+    reader.restore(origin); reader.context()
+    for row, line in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, false)) do
+      if line:find('[12]', 1, true) then vim.api.nvim_win_set_cursor(0, {row, 0}); break end
+    end
+    vim.api.nvim_feedkeys(vim.keycode('<CR>'), 'xt', false)
+  end
+  open()
+  local panel = vim.api.nvim_get_current_win()
+  SOLReaderChannel.pending[sent[#sent].id](nil, 'The canonical corpus changed; reopen it.')
+  assert(vim.api.nvim_get_current_win() == panel and errors[#errors]:find('corpus changed', 1, true))
+  vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  assert(vim.deep_equal(reader.capture(), origin))
+  open()
+  vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  SOLReaderChannel.pending[sent[#sent].id]({footnote = panels.root})
+  assert(vim.api.nvim_get_current_win() == reader.window)
+  assert(vim.deep_equal(reader.capture(), origin))
+  open(); SOLReaderChannel.pending[sent[#sent].id]({footnote = panels.root})
+  vim.o.columns = 26
+  vim.api.nvim_exec_autocmds('VimResized', {})
+  assert(vim.api.nvim_get_current_win() == reader.window)
+  assert(vim.deep_equal(reader.capture(), origin))
+  open(); SOLReaderChannel.pending[sent[#sent].id]({footnote = panels.root})
+  vim.cmd('q')
+  assert(vim.api.nvim_get_current_win() == reader.window)
+  assert(vim.deep_equal(reader.capture(), origin))
+  -- Native window close must not leave a saved popup packet shadowing motion.
+  vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  vim.api.nvim_win_set_cursor(reader.window, point(id, 20))
+  assert(reader.capture().cursor_offset == 20)
+  report.ok = true
+''', integrated=True)
+        self.assertTrue(report["ok"])
+
     def test_sentence_study_panel_lists_rows_and_enter_opens_one(self):
         report = self.run_lua(r'''
   local sent = {}
