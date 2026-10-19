@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### The note editor opens beside the text — 19 October 2026
+
+`a` (and `e` in `c`) now opens the note editor beside the passage when there
+is room, like the context panel, so the text you are writing about stays in
+view. **Fixed:** the selection quoted above the editor lost every letter "s".
+
 ### Words in context in ESSENCE — 19 October 2026
 
 A word's sources in ESSENCE now show the words around it and the passage's

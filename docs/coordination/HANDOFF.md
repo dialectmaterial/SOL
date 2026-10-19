@@ -32,6 +32,32 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Note editor beside the text — 19 October 2026
+
+**Task:** the maintainer's "go on", taking the note-editor candidate offered in the session; follows the side panels of #32.
+**Branch / PR:** `claude/note-editor-beside`, stacked on #32 · opened with `gh pr create`
+**Last implementation commit:** `150be3caeacf3ea48c7e47766f4a21e421766082`
+
+### Changed files
+- `sol/terminal/neovim_panels.lua`: `side_config()` extracted from `show_lines` and exported.
+- `sol/terminal/neovim_notes.lua`: the editor uses it (beside the page at full page height, else centred as before); the selection quote splits characters with `'\\zs'` (it was `'\zs'`, which Lua turns into `s`, so every "s" vanished from the quote).
+- `tests/test_reader_surface_neovim.py`: editor placement wide and narrow and the page restored after closing; the quote is the exact selection (fails without the fix).
+- `docs/BEING.md`, `CHANGELOG.md`.
+
+### Tests performed
+- Docs OK; full suite **1,716 tests, OK** (12 skipped, 4 expected failures).
+- Real session in tmux at 160×45: `v`, `a` opened the editor beside the page with the quote shown; the missing letters were found there.
+
+### Review round (Codex, 19 October)
+- `:q!` (any close other than save or discard) left the page shifted: only those two released the side columns. A `WinClosed` handler now tidies up after any close, scheduled after it completes; the draft is still kept. Regression: page restored and focused after `:q!`, draft offered again (fails without the fix).
+- Merged main (#34, #35): stacked entries kept.
+
+### Outstanding issues
+- None known.
+
+### Decisions requiring approval
+- **Default:** the editor follows the context panel's placement rules.
+
 ## Words in context in ESSENCE — 19 October 2026
 
 **Task:** the maintainer's "go on" on 19 October, taking the third candidate offered in the session (a word's sources with headings, pages and context); no task-board slot.
