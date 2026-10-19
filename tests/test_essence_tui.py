@@ -462,7 +462,7 @@ class ComparisonScreenTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIs(app.focused, table)
                 # Switching screens starts on that screen's first control.
                 await pilot.press("3")
-                self.assertEqual(app.focused.id, "target")
+                self.assertEqual(app.focused.id, "study")
                 await pilot.press("4")
                 self.assertIs(app.focused, table)
                 app.exit()
@@ -591,3 +591,130 @@ class RealComparisonTests(unittest.TestCase):
         alone = tui_words.run(real, "passage", "none")
         with self.assertRaisesRegex(ValueError, "Export needs a reference"):
             tui_words.export(alone, "csv", data_home=data_home)
+
+
+@unittest.skipUnless(_engine_installed(), "the ESSENCE engines are not installed")
+class SentenceStudyTests(unittest.TestCase):
+    """Sentence lengths from the interface, on the real engine."""
+
+    def setUp(self):
+        from fixtures_corpus import write_runtime_corpus
+        from sol import core
+        from sol.corpus import contract
+
+        temporary = tempfile.TemporaryDirectory(prefix="sol-essence-sentences-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        corpus = self.root / "corpus"
+        self.identifier, _ = write_runtime_corpus(corpus)
+        contract.initialize_corpus_identity(corpus)
+        self.snapshot = core.load_snapshot(corpus)
+        self.context = {**context(), "corpus": str(corpus),
+                        "reference": core.capture_reference(self.snapshot, self.identifier)}
+
+    def test_corpus_targets_measure_open_and_save(self):
+        from sol import core
+        from sol.essence import sentences as engine
+        from sol.essence.tui import sentences as tui_sentences
+
+        text = next(p for p in core.load_corpus_book(Path(self.context["corpus"])).passages
+                    if p.identifier == self.identifier).text
+        for target in ("passage", "section", "book"):
+            with self.subTest(target=target):
+                count = tui_sentences.run(self.context, target)
+                self.assertEqual(count.study["version"], 2)
+                self.assertEqual(count.study["summary"]["sentences"], 1)
+                lines = tui_sentences.summary(count)
+                self.assertTrue(lines[0].startswith("1 sentence, 13 words, 1 input"), lines[0])
+                self.assertIn("punctuation-rules-v1", lines[-1])
+                (words_cell, beginning, where), = tui_sentences.rows(count)
+                self.assertEqual((words_cell, where), ("13", "Synthetic section | p. 7"))
+                self.assertTrue(text.startswith(beginning))
+                source = tui_sentences.source(count, 0)
+                self.assertEqual((source["id"], source["start"]), (self.identifier, 0))
+        saved = tui_sentences.save(count, data_home=self.root / "data")
+        self.assertTrue(saved.name.startswith("sentences-"))
+        self.assertEqual(saved.stat().st_mode & 0o777, 0o600)
+        # No book text in the artifact, and it checks against the same provider.
+        self.assertNotIn("invented passage", saved.read_text(encoding="utf-8").casefold())
+        engine.check_sentence_result(count.target, engine.decode_sentence_result(saved.read_bytes()))
+
+    def test_files_need_no_corpus_and_cannot_open_in_the_reader(self):
+        from sol.essence.tui import sentences as tui_sentences
+
+        text = self.root / "invented.txt"
+        text.write_text("A short one. Then a somewhat longer second sentence follows here.", encoding="utf-8")
+        count = tui_sentences.run({**context(), "corpus": ""}, "file", target_file=str(text))
+        self.assertEqual([row[0] for row in tui_sentences.rows(count)], ["8", "3"])
+        self.assertEqual(tui_sentences.rows(count)[0][1:], ("Then a somewhat longer second sentence follows here.", "text file"))
+        self.assertIsNone(tui_sentences.source(count, 0))
+        with self.assertRaisesRegex(ValueError, "no CORE corpus"):
+            tui_sentences.run({**context(), "corpus": ""}, "book")
+
+    def test_a_corpus_changed_since_the_reader_opened_is_refused(self):
+        from sol import core
+        from sol.corpus import contract
+        from sol.essence.tui import sentences as tui_sentences
+
+        source = Path(self.context["corpus"]) / "sample.md"
+        source.write_text(source.read_text(encoding="utf-8").replace("An invented passage", "A replaced text", 1),
+                          encoding="utf-8")
+        contract.reindex(Path(self.context["corpus"]))
+        with self.assertRaises(core.ProtocolError) as caught:
+            tui_sentences.run(self.context, "section")
+        self.assertEqual(caught.exception.code, "generation_changed")
+
+
+@unittest.skipUnless(tui.textual_available() and _engine_installed(), "needs Textual and the ESSENCE engines")
+class SentenceScreenTests(unittest.IsolatedAsyncioTestCase):
+    async def test_sentence_results_list_the_longest_and_open_one_in_the_reader(self):
+        from sol.essence.tui import sentences as tui_sentences
+        from sol.essence.tui.app import EssenceApp
+
+        digest = "d" * 64
+        study = {"version": 2, "summary": {"sentences": 2, "tokens": 11, "mean": 5.5, "median": 5.5,
+                                           "p10": 3, "p90": 8, "max": 8},
+                 "histogram": [{"from": 1, "to": 10, "sentences": 2}, {"from": 11, "to": None, "sentences": 0}],
+                 "by_position": {name: {"mean": 5.5} for name in ("first", "middle", "last", "only")},
+                 "longest": [1, 0], "sentences": [[0, 0, 12, 3], [1, 4, 40, 8]],
+                 "input": {"provider": "core", "scope": {"kind": "corpus"},
+                           "inputs": [{"id": TARGET, "content_sha256": digest, "reader_path": "/BEING/a.txt",
+                                       "sources": [{"printed_page": "7"}]},
+                                      {"id": TARGET.replace("2", "3"), "content_sha256": digest,
+                                       "reader_path": "/BEING/b.txt", "sources": []}]},
+                 "exclusions": {"by_reason": {}, "outside_span": 0}}
+        count = tui_sentences.SentenceCount(study, object(), {}, {TARGET: "First heading | p. 7"})
+        written, calls = [], []
+        def run(*arguments, **files):
+            calls.append((arguments, files))
+            return count
+        with patch.object(tui_sentences, "run", side_effect=run), patch.object(tui_sentences, "save", return_value=None):
+            app = EssenceApp(context())
+            async with app.run_test(size=(120, 40)) as pilot:
+                original = app._driver.write
+                app._driver.write = lambda data: (written.append(data), original(data))[1]
+                await pilot.press("3")
+                self.assertEqual(app.focused.id, "study")
+                await pilot.press("down", "enter")  # Sentence lengths
+                await pilot.click("#run")
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual(calls[0][0][1], "passage")
+                self.assertEqual(app.query_one("#screens").active, "results")
+                table = app.query_one("#frequencies")
+                self.assertEqual([str(column.label) for column in table.columns.values()], ["Words", "Beginning", "Where"])
+                self.assertEqual(table.get_row_at(0)[::2], ["8", "/BEING/b.txt"])
+                self.assertEqual(table.get_row_at(1)[::2], ["3", "First heading | p. 7"])
+                self.assertFalse(app.query_one("#sources").display)
+                self.assertFalse(app.query_one("#export-row").display)
+                summary = str(app.query_one("#summary").render())
+                self.assertIn("2 sentences, 11 words", summary)
+                self.assertIs(app.focused, table)
+                await pilot.press("enter")
+                await pilot.pause()
+                requests = [data for data in written if data.startswith("\x1b]5379;sol-essence;")]
+                self.assertEqual(len(requests), 1)
+                payload = json.loads(base64.b64decode(requests[0][len("\x1b]5379;sol-essence;"):-1]))
+                self.assertEqual(payload["source"], {"id": TARGET.replace("2", "3"), "start": 4,
+                                                     "content_sha256": digest})
+                app.exit()

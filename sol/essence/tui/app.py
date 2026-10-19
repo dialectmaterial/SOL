@@ -16,7 +16,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import (Button, DataTable, Footer, Input, Label, Markdown, RadioButton, RadioSet, Static,
                              TabbedContent, TabPane)
 
-from sol.essence.tui import words
+from sol.essence.tui import sentences, words
 from sol.essence.tui.context import load_state, save_state
 
 SCREENS = {
@@ -95,7 +95,11 @@ class EssenceApp(App):
     def compose_experiment(self) -> ComposeResult:
         # Tab goes straight to the choices, not to the scrolling container.
         with VerticalScroll(can_focus=False):
-            yield Label("Word frequencies: count the words of a target, optionally against a reference.")
+            yield Label("Count the words of a target, optionally against a reference, or measure its "
+                        "sentence lengths (no reference).")
+            with RadioSet(id="study"):
+                yield RadioButton("Word frequencies", value=True, name="words")
+                yield RadioButton("Sentence lengths", name="sentences")
             with Horizontal(classes="choices"):
                 with RadioSet(id="target"):
                     for key, label in words.TARGETS.items():
@@ -106,7 +110,7 @@ class EssenceApp(App):
             yield Input(placeholder="Target text file (UTF-8), when 'A text file' is chosen", id="target-file")
             yield Input(placeholder="Reference text file (UTF-8), when 'A text file' is chosen", id="reference-file")
             with Horizontal(id="run-row"):
-                yield Button("Count words", id="run", variant="primary")
+                yield Button("Run", id="run", variant="primary")
                 yield Button("Cancel", id="cancel", disabled=True)
             yield Static("", id="status")
 
@@ -114,7 +118,7 @@ class EssenceApp(App):
         # Denominators, formulas and warnings can run long; they scroll so the
         # table keeps most of the height.
         with VerticalScroll(id="summary-box"):
-            yield Static("No count yet. Choose a target in Experiment and press Count words.", id="summary")
+            yield Static("Nothing yet. Choose a study and a target in Experiment, then press Run.", id="summary")
         yield DataTable(id="frequencies", zebra_stripes=True, cursor_type="row")
         yield Static("Sources of the highlighted word: Enter on a word comes here, Enter here opens it in the "
                      "reader (Alt-Left there returns to where you were), Escape goes back to the words.",
@@ -127,7 +131,7 @@ class EssenceApp(App):
 
     def choice(self, name: str) -> str:
         pressed = self.query_one(f"#{name}", RadioSet).pressed_button
-        return pressed.name if pressed is not None else ("passage" if name == "target" else "none")
+        return pressed.name if pressed is not None else {"target": "passage", "study": "words"}.get(name, "none")
 
     count_serial = 0
     last_count = None
@@ -142,7 +146,7 @@ class EssenceApp(App):
             self.query_one("#cancel", Button).disabled = False
             self.count_words(self.count_serial, self.choice("target"), self.choice("reference"),
                              self.query_one("#target-file", Input).value,
-                             self.query_one("#reference-file", Input).value)
+                             self.query_one("#reference-file", Input).value, self.choice("study"))
         elif event.button.id == "cancel":
             # The engine cannot be interrupted midway: the count finishes in
             # the background, and its result is discarded like a replaced one.
@@ -160,11 +164,14 @@ class EssenceApp(App):
             self.export_table(self.last_count, event.button.id.removeprefix("export-"))
 
     @work(thread=True, exclusive=True)
-    def count_words(self, serial, target, reference, target_file, reference_file) -> None:
+    def count_words(self, serial, target, reference, target_file, reference_file, study="words") -> None:
         # The engine reads the corpus or files; keep the interface responsive.
         try:
-            outcome = words.run(self.context, target, reference, target_file=target_file,
-                                reference_file=reference_file)
+            if study == "sentences":
+                outcome = sentences.run(self.context, target, target_file=target_file)
+            else:
+                outcome = words.run(self.context, target, reference, target_file=target_file,
+                                    reference_file=reference_file)
         except (words.EngineMissing, ValueError, OSError) as error:
             outcome = error
         try:
@@ -182,13 +189,17 @@ class EssenceApp(App):
             status.update(f"Not counted: {outcome}")
             return
         try:
-            saved = words.save(outcome) if self.state_file else None
+            module = sentences if isinstance(outcome, sentences.SentenceCount) else words
+            saved = module.save(outcome) if self.state_file else None
         except (words.EngineMissing, ValueError, OSError) as error:
             status.update(f"Counted, but not saved: {error}")
             saved = None
         self.show_result(outcome, saved)
 
     def show_result(self, count, saved) -> None:
+        if isinstance(count, sentences.SentenceCount):
+            return self.show_sentences(count, saved)
+        self.set_word_widgets(True)
         table = self.query_one("#frequencies", DataTable)
         table.clear(columns=True)
         table.add_columns("Word", "Target", "per 10,000", "Reference", "per 10,000",
@@ -211,6 +222,31 @@ class EssenceApp(App):
         # Words first: arrows choose a word, Enter goes to its sources.
         table.focus()
 
+    def set_word_widgets(self, shown) -> None:
+        # Sources and export belong to word counts only.
+        for selector in ("#sources-label", "#sources", "#export-row"):
+            self.query_one(selector).display = shown
+
+    def show_sentences(self, count, saved) -> None:
+        self.set_word_widgets(False)
+        table = self.query_one("#frequencies", DataTable)
+        table.clear(columns=True)
+        table.add_columns("Words", "Beginning", "Where")
+        table.add_rows(sentences.rows(count))
+        lines = sentences.summary(count)
+        if count.study["longest"]:
+            lines.append("The longest sentences are below; Enter opens one in the reader (Alt-Left there returns).")
+        lines.append(f"Saved: {saved} (check with: sol analyze check FILE)" if saved else
+                     "Not saved: this reader session has no workspace.")
+        self.query_one("#summary", Static).update("\n".join(lines))
+        self.query_one("#result-status", Static).update("")
+        self.query_one("#status", Static).update(
+            f"Measured {count.study['summary']['sentences']:,} sentences; see Results (4).")
+        self.last_count = count
+        self.shown_sources = ()
+        self.query_one("#screens", TabbedContent).active = "results"
+        table.focus()
+
     def show_sources(self, index) -> None:
         table = self.query_one("#sources", DataTable)
         table.clear(columns=True)
@@ -221,11 +257,21 @@ class EssenceApp(App):
                         for item in self.shown_sources])
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
-        if event.data_table.id == "frequencies" and self.last_count is not None:
+        if (event.data_table.id == "frequencies" and self.last_count is not None
+                and not isinstance(self.last_count, sentences.SentenceCount)):
             self.show_sources(event.cursor_row)
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         if event.data_table.id == "frequencies":
+            if isinstance(self.last_count, sentences.SentenceCount):
+                if not 0 <= event.cursor_row < len(self.last_count.study["longest"][:sentences.ROW_LIMIT]):
+                    return
+                source = sentences.source(self.last_count, event.cursor_row)
+                if source is None:
+                    self.query_one("#result-status", Static).update("A text file's sentences cannot be opened in the reader.")
+                else:
+                    self.open_in_reader(source)
+                return
             self.query_one("#sources", DataTable).focus()
             return
         if event.data_table.id != "sources" or not 0 <= event.cursor_row < len(self.shown_sources):
@@ -282,7 +328,7 @@ class EssenceApp(App):
         self.set_focus(None)
         self.query_one("#screens", TabbedContent).active = name
         # Then start on the screen's first control.
-        first = {"experiment": "#target", "results": "#frequencies"}.get(name)
+        first = {"experiment": "#study", "results": "#frequencies"}.get(name)
         if first:
             self.query_one(first).focus()
 
