@@ -102,6 +102,24 @@ def run(context, target_choice, reference_choice, *, target_file=None, reference
     return Count(comparison["study"], comparison, target, reference)
 
 
+def verified_file_text(path, sha256):
+    """The file's text exactly as the engine counted it, or None if it changed.
+
+    For display only: the engine's own bounded, stable read, decoded verbatim
+    (CRLF and BOM kept, so offsets still match), and only when the bytes still
+    have the digest the study recorded.
+    """
+    import hashlib
+    try:
+        _, inputs = engine()
+        raw = inputs._read_file(Path(path).expanduser().absolute())
+        if hashlib.sha256(raw).hexdigest() != sha256:
+            return None
+        return raw.decode("utf-8")
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 def rows(count, limit=ROW_LIMIT):
     """Table rows: word, count and rate for each side, then the two measures."""
     def cells(cell):
@@ -184,13 +202,13 @@ def export(count, table_format, *, data_home=None):
     return _create(text.encode("utf-8"), "." + table_format, data_home)
 
 
-def _create(data, suffix, data_home):
+def _create(data, suffix, data_home, prefix="words"):
     home = Path(data_home or os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
     directory = home / "sol" / "studies"
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     for number in range(100):
-        path = directory / (f"words-{stamp}" + (f"-{number}" if number else "") + suffix)
+        path = directory / (f"{prefix}-{stamp}" + (f"-{number}" if number else "") + suffix)
         try:
             descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
         except FileExistsError:

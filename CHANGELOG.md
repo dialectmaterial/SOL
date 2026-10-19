@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Sentence lengths in ESSENCE — 19 October 2026
+
+ESSENCE's Experiment screen now offers sentence lengths beside word
+frequencies, for this passage, its section, the whole book or a text file.
+Results shows how long the sentences are, how that varies by place in the
+paragraph, and the twelve longest; Enter opens one in the reader, and
+Alt-Left there returns. This replaces the reader's former `S`.
+
 ### Copying, quitting, the context panel and the status line — 19 October 2026
 
 - `y` now copies to your system clipboard; it failed before because the reader
