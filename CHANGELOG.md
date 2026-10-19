@@ -10,6 +10,23 @@ Results shows how long the sentences are, how that varies by place in the
 paragraph, and the twelve longest; Enter opens one in the reader, and
 Alt-Left there returns. This replaces the reader's former `S`.
 
+### Copying, quitting, the context panel and the status line — 19 October 2026
+
+- `y` now copies to your system clipboard; it failed before because the reader
+  hid your desktop session from the clipboard program. A selection may span
+  paragraphs, and dragging with the mouse selects and copies on release.
+  Where no clipboard program works, the terminal is asked instead (OSC 52).
+- `q` and `Ctrl-q` no longer quit, so a stray key cannot end a reading
+  session. Use `:q` or `:qa` to save your place and quit, or `:qa!` to quit
+  without saving.
+- `c` opens beside the text when there is room, with headed sections for
+  footnotes, your notes, markers and the record, and note dates in local time.
+- The status line shows where you are in the book (section titles and page),
+  the reading mode, how far through the book you are, and how to find help
+  and quit.
+- `S` (sentence lengths) is gone from the reader; `sol analyze sentences`
+  still runs the study.
+
 ### Sentence studies over UTF-8 files and CORE providers — 19 October 2026
 
 `sol analyze sentences --file PATH [--span START END]` measures ordinary text

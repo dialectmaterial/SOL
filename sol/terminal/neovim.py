@@ -304,7 +304,32 @@ def _write_json(path, value):
         stream.write(encoded)
 
 
+def clipboard_command(environment=None, which=None, platform=None):
+    """The system clipboard program for this session, or None to use OSC 52.
+
+    Chosen from the real environment before Neovim's is isolated: the program
+    then gets back exactly what it needs to reach the session (the Wayland
+    socket lives in the real XDG_RUNTIME_DIR, not Neovim's private one).
+    """
+    environment = os.environ if environment is None else environment
+    which = which or shutil.which
+    platform = platform or sys.platform
+    def keep(*names):
+        return {name: environment[name] for name in names if environment.get(name)}
+    if environment.get("WAYLAND_DISPLAY") and which("wl-copy"):
+        return {"command": [which("wl-copy"), "--type", "text/plain"],
+                "env": keep("WAYLAND_DISPLAY", "XDG_RUNTIME_DIR")}
+    if environment.get("DISPLAY"):
+        for name, arguments in (("xclip", ["-selection", "clipboard"]), ("xsel", ["--clipboard", "--input"])):
+            if which(name):
+                return {"command": [which(name), *arguments], "env": keep("DISPLAY", "XAUTHORITY")}
+    if platform == "darwin" and which("pbcopy"):
+        return {"command": [which("pbcopy")], "env": {}}
+    return None
+
+
 def _isolated_environment(root, input_path, output_path):
+    clipboard = clipboard_command()
     environment = os.environ.copy()
     for key in ("SOL_NVIM_REQUEST_FD", "SOL_NVIM_RESPONSE_FD"):
         environment.pop(key, None)
@@ -320,7 +345,8 @@ def _isolated_environment(root, input_path, output_path):
         environment[variable] = str(directory)
     environment.update(SOL_NVIM_INPUT=str(input_path), SOL_NVIM_OUTPUT=str(output_path),
                        SOL_NVIM_ADAPTER=str(Path(__file__).with_name("neovim.lua").resolve()),
-                       NVIM_LOG_FILE=str(root / "neovim.log"), NVIM_APPNAME="sol-reader")
+                       NVIM_LOG_FILE=str(root / "neovim.log"), NVIM_APPNAME="sol-reader",
+                       SOL_NVIM_CLIPBOARD=json.dumps(clipboard))
     return environment
 
 

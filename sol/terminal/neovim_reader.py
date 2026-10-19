@@ -122,8 +122,6 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     else:
         actions.read((), first=True)
     transient_markers = {}
-    # The latest sentence study shown in this session, for opening its rows.
-    study = None
     source_service, source_requests = None, {}
     mode = "continuous"
     focused = False
@@ -201,7 +199,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         structure["depth"] = tree_depth
         if start_tree:
             structure["root"] = "/"
-        payload.update(integrated=True, navigation=navigation, notice=notice or "", mode=mode, focus=focused,
+        progress = {"first": extent.first, "total": len(book.passages)}
+        payload.update(integrated=True, navigation=navigation, progress=progress, notice=notice or "", mode=mode, focus=focused,
                        markers=markers(), structure=structure, tree_only=start_tree,
                        personal=personal_notes(sample), search_marks=search_marks)
         neovim._safe_metadata({"notice": payload["notice"], "markers": payload["markers"], "structure": structure,
@@ -225,8 +224,6 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                     "search needs 1–256 characters")],
         "search_open": [("result", lambda result: type(result) is int and 1 <= result <= len(actions.results),
                          "choose a displayed search result")],
-        "study_open": [("row", lambda row: study is not None and type(row) is int and 1 <= row <= len(study["longest"]),
-                        "choose a displayed sentence")],
         "note_add": [note_body],
         "note_edit": [note_id, ("revision", lambda revision: type(revision) is int and revision >= 1,
                                 "the note's revision is required"), note_body],
@@ -241,31 +238,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     extra_fields["marker_clear"] = extra_fields["marker_open"] = extra_fields["marker_set"]
     navigation_actions = {"next", "previous", "passage_next", "passage_previous", "node_open", "marker_open",
                           "search_open", "search_next", "search_previous", "history_back", "history_forward",
-                          "study_open", "essence_source"}
-
-    def study_panel(request, identifier):
-        # ESSENCE measures the loaded section; BEING only shows the result and
-        # keeps the origin. Nothing here moves the cursor or writes the workspace.
-        # The origin is where the cursor is now: native motion sends no request,
-        # so Python's last accepted position may be another paragraph.
-        nonlocal study
-        from sol.essence.sentences import analyze_sentences, save_sentence_result
-        origin = request["packet"]["reference"]
-        actions.check_return_reference(origin)
-        scope = {"kind": "passages", "ids": [passage.identifier for passage in sample.passages]}
-        study = analyze_sentences(book.corpus_snapshot, scope=scope, origin=origin)
-        saved = None if workspace_reader is None else str(save_sentence_result(study))
-        summary, rows = study["summary"], []
-        for number, index in enumerate(study["longest"], 1):
-            passage_index, start, end, tokens = study["sentences"][index]
-            passage = book.find_passage(study["passages"][passage_index]["id"])
-            rows.append({"number": number, "tokens": tokens,
-                         "label": safe_label(f"{passage.heading or passage.node.title} | p. {passage.printed_page}"),
-                         "snippet": safe_label(" ".join(passage.text[start:end].split())[:150])})
-        excluded = study["exclusions"]["by_reason"]["review"]
-        return {"study": {"saved": saved, "summary": summary, "rows": rows, "histogram": study["histogram"],
-                          "positions": {name: values["mean"] for name, values in study["by_position"].items()},
-                          "passages": len(study["passages"]), "excluded_review": excluded}}
+                          "essence_source"}
 
     def search_panel(request, identifier):
         # Searching does not move the cursor, save a visit or erase a selection.
@@ -393,7 +366,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                             "env": environment}}
 
     panels = {"search": search_panel, "source_preview": source_panel, "marker_set": marker_panel,
-              "marker_clear": marker_panel, "note_add": note_panel, "sentence_study": study_panel,
+              "marker_clear": marker_panel, "note_add": note_panel,
               "note_edit": note_edit_panel, "note_history": note_history_panel, "footnote_open": footnote_panel, "essence_open": essence_panel}
 
     def handle(request):
@@ -450,9 +423,6 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             if not 0 <= at < len(book.passages):
                 raise ValueError("no adjacent paragraph")
             target, offset = book.passages[at].identifier, 0
-        elif operation == "study_open":
-            passage_index, offset = study["sentences"][study["longest"][request["row"] - 1]][:2]
-            target = study["passages"][passage_index]["id"]
         elif operation == "essence_source":
             # A word's source from an ESSENCE result: CORE captures the record
             # below, and the passage must still be the text that was counted.

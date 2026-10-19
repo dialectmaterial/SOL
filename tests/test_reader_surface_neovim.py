@@ -38,7 +38,9 @@ def neovim_environment(root):
         "XDG_DATA_HOME": str(root / "data"),
         "XDG_STATE_HOME": str(root / "state"),
         "XDG_CACHE_HOME": str(root / "cache"),
-        "NVIM_LOG_FILE": str(root / "neovim.log")}
+        "NVIM_LOG_FILE": str(root / "neovim.log"),
+        # Note times are shown in local time; fix the zone so text is predictable.
+        "TZ": "UTC"}
     for key in tuple(environment):
         if key.startswith(("SOL_", "KITTY_")) or key in {
             "VIMINIT", "EXINIT", "GVIMINIT", "NVIM_APPNAME", "NVIM", "NVIM_LISTEN_ADDRESS"}:
@@ -338,7 +340,7 @@ end
         self.run_lua(r'''
   local cp = reader.source_point(data.records[2].id, 11)
   vim.api.nvim_win_set_cursor(reader.window, {cp.row, cp.byte})
-  vim.api.nvim_feedkeys('q', 'xt', false)
+  vim.api.nvim_feedkeys(':q\r', 'xt', false)
 ''', integrated=True)
         result = json.loads(self.output.read_text())
         self.assertEqual(set(result), {"action", "packet"})
@@ -373,7 +375,7 @@ end
   vim.o.columns = 38
   vim.api.nvim_exec_autocmds('VimResized', {})
   assert(vim.deep_equal(reader.capture(), packet))
-  vim.api.nvim_feedkeys('q', 'xt', false)
+  vim.api.nvim_feedkeys(':q\r', 'xt', false)
 ''', integrated=True)
         result = json.loads(self.output.read_text())
         selected = validate_packet(self.sample.book, result["packet"])
@@ -423,18 +425,19 @@ end
 
     def test_yank_calls_clipboard_provider_with_exact_semantic_text(self):
         report = self.run_lua(r'''
-  local clipboard
-  vim.g.clipboard = {name = 'SOL isolated clipboard test', cache_enabled = 0,
-    copy = {['+'] = function(lines, kind) clipboard = table.concat(lines, '\n') end,
-            ['*'] = function(lines, kind) clipboard = table.concat(lines, '\n') end},
-    paste = {['+'] = function() return {{clipboard or ''}, 'v'} end,
-             ['*'] = function() return {{clipboard or ''}, 'v'} end}}
+  local clip_file = vim.fn.tempname()
+  vim.env.SOL_NVIM_CLIPBOARD = vim.json.encode({command = {'sh', '-c', 'cat > "$0"', clip_file}, env = vim.empty_dict()})
+  local function clipboard()
+    local stream = io.open(clip_file)
+    if not stream then return nil end
+    local text = stream:read('a'); stream:close(); os.remove(clip_file)
+    return text
+  end
   local id = data.records[1].id
   local packet = reader.capture('v', reader.source_point(id, 7), reader.source_point(id, 13))
   reader.restore(packet)
   reader.yank()
-  assert(clipboard == 'thought')
-  report.clipboard = clipboard
+  report.clipboard = clipboard()
 ''', integrated=True)
         self.assertEqual(report["clipboard"], "thought")
 
@@ -639,8 +642,8 @@ end
         self.assertEqual(report["after_quit"], ["Half a thought"])
         self.assertEqual(report["after_discard"], [""])
         context = "\n".join(report["context"])
-        self.assertIn("Workspace notes on this passage (1); a adds one, e edits", context)
-        self.assertIn("— Invented reader, 2026-10-17T12:00:00Z, revision 1\nA thought\non two lines", context)
+        self.assertIn("Your notes   1 · a add · e edit · r versions", context)
+        self.assertIn("  Invented reader · 17 Oct 2026, 12:00 · revision 1\n  A thought\n  on two lines", context)
         self.assertIn("notes need a workspace", report["temporary"])
 
     def test_context_edits_the_note_under_the_cursor_and_shows_its_versions(self):
@@ -703,11 +706,11 @@ end
   report.history = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 ''', integrated=True)
         context = "\n".join(report["context"])
-        self.assertIn("Workspace notes on this passage (2); a adds one, e edits the note under the cursor", context)
-        self.assertIn("— Invented reader, 2026-10-17T12:00:00Z, revision 1\n"
-                      "  (the passage has changed since this note was written)\nMy first\nthought", context)
-        self.assertIn("— Another reader, 2026-10-17T12:00:00Z, revision 1\n"
-                      "  (only the note's author can edit it)", context)
+        self.assertIn("Your notes   2 · a add · e edit · r versions", context)
+        self.assertIn("  Invented reader · 17 Oct 2026, 12:00 · revision 1\n"
+                      "  the passage has changed since this note was written\n  My first\n  thought", context)
+        self.assertIn("  Another reader · 17 Oct 2026, 12:00 · revision 1\n"
+                      "  only the note's author can edit it", context)
         self.assertIn("move the cursor onto one of the notes", report["ambiguous"])
         self.assertIn("only the note's author", report["foreign"])
         self.assertEqual(report["title"], " Edit your note (revision 1) ")
@@ -811,6 +814,167 @@ end
         self.assertIn("could not start", report["failure"]["warning"])
         self.assertTrue(report["failure"]["window"])
         self.assertTrue(report["failure"]["focused_reader"])
+
+    def test_copying_reaches_the_clipboard_from_keys_and_the_mouse(self):
+        texts = [passage.text for passage in self.sample.passages]
+        report = self.run_lua(r'''
+  local clip_file = vim.fn.tempname()
+  vim.env.SOL_NVIM_CLIPBOARD = vim.json.encode({command = {'sh', '-c', 'cat > "$0"', clip_file}, env = vim.empty_dict()})
+  local function clipboard()
+    local stream = io.open(clip_file)
+    if not stream then return nil end
+    local text = stream:read('a'); stream:close(); os.remove(clip_file)
+    return text
+  end
+  local messages = {}
+  local echo = vim.api.nvim_echo
+  vim.api.nvim_echo = function(chunks, ...) messages[#messages + 1] = chunks[1][1]; return echo(chunks, ...) end
+  local first, second = data.records[1], data.records[2]
+  -- Across two paragraphs: exact source text, joined by a blank line.
+  local a, b = reader.source_point(first.id, 5), reader.source_point(second.id, 9)
+  reader.restore(reader.capture('v', a, a))
+  vim.api.nvim_win_set_cursor(reader.window, {b.row, b.byte})
+  reader.yank()
+  report.across = clipboard()
+  report.mode_after = vim.fn.mode(1)
+  -- A start on the blank line between paragraphs moves forward to prose.
+  local blank = reader.source_point(second.id, 0).row - 1
+  vim.api.nvim_win_set_cursor(reader.window, {blank, 0})
+  vim.cmd('normal! v')
+  local c = reader.source_point(second.id, 4)
+  vim.api.nvim_win_set_cursor(reader.window, {c.row, c.byte})
+  reader.yank()
+  report.snapped = clipboard()
+  -- Releasing the mouse on a selection copies it; the mapping is the real one.
+  local maps = {}
+  for _, map in ipairs(vim.api.nvim_buf_get_keymap(reader.buffer, 'x')) do maps[map.lhs] = true end
+  report.mouse_maps = maps['<LeftRelease>'] == true and maps['<2-LeftRelease>'] == true
+  reader.restore(reader.capture('v', reader.source_point(first.id, 0), reader.source_point(first.id, 3)))
+  vim.api.nvim_feedkeys(vim.keycode('<LeftRelease>'), 'xt', false)
+  report.mouse = clipboard()
+  report.mouse_option = vim.o.mouse
+  -- A program that fails: the terminal is asked instead, and the reader says so.
+  vim.env.SOL_NVIM_CLIPBOARD = vim.json.encode({command = {'false'}, env = vim.empty_dict()})
+  reader.yank()
+  report.fallback = messages[#messages]
+  report.register = vim.fn.getreg('"')
+''', integrated=True)
+        self.assertEqual(report["across"], texts[0][5:] + "\n\n" + texts[1][:10])
+        self.assertEqual(report["mode_after"], "n")
+        self.assertEqual(report["snapped"], texts[1][:5])
+        self.assertTrue(report["mouse_maps"])
+        self.assertEqual(report["mouse"], texts[0][:4])
+        self.assertEqual(report["mouse_option"], "a")
+        self.assertIn("through the terminal", report["fallback"])
+        self.assertEqual(report["register"], texts[0])  # no selection: the paragraph under the cursor
+
+    def test_q_does_not_quit_and_qa_bang_leaves_without_saving(self):
+        report = self.run_lua(r'''
+  local messages = {}
+  local echo = vim.api.nvim_echo
+  vim.api.nvim_echo = function(chunks, ...) messages[#messages + 1] = chunks[1][1]; return echo(chunks, ...) end
+  vim.api.nvim_feedkeys('q', 'xt', false)
+  vim.api.nvim_feedkeys(vim.keycode('<C-q>'), 'xt', false)
+  report.hint = messages
+  report.alive = vim.api.nvim_buf_is_valid(reader.buffer)
+  local normal = {}
+  for _, map in ipairs(vim.api.nvim_buf_get_keymap(reader.buffer, 'n')) do normal[map.lhs] = true end
+  report.study_key = normal['S'] == true
+  vim.fn.writefile({vim.json.encode(report)}, os.getenv('SOL_NVIM_TEST_REPORT'))
+  vim.api.nvim_feedkeys(':qa!\\r', 'xt', false)
+''', integrated=True, automatic_quit=False)
+        self.assertEqual(report["hint"], ["Type :q to save your place and quit (:qa! quits without saving)"] * 2)
+        self.assertTrue(report["alive"])
+        self.assertFalse(report["study_key"])
+        self.assertFalse(self.output.exists())
+
+    def test_status_line_says_where_and_how_the_book_is_read(self):
+        report = self.run_lua(r'''
+  local path = data.records[2].context.path
+  local nodes, key = {}, ''
+  local names = {'Quality', 'Quality'}  -- a chapter and its section with one title
+  local index = 0
+  for segment in path:gmatch('[^/]+') do
+    key = key .. '/' .. segment; index = index + 1
+    nodes[#nodes + 1] = {key = key, title = names[index] or segment}
+  end
+  local payload = vim.deepcopy(data)
+  payload.structure = {nodes = nodes}
+  payload.progress = {first = 49, total = 101}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(payload)
+  local r = SOLNvimReader
+  local at = r.source_point(data.records[2].id, 0)
+  vim.api.nvim_win_set_cursor(r.window, {at.row, at.byte})
+  report.status = SOLStatus()
+  vim.o.columns = 60
+  report.narrow = SOLStatus()
+  local refused = 0
+  for _, bad in ipairs({{first = -1, total = 3}, {first = 3, total = 3}, {first = 0}, 'half'}) do
+    local broken = vim.deepcopy(payload); broken.progress = bad
+    if not pcall(assert(loadfile(os.getenv('SOL_NVIM_ADAPTER'))), broken) then refused = refused + 1 end
+  end
+  report.refused = refused
+''', integrated=True)
+        status = report["status"]
+        self.assertTrue(status.startswith(" %<Quality · p."), status)
+        self.assertIn(f"p. {self.sample.passages[1].printed_page}", status)
+        self.assertIn("%=Continuous · 50%% · ? keys · :q quit ", status)  # %% is a literal %
+        self.assertEqual(report["refused"], 4)
+
+    def test_context_opens_beside_the_page_when_there_is_room(self):
+        report = self.run_lua(r'''
+  local function geometry(window)
+    local config = vim.api.nvim_win_get_config(window)
+    return {col = config.col, width = config.width, row = config.row}
+  end
+  local function popup()
+    for _, window in ipairs(vim.api.nvim_list_wins()) do
+      if vim.api.nvim_win_get_config(window).zindex == 50 then return window end
+    end
+  end
+  vim.o.columns, vim.o.lines = 160, 40
+  vim.api.nvim_exec_autocmds('VimResized', {})
+  local centred = geometry(reader.window)
+  vim.api.nvim_feedkeys('c', 'xt', false)
+  report.wide = {page = geometry(reader.window), panel = geometry(popup()), centred = centred}
+  local panel_buffer = vim.api.nvim_win_get_buf(popup())
+  local marks = {}
+  for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(panel_buffer, -1, 0, -1, {details = true})) do
+    marks[mark[4].hl_group] = (marks[mark[4].hl_group] or 0) + 1
+  end
+  report.marks = marks
+  vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  report.closed = geometry(reader.window)
+  vim.o.columns = 100
+  vim.api.nvim_exec_autocmds('VimResized', {})
+  vim.api.nvim_feedkeys('c', 'xt', false)
+  report.narrow = {page = geometry(reader.window), panel = geometry(popup())}
+''', integrated=True)
+        wide = report["wide"]
+        self.assertLess(wide["page"]["col"], wide["centred"]["col"])
+        self.assertGreaterEqual(wide["panel"]["col"], wide["page"]["col"] + wide["page"]["width"] + 1)
+        self.assertLessEqual(wide["panel"]["col"] + wide["panel"]["width"] + 2, 160)
+        self.assertEqual(wide["panel"]["row"], wide["page"]["row"])
+        self.assertGreater(report["marks"].get("SOLSourceHeading", 0), 1)
+        self.assertGreater(report["marks"].get("NonText", 0), 0)
+        self.assertEqual(report["closed"], wide["centred"])
+        # Too narrow to share: the panel opens over the page, which stays centred.
+        narrow = report["narrow"]
+        self.assertEqual(narrow["page"]["col"], (100 - narrow["page"]["width"]) // 2)
+        self.assertLess(narrow["panel"]["col"], narrow["page"]["col"] + narrow["page"]["width"])
+
+    def test_note_times_are_shown_in_local_time(self):
+        self.environment = {**self.environment, "TZ": "Europe/Amsterdam"}
+        report = self.run_lua(r'''
+  data.personal = {persistent = true, notes = {[data.records[1].id] = {{
+    id = 'mine', author = 'Invented reader', created_at = '2026-10-17T12:00:00Z', revision = 1,
+    edit_refusal = '', changed_source = false, retired_target = false, body = 'x', lines = {'x'}}}}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  SOLNvimReader.context()
+  report.lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+''', integrated=True)
+        # 12:00 UTC on 17 October is 14:00 in Amsterdam (summer time).
+        self.assertIn("  Invented reader · 17 Oct 2026, 14:00 · revision 1", report["lines"])
 
     def test_essence_asks_the_reader_to_open_a_source_and_saves_when_the_reader_quits(self):
         # A stand-in for ESSENCE in a raw terminal: on "g" it sends a foreign
@@ -1040,7 +1204,7 @@ while True:
         vim.api.nvim_feedkeys('c', 'xt', false)
         assert(vim.fn.mode(1) == 'n')
         local listing = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
-        assert(listing:find('Book footnotes', 1, true))
+        assert(listing:find('Footnotes', 1, true))
         assert(not listing:find('first thought', 1, true), 'book text should be read in its own panel')
         choose('[12]')
         assert(vim.deep_equal(sent[#sent].packet, origin) and sent[#sent].mode == mode)
@@ -1139,31 +1303,6 @@ while True:
 ''', integrated=True)
         self.assertTrue(report["ok"])
 
-    def test_sentence_study_panel_lists_rows_and_enter_opens_one(self):
-        report = self.run_lua(r'''
-  local sent = {}
-  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
-    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
-  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
-  vim.api.nvim_feedkeys('S', 'xt', false)
-  report.request = sent[1].op
-  _G.SOLReaderChannel.pending[sent[1].id]({study = {saved = '/invented/sentences.sol-analysis.json',
-    summary = {sentences = 3, tokens = 30, mean = 10.0, median = 9, p10 = 5, p90 = 16, max = 16},
-    histogram = {{from = 1, to = 10, sentences = 2}, {from = 101, to = vim.NIL, sentences = 1}},
-    positions = {first = 9.0, middle = vim.NIL, last = 16.0, only = vim.NIL}, passages = 2, excluded_review = 1,
-    rows = {{number = 1, tokens = 16, label = 'Invented | p. 7', snippet = 'A long invented sentence.'}}}})
-  report.lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-  vim.api.nvim_feedkeys(vim.keycode('<CR>'), 'xt', false)
-  report.opened = {sent[2].op, sent[2].row}
-''', integrated=True)
-        self.assertEqual(report["request"], "sentence_study")
-        text = "\n".join(report["lines"])
-        self.assertIn("3 sentences in 2 passages; mean 10.0, median 9, longest 16 words.", text)
-        self.assertIn("Mean by place in paragraph: first 9.0, last 16.0", text)
-        self.assertIn("1 passage(s) awaiting source review were left out.", text)
-        self.assertIn("1. 16 words | Invented | p. 7", text)
-        self.assertEqual(report["opened"], ["study_open", 1])
-
     def test_search_marks_highlight_matches_until_escape(self):
         report = self.run_lua(r'''
   local payload = vim.deepcopy(data)
@@ -1231,12 +1370,14 @@ while True:
         start, end = text.index("𝔸"), text.index("ground") + len("ground")
         report = self.run_lua(r'''
   local adapter = os.getenv('SOL_NVIM_ADAPTER')
-  local clipboard
-  vim.g.clipboard = {name = 'SOL isolated clipboard test', cache_enabled = 0,
-    copy = {['+'] = function(lines) clipboard = table.concat(lines, '\n') end,
-            ['*'] = function(lines) clipboard = table.concat(lines, '\n') end},
-    paste = {['+'] = function() return {{clipboard or ''}, 'v'} end,
-             ['*'] = function() return {{clipboard or ''}, 'v'} end}}
+  local clip_file = vim.fn.tempname()
+  vim.env.SOL_NVIM_CLIPBOARD = vim.json.encode({command = {'sh', '-c', 'cat > "$0"', clip_file}, env = vim.empty_dict()})
+  local function clipboard()
+    local stream = io.open(clip_file)
+    if not stream then return nil end
+    local text = stream:read('a'); stream:close(); os.remove(clip_file)
+    return text
+  end
   local payload = vim.deepcopy(data)
   -- Callouts inside the selection, beside a combining mark and at its edge.
   payload.records[1].callouts = {{offset = ''' + str(start) + r''', label = '3'},
@@ -1253,11 +1394,10 @@ while True:
       local first = reader.source_point(id, ''' + str(start) + r''')
       local last = reader.source_point(id, ''' + str(end - 1) + r''')
       for _, ends in ipairs({{first, last}, {last, first}}) do
-        clipboard = nil
         local packet = reader.capture('v', ends[1], ends[2])
         reader.restore(packet)
         reader.yank()
-        report.yanks[#report.yanks + 1] = {width, mode, packet.selection.start, packet.selection['end'], clipboard}
+        report.yanks[#report.yanks + 1] = {width, mode, packet.selection.start, packet.selection['end'], clipboard()}
         vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
       end
     end

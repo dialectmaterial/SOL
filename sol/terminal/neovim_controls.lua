@@ -54,17 +54,73 @@ return function(reader)
   local function marker(slot, operation)
     request(operation or 'marker_set', {slot = slot})
   end
-  local function yank()
-    local packet = current_packet()
-    local record = by_id[packet.reference.reference.target_id]
-    local text = packet.selection ~= vim.NIL and packet.selection.text or record.plain_text
-    vim.fn.setreg('"', text, 'v')
-    if vim.fn.has('clipboard') ~= 1 then
-      fail('No system clipboard provider. Text is in the Neovim register only; install wl-clipboard (Wayland) or xclip (X11).')
+  -- The system clipboard: the program Python chose from the real session,
+  -- else the terminal itself through OSC 52. Returns how it was copied.
+  local function copy(text)
+    local clipboard = vim.json.decode(vim.env.SOL_NVIM_CLIPBOARD or 'null', {luanil = {object = true, array = true}})
+    if type(clipboard) == 'table' and type(clipboard.command) == 'table' then
+      -- No output pipes: wl-copy leaves a process behind that would hold them open.
+      local ok, result = pcall(function()
+        return vim.system(clipboard.command, {stdin = text, env = clipboard.env, stdout = false, stderr = false}):wait(3000)
+      end)
+      if ok and type(result) == 'table' and result.code == 0 then return 'clipboard' end
     end
-    if vim.fn.setreg('+', text, 'v') ~= 0 then fail('clipboard provider refused the yank') end
-    normal_escape()
-    api.nvim_echo({{'Copied to clipboard', 'None'}}, false, {})
+    local ok = pcall(function() require('vim.ui.clipboard.osc52').copy('+')(vim.split(text, '\n', {plain = true}), 'v') end)
+    return ok and 'terminal' or nil
+  end
+  local order = {}
+  for index, record in ipairs(records) do order[record.id] = index end
+  -- A selection end on a blank line or heading moves to the nearest prose
+  -- inside the selection: forward for its start, back for its end.
+  local function endpoint(row, byte, last)
+    if source_rows[row] then
+      local location = source_location(row, byte)
+      if last then location.offset = math.min(by_id[location.id]._length, location.offset + 1) end
+      return location
+    end
+    local nearest
+    for candidate in pairs(source_rows) do
+      if (last and candidate < row or not last and candidate > row)
+          and (not nearest or math.abs(candidate - row) < math.abs(nearest - row)) then nearest = candidate end
+    end
+    if not nearest then fail('select some passage text to copy') end
+    local item = source_rows[nearest]
+    return {id = item.id, offset = last and item.finish or item.start}
+  end
+  -- Exact source text: the selection, across paragraphs if need be (joined by
+  -- a blank line), or the current paragraph without one.
+  local function selected_text()
+    local visual = vim.fn.mode(1)
+    if visual ~= 'v' and visual ~= 'V' then
+      return by_id[current_packet().reference.reference.target_id].plain_text
+    end
+    local a, b = vim.fn.getpos('v'), vim.fn.getpos('.')
+    if b[2] < a[2] or (b[2] == a[2] and b[3] < a[3]) then a, b = b, a end
+    local first = endpoint(a[2], visual == 'V' and 0 or a[3] - 1, false)
+    local last_byte = visual == 'V' and math.max(0, #(api.nvim_buf_get_lines(buffer, b[2] - 1, b[2], false)[1] or '') - 1)
+      or b[3] - 1
+    local last = endpoint(b[2], last_byte, true)
+    local from, to = order[first.id], order[last.id]
+    if from > to or (from == to and first.offset >= last.offset) then fail('select some passage text to copy') end
+    local slice = reader.text.slice
+    if from == to then return slice(records[from].plain_text, first.offset, last.offset) end
+    local parts = {slice(records[from].plain_text, first.offset, records[from]._length)}
+    for index = from + 1, to - 1 do parts[#parts + 1] = records[index].plain_text end
+    parts[#parts + 1] = slice(records[to].plain_text, 0, last.offset)
+    return table.concat(parts, '\n\n')
+  end
+  local function yank()
+    verified_projection()
+    local text = selected_text()
+    vim.fn.setreg('"', text, 'v')
+    if vim.fn.mode(1) ~= 'n' then normal_escape() end
+    local how = copy(text)
+    local count = vim.fn.strchars(text)
+    if not how then
+      fail('Could not reach the system clipboard; the text is in Neovim\'s register only')
+    end
+    api.nvim_echo({{('Copied %d characters%s'):format(count,
+      how == 'terminal' and ' (through the terminal)' or ''), 'None'}}, false, {})
     return text
   end
   local tree_view
@@ -86,58 +142,101 @@ return function(reader)
     })
     return tree_view
   end
+  -- A UTC stamp "2026-10-17T12:00:00Z" in local time, as "17 Oct 2026, 14:00";
+  -- anything else unchanged.
+  local MONTHS = {'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'}
+  local function when(stamp)
+    local y, m, d, hh, mm = tostring(stamp):match('^(%d%d%d%d)%-(%d%d)%-(%d%d)T(%d%d):(%d%d)')
+    if not y or not MONTHS[tonumber(m)] then return tostring(stamp) end
+    -- os.time reads a table as local time; correct it by the zone's offset then.
+    local guess = os.time({year = tonumber(y), month = tonumber(m), day = tonumber(d),
+      hour = tonumber(hh), min = tonumber(mm), sec = 0, isdst = false})
+    local offset = os.time(os.date('*t', guess)) - os.time(os.date('!*t', guess))
+    local shown = os.date('*t', guess + offset)
+    return ('%d %s %d, %02d:%02d'):format(shown.day, MONTHS[shown.month], shown.year, shown.hour, shown.min)
+  end
+  local function words(value) return (tostring(value):gsub('_', ' ')) end
   reader.context = function(origin)
     local packet = origin or current_packet()
     local record = by_id[packet.reference.reference.target_id]
-    local lines = { record.heading, "" }
+    local lines, marks = {}, {}
     local note_rows, book_rows = {}, {}
-    local function add(text)
-      for _, line in ipairs(vim.split(tostring(text), "\n", { plain = true })) do lines[#lines + 1] = line end
+    local function add(text, group)
+      for _, line in ipairs(vim.split(tostring(text), "\n", { plain = true })) do
+        lines[#lines + 1] = line
+        if group then marks[#marks + 1] = {#lines, group} end
+      end
     end
-    for _, warning in ipairs(record.warnings) do add("Warning: " .. warning) end
-    add("Book footnotes on this passage (" .. #record.notes .. ") · Enter opens one")
+    -- A section: its name stands out, its keys stay quiet beside it.
+    local function section(name, hint)
+      add('')
+      add(name .. (hint and hint ~= '' and ('   ' .. hint) or ''))
+      marks[#marks + 1] = {#lines, 'SOLSourceHeading', 0, #name}
+      if hint and hint ~= '' then marks[#marks + 1] = {#lines, 'NonText', #name} end
+    end
+    add(record.heading, 'SOLSourceHeading')
+    local where = reader.view.breadcrumb(record.context.path)
+    if where ~= '' then add(where, 'NonText') end
+    local printed, pdf = record.context.printed_pages, record.context.pdf_pages
+    local function span(range)
+      if range[1] == nil or range[1] == vim.NIL then return nil end
+      if range[2] == nil or range[2] == vim.NIL or range[2] == range[1] then return tostring(range[1]) end
+      return range[1] .. '–' .. range[2]
+    end
+    local page_parts = {}
+    if span(printed) then page_parts[#page_parts + 1] = 'p. ' .. span(printed) end
+    if span(pdf) then page_parts[#page_parts + 1] = 'PDF p. ' .. span(pdf) end
+    if #page_parts > 0 then add(table.concat(page_parts, ' · '), 'NonText') end
+    if #record.warnings > 0 then add('') end
+    for _, warning in ipairs(record.warnings) do add('! ' .. warning, 'SOLSourceWarning') end
+
+    section('Footnotes', #record.notes == 0 and 'none' or (#record.notes .. ' · Enter reads one'))
     for _, note in ipairs(record.notes) do
       local first = #lines + 1
-      add("[" .. (note.label ~= "" and note.label or "?") .. "] " .. attribution_line(note.attribution))
-      for _, warning in ipairs(note.warnings) do add("Warning: " .. warning) end
+      add('  [' .. (note.label ~= '' and note.label or '?') .. '] ' .. attribution_line(note.attribution))
+      for _, warning in ipairs(note.warnings) do add('      ! ' .. warning, 'SOLSourceWarning') end
       book_rows[#book_rows + 1] = {first = first, last = #lines, id = note.reference.reference.target_id}
     end
     if data.personal then
-      add("")
       if not data.personal.persistent then
-        add("Personal notes need a workspace; this temporary session saves nothing.")
+        section('Your notes', 'need a workspace; this session saves nothing')
       else
         local mine = data.personal.notes[record.id] or {}
-        add("Workspace notes on this passage (" .. #mine .. "); a adds one" ..
-          (#mine > 0 and ", e edits the note under the cursor, r shows its versions" or ""))
-        for _, item in ipairs(mine) do
+        section('Your notes', (#mine == 0 and 'none' or tostring(#mine)) .. ' · a add' ..
+          (#mine > 0 and ' · e edit · r versions' or ''))
+        for index, item in ipairs(mine) do
+          if index > 1 then add('') end
           local first = #lines + 1
-          add("— " .. item.author .. ", " .. item.created_at ..
-            (item.revision ~= vim.NIL and (", revision " .. tostring(item.revision)) or ""))
-          if item.changed_source then add("  (the passage has changed since this note was written)") end
-          if item.retired_target then add("  (written on a retired record ID; shown here through its successor)") end
-          if item.edit_refusal ~= "" then add("  (" .. item.edit_refusal .. ")") end
-          for _, line in ipairs(item.lines) do add(line) end
+          add('  ' .. item.author .. ' · ' .. when(item.created_at) ..
+            (item.revision ~= vim.NIL and (' · revision ' .. tostring(item.revision)) or ''), 'NonText')
+          if item.changed_source then add('  the passage has changed since this note was written', 'SOLSourceWarning') end
+          if item.retired_target then add('  written on a retired record ID; shown here through its successor', 'NonText') end
+          if item.edit_refusal ~= "" then add('  ' .. item.edit_refusal, 'NonText') end
+          for _, line in ipairs(item.lines) do add('  ' .. line) end
           note_rows[#note_rows + 1] = { first = first, last = #lines, item = item }
         end
       end
     end
-    add(""); add("Source context (not selectable passage text)"); add("")
-    add(record.context.path)
-    add('Reading scope: loaded section (' .. #records .. ' paragraphs); gg/G stay here.')
-    add("Printed pages: " .. vim.json.encode(record.context.printed_pages))
-    add("PDF pages: " .. vim.json.encode(record.context.pdf_pages))
-    add("Attribution: " .. vim.json.encode(record.context.attribution))
-    add("Record: " .. record.id)
     if data.markers then
-      add(''); add('Paragraph markers' .. (data.markers.persistent and ' (saved in workspace)' or ' (temporary session only)'))
+      section('Markers', "m1–3 set · '1–3 go · dm1–3 clear" .. (data.markers.persistent and '' or ' · this session only'))
       for _, slot in ipairs(data.markers.slots) do
-        add(tostring(slot.slot) .. '. ' .. slot.label .. (slot.resolved == record.id and '  [here]' or ''))
+        add('  ' .. tostring(slot.slot) .. '  ' .. slot.label .. (slot.resolved == record.id and '   ← here' or ''))
       end
-      add("m1/m2/m3 place; '1/'2/'3 return; dm1/dm2/dm3 clear")
     end
-    add(""); add("Esc returns to reading. Notes and context have no passage-selection identity.")
-    show_lines(lines, packet)
+    section('About this text')
+    local attribution = record.context.attribution
+    if type(attribution) == 'table' and attribution.author then
+      local how = {}
+      for _, key in ipairs({'role', 'status'}) do
+        if type(attribution[key]) == 'string' and attribution[key] ~= '' then how[#how + 1] = words(attribution[key]) end
+      end
+      add('  Author   ' .. attribution.author .. (#how > 0 and (' (' .. table.concat(how, ', ') .. ')') or ''))
+    end
+    add('  Section  ' .. #records .. ' paragraphs loaded; gg/G stay in them')
+    add('  Record   ' .. record.id, 'NonText')
+    add('')
+    add('Esc returns to reading', 'NonText')
+    show_lines(lines, packet, marks)
     panels.context_open = true
     local panel = api.nvim_get_current_buf()
     vim.keymap.set('n', '<CR>', function()
@@ -186,16 +285,16 @@ return function(reader)
         "p                toggle continuous / one-paragraph reading",
         "m1, m2, m3       attach/move one of three paragraph markers",
         "'1, '2, '3       jump to a marker; dm1/dm2/dm3 clear it",
-        "y                copy the selection or current paragraph to clipboard",
+        "y                copy the selection (or this paragraph) to the clipboard",
+        "mouse            scroll; drag to select, and the selection is copied",
         "t                book outline: h/l branches, Enter read, Esc return",
         "/                literal search across the whole book",
         "Ctrl-P / Ctrl-N  previous / next search-result passage",
         "Esc              hide the search-match marks",
-        "S                sentence lengths in this section (ESSENCE study)",
         "E                open ESSENCE beside the reader; in it Alt-F fullscreen, Alt-R back",
         "Alt-Left/Right   return / forward through reading history",
-        "v                characterwise selection inside one passage",
-        "c                source pages, attribution and linked notes",
+        "v                select text; y copies it, even across paragraphs",
+        "c                beside the text: pages, footnotes, your notes, markers",
         "c, then Enter    read one book footnote; Enter follows a further link",
         "Backspace / Esc  in a footnote: previous panel / exact passage selection",
         "s                show the printed source of this passage (formulas)",
@@ -203,7 +302,7 @@ return function(reader)
         "c, then e / r    edit your note under the cursor / show its earlier versions",
         "f                toggle quiet focus mode",
         "T                cycle Terminal / Dark / Paper theme for this session",
-        "q / Ctrl-q       save the semantic position and quit",
+        ":q  or  :qa      save your exact place and quit",
         ":qa!             quit without saving the current cursor", "",
         "In paragraph mode, j/k stay here. Use b/n to change paragraph.",
         "In continuous mode, j/k can continue across reading sections.",
@@ -279,8 +378,37 @@ return function(reader)
       else set_exact_cursor(source_point(selected.id, 0)); vim.cmd('normal! zt') end
     elseif integrated then request(delta > 0 and 'passage_next' or 'passage_previous') end
   end
-  for _, key in ipairs({ "q", "<C-q>" }) do
-    vim.keymap.set({ "n", "x" }, key, guarded(function() reading_request("quit") end), { buffer = buffer, silent = true })
+  if integrated then
+    -- Quitting is a command, not a stray key: q and Ctrl-q only say how.
+    for _, key in ipairs({ "q", "<C-q>" }) do
+      vim.keymap.set({ "n", "x" }, key, function()
+        api.nvim_echo({{"Type :q to save your place and quit (:qa! quits without saving)", "None"}}, false, {})
+      end, { buffer = buffer, silent = true })
+    end
+    -- :q, :qa and their spellings save the exact position first; :qa! (any
+    -- command with !) is left to Neovim and quits without saving.
+    local quits = {}
+    for _, name in ipairs({ "q", "qu", "qui", "quit", "qa", "qal", "qall", "quita", "quital", "quitall",
+                            "wq", "wqa", "wqal", "wqall", "x", "xa", "xal", "xall", "xi", "xit", "exi", "exit" }) do
+      quits[name] = true
+    end
+    vim.keymap.set("c", "<CR>", function()
+      -- From a selection, ":" starts with its range; the selection is kept.
+      local line = vim.fn.getcmdline()
+      local selected = line:match("^%s*'<,'>") ~= nil
+      if vim.fn.getcmdtype() == ":" and quits[vim.trim(line:gsub("^%s*'<,'>", ""), nil)] then
+        vim.schedule(guarded(function()
+          if selected then vim.cmd("normal! gv") end
+          reading_request("quit")
+        end))
+        return "<C-c>"
+      end
+      return "<CR>"
+    end, { buffer = buffer, expr = true })
+  else
+    for _, key in ipairs({ "q", "<C-q>" }) do
+      vim.keymap.set({ "n", "x" }, key, guarded(function() reading_request("quit") end), { buffer = buffer, silent = true })
+    end
   end
   vim.keymap.set({ "n", "x" }, "j", "gj", { buffer = buffer, silent = true })
   vim.keymap.set({ "n", "x" }, "k", "gk", { buffer = buffer, silent = true })
@@ -306,12 +434,14 @@ return function(reader)
     vim.keymap.set("n", "]c", guarded(function() reading_request("next") end), { buffer = buffer, silent = true })
     vim.keymap.set({'n', 'x'}, 'p', guarded(toggle_mode), {buffer = buffer, silent = true})
     vim.keymap.set({'n', 'x'}, 'y', guarded(yank), {buffer = buffer, silent = true})
+    for _, release in ipairs({'<LeftRelease>', '<2-LeftRelease>', '<3-LeftRelease>'}) do
+      vim.keymap.set('x', release, guarded(yank), {buffer = buffer, silent = true})
+    end
     vim.keymap.set('n', 't', guarded(tree), {buffer = buffer, silent = true})
     vim.keymap.set('n', 'f', guarded(toggle_focus), {buffer = buffer, silent = true})
     vim.keymap.set('n', 'b', guarded(function() passage(-1) end), {buffer = buffer, silent = true})
     vim.keymap.set('n', 'n', guarded(function() passage(1) end), {buffer = buffer, silent = true})
     vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
-    vim.keymap.set('n', 'S', guarded(function() request('sentence_study') end), {buffer = buffer, silent = true})
     vim.keymap.set({'n', 'x'}, 'E', guarded(function()
       -- Capture the exact position and selection; ESSENCE returns to it with
       -- Alt-R and on closing. Visual mode stays until ESSENCE actually opens
