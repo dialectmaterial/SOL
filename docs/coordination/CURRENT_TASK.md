@@ -50,7 +50,7 @@ placement; documentation check and full suite pass; a real-book run reported.
 
 ## Codex: ESSENCE sentence study without CORE
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `codex/sentence-file-provider`
 **Requested:** 18 October 2026, by the maintainer
 
