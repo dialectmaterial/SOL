@@ -8,7 +8,8 @@ from sol.essence.word_inputs import CoreProvider, FileProvider, WordStudyError, 
 from sol.essence.words import MAX_RESULT_BYTES, analyze_words, check_word_result, decode_word_result, encode_word_result
 
 
-def add_arguments(parser, *, words=False):
+def add_input_arguments(parser, *, words=False, unit="tokens"):
+    """Shared provider and target-scope options for words and sentences."""
     parser.add_argument("--provider", choices=("core", "file"), help="default: file with --input-file, otherwise core")
     flags = ("--input-file", "--file") if words else ("--input-file",)
     parser.add_argument(*flags, dest="input_file", type=Path, metavar="TEXT", help="explicit regular UTF-8 target file")
@@ -16,7 +17,11 @@ def add_arguments(parser, *, words=False):
     target.add_argument("--within", metavar="PATH", help="CORE target reader path")
     target.add_argument("--passage", action="append", metavar="UUID", help="exact CORE target ID; repeat for several")
     parser.add_argument("--span", nargs=2, type=int, metavar=("START", "END"),
-                        help="half-open codepoints in the file or single --passage; count only whole contained tokens")
+                        help=f"half-open codepoints in the file or single --passage; count only whole contained {unit}")
+
+
+def add_arguments(parser, *, words=False):
+    add_input_arguments(parser, words=words)
     parser.add_argument("--compare", action="store_true", help="compare with the whole target source")
     parser.add_argument("--reference-provider", choices=("core", "file"))
     source = parser.add_mutually_exclusive_group()
