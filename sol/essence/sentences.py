@@ -13,11 +13,8 @@ import re
 import statistics
 import unicodedata
 
-from sol import core
-from sol.essence.terms import (
-    TermExperimentError, _binding, _current, _facsimile_spans, _fresh, _integer, _json, _json_value,
-    _keys, _reader_doctrine, _tokens, _validate_binding,
-)
+from sol.essence.tokenization import word_tokens as _tokens
+from sol.essence.validation import TermExperimentError, _integer, _json, _json_value, _keys, _validate_binding
 
 
 MAX_RESULT_BYTES = 1048576
@@ -155,6 +152,8 @@ def _in_scope(record, scope):
 
 
 def _selection(record, scope):
+    from sol.essence.terms import _reader_doctrine
+
     attribution = record["attribution"]
     if not _in_scope(record, scope):
         return "scope"
@@ -183,6 +182,9 @@ def _summary(lengths):
 
 
 def _analyze(snapshot, scope, origin):
+    from sol import core
+    from sol.essence.terms import _binding, _current, _facsimile_spans
+
     binding = _binding(snapshot)
     if origin is not None:
         try:
@@ -242,6 +244,9 @@ def _analyze(snapshot, scope, origin):
 
 
 def _validate(result):
+    from sol import core
+    from sol.essence.terms import _reader_doctrine
+
     result = _json_value(result)
     _keys(result, {"protocol", "version", "corpus", "generation", "method", "scope", "origin", "summary",
                    "histogram", "by_position", "longest", "passages", "sentences", "exclusions"},
@@ -301,12 +306,16 @@ def _validate(result):
 
 def analyze_sentences(snapshot, *, scope=None, origin=None):
     """Segment and measure every eligible sentence in scope, in corpus order."""
+    from sol.essence.terms import _fresh
+
     scope = _scope({"kind": "corpus"} if scope is None else _json_value(scope))
     return _analyze(_fresh(snapshot), scope, origin)
 
 
 def check_sentence_result(snapshot, result):
     """Recompute; return fresh data only after exact agreement."""
+    from sol.essence.terms import _binding, _current, _fresh
+
     result = _validate(result)
     fresh = _fresh(snapshot)
     expected_binding = _binding(fresh)
