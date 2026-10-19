@@ -133,6 +133,18 @@ return function(reader)
     return { id = source.id, start = source.start, content_sha256 = source.content_sha256 }
   end
 
+  -- Leaving terminal mode completes only after this callback returns, and the
+  -- reader can capture its position only in normal mode: wait for it.
+  local function when_normal(action)
+    if vim.fn.mode(1) == 'n' then return action() end
+    local id
+    id = api.nvim_create_autocmd('ModeChanged', { callback = function()
+      if vim.fn.mode(1) ~= 'n' then return end
+      api.nvim_del_autocmd(id)
+      if reader_window() == api.nvim_get_current_win() then vim.schedule(action) end
+    end })
+  end
+
   function state.open_source(sequence)
     local source, problem = source_request(sequence)
     if not source then
@@ -140,7 +152,7 @@ return function(reader)
       return
     end
     reveal_reader()
-    reader.requests.request('essence_source', { source = source })
+    when_normal(function() reader.requests.request('essence_source', { source = source }) end)
   end
 
   -- Quitting the reader with ESSENCE open: let ESSENCE save as if left with q.
@@ -173,12 +185,18 @@ return function(reader)
     for _, part in ipairs(spec.command) do
       if type(part) ~= 'string' then fail('invalid ESSENCE launch') end
     end
+    if spec.env ~= nil and type(spec.env) ~= 'table' then fail('invalid ESSENCE launch') end
+    for name, value in pairs(spec.env or {}) do
+      if type(name) ~= 'string' or not name:match('^[A-Z_]+$') or type(value) ~= 'string' then
+        fail('invalid ESSENCE launch')
+      end
+    end
     state.layout = vim.o.columns >= SPLIT_MINIMUM and 'split' or 'full'
     local buffer = api.nvim_create_buf(false, true)
     state.buffer = buffer
     state.window = api.nvim_open_win(buffer, true, config())
     vim.wo[state.window].winhighlight = 'NormalFloat:Normal,FloatBorder:WinSeparator'
-    local started, job = pcall(vim.fn.jobstart, spec.command, { term = true,
+    local started, job = pcall(vim.fn.jobstart, spec.command, { term = true, env = spec.env,
       on_exit = function(_, code) vim.schedule(function() if state.buffer == buffer then state.closed(code) end end) end })
     if not started or type(job) ~= 'number' or job <= 0 then
       state.closed(-1, 'ESSENCE could not start: ' .. tostring(job))

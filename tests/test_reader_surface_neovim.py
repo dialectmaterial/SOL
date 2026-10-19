@@ -829,7 +829,7 @@ while True:
         os.write(1, b'\\x1b]0;a title\\x07\\x1b]5379;sol-essence;not-json\\x07')
         os.write(1, b'\\x1b]5379;sol-essence;{encoded}\\x07')
     elif key in (b'\\x11', b''):
-        open({str(saved)!r}, 'w').write('saved')
+        open({str(saved)!r}, 'w').write('saved ' + os.environ.get('XDG_DATA_HOME', ''))
         break
 """, encoding="utf-8")
         paths = f"local PYTHON, STUB = {json.dumps(sys.executable)}, {json.dumps(str(stub))}\n"
@@ -842,14 +842,26 @@ while True:
   assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
   local reader = SOLNvimReader
   vim.api.nvim_feedkeys('E', 'xt', false)
-  _G.SOLReaderChannel.pending[sent[1].id]({essence = {command = {PYTHON, STUB}}})
+  _G.SOLReaderChannel.pending[sent[1].id]({essence = {command = {PYTHON, STUB}, env = {XDG_DATA_HOME = '/invented/data'}}})
   local essence = assert(SOLEssence)
   assert(vim.wait(5000, function()
     return table.concat(vim.api.nvim_buf_get_lines(essence.buffer, 0, -1, false), '\n'):find('ESSENCE STUB READY') ~= nil
   end, 10), 'ESSENCE did not start in its terminal')
   essence.toggle()
   report.before = essence.layout
+  -- In a real terminal ESSENCE has the keyboard in terminal mode, which ends
+  -- only after the request's callback returns; a script cannot stay in it,
+  -- so report it, then announce the change as Neovim does.
+  local real_mode, terminal = vim.fn.mode, true
+  vim.fn.mode = function(...) if terminal then return 't' end return real_mode(...) end
   vim.fn.chansend(essence.job, 'g')
+  assert(vim.wait(5000, function() return vim.api.nvim_get_current_win() == SOLNvimReader.window end, 10),
+    'the reader was not shown')
+  vim.wait(200)
+  report.while_terminal = #sent
+  terminal = false
+  vim.api.nvim_exec_autocmds('ModeChanged', {pattern = 't:n'})
+  vim.fn.mode = real_mode
   assert(vim.wait(5000, function() return #sent > 1 end, 10), 'no source request reached the reader')
   vim.wait(200)
   report.requests = {}
@@ -876,13 +888,14 @@ while True:
   report.exited = vim.fn.jobwait({job}, 0)[1] ~= -1
 ''', integrated=True)
         self.assertEqual(report["before"], "full")
+        self.assertEqual(report["while_terminal"], 1)  # only E's request: nothing sent from terminal mode
         self.assertEqual(report["requests"], [{"op": "essence_source", "source": request["source"]}])
         self.assertEqual(report["after"], {"layout": "split", "focused_reader": True, "alive": True})
         self.assertEqual(report["warnings"], ["ESSENCE sent an invalid source request"])
         self.assertLessEqual(report["popup"]["right"], report["popup"]["essence"])
         self.assertEqual(report["autocmds"], 1)
         self.assertTrue(report["exited"])
-        self.assertEqual(saved.read_text(), "saved")
+        self.assertEqual(saved.read_text(), "saved /invented/data")
 
     def test_essence_from_a_selection_returns_to_the_exact_selection(self):
         # Reported by Codex's review of PR #24.
