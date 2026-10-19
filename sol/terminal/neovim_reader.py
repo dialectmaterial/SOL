@@ -7,6 +7,7 @@ No editor buffer or byte column is ever saved as a reading position.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import os
 import sys
 import unicodedata
 
@@ -20,6 +21,9 @@ from sol.terminal.theme import DEFAULT_THEME, THEMES
 
 
 SECTION_BUDGET = 64
+# The reader's own values of what Neovim's isolation replaces, given back to ESSENCE.
+ESSENCE_ENVIRONMENT = ("XDG_CONFIG_HOME", "XDG_CONFIG_DIRS", "XDG_DATA_HOME", "XDG_DATA_DIRS",
+                       "XDG_STATE_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR", "TMPDIR")
 NOTE_LIMIT = 20000
 REVIEW_NOTES = {
     "needs_visual_review": "The typed text is an unreviewed transcription and may be wrong. "
@@ -228,11 +232,16 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                                 "the note's revision is required"), note_body],
         "note_history": [note_id],
         "footnote_open": [("trail", lambda trail: isinstance(trail, list), "choose a linked book footnote")],
+        "essence_source": [("source", lambda source: isinstance(source, dict)
+                            and set(source) == {"id", "start", "content_sha256"}
+                            and isinstance(source["id"], str) and isinstance(source["content_sha256"], str)
+                            and type(source["start"]) is int and source["start"] >= 0,
+                            "choose a source passage listed in ESSENCE")],
     }
     extra_fields["marker_clear"] = extra_fields["marker_open"] = extra_fields["marker_set"]
     navigation_actions = {"next", "previous", "passage_next", "passage_previous", "node_open", "marker_open",
                           "search_open", "search_next", "search_previous", "history_back", "history_forward",
-                          "study_open"}
+                          "study_open", "essence_source"}
 
     def study_panel(request, identifier):
         # ESSENCE measures the loaded section; BEING only shows the result and
@@ -368,7 +377,6 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         state_file = None
         if workspace_reader is not None:
             from pathlib import Path
-            import os
             state_home = os.environ.get("XDG_STATE_HOME") or str(Path.home() / ".local" / "state")
             state_file = Path(state_home) / "sol" / "essence" / "investigation.json"
         selection = request["packet"]["selection"]
@@ -377,7 +385,12 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             selection=None if selection is None else {key: value for key, value in selection.items() if key != "text"},
             label=safe_label(f"{passage.heading or passage.node.title} | p. {passage.printed_page}"),
             corpus=str(book.corpus_directory or ""), state_file=state_file)
-        return {"essence": {"command": [sys.executable, "-m", "sol.essence.tui", "--context", str(context)]}}
+        # Neovim runs with private XDG and temporary directories; ESSENCE is a
+        # SOL program and saves studies where the reader does, so it gets the
+        # reader's own values back (empty means unset, as XDG treats it).
+        environment = {name: os.environ.get(name, "") for name in ESSENCE_ENVIRONMENT}
+        return {"essence": {"command": [sys.executable, "-m", "sol.essence.tui", "--context", str(context)],
+                            "env": environment}}
 
     panels = {"search": search_panel, "source_preview": source_panel, "marker_set": marker_panel,
               "marker_clear": marker_panel, "note_add": note_panel, "sentence_study": study_panel,
@@ -440,6 +453,11 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         elif operation == "study_open":
             passage_index, offset = study["sentences"][study["longest"][request["row"] - 1]][:2]
             target = study["passages"][passage_index]["id"]
+        elif operation == "essence_source":
+            # A word's source from an ESSENCE result: CORE captures the record
+            # below, and the passage must still be the text that was counted.
+            source = request["source"]
+            target, offset = source["id"], source["start"]
         elif operation in ("search_open", "search_next", "search_previous", "history_back", "history_forward"):
             target = None
         else:
@@ -450,6 +468,12 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         if target is not None:
             from sol.core.protocol import capture_reference
             reference = capture_reference(book.corpus_snapshot, target)
+            if operation == "essence_source":
+                if (reference["reference"]["target_id"] != target
+                        or reference["reference"]["content_sha256"] != request["source"]["content_sha256"]):
+                    raise ValueError("this passage changed after ESSENCE counted it; count again")
+                if offset > len(book.find_passage(target).text):
+                    raise ValueError("this source position is outside its passage")
         # Retain the actual outgoing semantic location first, not Python's last
         # loaded cursor or Neovim's disposable buffer jumplist. The editor shows
         # it, so it may be saved even if the move below is refused.

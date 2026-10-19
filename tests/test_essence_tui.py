@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 from pathlib import Path
@@ -152,12 +153,39 @@ class FakeWords:
         return json.dumps(result, sort_keys=True)
 
 
+class FakeComparison:
+    """The stage 3 engine's two functions, over FakeWords' study."""
+
+    exports = []
+
+    @staticmethod
+    def compare_words(target, *, reference, result=None):
+        study = FakeWords.analyze_words(target, reference=reference) if result is None else result
+        rows = [{**row, "rate_difference_per_10000_tokens": None, "rate_difference_status": "empty_reference",
+                 "log2_rate_ratio": None, "log2_ratio_status": "empty_reference"} for row in study["frequencies"]]
+        return {"method": {}, "study": study, "study_sha256": "0" * 64, "rows": rows,
+                "warnings": [*study["warnings"], "Descriptive only."]}
+
+    @classmethod
+    def export_word_comparison(cls, target, *, reference, result=None, format="csv"):
+        cls.exports.append((target, reference, result, format))
+        separator = "," if format == "csv" else "\t"
+        return f"word{separator}target_count\n" + "".join(
+            f"{row['word']}{separator}{row['target']['count']}\n" for row in result["frequencies"])
+
+
+def fake_engines(test):
+    """Patch both engine lookups for one test."""
+    for name, value in (("engine", (FakeWords, FakeInputs)), ("comparison_engine", FakeComparison)):
+        patcher = patch.object(tui_words, name, return_value=value)
+        patcher.start()
+        test.addCleanup(patcher.stop)
+
+
 class WordChoiceTests(unittest.TestCase):
     def setUp(self):
         FakeWords.calls.clear()
-        patcher = patch.object(tui_words, "engine", return_value=(FakeWords, FakeInputs))
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        fake_engines(self)
         # These tests cover choices, not the reference check, which has its own test.
         checker = patch("sol.core.check_reference", return_value=None)
         checker.start()
@@ -201,13 +229,18 @@ class WordChoiceTests(unittest.TestCase):
             tui_words.run(no_corpus, "book", "none")
 
     def test_rows_summary_and_owner_only_saving(self):
-        result = FakeWords.analyze_words(object(), reference=object())
+        alone = tui_words.Count(FakeWords.analyze_words(object()), None, object(), None)
+        self.assertEqual(tui_words.rows(alone)[0][0], ("being", "20", "6666.67", "", ""))
+        self.assertNotIn(tui_words.METHOD_LINE, tui_words.summary(alone))
+        result = tui_words.run(context(), "passage", "book", loader=lambda directory: self.book())
         shown, total = tui_words.rows(result)
-        self.assertEqual(shown[0], ("being", "20", "6666.67", "0", "undefined"))
+        # Undefined measures say why, in the engine's terms.
+        self.assertEqual(shown[0], ("being", "20", "6666.67", "0", "undefined", "empty reference", "empty reference"))
         self.assertEqual(total, 2)
         lines = tui_words.summary(result)
         self.assertTrue(lines[0].startswith("Target: 30 tokens, 2 distinct words"))
-        self.assertIn("undefined", lines[-1])
+        self.assertIn(tui_words.METHOD_LINE, lines)
+        self.assertEqual(lines[-1], "Note: Descriptive only.")
         first = tui_words.save(result, data_home=self.root)
         second = tui_words.save(result, data_home=self.root)
         self.assertNotEqual(first, second)
@@ -279,11 +312,13 @@ class RealEngineTests(unittest.TestCase):
                 "reference": core.capture_reference(snapshot, identifier)}
         for target, reference in (("passage", "none"), ("section", "book"), ("book", "none")):
             with self.subTest(target=target, reference=reference):
-                result = tui_words.run(real, target, reference)
+                count = tui_words.run(real, target, reference)
+                result = count.study
                 self.assertEqual(result["protocol"], "sol.word-frequencies")
+                self.assertEqual(count.comparison is None, reference == "none")
                 self.assertGreater(result["target"]["summary"]["token_count"], 0)
                 self.assertEqual(result["reference"] is None, reference == "none")
-                shown, total = tui_words.rows(result)
+                shown, total = tui_words.rows(count)
                 self.assertEqual(len(shown), total)
 
 
@@ -354,3 +389,205 @@ class CountOrderTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.3)
             self.assertEqual(shown, ["b"])
             self.assertEqual(len(saved), 1)
+
+
+def comparison_count():
+    """A target from the corpus and a reference from a text file, as the engine shapes them."""
+    digest = "c" * 64
+    core_side = {"provider": "core", "scope": {"kind": "corpus"},
+                 "summary": {"token_count": 30, "type_count": 2, "input_count": 1},
+                 "inputs": [{"id": TARGET, "content_sha256": digest, "reader_path": "/BEING/quality",
+                             "sources": [{"printed_page": "7"}]}]}
+    file_side = {"provider": "file", "scope": {"kind": "file"},
+                 "summary": {"token_count": 10, "type_count": 1, "input_count": 1}, "inputs": [{"span": [0, 40]}]}
+    cell = lambda count, total, locations: {"count": count, "denominator": total, "locations": locations,
+                                            "rate_per_10000_tokens": round(count * 10000 / total, 6)}
+    study = {"target": core_side, "reference": file_side, "warnings": [],
+             "frequencies": [{"word": "being", "target": cell(20, 30, [[0, 20, 4, 9]]),
+                              "reference": cell(5, 10, [[0, 5, 12, 17]])}]}
+    rows = [{**study["frequencies"][0], "rate_difference_per_10000_tokens": 1666.666667,
+             "rate_difference_status": "defined", "log2_rate_ratio": 0.415037, "log2_ratio_status": "defined"}]
+    comparison = {"study": study, "rows": rows, "warnings": ["Descriptive only."]}
+    return tui_words.Count(study, comparison, object(), object()), digest
+
+
+@unittest.skipUnless(tui.textual_available(), "the essence extra (Textual) is not installed")
+class ComparisonScreenTests(unittest.IsolatedAsyncioTestCase):
+    async def counted(self, app, pilot):
+        await pilot.press("3")
+        await pilot.click("#run")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+
+    async def test_measures_sources_and_opening_one_in_the_reader(self):
+        from sol.essence.tui.app import EssenceApp
+
+        count, digest = comparison_count()
+        written = []
+        with patch.object(tui_words, "run", return_value=count), patch.object(tui_words, "save", return_value=None):
+            app = EssenceApp(context())
+            async with app.run_test(size=(120, 40)) as pilot:
+                original = app._driver.write
+                app._driver.write = lambda data: (written.append(data), original(data))[1]
+                await self.counted(app, pilot)
+                table = app.query_one("#frequencies")
+                self.assertEqual([str(column.label) for column in table.columns.values()][-2:],
+                                 ["Difference", "Log₂ ratio"])
+                self.assertEqual(table.get_row_at(0)[-2:], ["+1666.67", "+0.42"])
+                self.assertIn(tui_words.METHOD_LINE, str(app.query_one("#summary").render()))
+                sources = app.query_one("#sources")
+                self.assertEqual(sources.row_count, 2)
+                # The keyboard path: words are focused after a count, Enter
+                # goes to the word's sources, Enter there opens one.
+                self.assertIs(app.focused, table)
+                await pilot.press("enter")
+                await pilot.pause()
+                self.assertIs(app.focused, sources)
+                await pilot.press("enter")
+                await pilot.pause()
+                requests = [data for data in written if data.startswith("\x1b]5379;sol-essence;")]
+                self.assertEqual(len(requests), 1)
+                self.assertTrue(requests[0].endswith("\x07"))
+                encoded = requests[0][len("\x1b]5379;sol-essence;"):-1]
+                self.assertEqual(json.loads(base64.b64decode(encoded)),
+                                 {"version": 1, "op": "open_source",
+                                  "source": {"id": TARGET, "start": 4, "content_sha256": digest}})
+                # The text file's occurrence is listed but cannot open in the reader.
+                await pilot.press("down", "enter")
+                await pilot.pause()
+                self.assertEqual(len([data for data in written if data.startswith("\x1b]5379;")]), 1)
+                self.assertIn("cannot be opened", str(app.query_one("#result-status").render()))
+                await pilot.press("escape")
+                await pilot.pause()
+                self.assertIs(app.focused, table)
+                # Switching screens starts on that screen's first control.
+                await pilot.press("3")
+                self.assertEqual(app.focused.id, "target")
+                await pilot.press("4")
+                self.assertIs(app.focused, table)
+                app.exit()
+
+    async def test_export_writes_only_in_workspace_sessions(self):
+        from sol.essence.tui.app import EssenceApp
+
+        count, _ = comparison_count()
+        exported = []
+        def export(chosen, table_format):
+            exported.append((chosen, table_format))
+            return Path("/invented/words.tsv")
+        for state_file in (None, Path(tempfile.mkdtemp(prefix="sol-essence-export-")) / "state.json"):
+            exported.clear()
+            with self.subTest(workspace=state_file is not None), patch.object(tui_words, "run", return_value=count), \
+                    patch.object(tui_words, "save", return_value=None), patch.object(tui_words, "export", side_effect=export):
+                app = EssenceApp(context(state_file))
+                async with app.run_test(size=(120, 40)) as pilot:
+                    await self.counted(app, pilot)
+                    await pilot.click("#export-tsv")
+                    await app.workers.wait_for_complete()
+                    await pilot.pause()
+                    status = str(app.query_one("#result-status").render())
+                    if state_file is None:
+                        self.assertEqual(exported, [])
+                        self.assertIn("Not exported", status)
+                    else:
+                        self.assertEqual(exported, [(count, "tsv")])
+                        self.assertIn("Exported: /invented/words.tsv", status)
+                    app.exit()
+
+    async def test_without_a_reference_there_is_nothing_to_export(self):
+        from sol.essence.tui.app import EssenceApp
+
+        study = FakeWords.analyze_words(object())
+        with patch.object(tui_words, "run", return_value=tui_words.Count(study, None, object(), None)), \
+                patch.object(tui_words, "save", return_value=None):
+            app = EssenceApp(context())
+            async with app.run_test(size=(120, 40)) as pilot:
+                await self.counted(app, pilot)
+                self.assertTrue(app.query_one("#export-csv").disabled)
+                self.assertEqual(len(app.query_one("#frequencies").columns), 5)
+                app.exit()
+
+    async def test_a_cancelled_count_shows_and_saves_nothing(self):
+        import threading
+        from sol.essence.tui.app import EssenceApp
+
+        release, shown, saved = threading.Event(), [], []
+        def run(*arguments, **files):
+            release.wait(5)
+            return comparison_count()[0]
+        with patch.object(tui_words, "run", side_effect=run), \
+                patch.object(tui_words, "save", side_effect=lambda count: saved.append(count)), \
+                patch.object(EssenceApp, "show_result", lambda self, count, path: shown.append(count)):
+            app = EssenceApp(context(Path(tempfile.mkdtemp(prefix="sol-essence-cancel-")) / "state.json"))
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.press("3")
+                await pilot.click("#run")
+                await pilot.pause(0.2)
+                self.assertFalse(app.query_one("#cancel").disabled)
+                await pilot.click("#cancel")
+                await pilot.pause()
+                release.set()
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual((shown, saved), ([], []))
+                self.assertIn("Cancelled", str(app.query_one("#status").render()))
+                self.assertTrue(app.query_one("#cancel").disabled)
+                app.exit()
+
+    async def test_ctrl_q_leaves_and_saves_even_from_a_text_field(self):
+        # Quitting the reader sends Ctrl-Q; a focused input must not swallow it.
+        from sol.essence.tui.app import EssenceApp
+
+        state_file = Path(tempfile.mkdtemp(prefix="sol-essence-quit-")) / "state.json"
+        app = EssenceApp(context(state_file))
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.press("3")
+            app.query_one("#target-file").focus()
+            await pilot.press("ctrl+q")
+            await pilot.pause()
+        self.assertEqual(json.loads(state_file.read_text())["screen"], "experiment")
+
+
+@unittest.skipUnless(_engine_installed(), "the ESSENCE stage 2 engine is not merged yet")
+class RealComparisonTests(unittest.TestCase):
+    def test_sources_and_export_from_the_real_engines(self):
+        from fixtures_corpus import write_runtime_corpus
+        from sol import core
+        from sol.corpus import contract
+
+        temporary = tempfile.TemporaryDirectory(prefix="sol-essence-compare-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        corpus = root / "corpus"
+        identifier, _ = write_runtime_corpus(corpus)
+        contract.initialize_corpus_identity(corpus)
+        snapshot = core.load_snapshot(corpus)
+        reference_file = root / "reference.txt"
+        reference_file.write_text("An invented reference, with an invented word or two.", encoding="utf-8")
+        real = {**context(), "corpus": str(corpus), "reference": core.capture_reference(snapshot, identifier)}
+        count = tui_words.run(real, "passage", "file", reference_file=str(reference_file))
+        self.assertIsNotNone(count.comparison)
+        index = next(number for number, row in enumerate(count.study["frequencies"]) if row["word"] == "invented")
+        found = tui_words.sources(count, index)
+        corpus_sources = [item for item in found if item["side"] == "target"]
+        self.assertEqual([item["open"]["id"] for item in corpus_sources], [identifier])
+        text = next(p for p in core.load_corpus_book(corpus).passages if p.identifier == identifier).text
+        start = corpus_sources[0]["open"]["start"]
+        self.assertEqual(text[start:start + len("invented")].casefold(), "invented")
+        self.assertEqual([item["open"] for item in found if item["side"] == "reference"], [None])
+        data_home = root / "data"
+        exported = tui_words.export(count, "csv", data_home=data_home)
+        self.assertEqual(exported.suffix, ".csv")
+        self.assertEqual(exported.stat().st_mode & 0o777, 0o600)
+        self.assertTrue(exported.read_text(encoding="utf-8").startswith("word,"))
+        self.assertNotEqual(tui_words.export(count, "csv", data_home=data_home), exported)
+        # A source changed since the count is refused, not exported.
+        reference_file.write_text("Something else entirely.", encoding="utf-8")
+        from sol.essence.word_inputs import WordStudyError
+        with self.assertRaises(WordStudyError) as caught:
+            tui_words.export(count, "tsv", data_home=data_home)
+        self.assertEqual(caught.exception.status, "stale")
+        self.assertEqual(len(list((data_home / "sol" / "studies").iterdir())), 2)
+        alone = tui_words.run(real, "passage", "none")
+        with self.assertRaisesRegex(ValueError, "Export needs a reference"):
+            tui_words.export(alone, "csv", data_home=data_home)

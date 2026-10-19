@@ -32,6 +32,46 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## ESSENCE stage 3, the interface side — 18 October 2026
+
+**Task:** "Claude Code: ESSENCE stage 3, the interface side", assigned in task-board [PR #28](https://github.com/dialectmaterial/SOL/pull/28) (approved by the maintainer on 18 October 2026; not yet merged, so this branch's `CURRENT_TASK.md` is left as it was to avoid a conflict).
+**Branch / PR:** `claude/essence-comparison-ui`, stacked on Codex's #29 · opened with `gh pr create`
+**Last implementation commit:** `1539983c49133e8d3665f7ec583d40a72da331d7` (first round `66663f0`; fixes from a real-book session follow it)
+
+### Changed files
+- `sol/essence/tui/words.py` — `Count` (study, comparison view, providers); with a reference, `run` calls `compare_words` once; `rows` adds the two measures and names undefined ones; `sources` lists each contributing passage per side (corpus rows carry ID, first offset and content digest; file rows cannot open); `export` calls `export_word_comparison` and writes owner-only, never overwriting.
+- `sol/essence/tui/app.py` — Results: measure columns, Sources table (Enter opens in the reader), Export CSV/TSV (workspace sessions only), a status line; Experiment: Cancel; Ctrl-Q with priority. The open request is a private OSC written through Textual's driver, as Textual writes its own clipboard OSC.
+- `sol/terminal/neovim_essence.lua` — `TermRequest` on ESSENCE's buffer: strict shape check, reader shown (from fullscreen: beside, or hidden when narrow), `essence_source` request; a malformed request is reported and ignored. `VimLeavePre` sends Ctrl-Q and waits up to 2 s.
+- `sol/terminal/neovim_reader.py` — `essence_source` navigation: CORE capture, refusal on a changed content digest or an offset outside the passage, then the staged path shared with `study_open`.
+- `sol/terminal/neovim_view.lua`, `neovim_panels.lua`, `neovim_notes.lua`, `neovim_tree.lua` — popups, the note editor and the outline centre in the reader's columns while ESSENCE is beside it.
+- Tests: `test_essence_tui.py` (measure columns and undefined labels, sources, the exact OSC payload, file sources not opening, export only in workspace sessions, nothing to export without a reference, cancel saves and shows nothing, Ctrl-Q from a text field saves; real engines: sources at the right offset, owner-only export, stale file refused); `test_neovim_reader.py` (open, history back, four refusals that move nothing); `test_reader_surface_neovim.py` (headless Neovim with a raw-terminal stand-in: foreign OSC ignored, malformed one warned once, valid one sent, fullscreen becomes beside, popup stays left of ESSENCE, quitting saves).
+- `docs/BEING.md` (§2 `E` row, §6), `docs/ESSENCE.md` (§4), `CHANGELOG.md`.
+
+### Second round: a real session on the book (19 October)
+Running `sol` in tmux on the real corpus found three things the tests had not:
+- **Studies saved from ESSENCE were lost** (since stage 2): ESSENCE inherited Neovim's private XDG/`TMPDIR` directories, so `words-*.sol-analysis.json` went into the reader's temporary folder, deleted on exit. The launch now carries the reader's own values (`ESSENCE_ENVIRONMENT` in `neovim_reader.py`), and Neovim starts ESSENCE with them.
+- **Opening a source failed in a real terminal:** terminal mode ends only after the OSC callback returns, and the reader captures a position only in normal mode. The request now waits for `ModeChanged` to normal mode in the reader window. The headless test now reports terminal mode and announces the change, and fails with the real error if the wait is removed.
+- **The keyboard path on Results was unpredictable:** Tab stopped at the tab bar and the scroll container, and switching screens could jump back to Results. Now a count focuses the word table, Enter goes to the word's sources, Escape goes back, and `1`–`4` start on each screen's first control. The summary scrolls in at most 8 lines, so the table keeps its height.
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — OK; full suite — **1,688 tests, OK** (12 skipped, 4 expected failures); `git diff --check` clean.
+- Mutation check: restoring the old popup geometry fails the new headless test (108 > 76 columns).
+- Real Textual app inside a headless Neovim terminal: its open request arrives intact through `TermRequest`; Ctrl-Q sent by Neovim saves state and exits in about 0.25 s.
+- Real book (read-only, this machine): section vs whole book 2.8 s through the interface (`analyze_words` alone 1.7 s; the comparison's study digest and rows add about 0.5 s); whole book alone 1.6 s; 1,177 sources for *being*, the first opening at the word; CSV export 3.2 s, 11.7 MB.
+- Real session after the fixes, `sol` in tmux at 160×45 on the real book: `E`, then `3`, section vs whole book, Count (about 6 s); the study saved owner-only in the reader's data folder; TSV export 11.7 MB; Down to *determinateness*, Enter, Enter: the reader opened p. 10 with the cursor on the word's first letter; Alt-Left returned to the start; `q` with ESSENCE open saved `{"screen": "results", …}` and exited 0.
+- After the fixes: docs OK; full suite **1,688 tests, OK** (12 skipped, 4 expected failures).
+- Not done: a manual session in Alacritty or Kitty (this machine has foot); tmux is a real terminal, but a human did not watch it.
+
+### Outstanding issues
+- Cancel cannot stop the engine; the count finishes in the background and is discarded.
+- A source opens at the word's first occurrence in that passage; later occurrences are not listed separately (the v1 artifact keeps only the first).
+- If the reader is busy with another request, a source request is dropped silently, as other requests are.
+- Exports name themselves `words-<time>.csv|tsv`; they are not linked to the saved study's file name.
+- Studies saved from ESSENCE before this fix are gone (they were in a temporary folder); nothing to migrate.
+
+### Decisions requiring approval
+- **Defaults:** OSC number 5379 and the `sol-essence` tag; opening from fullscreen leaves ESSENCE beside the reader (hidden below 100 columns); Ctrl-Q as the save-on-quit signal with a 2 s wait; export only in workspace sessions, into the studies directory; undefined-measure labels; sources table height 8 rows. No reserved decision: no CORE/protocol/workspace contract or dependency changes.
+
 ## ESSENCE stage 3 engine: comparison measures and export — 19 October 2026
 
 **Task:** [Codex: ESSENCE stage 3 engine, comparison measures and export](https://github.com/dialectmaterial/SOL/blob/df852763fe325cb06acdac825538d91ff98cca9a/docs/coordination/CURRENT_TASK.md#codex-essence-stage-3-engine-comparison-measures-and-export), assigned by the maintainer and in task-board PR #28.
