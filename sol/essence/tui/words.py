@@ -102,6 +102,24 @@ def run(context, target_choice, reference_choice, *, target_file=None, reference
     return Count(comparison["study"], comparison, target, reference)
 
 
+def verified_file_text(path, sha256):
+    """The file's text exactly as the engine counted it, or None if it changed.
+
+    For display only: the engine's own bounded, stable read, decoded verbatim
+    (CRLF and BOM kept, so offsets still match), and only when the bytes still
+    have the digest the study recorded.
+    """
+    import hashlib
+    try:
+        _, inputs = engine()
+        raw = inputs._read_file(Path(path).expanduser().absolute())
+        if hashlib.sha256(raw).hexdigest() != sha256:
+            return None
+        return raw.decode("utf-8")
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 def rows(count, limit=ROW_LIMIT):
     """Table rows: word, count and rate for each side, then the two measures."""
     def cells(cell):

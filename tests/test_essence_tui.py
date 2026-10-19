@@ -651,6 +651,32 @@ class SentenceStudyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no CORE corpus"):
             tui_sentences.run({**context(), "corpus": ""}, "book")
 
+    def test_file_beginnings_are_verbatim_and_verified(self):
+        # Reported by Codex's review of #34: CRLF was rewritten, shifting every slice.
+        from sol.essence.tui import sentences as tui_sentences
+
+        path = self.root / "crlf.txt"
+        text = "\ufeffShort.\r\nThis sentence is much longer.\r\nFinal."
+        path.write_bytes(text.encode("utf-8"))
+        count = tui_sentences.run({**context(), "corpus": ""}, "file", target_file=str(path))
+        self.assertEqual(tui_sentences.rows(count)[0][1], "This sentence is much longer.")
+        lines = tui_sentences.summary(count)
+        self.assertTrue(any(line.startswith("Mean words by place among the file's retained sentences") for line in lines))
+        self.assertNotIn("paragraph", " ".join(lines))
+        self.assertNotIn("translation's words", " ".join(lines))
+        # A file changed after the count shows no beginnings rather than wrong ones.
+        real = tui_sentences.engine()
+        class Changing:
+            @staticmethod
+            def analyze_sentences(provider):
+                study = real.analyze_sentences(provider)
+                path.write_bytes(b"Something else entirely. Much shorter.")
+                return study
+        path.write_bytes(text.encode("utf-8"))
+        with patch.object(tui_sentences, "engine", return_value=Changing):
+            changed = tui_sentences.run({**context(), "corpus": ""}, "file", target_file=str(path))
+        self.assertEqual([row[1] for row in tui_sentences.rows(changed)], ["", "", ""])
+
     def test_a_corpus_changed_since_the_reader_opened_is_refused(self):
         from sol import core
         from sol.corpus import contract

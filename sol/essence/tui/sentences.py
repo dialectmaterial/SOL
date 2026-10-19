@@ -17,6 +17,8 @@ ROW_LIMIT = 12  # the study keeps its twelve longest sentences
 BAR = 24  # columns of the widest histogram bar
 POSITIONS = (("first", "First in paragraph"), ("middle", "Middle"), ("last", "Last"),
              ("only", "Only sentence"))
+# A file is one input row: places are among its retained sentences, not paragraphs.
+FILE_POSITIONS = (("first", "First"), ("middle", "Middle"), ("last", "Last"), ("only", "Only sentence"))
 
 
 @dataclass
@@ -61,7 +63,7 @@ def run(context, target_choice, *, target_file=None, loader=None):
             texts[item["id"]] = passage.text
             labels[item["id"]] = f"{passage.heading or passage.node.title} | p. {passage.printed_page}"
     if target_choice == "file":
-        texts[None] = target.path.read_text(encoding="utf-8")
+        texts[None] = words.verified_file_text(target.path, study["input"]["binding"]["sha256"])
     return SentenceCount(study, target, texts, labels)
 
 
@@ -84,17 +86,23 @@ def summary(count):
             bar = "█" * round(BAR * row["sentences"] / peak)
             lines.append(f"{span:>8} words {row['sentences']:>6,}  {bar}")
         lines.append("")
-        means = [f"{label} {study['by_position'][key]['mean']:.1f}" for key, label in POSITIONS
-                 if study["by_position"][key]["mean"] is not None]
-        lines.append("Mean words by place in the paragraph: " + ", ".join(means))
+        file = part["provider"] == "file"
+        means = [f"{label} {study['by_position'][key]['mean']:.1f}" for key, label in
+                 (FILE_POSITIONS if file else POSITIONS) if study["by_position"][key]["mean"] is not None]
+        lines.append(("Mean words by place among the file's retained sentences (the file is one input): "
+                      if file else "Mean words by place in the paragraph: ") + ", ".join(means))
     excluded = study["exclusions"]
     review = excluded["by_reason"].get("review", 0)
     if review:
         lines.append(f"{review:,} passages awaiting source review were left out.")
     if excluded["outside_span"]:
         lines.append(f"{excluded['outside_span']:,} sentences cut by the span were left out.")
-    lines.append("Sentences end by declared punctuation rules (punctuation-rules-v1) and are counted "
-                 "in the English translation's words; this describes the translation, not Hegel's German.")
+    if part["provider"] == "file":
+        lines.append("Sentences end by declared punctuation rules (punctuation-rules-v1, written for the "
+                     "Cambridge translation of the Logic) and are counted in SOL's word tokens.")
+    else:
+        lines.append("Sentences end by declared punctuation rules (punctuation-rules-v1) and are counted "
+                     "in the English translation's words; this describes the translation, not Hegel's German.")
     return lines
 
 
