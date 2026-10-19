@@ -48,11 +48,66 @@ Write "None." rather than deleting a heading.
 - Docs OK; full suite **1,716 tests, OK** (12 skipped, 4 expected failures).
 - Real session in tmux at 160×45: `v`, `a` opened the editor beside the page with the quote shown; the missing letters were found there.
 
+### Review round (Codex, 19 October)
+- `:q!` (any close other than save or discard) left the page shifted: only those two released the side columns. A `WinClosed` handler now tidies up after any close, scheduled after it completes; the draft is still kept. Regression: page restored and focused after `:q!`, draft offered again (fails without the fix).
+- Merged main (#34, #35): stacked entries kept.
+
 ### Outstanding issues
 - None known.
 
 ### Decisions requiring approval
 - **Default:** the editor follows the context panel's placement rules.
+
+## Words in context in ESSENCE — 19 October 2026
+
+**Task:** the maintainer's "go on" on 19 October, taking the third candidate offered in the session (a word's sources with headings, pages and context); no task-board slot.
+**Branch / PR:** `claude/essence-word-sources`, stacked on #34 · opened with `gh pr create`
+**Last implementation commit:** `f941a2acaf25ee05effc273d9dfbd77481290f99`
+
+### Changed files
+- `sol/essence/tui/words.py`: `Count` keeps the loaded book and texts read, for display only; `sources` gives each row the passage heading and page and a `context` (words either side of the first occurrence), or None when the text no longer has the counted digest.
+- `sol/essence/tui/app.py`: the sources table shows Side | Count | In context (word in bold) | Where.
+- `tests/test_essence_tui.py`: real engine with a corpus passage and a text file (exact context, label, cut marks), a file changed after the count shows none; the fixture gained `text_sha256`.
+- `docs/ESSENCE.md` §4, `CHANGELOG.md`.
+
+### Tests performed
+- Docs OK; full suite **1,715 tests, OK** (12 skipped, 4 expected failures).
+- Real session in tmux on the book, ESSENCE fullscreen: each source showed its context and heading and page, e.g. *Remark 1 | p. 120*.
+
+### Outstanding issues
+- Still one row per passage, at the word's first occurrence there (the v1 artifact keeps only that); every occurrence would need either the study to keep them or the interface to search the text again.
+
+### Decisions requiring approval
+- **Defaults:** 40 characters of context each side, cut at whole words with "…"; no context when the digest differs.
+
+## The sentence study in ESSENCE — 19 October 2026
+
+**Task:** "Claude Code: The sentence study in ESSENCE", assigned in task-board PR #33 (not yet merged; this branch leaves `CURRENT_TASK.md` alone to avoid a conflict).
+**Branch / PR:** `claude/essence-sentences-ui` · opened with `gh pr create`
+**Last implementation commit:** `10dab25070141869582ab5e86da77be41c6803a8`
+
+### Changed files
+- `sol/essence/tui/sentences.py` (new, no Textual): choices to providers (shared with words), `run` → `SentenceCount` (the v2 study, its provider, display-only texts and labels), `summary` (totals, bars, means by place, exclusions, method note), `rows` (twelve longest: words, beginning, heading | page), `source` (what `essence_source` needs, or None for a file), owner-only `save`.
+- `sol/essence/tui/words.py`: `_create` takes a file-name prefix.
+- `sol/essence/tui/app.py`: a study choice on Experiment (focused first); the worker runs either study; Results shows the sentence view, hides sources and export for it, and Enter opens a sentence in the reader.
+- `tests/test_essence_tui.py`: real engine on an invented corpus (three targets, labels, source offset, saving, no book text in the artifact, recheck), files without a corpus, a changed corpus refused, and the screen flow with the exact open request.
+- `docs/ESSENCE.md` §2 and §4, `CHANGELOG.md`.
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — OK; full suite — **1,714 tests, OK** (12 skipped, 4 expected failures).
+- Real session in tmux on the book: `E`, `3`, Sentence lengths, This section (Existence: 137 passages, 624 sentences, longest 123), Run; Enter on the longest opened it in the reader at its first letter; the study was saved in the reader's data folder.
+
+### Review round (Codex, 19 October)
+- File beginnings were read with `Path.read_text`, which rewrites CRLF, so later slices shifted ("his sentence…"). Now `words.verified_file_text` uses the engine's bounded stable read, decodes verbatim (CRLF, BOM) and returns nothing unless the bytes match the study's file digest; a file changed after the count shows no beginnings. Regressions for CRLF/BOM and a change between analysis and display.
+- File studies are one input row: their means are now "by place among the file's retained sentences", and the method note no longer calls a file the English translation.
+- Merged main (#32): kept both stacked entries; ESSENCE §2 keeps #32's `S` removal and this branch's interface line.
+
+### Outstanding issues
+- Only the twelve longest sentences are listed (the v2 study keeps those); browsing every sentence needs a decision on the study's shape.
+- Built on main, not on #32: `essence_source` exists on main already, so opening works without #32. ESSENCE §2 line 24 is edited by both PRs; whichever merges second resolves one line.
+
+### Decisions requiring approval
+- **Defaults:** the study choice and its order; no reference for sentences; the summary's wording; columns Words | Beginning | Where; beginnings cut at 60 characters.
 
 ## Reader: clipboard, quitting, side panels, status line, no `S` — 19 October 2026
 

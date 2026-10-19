@@ -8,8 +8,9 @@ lazily, so the interface still opens, and says so, when it is not installed.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import hashlib
 import os
 from pathlib import Path
 
@@ -32,6 +33,9 @@ class Count:
     comparison: dict | None
     target: object
     reference: object | None
+    # For display only, never saved: the loaded book and texts already read.
+    book: object = field(default=None, repr=False)
+    texts: dict = field(default_factory=dict, repr=False)
 
 
 class EngineMissing(RuntimeError):
@@ -96,10 +100,28 @@ def run(context, target_choice, reference_choice, *, target_file=None, reference
     target = provider(target_choice, context, book=book, snapshot=snapshot, path=target_file, inputs=inputs)
     reference = provider(reference_choice, context, book=book, snapshot=snapshot, path=reference_file, inputs=inputs)
     if reference is None:
-        return Count(words.analyze_words(target), None, target, None)
+        return Count(words.analyze_words(target), None, target, None, book)
     # One computation: the comparison view carries the unchanged v1 study.
     comparison = comparison_engine().compare_words(target, reference=reference)
-    return Count(comparison["study"], comparison, target, reference)
+    return Count(comparison["study"], comparison, target, reference, book)
+
+
+def verified_file_text(path, sha256):
+    """The file's text exactly as the engine counted it, or None if it changed.
+
+    For display only: the engine's own bounded, stable read, decoded verbatim
+    (CRLF and BOM kept, so offsets still match), and only when the bytes still
+    have the digest the study recorded.
+    """
+    import hashlib
+    try:
+        _, inputs = engine()
+        raw = inputs._read_file(Path(path).expanduser().absolute())
+        if hashlib.sha256(raw).hexdigest() != sha256:
+            return None
+        return raw.decode("utf-8")
+    except (OSError, ValueError, AttributeError):
+        return None
 
 
 def rows(count, limit=ROW_LIMIT):
@@ -135,16 +157,64 @@ def sources(count, index):
         cell, part = row[side], count.study[side]
         if cell is None:
             continue
-        for input_index, occurrences, start, _ in cell["locations"]:
+        for input_index, occurrences, start, end in cell["locations"]:
             item = part["inputs"][input_index]
             if part["provider"] == "core":
+                passage = _passage(count, item["id"])
                 pages = item["sources"][0]["printed_page"] if item["sources"] else None
-                label = f"{item['reader_path']} | p. {pages}" if pages else item["reader_path"]
+                if passage is not None:
+                    label = f"{passage.heading or passage.node.title} | p. {passage.printed_page}"
+                else:
+                    label = f"{item['reader_path']} | p. {pages}" if pages else item["reader_path"]
                 opens = {"id": item["id"], "start": start, "content_sha256": item["content_sha256"]}
+                text = passage.text if passage is not None else None
             else:
                 label, opens = f"text file, at character {start:,}", None
-            found.append({"side": side, "count": occurrences, "label": label, "open": opens})
+                text = _file_text(count, side)
+            found.append({"side": side, "count": occurrences, "label": label, "open": opens,
+                          "context": _context(text, item["text_sha256"], start, end)})
     return found
+
+
+CONTEXT = 40  # characters of text shown on each side of an occurrence
+
+
+def _passage(count, identifier):
+    if count.book is None:
+        return None
+    try:
+        return count.book.find_passage(identifier)
+    except ValueError:
+        return None
+
+
+def _file_text(count, side):
+    # Verbatim and verified against the counted bytes (CRLF and BOM kept).
+    if side not in count.texts:
+        provider = count.target if side == "target" else count.reference
+        path = getattr(provider, "path", None)
+        count.texts[side] = None if path is None else verified_file_text(path, count.study[side]["binding"]["sha256"])
+    return count.texts[side]
+
+
+def _context(text, digest, start, end):
+    """The words around an occurrence, or None when the text is not what was counted.
+
+    The digest is the counted text's; a file or passage changed since then
+    shows no context rather than the wrong one.
+    """
+    if text is None or hashlib.sha256(text.encode("utf-8")).hexdigest() != digest:
+        return None
+    before, after = text[max(0, start - CONTEXT):start], text[end:end + CONTEXT]
+    # Cut at whole words, and say so; line breaks show as spaces.
+    if start > CONTEXT:
+        before = "…" + before.split(" ", 1)[-1]
+    if end + CONTEXT < len(text):
+        after = after.rsplit(" ", 1)[0] + "…"
+    def flat(part):
+        return " ".join(part.split())
+    return {"left": flat(before) + (" " if before[-1:].isspace() else ""), "word": text[start:end],
+            "right": (" " if after[:1].isspace() else "") + flat(after)}
 
 
 def summary(count):
@@ -184,13 +254,13 @@ def export(count, table_format, *, data_home=None):
     return _create(text.encode("utf-8"), "." + table_format, data_home)
 
 
-def _create(data, suffix, data_home):
+def _create(data, suffix, data_home, prefix="words"):
     home = Path(data_home or os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
     directory = home / "sol" / "studies"
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     for number in range(100):
-        path = directory / (f"words-{stamp}" + (f"-{number}" if number else "") + suffix)
+        path = directory / (f"{prefix}-{stamp}" + (f"-{number}" if number else "") + suffix)
         try:
             descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
         except FileExistsError:
