@@ -35,22 +35,23 @@ Write "None." rather than deleting a heading.
 ## ESSENCE encyclopedia proposal — 19 October 2026
 
 **Task:** [Codex: Proposal for the ESSENCE encyclopedia (stage 4)](https://github.com/dialectmaterial/SOL/blob/379553bead8b408ae0fe8636b6528bf9ef3a2209/docs/coordination/CURRENT_TASK.md#codex-proposal-for-the-essence-encyclopedia-stage-4).
-**Branch / PR:** `codex/encyclopedia-proposal` · opened with `gh pr create --base main`; status `In review`.
+**Branch / PR:** `codex/encyclopedia-proposal` · [PR #37](https://github.com/dialectmaterial/SOL/pull/37); status `In review`, approved by Claude Code.
 **Last implementation commit:** `08e01618b6f3f77077fd8f044e1dd01b838b25ec` (this report is committed after it).
 
 ### Changed files
 
 - `docs/coordination/proposals/ESSENCE_ENCYCLOPEDIA_PROPOSAL.md` — structured Markdown/JSON format, the three object schemas, cited/status-bearing genealogy, source and editorial rules, bounded initial coverage and pinned SOL method links, an offline CORE-free validator/CLI design, three complete draft entries and six decisions with options/recommendations.
 - `docs/coordination/CURRENT_TASK.md` — own task moved through `In progress` to `In review`.
-- `docs/coordination/HANDOFF.md` — this report; both preceding reports retained. No application code, authority, dependency or legacy change.
+- `docs/coordination/HANDOFF.md` — this report; all preceding reports retained. No application code, authority, dependency or legacy change relative to main.
 
 ### Tests performed
 
 - `.venv/bin/python -B scripts/check_docs.py` — OK: four authorities, local links/anchors and lossless legacy inventory.
-- `.venv/bin/python -B -m unittest discover -s tests` — **1,719 tests, OK (12 skipped, 4 existing expected failures)**; isolated XDG config/data/state/cache, after rebasing onto main including #32 and #34.
+- `.venv/bin/python -B -m unittest discover -s tests` — **1,722 tests, OK (12 skipped, 4 existing expected failures)**; isolated XDG config/data/state/cache, after integrating main through #36.
 - Parsed all three nested sample files with the existing CommonMark parser and standard JSON decoder: common fields, required headings, unique IDs, evidence pointers and adapter-to-task reference checked.
 - Checked bibliography against primary publisher/proceedings/author pages and the specifically cited BERT paper section; recorded abstract-only/metadata-only access and unresolved questions. Checked SOL adapter fields against the pinned source revision, including the distribution name and byte bounds.
 - `git diff --check` — OK. No private material was needed for this documentation task.
+- Refreshed against main after #35 and #36: resolved only the stacked handoff entries, preserving every main report byte-for-byte. The proposal is unchanged from the version Claude reviewed; schema and CLI adoption remain pending.
 
 ### Outstanding issues
 
@@ -61,6 +62,32 @@ Write "None." rather than deleting a heading.
 
 - **(reserved)** Adoption of a public catalog format/CLI, or later artifact/workspace reference fields, needs the maintainer's decision and appropriate authority updates before implementation depends on it. This PR only records the proposal.
 - **Recommendations for review:** JSON metadata inside CommonMark; three object kinds plus shared references; cited typed edges with separate epistemic/editorial states; explicit draft/publish gates; bounded initial coverage; offline explicit-directory validation with no adapter execution. Section 9 gives alternatives and a recommendation for each of six decisions. Parsing limits and presentation details remain proposed defaults.
+
+## Note editor beside the text — 19 October 2026
+
+**Task:** the maintainer's "go on", taking the note-editor candidate offered in the session; follows the side panels of #32.
+**Branch / PR:** `claude/note-editor-beside`, stacked on #32 · opened with `gh pr create`
+**Last implementation commit:** `150be3caeacf3ea48c7e47766f4a21e421766082`
+
+### Changed files
+- `sol/terminal/neovim_panels.lua`: `side_config()` extracted from `show_lines` and exported.
+- `sol/terminal/neovim_notes.lua`: the editor uses it (beside the page at full page height, else centred as before); the selection quote splits characters with `'\\zs'` (it was `'\zs'`, which Lua turns into `s`, so every "s" vanished from the quote).
+- `tests/test_reader_surface_neovim.py`: editor placement wide and narrow and the page restored after closing; the quote is the exact selection (fails without the fix).
+- `docs/BEING.md`, `CHANGELOG.md`.
+
+### Tests performed
+- Docs OK; full suite **1,716 tests, OK** (12 skipped, 4 expected failures).
+- Real session in tmux at 160×45: `v`, `a` opened the editor beside the page with the quote shown; the missing letters were found there.
+
+### Review round (Codex, 19 October)
+- `:q!` (any close other than save or discard) left the page shifted: only those two released the side columns. A `WinClosed` handler now tidies up after any close, scheduled after it completes; the draft is still kept. Regression: page restored and focused after `:q!`, draft offered again (fails without the fix).
+- Merged main (#34, #35): stacked entries kept.
+
+### Outstanding issues
+- None known.
+
+### Decisions requiring approval
+- **Default:** the editor follows the context panel's placement rules.
 
 ## Words in context in ESSENCE — 19 October 2026
 

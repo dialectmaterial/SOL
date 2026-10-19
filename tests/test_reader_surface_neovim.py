@@ -963,6 +963,77 @@ end
         self.assertEqual(narrow["page"]["col"], (100 - narrow["page"]["width"]) // 2)
         self.assertLess(narrow["panel"]["col"], narrow["page"]["col"] + narrow["page"]["width"])
 
+    def test_note_editor_opens_beside_the_page_when_there_is_room(self):
+        report = self.run_lua(r"""
+  local function geometry(window)
+    local config = vim.api.nvim_win_get_config(window)
+    return {col = config.col, width = config.width, row = config.row, height = config.height}
+  end
+  local function editor()
+    for _, window in ipairs(vim.api.nvim_list_wins()) do
+      if vim.api.nvim_win_get_config(window).zindex == 50 then return window end
+    end
+  end
+  data.personal = {persistent = true, notes = {}}
+  for _, columns in ipairs({160, 100}) do
+    vim.o.columns, vim.o.lines = columns, 40
+    assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+    local reader = SOLNvimReader
+    local centred = geometry(reader.window)
+    reader.note()
+    report[tostring(columns)] = {page = geometry(reader.window), editor = geometry(editor()), centred = centred,
+                                 insert = vim.fn.mode(1)}
+    vim.api.nvim_feedkeys(vim.keycode('<C-c>'), 'xt', false)
+    report[tostring(columns)].closed = geometry(reader.window)
+  end
+  -- Reported by Codex's review of #36: :q! left the page shifted.
+  -- Drafts live on the reader's channel; a stand-in keeps them here.
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '', writer = {write = function() end}}
+  vim.o.columns = 160
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  local reader = SOLNvimReader
+  local before = geometry(reader.window)
+  reader.note()
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, {'A draft to keep'})
+  vim.cmd('stopinsert')
+  vim.cmd('q!')
+  vim.wait(50)
+  report.forced = {before = before, after = geometry(reader.window),
+                   focused = vim.api.nvim_get_current_win() == reader.window}
+  reader.note()
+  report.forced.draft = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+""", integrated=True)
+        wide, narrow = report["160"], report["100"]
+        self.assertLess(wide["page"]["col"], wide["centred"]["col"])
+        self.assertGreaterEqual(wide["editor"]["col"], wide["page"]["col"] + wide["page"]["width"] + 1)
+        self.assertEqual(wide["editor"]["height"], wide["page"]["height"] - 2)
+        self.assertEqual(wide["closed"], wide["centred"])
+        # Too narrow: over the page as before, which stays centred.
+        self.assertEqual(narrow["page"], narrow["centred"])
+        self.assertLess(narrow["editor"]["col"], narrow["page"]["col"] + narrow["page"]["width"])
+        forced = report["forced"]
+        self.assertEqual(forced["after"], forced["before"])
+        self.assertTrue(forced["focused"])
+        self.assertEqual(forced["draft"], ["A draft to keep"])
+
+    def test_note_editor_quotes_the_selection_exactly(self):
+        text = self.sample.passages[1].text
+        report = self.run_lua(r"""
+  data.personal = {persistent = true, notes = {}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  local reader = SOLNvimReader
+  local id = data.records[2].id
+  reader.restore(reader.capture('v', reader.source_point(id, 0), reader.source_point(id, 29)))
+  reader.note()
+  local quoted = {}
+  for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(0, -1, 0, -1, {details = true})) do
+    for _, line in ipairs(mark[4].virt_lines or {}) do quoted[#quoted + 1] = line[1][1] end
+  end
+  report.quoted = quoted
+""", integrated=True)
+        self.assertEqual(report["quoted"][0], " ".join(text[:30].split()))
+        self.assertIn("s", report["quoted"][0])
+
     def test_note_times_are_shown_in_local_time(self):
         self.environment = {**self.environment, "TZ": "Europe/Amsterdam"}
         report = self.run_lua(r'''
