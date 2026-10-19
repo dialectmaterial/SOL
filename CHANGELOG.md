@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Words in context in ESSENCE — 19 October 2026
+
+A word's sources in ESSENCE now show the words around it and the passage's
+heading and page, instead of a file path, so you can judge an occurrence
+before opening it in the reader.
+
 ### Sentence lengths in ESSENCE — 19 October 2026
 
 ESSENCE's Experiment screen now offers sentence lengths beside word
