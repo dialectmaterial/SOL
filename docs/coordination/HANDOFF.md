@@ -32,6 +32,80 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## ESSENCE stage 3 engine: comparison measures and export — 19 October 2026
+
+**Task:** [Codex: ESSENCE stage 3 engine, comparison measures and export](https://github.com/dialectmaterial/SOL/blob/df852763fe325cb06acdac825538d91ff98cca9a/docs/coordination/CURRENT_TASK.md#codex-essence-stage-3-engine-comparison-measures-and-export), assigned by the maintainer and in task-board PR #28.
+**Branch / PR:** `codex/essence-comparison` · opened with `gh pr create --base main`. Status: `In review`.
+**Last implementation commit:** `df852763fe325cb06acdac825538d91ff98cca9a` (this report follows).
+
+### Changed files
+
+- `sol/essence/comparison.py` — two documented descriptive measures over verified v1 counts, explicit undefined reasons, unchanged source study, and CSV/TSV export with denominators, source bindings, scope/study digests and warnings. No new saved artifact schema.
+- `sol/essence/cli.py`, `word_cli.py`, `__init__.py` — `sol analyze words-export FILE --format csv|tsv`, common provider reconstruction with `check`, and lazy Python exports. Decode precedes source discovery; verification completes before table output.
+- `tests/test_word_comparison.py` — 17 invented-input tests: formulas/sign, unequal denominators, zero counts/empty scopes, Unicode CSV/TSV round trips, both providers, CORE CLI export, stale/unselected changes, tampered counts, v1 compatibility and CORE/UI-free file execution.
+- `docs/ESSENCE.md` §5, `CHANGELOG.md` — formulas, zero policy, limits and examples. `CURRENT_TASK.md` records only Codex's assigned slot from #28 and status; Claude's slot is untouched here.
+
+### Python contract for the interface
+
+Both functions are in `sol.essence.comparison`, also exported from `sol.essence`:
+
+```python
+compare_words(target, *, reference, result=None) -> dict
+export_word_comparison(target, *, reference, result=None, format="csv") -> str
+```
+
+`target` and required `reference` are the existing `CoreProvider(snapshot,
+scope=None)` or `FileProvider(path, scope=None)`, independently scoped and
+possibly mixed. `result=None` runs a new `analyze_words`; otherwise `result`
+must be the existing `sol.word-frequencies` v1 artifact and is strictly
+recomputed with those providers/scopes before any measure or export is used.
+Refusals use existing `WordStudyError` (`status`, `code`) / filesystem errors.
+The previous `analyze_words` names and result shape are unchanged.
+
+The comparison view has `method`, `study` (the unchanged verified v1 artifact),
+`study_sha256` (SHA-256 of `encode_word_result(study)` without newline), `rows`
+and `warnings`. Every row has `word`, the existing `target`/`reference` cells
+(including count, denominator, rate, locations), plus
+`rate_difference_per_10000_tokens`, `rate_difference_status`,
+`log2_rate_ratio`, `log2_ratio_status`. Order is the study's union-vocabulary
+order. UI code may save `view['study']` through the existing v1 codec; the
+comparison view itself is not an artifact accepted by `sol analyze check`.
+
+For counts `a,b` and token totals `Nt,Nr`, difference is
+`10000*(a/Nt-b/Nr)`; log ratio is `log2((a*Nr)/(b*Nt))`. Round only the final
+measures to six decimals. No smoothing: zero counts make the log ratio null
+with `zero_target_count`/`zero_reference_count`; the difference stays defined
+when both denominators are positive. An empty denominator makes both null
+with `empty_target`/`empty_reference`. Otherwise status is `defined`; two empty
+scopes have no vocabulary rows. Positive measures mean a higher target rate.
+Warnings retain projection/size/source cautions and explicitly deny a
+significance, confidence or conceptual-similarity interpretation.
+
+Export returns text without writing files, using standard CSV quoting and LF
+records (`format='csv'` or `'tsv'`). Empty numeric cells have explicit status
+columns; a header-only table represents an empty union. Each word row repeats
+the method ID, original-study digest, provider/binding metadata, scope digests
+and warnings. There are no passage texts, contexts, source paths, headings,
+token sequences or new dependency. Keep the original private study for source
+locations and empty-scope provenance; exports do not replace it or authorize
+source/workspace writes.
+
+### Tests performed
+
+- 17 focused comparison/export tests passed. Docs check and `git diff --check` passed. Full suite: **1,680 tests, OK (11 skipped, 4 existing expected failures)**.
+- Existing `words --json` v1 and term CLI JSON/stdout/stderr are byte-for-byte identical to main on invented inputs. Existing artifact check/encoding remain unchanged. A subprocess blocks all CORE/corpus/reader/terminal/TUI imports and successfully compares/exports ordinary files through API and CLI.
+- Read-only private Being-versus-book trial: 131,267 versus 312,481 tokens; 7,317 TSV rows round-tripped, 11,709,384 UTF-8 bytes with warnings/provenance. Study and export computed in memory, no output file saved and no source modified.
+- Reviewed and merged [#24](https://github.com/dialectmaterial/SOL/pull/24#issuecomment-6251723844) after 1,653 tests and its launch-refusal regression; [#25](https://github.com/dialectmaterial/SOL/pull/25#issuecomment-6251744268) after 1,661 tests, stale-context and cancelled-count regressions; [#27](https://github.com/dialectmaterial/SOL/pull/27#issuecomment-6251879359) after resolving HANDOFF/CHANGELOG-only conflicts, 1,663 combined tests and a read-only real-book verification check. Every PR's GitHub checks passed before merge.
+
+### Outstanding issues
+
+- [#28](https://github.com/dialectmaterial/SOL/pull/28#issuecomment-6251755945) is reviewed (docs, 1,642 tests and GitHub checks pass) but conflicts in `CURRENT_TASK.md` after the earlier merges. CLAUDE.md requires the author to resolve this non-HANDOFF/CHANGELOG conflict; requested that fix. The assigned Codex task is recorded here so the implementation does not wait on a coordination-only conflict. The dropped on-disk cache was not implemented.
+- Interface controls/source navigation remain Claude's lane. No file in `sol/essence/tui/`, `sol/terminal/`, `sol/core/`, `sol/corpus/`, `sol/reader/` or `pyproject.toml` is changed by this engine PR. No keyness/significance estimator or inference for rare/overlapping observations is added.
+
+### Decisions requiring approval
+
+- None reserved. Defaults for review: two descriptive effect sizes; no pseudocounts; null plus a reason rather than infinity; six-decimal final rounding; required reference; a derived view over unchanged v1 studies; CSV/TSV with explicit denominators and provenance, blank undefined numeric cells, header-only empty tables. These change no CORE/reference/workspace contract or dependency.
+
 ## Faster reader start-up — 19 October 2026
 
 **Task:** maintainer's request in the session ("sol starts super slow"), within Claude Code's CORE/reader lane.

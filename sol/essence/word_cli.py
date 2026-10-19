@@ -121,13 +121,30 @@ def render_words(result):
     return "\n".join(lines)
 
 
-def run(options, result=None):
-    """Both CLI execution and verification use the public engine function."""
+def _providers(options, result=None):
+    """Explicit sources and optional saved scopes, shared with verified export."""
     target = _provider(options, saved=result["target"] if result else None)
     requested = options.compare or any(getattr(options, "reference_" + name) is not None
                                       for name in ("provider", "file", "corpus", "within", "passage", "span"))
     saved_reference = result["reference"] if result else None
     reference = _provider(options, reference=True, saved=saved_reference, target=target) if requested or saved_reference is not None else None
+    return target, reference
+
+
+def run_export(options):
+    """Decode before opening sources, then strictly verify before tabular output."""
+    from sol.essence.comparison import export_word_comparison
+
+    result = decode_word_result(read_artifact(options.file))
+    target, reference = _providers(options, result)
+    output = export_word_comparison(target, reference=reference, result=result, format=options.format)
+    sys.stdout.write(output)
+    return 0
+
+
+def run(options, result=None):
+    """Both CLI execution and verification use the public engine function."""
+    target, reference = _providers(options, result)
     result = analyze_words(target, reference=reference) if result is None else check_word_result(target, result, reference=reference)
     if options.json:
         if options.action == "check":

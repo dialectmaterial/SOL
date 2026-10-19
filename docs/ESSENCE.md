@@ -230,6 +230,73 @@ changes during execution are refused too. Rechecking does not overwrite the
 artifact or change canonical/workspace data. Interface integration and its
 CLI/TUI equivalence trial remain separate work.
 
+### Stage 3 engine — comparison measures and export (implemented, 19 October)
+
+`sol.essence.comparison.compare_words(target, *, reference, result=None)`
+uses the same CORE/file providers and scopes as `analyze_words`. It analyzes
+fresh inputs, or strictly recomputes the supplied **existing v1** `result`
+before deriving measurements. Its returned view has `method`, the unchanged
+v1 `study`, `study_sha256`, `rows` and `warnings`. Each row contains `word`,
+the original `target`/`reference` frequency cells, two measurements and their
+statuses. This view is not a new saved artifact: keep the original
+`sol.word-frequencies` v1 JSON, which still checks and encodes unchanged.
+
+The deliberately small method, `word-rate-comparison-v1`, uses occurrence
+counts `a`, `b` and complete token denominators `Nt`, `Nr`:
+
+- **Rate difference per 10,000 tokens:** `10000 * (a/Nt - b/Nr)`.
+  Positive means a higher target rate; zero means equal rates at the reported
+  precision. It is computed from counts before rounding, rather than by
+  subtracting the rounded rates in the study.
+- **Log₂ rate ratio:** `log2((a*Nr)/(b*Nt))`, defined only with positive counts
+  and denominators. `+1` means twice the reference rate, `-1` half. There is
+  **no smoothing or pseudocount**: a missing word yields `null` and
+  `zero_target_count` or `zero_reference_count`, not infinity or an invented
+  small count. The rate difference remains defined in those cases.
+
+Both measures round to six decimal places. A zero token denominator makes
+both undefined, with `empty_target` or `empty_reference`; two empty scopes
+have no vocabulary rows. Numeric fields are `rate_difference_per_10000_tokens`
+and `log2_rate_ratio`; status fields are `rate_difference_status` and
+`log2_ratio_status` (`defined` for finite reported measurements). Rows retain
+the study's descending-target-count/word order, including reference-only words.
+These are **descriptive lexical effect sizes**, with no significance test,
+confidence estimate or conceptual-similarity claim. Unequal sizes, overlapping
+scopes and small counts do not establish a population inference. Existing
+projection/edition/unequal-denominator warnings are retained. No keyness
+statistic is implemented.
+
+`export_word_comparison(target, *, reference, result=None, format="csv")`
+repeats the same source verification and returns CSV or TSV text without
+writing files. From the CLI, export a saved target/reference study with
+explicit sources (replace these private paths):
+
+```sh
+sol analyze words --file /private/target.txt --reference-file /private/reference.txt --json > /private/study.json
+sol analyze words-export /private/study.json --input-file /private/target.txt --reference-file /private/reference.txt --format csv > /private/comparison.csv
+sol analyze words-export /private/study.json --input-file /private/target.txt --reference-file /private/reference.txt --format tsv > /private/comparison.tsv
+sol analyze words-export /private/core-study.json --corpus /private/corpus --format csv
+```
+
+CORE scopes are recovered from the validated artifact, just as for `check`;
+an independent CORE reference uses `--reference-corpus`. File sources are
+never opened from artifact data. A reference is required. Changed source
+bytes/generations, tampered studies and unsupported versions refuse before
+any table is emitted. CSV/TSV are derived tables, not accepted by `check` and
+never used to update the corpus; verify their retained original study instead.
+
+Both formats have one header and a row per union-vocabulary word, Unicode
+spellings, absolute counts, explicit per-side token denominators, rates,
+measurements and statuses. Undefined numeric cells are empty; their status
+explains why. Additional columns retain the method ID, the canonical v1
+encoding's SHA-256 (without its final newline), provider names, full source
+bindings, scope digests and warnings. Binding/warning cells are quoted JSON;
+scope details remain in the original study. No passage text, contexts,
+source paths, headings or token sequences are exported. Empty unions produce
+a header-only table; retain the study for empty-scope totals and provenance.
+Keep the study and exports private and outside Git. The engine imports no
+Textual; interface controls and source navigation remain separate work.
+
 ### Experiment A — syntax and positionality (highest priority)
 
 **Research question:** how do sentence lengths and selected grammatical constructions vary across paragraphs and across positions within a passage or chapter of Hegel's *Science of Logic* in the current **English translation**?
