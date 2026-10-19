@@ -23,8 +23,21 @@ return function(reader)
     if api.nvim_win_is_valid(window) then api.nvim_set_current_win(window) end
     if packet then restore(packet) end
   end
-  -- Beside the page when there is room (the page moves left to make it),
-  -- else over the page as before. marks: {line, group[, first, last]} in bytes.
+  -- Where a panel goes beside the page, moving the page left to make room;
+  -- nil when the reader's columns are too narrow, and the panel goes over it.
+  local function side_config()
+    local columns = reader.view.reader_columns()
+    local page = math.max(1, math.min(data.width, columns - 4))
+    local room = columns - page - 6
+    if room < SIDE_MINIMUM then return nil end
+    local width = math.min(SIDE_MAXIMUM, room)
+    reader.view.set_side(width + 4)
+    local placed = api.nvim_win_get_config(window)
+    return { relative = "editor", row = placed.row, col = placed.col + placed.width + 2, width = width,
+      height = math.max(1, placed.height - 2) }
+  end
+  -- Beside the page when there is room, else over the page as before.
+  -- marks: {line, group[, first, last]} in bytes.
   local function show_lines(lines, return_packet, marks)
     return_packet = return_packet or panels.return_packet
     close_popup()
@@ -37,17 +50,9 @@ return function(reader)
         { end_col = math.min(#text, mark[4] or #text), hl_group = mark[2] })
     end
     vim.bo[panel].modifiable, vim.bo[panel].readonly, vim.bo[panel].bufhidden = false, true, "wipe"
-    local columns = reader.view.reader_columns()
-    local page = math.max(1, math.min(data.width, columns - 4))
-    local room = columns - page - 6
-    local config
-    if room >= SIDE_MINIMUM then
-      local width = math.min(SIDE_MAXIMUM, room)
-      reader.view.set_side(width + 4)
-      local placed = api.nvim_win_get_config(window)
-      config = { relative = "editor", row = placed.row, col = placed.col + placed.width + 2, width = width,
-        height = math.max(1, placed.height - 2) }
-    else
+    local config = side_config()
+    if not config then
+      local columns = reader.view.reader_columns()
       local width, height = math.max(1, math.min(data.width, columns - 6)), math.max(1, vim.o.lines - 8)
       config = { relative = "editor", row = 3, col = math.max(0, math.floor((columns - width) / 2)), width = width,
         height = math.min(height, math.max(1, #lines)) }
@@ -147,6 +152,7 @@ return function(reader)
   end
 
   panels.close_popup, panels.show_lines, panels.current_packet = close_popup, show_lines, current_packet
+  panels.side_config = side_config
   panels.show_search, panels.show_source = show_search, show_source
   panels.source = source
   return panels

@@ -37,12 +37,15 @@ return function(reader)
       api.nvim_buf_set_lines(editor, 0, -1, false, vim.split(initial, '\n', { plain = true }))
     end
     vim.bo[editor].modified = false
+    -- Beside the passage when there is room, as the context panel is.
+    local side = panels.side_config()
     local columns = reader.view.reader_columns()
-    local width = math.max(20, math.min(data.width, columns - 6))
+    local width = side and side.width or math.max(20, math.min(data.width, columns - 6))
     local quote = {}
     if packet.selection ~= vim.NIL then
       local text, line = packet.selection.text:gsub('%s+', ' '), ''
-      for _, char in ipairs(vim.fn.split(text, '\zs')) do
+      -- One character at a time; in Lua, '\\zs' must be escaped to reach Vim.
+      for _, char in ipairs(vim.fn.split(text, '\\zs')) do
         if vim.fn.strdisplaywidth(line .. char) > width - 2 then
           quote[#quote + 1] = line; line = ''
           if #quote == 3 then quote[3] = vim.fn.strcharpart(quote[3], 0, vim.fn.strchars(quote[3]) - 1) .. '…'; break end
@@ -51,12 +54,13 @@ return function(reader)
       end
       if #quote < 3 and line ~= '' then quote[#quote + 1] = line end
     end
-    panels.window = api.nvim_open_win(editor, true, { relative = 'editor', row = 3,
-      col = math.max(0, math.floor((columns - width) / 2)), width = width,
-      height = math.max(3, math.min(12 + #quote, vim.o.lines - 10)), style = 'minimal', border = 'single', zindex = 50,
-      title = edit and (' Edit your note (revision ' .. tostring(edit.revision) .. ') ')
-        or (' Note on: ' .. vim.fn.strcharpart(record.heading, 0, width - 14) .. ' '), title_pos = 'left',
-      footer = ' Ctrl-S or :w saves · Ctrl-C discards ', footer_pos = 'right' })
+    local config = side or { relative = 'editor', row = 3, col = math.max(0, math.floor((columns - width) / 2)),
+      width = width, height = math.max(3, math.min(12 + #quote, vim.o.lines - 10)) }
+    config.style, config.border, config.zindex = 'minimal', 'single', 50
+    config.title = edit and (' Edit your note (revision ' .. tostring(edit.revision) .. ') ')
+      or (' Note on: ' .. vim.fn.strcharpart(record.heading, 0, width - 14) .. ' ')
+    config.title_pos, config.footer, config.footer_pos = 'left', ' Ctrl-S or :w saves · Ctrl-C discards ', 'right'
+    panels.window = api.nvim_open_win(editor, true, config)
     vim.wo[panels.window].wrap, vim.wo[panels.window].linebreak = true, true
     vim.wo[panels.window].winhighlight = 'NormalFloat:SOLPanel,FloatBorder:SOLPanelBorder'
     if #quote > 0 then
