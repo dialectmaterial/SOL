@@ -36,8 +36,7 @@ from sol.workspace.store import Workspace
 OPERATIONS = ("snapshot_load", "corpus_book_load", "core_verify", "payload_ordinary",
               "payload_footnote_heavy", "typography_ordinary", "typography_footnote_heavy",
               "startup_python_first_payload", "controller_next", "controller_previous",
-              "controller_search", "controller_search_open", "controller_history_back",
-              "controller_sentence_study")
+              "controller_search", "controller_search_open", "controller_history_back")
 
 
 def synthetic_corpus(directory):
@@ -167,9 +166,6 @@ def controller_session(directory, root, number, width, measure):
         measure("controller_history_back", lambda: request("history_back"))
         if payload["records"][0]["id"] != destination:
             raise ValueError("history did not restore the previous section")
-        study = measure("controller_sentence_study", lambda: request("sentence_study"))
-        if "study" not in study:
-            raise ValueError("controller did not produce a study")
         return 0, None  # Exit without a fake editor quit packet.
 
     try:
