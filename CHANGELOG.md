@@ -13,6 +13,10 @@ were. A running count can be cancelled. Quitting the reader while ESSENCE is
 open now saves ESSENCE's state, and the reader's popups stay in the reader's
 columns instead of covering ESSENCE.
 
+**Fixed:** studies saved from ESSENCE (and the new exports) were written into
+the reader's private temporary folder and deleted when the reader closed; they
+now go to `~/.local/share/sol/studies` like the reader's own studies.
+
 ### Compare word rates and export verified tables — 19 October 2026
 
 The UI-independent `compare_words` function reports a rate difference and
