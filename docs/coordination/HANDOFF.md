@@ -32,6 +32,39 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Reader: clipboard, quitting, side panels, status line, no `S` — 19 October 2026
+
+**Task:** the maintainer's requests in the session on 19 October (context panel beside the text with better formatting; `y` and mouse selection to the system clipboard; remove `S`; a better status line), and the quit change the maintainer added: `:q`/`:qa` save and quit, `q`/`Ctrl-q` no longer quit, `:qa!` unchanged.
+**Branch / PR:** `claude/reader-panels-clipboard`, stacked on #30 · opened with `gh pr create`
+**Last implementation commit:** `f1c95eb9bea943c418fa3da790e3422a62e7de81` (this report is committed after it)
+
+### Changed files
+- `sol/terminal/neovim.py` — `clipboard_command()` picks `wl-copy`, `xclip`, `xsel` or `pbcopy` from the real environment, with only the variables it needs; `_isolated_environment` passes it as `SOL_NVIM_CLIPBOARD`.
+- `sol/terminal/neovim_controls.lua` — `y` copies exact source text, across paragraphs too, through that program, else OSC 52, and reports how; mouse release copies; `q`/`Ctrl-q` hint, `:q`/`:qa`/`:wq`/`:x` save and quit (from a selection too), `:qa!` untouched; the context panel rewritten with headed sections, highlights and local times; the help screen updated; `S` removed.
+- `sol/terminal/neovim_view.lua` — mouse on in the reader; the status line (`SOLStatus`: breadcrumb with repeated titles collapsed, pages, mode, focus, percentage, keys); `set_side`, so the page and a side panel centre together; `progress` validated.
+- `sol/terminal/neovim_panels.lua` — `show_lines` opens beside the page when 34+ columns are spare (at most 64 wide, page height), else over it; highlight marks; the study panel removed. `neovim_requests.lua` — study dispatch removed.
+- `sol/terminal/neovim_reader.py` — `progress` (first passage of the section, book total) in the payload; `sentence_study`/`study_open` removed.
+- `scripts/reader_timings.py` — the section-study measurement removed with `S`.
+- Tests: clipboard program choice and its handoff through the isolated environment (`test_neovim_reader.py`); headless Neovim: copy across paragraphs, snapping, mouse release, OSC 52 fallback, `q` not quitting, `:qa!` saving nothing, `S` unmapped, status line content and refused `progress`, side vs overlay placement and highlights, local note times (`test_reader_surface_neovim.py`); quitting with `:q` in the pty tests; `TZ=UTC` in the shared test environment; the refused-move test covers `essence_source` instead of `study_open`; the `S` tests removed.
+- `docs/BEING.md` (controls, a 19 October section, §6), `docs/ESSENCE.md`, `docs/ARCHITECTURE.md`, `CHANGELOG.md`.
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — OK; full suite — **1,692 tests, OK** (12 skipped, 4 expected failures).
+- Real session, `sol` in tmux at 160×45 on the real book: `y` on a selection, read back with `wl-paste` (exact text); repeated copies; a 753-character selection over two paragraphs (exact, joined by a blank line); `q` shows the hint, `:q` exits 0; the status line followed the cursor (*The Doctrine of Being › Determinateness (Quality) › Existence · p. 83 … Continuous · 9%*); `c` opened beside the page with the page moved left.
+- Found and fixed on the way: `wl-copy` leaves a process holding output pipes, so the copy now opens none; a test helper default bound `shutil.which` too early.
+- Not done: mouse selection in a real terminal (tmux cannot send mouse drags; the mapping is tested headless), and anything in Alacritty or Kitty.
+
+### Outstanding issues
+- OSC 52 cannot be confirmed: the reader says the text went "through the terminal", and the terminal may ignore it (Alacritty and foot accept it; tmux needs `set-clipboard on`).
+- With the mouse on, the terminal's own selection needs Shift-drag in most terminals.
+- Ctrl-S in the note editor did not arrive through tmux in the session test; `:w` did. Not investigated; Ctrl-S works in the headless tests.
+- The note editor still opens over the page.
+
+### Decisions requiring approval
+- **(reserved, approved by the maintainer in the session on 19 October 2026)** BEING §6 and ESSENCE §4 Decision text: `S` no longer "stays the quick sentence study"; it is removed from the reader.
+- **Defaults (the maintainer's two open questions):** `Ctrl-q` is removed as a quit key too; ESSENCE keeps `q` (it only closes ESSENCE).
+- **Other defaults:** side panel at 34–64 columns; footnotes, search results and help also open beside; the status line's content; `:wq`/`:x` counted as quitting; OSC 52 as the fallback.
+
 ## ESSENCE stage 3, the interface side — 18 October 2026
 
 **Task:** "Claude Code: ESSENCE stage 3, the interface side", assigned in task-board [PR #28](https://github.com/dialectmaterial/SOL/pull/28) (approved by the maintainer on 18 October 2026; not yet merged, so this branch's `CURRENT_TASK.md` is left as it was to avoid a conflict).
