@@ -57,7 +57,7 @@ Write "None." rather than deleting a heading.
 ### Outstanding issues
 - OSC 52 cannot be confirmed: the reader says the text went "through the terminal", and the terminal may ignore it (Alacritty and foot accept it; tmux needs `set-clipboard on`).
 - With the mouse on, the terminal's own selection needs Shift-drag in most terminals.
-- Ctrl-S in the note editor did not arrive through tmux in the session test; `:w` did. Not investigated; Ctrl-S works in the headless tests.
+- (Checked afterwards: Ctrl-S saves a note from insert and normal mode in a real session; the first attempt had sent keys before the editor opened. No bug.)
 - The note editor still opens over the page.
 
 ### Decisions requiring approval
