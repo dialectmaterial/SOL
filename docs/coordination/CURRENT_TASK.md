@@ -12,79 +12,75 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: ESSENCE stage 3, the interface side
+## Claude Code: The sentence study in ESSENCE
 
-**Status:** In progress
-**Branch:** `claude/essence-comparison-ui`
-**Requested:** 18 October 2026, by the maintainer
-
-### Goal
-
-In ESSENCE, a target/reference count shows Codex's comparison measures, can be
-exported as CSV or TSV, and a word's source passage opens in the reader;
-returning to the earlier reading position stays a separate step. A long count
-can be cancelled.
-
-### Scope
-
-[ESSENCE §4–§5 stage 3](../ESSENCE.md#5-prioritized-experiments),
-[BEING §6](../BEING.md#6-being--essence-without-terminal-dogma):
-`sol/essence/tui/`, `sol/terminal/` (the reader side of opening a source),
-tests, ESSENCE §4, BEING §6 and CHANGELOG. Also the two stage 1 leftovers:
-quitting the reader while ESSENCE is open saves ESSENCE's state, and reader
-popups (`c`, search) centre in the reader's columns rather than over ESSENCE.
-
-### Constraints
-
-Call `sol.essence.compare_words` / `export_word_comparison` (PR #29) rather
-than computing measures in the interface. Opening a source goes through the
-reader's ordinary guarded navigation; an artifact's locations are never
-authority to navigate without CORE's checks. No existing reader key remapped.
-Do not touch `sol/essence/` outside `sol/essence/tui/` (Codex's task).
-
-### Acceptance
-
-Textual pilot and headless Neovim tests for the comparison table, export,
-source opening and return, cancellation, quitting with ESSENCE open, and popup
-placement; documentation check and full suite pass; a real-book run reported.
-
-## Codex: ESSENCE sentence study without CORE
-
-**Status:** In review
-**Branch:** `codex/sentence-file-provider`
-**Requested:** 18 October 2026, by the maintainer
+**Status:** Ready
+**Branch:** `claude/essence-sentences-ui`
+**Requested:** 19 October 2026, by the maintainer
 
 ### Goal
 
-The sentence study runs on an ordinary UTF-8 text file as well as on the CORE
-corpus, through the same provider boundary as the word engine, so that `S` can
-later move into the ESSENCE interface and ESSENCE §4 decision 7 (CORE optional)
-holds for a second study.
+The sentence-length study, removed from the reader as `S`, runs from ESSENCE's
+Experiment screen beside word frequencies, on a passage, section, the whole
+book or a text file, and a listed sentence opens in the reader.
 
 ### Scope
 
-[ESSENCE §4 decision 7, §5 Experiment A](../ESSENCE.md#5-prioritized-experiments):
-`sol/essence/` except `sol/essence/tui/`, tests, ESSENCE §2 and §5, and
-CHANGELOG. Accept `CoreProvider`/`FileProvider` (and their scopes, including
-spans) in the sentence study; `sol analyze sentences --file PATH [--span S E]`;
-`sol analyze check` support with explicit file paths, as for words. A Python
-function the interface can call, documented in the handoff.
+[ESSENCE §4–§5, Experiment A](../ESSENCE.md#experiment-a--syntax-and-positionality-highest-priority),
+[BEING §6](../BEING.md#6-being--essence-without-terminal-dogma): `sol/essence/tui/`,
+`sol/terminal/` only if opening a sentence needs it, tests, ESSENCE §4 and CHANGELOG.
+Call `sol.essence.sentences.analyze_sentences` with the v2 providers (#31);
+Results shows counts, the histogram, means by place in the paragraph and the
+longest sentences; Enter opens one through the reader's `essence_source`.
 
 ### Constraints
 
-`punctuation-rules-v1` and existing `sol.sentence-study` v1 artifacts are
-unchanged and still check; a file result needs a new version or a separately
-named method if its shape must differ. The reader's `S` keeps working
-unchanged. File input stores no book text, only digests and offsets. No new
-dependency. Do not touch `sol/essence/tui/`, `sol/terminal/`, `sol/core/`,
-`sol/corpus/`, `sol/reader/` or `pyproject.toml` (Claude Code's task).
+No change to `sol/essence/` outside `sol/essence/tui/` (Codex's lane) and no
+change to the v1/v2 artifacts. Workspace sessions save the artifact; temporary
+sessions save nothing. No new dependency.
 
 ### Acceptance
 
-Tests for both providers, spans that cut sentences, Unicode, empty input, a
-changed file refused by `check`, CORE-free import for file input, and existing
-sentence artifacts byte-for-byte unchanged. Documentation check and full suite
-pass.
+Textual pilot tests for choices, results, saving and opening a sentence; the
+real-engine test; a real session on the book reported. Documentation check and
+full suite pass.
+
+## Codex: Proposal for the ESSENCE encyclopedia (stage 4)
+
+**Status:** Ready
+**Branch:** `codex/encyclopedia-proposal`
+**Requested:** 19 October 2026, by the maintainer
+
+### Goal
+
+A reviewed proposal the maintainer can decide on, so that stage 4 can then be
+built: how encyclopedia entries are written, sourced, related and checked.
+
+### Scope
+
+[ESSENCE §4 open decisions, §5 stage 4, §7](../ESSENCE.md#7-model-history-encyclopedia-and-task-registry-proposed):
+a new `docs/coordination/proposals/ESSENCE_ENCYCLOPEDIA_PROPOSAL.md`. Cover the
+source format (plain, structured Markdown per §7), the fields of the three
+knowledge objects (historical entry, task/capability record, runnable
+adapter), how relations in the genealogy carry a citation and a status, what
+counts as a source, editorial and provenance rules, initial coverage (a short
+list of entries, e.g. from n-gram counts and TF-IDF to word vectors and
+transformer encoders), how entries link back to SOL's own methods, and a
+design for a CORE-free validator and CLI. Include two or three complete
+sample entries with real, checked citations, and say what is unknown.
+
+### Constraints
+
+A proposal, not an implementation: no application code, no change to the four
+authorities, no dependency. Do not invent citations: every reference must be
+one you can name exactly (authors, year, title, venue), or be marked as
+needing a source. Do not touch Claude Code's files (`sol/essence/tui/`,
+`sol/terminal/`).
+
+### Acceptance
+
+The documentation check passes; the proposal lists the decisions it asks the
+maintainer to take, each with options and a recommendation.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
