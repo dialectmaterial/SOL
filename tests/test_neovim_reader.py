@@ -856,6 +856,10 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             launch = on_request({"op": "essence_open", "packet": packet, "mode": "continuous"})["essence"]
             command = launch["command"]
             self.assertEqual(command[:4], [sys.executable, "-m", "sol.essence.tui", "--context"])
+            # Neovim's private directories are not ESSENCE's: studies go where the reader's go.
+            self.assertEqual(launch["env"]["XDG_STATE_HOME"], str(state_home))
+            self.assertEqual(launch["env"]["XDG_DATA_HOME"], os.environ.get("XDG_DATA_HOME", ""))
+            self.assertEqual(set(launch["env"]), set(neovim_reader.ESSENCE_ENVIRONMENT))
             path = Path(command[4])
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             context = read_context(path)
@@ -920,6 +924,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         def native(payload, _, on_request):
             launch = on_request({"op": "essence_open", "packet": payload["restore"], "mode": "continuous"})
             self.assertIsNone(read_context(launch["essence"]["command"][4])["state_file"])
+            self.assertIn("TMPDIR", launch["essence"]["env"])
             return 0, None
 
         with patch("sol.essence.tui.textual_available", return_value=True), \
