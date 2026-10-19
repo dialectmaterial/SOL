@@ -622,40 +622,6 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 0)
 
-    def test_sentence_study_opens_its_longest_sentence_and_returns_to_the_origin(self):
-        self.extend(3)
-        records = self.rows()
-        text = ("Short one. This second sentence is clearly the longest one in the whole invented section, "
-                "because it keeps going well past every other sentence here.")
-        records[-1].update(markdown=text, plain_text=text)
-        self.write_records(records)
-        service = self.service()
-        self.position(service, 4)
-        data_home = self.root / "data"
-        def native(payload, _, on_request):
-            origin = payload["restore"]
-            study = on_request({"op": "sentence_study", "packet": origin, "mode": "continuous"})["study"]
-            self.assertEqual(study["rows"][0]["tokens"], 23)
-            self.assertTrue(study["rows"][0]["snippet"].startswith("This second sentence"))
-            saved = Path(study["saved"])
-            self.assertEqual(saved.parent, data_home / "sol" / "studies")
-            self.assertEqual(saved.stat().st_mode & 0o777, 0o600)
-            self.assertEqual(json.loads(saved.read_text())["origin"]["reference"]["target_id"],
-                             origin["reference"]["reference"]["target_id"])
-            opened = on_request({"op": "study_open", "row": 1, "packet": origin, "mode": "continuous"})["payload"]
-            self.assertEqual(opened["restore"]["reference"]["reference"]["target_id"], records[-1]["id"])
-            self.assertEqual(opened["restore"]["cursor_offset"], text.index("This"))
-            back = on_request({"op": "history_back", "packet": opened["restore"], "mode": "continuous"})["payload"]
-            self.assertEqual(back["restore"]["reference"]["reference"]["target_id"],
-                             origin["reference"]["reference"]["target_id"])
-            self.assertEqual(back["restore"]["cursor_offset"], origin["cursor_offset"])
-            with self.assertRaisesRegex(ValueError, "choose a displayed sentence"):
-                on_request({"op": "study_open", "row": 99, "packet": back["restore"], "mode": "continuous"})
-            return 0, {"action": "quit", "packet": back["restore"]}
-        with patch.dict(os.environ, XDG_DATA_HOME=str(data_home)), \
-                patch.object(neovim, "launch_payload", side_effect=native):
-            self.assertEqual(self.run_view(service), 0)
-
     def test_refused_destination_view_keeps_the_shown_and_saved_position(self):
         """A destination whose view cannot be prepared is never saved or entered in history."""
         self.extend(3)
@@ -669,7 +635,10 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
                   "search_open": ({"result": 1}, {"op": "search", "query": "paragraph 2"}),
                   "search_next": ({}, {"op": "search", "query": "paragraph 2"}),
                   "history_back": ({}, {"op": "passage_previous"}),
-                  "study_open": ({"row": 1}, {"op": "sentence_study"})}
+                  "essence_source": ({"source": {"id": self.book.passages[2].identifier, "start": 0,
+                                                 "content_sha256": core.capture_reference(
+                                                     self.book.corpus_snapshot, self.book.passages[2].identifier
+                                                 )["reference"]["content_sha256"]}}, None)}
 
         def saved_at(service):
             state = service.store.get_state()
@@ -798,30 +767,6 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 1)
 
-    def test_sentence_study_starts_from_the_paragraph_the_cursor_is_in(self):
-        """A native move sends no request; the study's packet is still the live origin."""
-        self.extend(3)
-        service = self.service()
-        self.position(service, 4)
-        data_home = self.root / "data"
-
-        def native(payload, _, on_request):
-            moved = self.reply(payload, record=2, offset=5)["packet"]
-            saved = service.store.get_state()
-            study = on_request({"op": "sentence_study", "packet": moved, "mode": "continuous"})["study"]
-            origin = json.loads(Path(study["saved"]).read_text())["origin"]
-            self.assertEqual(origin, moved["reference"])
-            self.assertEqual(service.store.get_state(), saved)  # Studying saves no visit.
-            opened = on_request({"op": "study_open", "row": 1, "packet": moved, "mode": "continuous"})["payload"]
-            back = on_request({"op": "history_back", "packet": opened["restore"], "mode": "continuous"})["payload"]
-            self.assertEqual(back["restore"]["reference"], moved["reference"])
-            self.assertEqual(back["restore"]["cursor_offset"], 5)
-            return 0, {"action": "quit", "packet": back["restore"]}
-
-        with patch.dict(os.environ, XDG_DATA_HOME=str(data_home)), \
-                patch.object(neovim, "launch_payload", side_effect=native):
-            self.assertEqual(self.run_view(service), 0)
-
     def test_corpus_changed_between_two_requests_is_refused_without_saving(self):
         self.extend(3)
         service = self.service()
@@ -949,3 +894,44 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ClipboardCommandTests(unittest.TestCase):
+    """The program the reader copies with, chosen from the real session."""
+
+    @staticmethod
+    def which(*available):
+        return lambda name: f"/usr/bin/{name}" if name in available else None
+
+    def test_the_session_decides_the_program_and_what_it_needs(self):
+        wayland = {"WAYLAND_DISPLAY": "wayland-1", "XDG_RUNTIME_DIR": "/run/user/1000", "DISPLAY": ":0"}
+        cases = {
+            "wayland": (wayland, ("wl-copy", "xclip"), "linux",
+                        {"command": ["/usr/bin/wl-copy", "--type", "text/plain"],
+                         "env": {"WAYLAND_DISPLAY": "wayland-1", "XDG_RUNTIME_DIR": "/run/user/1000"}}),
+            "x11 xclip": ({"DISPLAY": ":0", "XAUTHORITY": "/home/x/.Xauthority"}, ("xclip", "xsel"), "linux",
+                          {"command": ["/usr/bin/xclip", "-selection", "clipboard"],
+                           "env": {"DISPLAY": ":0", "XAUTHORITY": "/home/x/.Xauthority"}}),
+            "x11 xsel": ({"DISPLAY": ":0"}, ("xsel",), "linux",
+                         {"command": ["/usr/bin/xsel", "--clipboard", "--input"], "env": {"DISPLAY": ":0"}}),
+            "wayland without wl-copy": (wayland, ("xclip",), "linux",
+                                        {"command": ["/usr/bin/xclip", "-selection", "clipboard"],
+                                         "env": {"DISPLAY": ":0"}}),
+            "macos": ({}, ("pbcopy",), "darwin", {"command": ["/usr/bin/pbcopy"], "env": {}}),
+            # No program: the reader falls back to the terminal (OSC 52).
+            "ssh or console": ({}, ("wl-copy", "xclip"), "linux", None),
+        }
+        for name, (environment, available, platform, expected) in cases.items():
+            with self.subTest(name):
+                self.assertEqual(neovim.clipboard_command(environment, self.which(*available), platform), expected)
+
+    def test_neovim_gets_the_choice_although_its_own_directories_are_private(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.dict(os.environ, {"WAYLAND_DISPLAY": "wayland-1", "XDG_RUNTIME_DIR": "/run/user/1000"}), \
+                patch.object(neovim.shutil, "which", self.which("wl-copy")):
+            root = Path(temporary)
+            environment = neovim._isolated_environment(root, root / "input", root / "output")
+        self.assertEqual(environment["XDG_RUNTIME_DIR"], str(root / "runtime"))
+        chosen = json.loads(environment["SOL_NVIM_CLIPBOARD"])
+        self.assertEqual(chosen["env"]["XDG_RUNTIME_DIR"], "/run/user/1000")

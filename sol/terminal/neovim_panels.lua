@@ -1,4 +1,4 @@
--- Shared popup lifecycle and search, sentence-study and printed-source panels.
+-- Shared popup lifecycle, search results and the printed-source panel.
 return function(reader)
   local api = vim.api
   local data = reader.view.data
@@ -12,25 +12,48 @@ return function(reader)
   local restore = reader.view.restore
   local function request(...) return reader.requests.request(...) end
   local panels = {context_open = false}
+  -- The narrowest panel worth putting beside the page, and the widest.
+  local SIDE_MINIMUM, SIDE_MAXIMUM = 34, 64
+  local panel_namespace = api.nvim_create_namespace('SOLPanelText')
   local function close_popup()
     local closing, packet = panels.window, panels.return_packet
     panels.window, panels.context_open, panels.return_packet = nil, false, nil
     if closing and api.nvim_win_is_valid(closing) then api.nvim_win_close(closing, true) end
+    reader.view.set_side(0)
     if api.nvim_win_is_valid(window) then api.nvim_set_current_win(window) end
     if packet then restore(packet) end
   end
-  local function show_lines(lines, return_packet)
+  -- Beside the page when there is room (the page moves left to make it),
+  -- else over the page as before. marks: {line, group[, first, last]} in bytes.
+  local function show_lines(lines, return_packet, marks)
     return_packet = return_packet or panels.return_packet
     close_popup()
     if vim.fn.mode(1) ~= 'n' then normal_escape() end
     local panel = api.nvim_create_buf(false, true)
     api.nvim_buf_set_lines(panel, 0, -1, false, lines)
+    for _, mark in ipairs(marks or {}) do
+      local text = lines[mark[1]] or ''
+      api.nvim_buf_set_extmark(panel, panel_namespace, mark[1] - 1, mark[3] or 0,
+        { end_col = math.min(#text, mark[4] or #text), hl_group = mark[2] })
+    end
     vim.bo[panel].modifiable, vim.bo[panel].readonly, vim.bo[panel].bufhidden = false, true, "wipe"
     local columns = reader.view.reader_columns()
-    local width, height = math.max(1, math.min(data.width, columns - 6)), math.max(1, vim.o.lines - 8)
-    panels.window = api.nvim_open_win(panel, true, { relative = "editor", row = 3,
-      col = math.max(0, math.floor((columns - width) / 2)), width = width,
-      height = math.min(height, math.max(1, #lines)), style = "minimal", border = "single", zindex = 50 })
+    local page = math.max(1, math.min(data.width, columns - 4))
+    local room = columns - page - 6
+    local config
+    if room >= SIDE_MINIMUM then
+      local width = math.min(SIDE_MAXIMUM, room)
+      reader.view.set_side(width + 4)
+      local placed = api.nvim_win_get_config(window)
+      config = { relative = "editor", row = placed.row, col = placed.col + placed.width + 2, width = width,
+        height = math.max(1, placed.height - 2) }
+    else
+      local width, height = math.max(1, math.min(data.width, columns - 6)), math.max(1, vim.o.lines - 8)
+      config = { relative = "editor", row = 3, col = math.max(0, math.floor((columns - width) / 2)), width = width,
+        height = math.min(height, math.max(1, #lines)) }
+    end
+    config.style, config.border, config.zindex = "minimal", "single", 50
+    panels.window = api.nvim_open_win(panel, true, config)
     vim.wo[panels.window].wrap, vim.wo[panels.window].linebreak = true, true
     vim.wo[panels.window].winhighlight = "NormalFloat:SOLPanel,FloatBorder:SOLPanelBorder"
     panels.return_packet = return_packet
@@ -59,7 +82,7 @@ return function(reader)
     end
     return capture()
   end
-  local show_search, show_study, show_source
+  local show_search, show_source
   show_search = function(result)
     local lines = {'Search: ' .. result.query, 'Whole book, literal and case-insensitive. Up to ' .. result.limit .. ' passages.', ''}
     local rows = {}
@@ -80,55 +103,6 @@ return function(reader)
       if not number then return end
       close_popup(); request('search_open', {result = number})
     end, {buffer = panel, silent = true})
-  end
-  -- ESSENCE measured the loaded section; Enter reads a sentence where it stands,
-  -- and Alt-Left returns to where the study was started.
-  show_study = function(result)
-    local summary = result.summary
-    local lines = { 'Sentence lengths in this section (English translation)', '' }
-    if summary.sentences == 0 then
-      lines[#lines + 1] = 'No eligible sentences here.'
-    else
-      lines[#lines + 1] = summary.sentences .. ' sentences in ' .. result.passages .. ' passages; mean '
-        .. string.format('%.1f', summary.mean) .. ', median ' .. summary.median .. ', longest ' .. summary.max .. ' words.'
-      local peak = 1
-      for _, bin in ipairs(result.histogram) do peak = math.max(peak, bin.sentences) end
-      for _, bin in ipairs(result.histogram) do
-        local span = bin.to ~= vim.NIL and (bin.from .. '–' .. bin.to) or (bin.from .. '+')
-        lines[#lines + 1] = string.format('%8s %5d  ', span, bin.sentences) .. string.rep('█', math.floor(20 * bin.sentences / peak + 0.5))
-      end
-      local means = {}
-      for _, name in ipairs({ 'first', 'middle', 'last', 'only' }) do
-        local value = result.positions[name]
-        if value ~= vim.NIL then means[#means + 1] = name .. ' ' .. string.format('%.1f', value) end
-      end
-      lines[#lines + 1] = 'Mean by place in paragraph: ' .. table.concat(means, ', ')
-    end
-    if result.excluded_review > 0 then
-      lines[#lines + 1] = result.excluded_review .. ' passage(s) awaiting source review were left out.'
-    end
-    lines[#lines + 1] = result.saved ~= vim.NIL and ('Saved: ' .. result.saved) or 'Not saved: temporary session.'
-    lines[#lines + 1] = ''
-    local rows = {}
-    if #result.rows > 0 then lines[#lines + 1] = 'Longest sentences:' end
-    local first_row
-    for _, item in ipairs(result.rows) do
-      lines[#lines + 1] = item.number .. '. ' .. item.tokens .. ' words | ' .. item.label
-      rows[#lines] = item.number
-      first_row = first_row or #lines
-      lines[#lines + 1] = '   ' .. item.snippet
-      rows[#lines] = item.number
-    end
-    lines[#lines + 1] = ''
-    lines[#lines + 1] = 'Enter reads that sentence; Alt-Left then returns here. Esc closes.'
-    show_lines(lines)
-    local panel = api.nvim_get_current_buf()
-    if first_row then api.nvim_win_set_cursor(panels.window, { first_row, 0 }) end
-    vim.keymap.set('n', '<CR>', function()
-      local number = rows[api.nvim_win_get_cursor(panels.window)[1]]
-      if not number then return end
-      close_popup(); request('study_open', { row = number })
-    end, { buffer = panel, silent = true })
   end
   -- The printed page is the authority for formulas the typed text cannot carry.
   -- Python renders it from the verified PDF; a separate viewer shows it, so this
@@ -173,7 +147,7 @@ return function(reader)
   end
 
   panels.close_popup, panels.show_lines, panels.current_packet = close_popup, show_lines, current_packet
-  panels.show_search, panels.show_study, panels.show_source = show_search, show_study, show_source
+  panels.show_search, panels.show_source = show_search, show_source
   panels.source = source
   return panels
 end

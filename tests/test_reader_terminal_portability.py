@@ -59,7 +59,7 @@ vim.defer_fn(function()
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'xt', false)
     assert(vim.deep_equal(before, r.capture()))
     vim.fn.writefile({vim.json.encode({ok = true, term = vim.env.TERM})}, vim.env.SOL_TEST_REPORT)
-    vim.api.nvim_feedkeys('q', 'xt', false)
+    vim.api.nvim_feedkeys(':q\\r', 't', false)
   end, debug.traceback)
   if not ok then
     vim.fn.writefile({vim.json.encode({ok = false, error = tostring(problem)})}, vim.env.SOL_TEST_REPORT)
