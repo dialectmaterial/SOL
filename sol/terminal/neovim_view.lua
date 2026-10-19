@@ -166,11 +166,20 @@ return function(reader, supplied)
   vim.o.laststatus, vim.o.showtabline, vim.o.cmdheight = 3, 0, 1
   vim.o.showmode, vim.o.showcmd, vim.o.ruler, vim.o.hidden = false, false, false, true
   vim.o.mouse, vim.o.clipboard = "", ""
+  -- In the reader the mouse scrolls and selects; a selection is copied when
+  -- the button is released. No right-click menu.
+  if integrated then vim.o.mouse, vim.o.mousemodel = "a", "extend" end
   -- No "~" past the text and no "@@@" when a paragraph continues below the window.
   vim.o.fillchars = "eob: ,lastline: "
   vim.o.statusline = " j/k lines   [p/]p passages   / search   v select   c source/notes   ? help   q return"
   if integrated then
-    vim.o.statusline = " SOL " .. mode .. " | b/n paragraphs  p mode  m1-3 mark  y copy  t tree  ? help  q quit"
+    local progress = data.progress
+    if progress ~= nil and (type(progress) ~= "table" or not exact_keys(progress, { "first", "total" })
+        or not integer(progress.first) or not integer(progress.total) or progress.first < 0
+        or progress.total < 1 or progress.first >= progress.total) then
+      fail("invalid reading progress")
+    end
+    vim.o.statusline = "%!v:lua.SOLStatus()"
   end
   vim.o.selection = "inclusive"
   vim.o.hlsearch = true
@@ -189,14 +198,66 @@ return function(reader, supplied)
     local essence = rawget(_G, "SOLEssence")
     return math.max(1, vim.o.columns - (essence and essence.reserved and essence.reserved() or 0))
   end
+  -- Columns a side panel takes to the right of the page; the page and panel
+  -- then centre together instead of the page alone.
+  local side = 0
   local function window_config()
     local columns = reader_columns()
     local width = math.max(1, math.min(data.width, columns - 4))
     return { relative = "editor", row = math.min(2, math.max(0, vim.o.lines - 4)),
-      col = math.max(0, math.floor((columns - width) / 2)), width = width,
+      col = math.max(0, math.floor((columns - width - side) / 2)), width = width,
       height = math.max(1, vim.o.lines - 6), style = "minimal", border = "none", zindex = 20 }
   end
   local window = api.nvim_open_win(buffer, true, window_config())
+
+  -- The status line says where the cursor is in the book and how it is read:
+  -- the section's breadcrumb and page on the left, mode and progress on the
+  -- right, then the two keys a reader needs to find everything else.
+  local titles = {}
+  for _, node in ipairs(type(data.structure) == "table" and data.structure.nodes or {}) do
+    titles[node.key] = node.title
+  end
+  local function breadcrumb(path)
+    local parts, key = {}, ""
+    for segment in path:gmatch("[^/]+") do
+      key = key .. "/" .. segment
+      -- A chapter and its first section often share a title; say it once.
+      if titles[key] and titles[key] ~= "" and titles[key] ~= parts[#parts] then parts[#parts + 1] = titles[key] end
+    end
+    return table.concat(parts, " › ")
+  end
+  local function pages(record)
+    local first, last = record.context.printed_pages[1], record.context.printed_pages[2]
+    if first == nil or first == vim.NIL then return "" end
+    if last == nil or last == vim.NIL or last == first then return "p. " .. first end
+    return "pp. " .. first .. "–" .. last
+  end
+  local function statusline_text()
+    if not api.nvim_win_is_valid(window) then return "" end
+    local row = api.nvim_win_get_cursor(window)[1]
+    local record, index = records[1], 1
+    for at, candidate in ipairs(records) do
+      local position = positions[candidate.id]
+      if position and position.first_row <= row then record, index = candidate, at end
+    end
+    local where = breadcrumb(record.context.path)
+    local page = pages(record)
+    local left = where ~= "" and (page ~= "" and where .. " · " .. page or where) or page
+    local right = { mode == "paragraph" and "One paragraph" or "Continuous" }
+    if data.focus then right[#right + 1] = "focus" end
+    if data.progress ~= nil then
+      local done = (data.progress.first + index - 1) / math.max(1, data.progress.total - 1)
+      right[#right + 1] = string.format("%d%%", math.floor(100 * done + 0.5))
+    end
+    right[#right + 1] = "? keys · :q quit"
+    local function escape(text) return (text:gsub("%%", "%%%%")) end
+    return " %<" .. escape(left) .. "%=" .. escape(table.concat(right, " · ")) .. " "
+  end
+  _G.SOLStatus = function()
+    local ok, text = pcall(statusline_text)
+    return ok and text or " SOL"
+  end
+  api.nvim_create_autocmd("CursorMoved", { buffer = buffer, callback = function() vim.cmd("redrawstatus") end })
   vim.wo[window].wrap, vim.wo[window].linebreak, vim.wo[window].breakindent = true, true, false
   vim.wo[window].number, vim.wo[window].relativenumber, vim.wo[window].cursorline = false, false, false
   vim.wo[window].signcolumn, vim.wo[window].foldcolumn, vim.wo[window].colorcolumn = "no", "0", ""
@@ -465,6 +526,12 @@ return function(reader, supplied)
     superscript = superscript,
     window_config = window_config,
     reader_columns = reader_columns,
+    set_side = function(columns)
+      side = columns
+      if api.nvim_win_is_valid(window) then api.nvim_win_set_config(window, window_config()) end
+    end,
+    breadcrumb = breadcrumb,
+    pages = pages,
     cycle_theme = cycle_theme,
   }
 end

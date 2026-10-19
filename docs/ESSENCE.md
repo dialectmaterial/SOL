@@ -20,7 +20,7 @@ ESSENCE is not currently a complete model environment. The inspected code contai
 
 - `sol.essence.prose.export_prose` and `sol analyze prose --json`: a **verified, Hegel-specific** prose-only analysis view over the current corpus.
 - `sol analyze term WORD`: a reproducible lexical-distribution experiment with reference-bound source matches; `sol analyze check FILE` checks its result against a current corpus generation.
-- `sol analyze sentences [--within PATH]`: the existing v1 corpus sentence-length study, also run from the reader with `S`. `sol analyze sentences --file PATH [--span START END]` and the provider API add v2 studies over UTF-8 files or independently scoped CORE inputs; `sol analyze check FILE --input-file PATH` verifies file studies against an explicit local source.
+- `sol analyze sentences [--within PATH]`: the existing v1 corpus sentence-length study (run from the reader with `S` until 19 October, when the maintainer removed that key). `sol analyze sentences --file PATH [--span START END]` and the provider API add v2 studies over UTF-8 files or independently scoped CORE inputs; `sol analyze check FILE --input-file PATH` verifies file studies against an explicit local source.
 - The optional Textual interface and the word engine's CORE/file counts, comparison measures and CSV/TSV export described in §4–§5. The interface also runs the sentence-length study through the provider API (19 October).
 - `sol.core` public snapshot/reference APIs, including source/edition/generation binding and batch captures; these are usable without opening BEING.
 - A narrow optional `sol-kitty` + Zsh handoff for a source passage, with an explicit proposed return to BEING. The handoff carries **references**, not an ML result database or unrestricted authority to save notes.
@@ -124,7 +124,7 @@ A result should distinguish **reproducing the exact experiment generation** (str
 
 **Open decisions** (each needs its own review before implementation):
 
-- ~~the key that opens ESSENCE~~ **decided 18 October 2026:** `E` in the reader (unmapped until now); `S` stays the quick sentence study ([BEING §6](BEING.md#6-being--essence-without-terminal-dogma));
+- ~~the key that opens ESSENCE~~ **decided 18 October 2026:** `E` in the reader (unmapped until now); `S` stayed the quick sentence study until the maintainer removed it on 19 October 2026 ([BEING §6](BEING.md#6-being--essence-without-terminal-dogma));
 - the default split side, minimum widths and focus transitions;
 - the persistence format of an investigation, and what happens to explicitly started background jobs on exit;
 - the provider/adapter API, its versioning, and when (if ever) to publish separate distributions;
@@ -359,7 +359,7 @@ artifact. The CLI reconstructs the recorded scope after decoding, but file
 checks always require `--input-file PATH`. V2 is bounded to 16 MiB, allowing
 whole-book provenance, and files to the shared 64 MiB input bound. V1 keeps
 its 1 MiB bound and original encoding/method; bare-snapshot calls, existing
-artifacts, ordinary corpus CLI output and the reader's `S` remain v1.
+artifacts and ordinary corpus CLI output remain v1 (as did the reader's `S` until its removal on 19 October).
 
 ```sh
 sol analyze sentences --file /absolute/path/to/text.txt

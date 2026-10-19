@@ -71,12 +71,50 @@ Write "None." rather than deleting a heading.
 - `.venv/bin/python -B scripts/check_docs.py` — OK; full suite — **1,714 tests, OK** (12 skipped, 4 expected failures).
 - Real session in tmux on the book: `E`, `3`, Sentence lengths, This section (Existence: 137 passages, 624 sentences, longest 123), Run; Enter on the longest opened it in the reader at its first letter; the study was saved in the reader's data folder.
 
+### Review round (Codex, 19 October)
+- File beginnings were read with `Path.read_text`, which rewrites CRLF, so later slices shifted ("his sentence…"). Now `words.verified_file_text` uses the engine's bounded stable read, decodes verbatim (CRLF, BOM) and returns nothing unless the bytes match the study's file digest; a file changed after the count shows no beginnings. Regressions for CRLF/BOM and a change between analysis and display.
+- File studies are one input row: their means are now "by place among the file's retained sentences", and the method note no longer calls a file the English translation.
+- Merged main (#32): kept both stacked entries; ESSENCE §2 keeps #32's `S` removal and this branch's interface line.
+
 ### Outstanding issues
 - Only the twelve longest sentences are listed (the v2 study keeps those); browsing every sentence needs a decision on the study's shape.
 - Built on main, not on #32: `essence_source` exists on main already, so opening works without #32. ESSENCE §2 line 24 is edited by both PRs; whichever merges second resolves one line.
 
 ### Decisions requiring approval
 - **Defaults:** the study choice and its order; no reference for sentences; the summary's wording; columns Words | Beginning | Where; beginnings cut at 60 characters.
+
+## Reader: clipboard, quitting, side panels, status line, no `S` — 19 October 2026
+
+**Task:** the maintainer's requests in the session on 19 October (context panel beside the text with better formatting; `y` and mouse selection to the system clipboard; remove `S`; a better status line), and the quit change the maintainer added: `:q`/`:qa` save and quit, `q`/`Ctrl-q` no longer quit, `:qa!` unchanged.
+**Branch / PR:** `claude/reader-panels-clipboard`, stacked on #30 · opened with `gh pr create`
+**Last implementation commit:** `f1c95eb9bea943c418fa3da790e3422a62e7de81` (this report is committed after it)
+
+### Changed files
+- `sol/terminal/neovim.py` — `clipboard_command()` picks `wl-copy`, `xclip`, `xsel` or `pbcopy` from the real environment, with only the variables it needs; `_isolated_environment` passes it as `SOL_NVIM_CLIPBOARD`.
+- `sol/terminal/neovim_controls.lua` — `y` copies exact source text, across paragraphs too, through that program, else OSC 52, and reports how; mouse release copies; `q`/`Ctrl-q` hint, `:q`/`:qa`/`:wq`/`:x` save and quit (from a selection too), `:qa!` untouched; the context panel rewritten with headed sections, highlights and local times; the help screen updated; `S` removed.
+- `sol/terminal/neovim_view.lua` — mouse on in the reader; the status line (`SOLStatus`: breadcrumb with repeated titles collapsed, pages, mode, focus, percentage, keys); `set_side`, so the page and a side panel centre together; `progress` validated.
+- `sol/terminal/neovim_panels.lua` — `show_lines` opens beside the page when 34+ columns are spare (at most 64 wide, page height), else over it; highlight marks; the study panel removed. `neovim_requests.lua` — study dispatch removed.
+- `sol/terminal/neovim_reader.py` — `progress` (first passage of the section, book total) in the payload; `sentence_study`/`study_open` removed.
+- `scripts/reader_timings.py` — the section-study measurement removed with `S`.
+- Tests: clipboard program choice and its handoff through the isolated environment (`test_neovim_reader.py`); headless Neovim: copy across paragraphs, snapping, mouse release, OSC 52 fallback, `q` not quitting, `:qa!` saving nothing, `S` unmapped, status line content and refused `progress`, side vs overlay placement and highlights, local note times (`test_reader_surface_neovim.py`); quitting with `:q` in the pty tests; `TZ=UTC` in the shared test environment; the refused-move test covers `essence_source` instead of `study_open`; the `S` tests removed.
+- `docs/BEING.md` (controls, a 19 October section, §6), `docs/ESSENCE.md`, `docs/ARCHITECTURE.md`, `CHANGELOG.md`.
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — OK; full suite — **1,692 tests, OK** (12 skipped, 4 expected failures).
+- Real session, `sol` in tmux at 160×45 on the real book: `y` on a selection, read back with `wl-paste` (exact text); repeated copies; a 753-character selection over two paragraphs (exact, joined by a blank line); `q` shows the hint, `:q` exits 0; the status line followed the cursor (*The Doctrine of Being › Determinateness (Quality) › Existence · p. 83 … Continuous · 9%*); `c` opened beside the page with the page moved left.
+- Found and fixed on the way: `wl-copy` leaves a process holding output pipes, so the copy now opens none; a test helper default bound `shutil.which` too early.
+- Not done: mouse selection in a real terminal (tmux cannot send mouse drags; the mapping is tested headless), and anything in Alacritty or Kitty.
+
+### Outstanding issues
+- OSC 52 cannot be confirmed: the reader says the text went "through the terminal", and the terminal may ignore it (Alacritty and foot accept it; tmux needs `set-clipboard on`).
+- With the mouse on, the terminal's own selection needs Shift-drag in most terminals.
+- (Checked afterwards: Ctrl-S saves a note from insert and normal mode in a real session; the first attempt had sent keys before the editor opened. No bug.)
+- The note editor still opens over the page.
+
+### Decisions requiring approval
+- **(reserved, approved by the maintainer in the session on 19 October 2026)** BEING §6 and ESSENCE §4 Decision text: `S` no longer "stays the quick sentence study"; it is removed from the reader.
+- **Defaults (the maintainer's two open questions):** `Ctrl-q` is removed as a quit key too; ESSENCE keeps `q` (it only closes ESSENCE).
+- **Other defaults:** side panel at 34–64 columns; footnotes, search results and help also open beside; the status line's content; `:wq`/`:x` counted as quitting; OSC 52 as the fallback.
 
 ## ESSENCE sentence study without CORE — 19 October 2026
 

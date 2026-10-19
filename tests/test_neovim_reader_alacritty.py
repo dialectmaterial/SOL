@@ -72,7 +72,7 @@ vim.defer_fn(function()
       reader.context()
       api.nvim_feedkeys(api.nvim_replace_termcodes('<Esc>', true, false, true), 'xt', false)
       report({status = 'reopened', packet = reader.capture()})
-      api.nvim_feedkeys('q', 'xt', false)
+      api.nvim_feedkeys(':q\r', 't', false)
       return
     end
     -- Exercise native line, half-window, scope-end and local search mechanics.
@@ -129,7 +129,7 @@ timer:start(80, 70, vim.schedule_wrap(function()
       assert(vim.deep_equal(saved, reader.capture()))
       report({status = 'saved', packet = reader.capture()})
       timer:stop(); timer:close()
-      api.nvim_feedkeys('q', 'xt', false)
+      api.nvim_feedkeys(':q\r', 't', false)
     end
   end, debug.traceback)
   if not ok then timer:stop(); timer:close(); fail(problem) end
