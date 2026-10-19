@@ -20,12 +20,12 @@ ESSENCE is not currently a complete model environment. The inspected code contai
 
 - `sol.essence.prose.export_prose` and `sol analyze prose --json`: a **verified, Hegel-specific** prose-only analysis view over the current corpus.
 - `sol analyze term WORD`: a reproducible lexical-distribution experiment with reference-bound source matches; `sol analyze check FILE` checks its result against a current corpus generation.
-- `sol analyze sentences [--within PATH]`: a reproducible sentence-length study (Experiment A's first half, below), also run from the reader with `S`; `sol analyze check FILE` verifies it too.
+- `sol analyze sentences [--within PATH]`: a reproducible sentence-length study (Experiment A's first half, below), run from the reader with `S` until 19 October, when the maintainer removed that key; `sol analyze check FILE` verifies it too.
 - `sol.core` public snapshot/reference APIs, including source/edition/generation binding and batch captures; these are usable without opening BEING.
 - A narrow optional `sol-kitty` + Zsh handoff for a source passage, with an explicit proposed return to BEING. The handoff carries **references**, not an ML result database or unrestricted authority to save notes.
 - Checkout-only reading/rendering research, not an installed ESSENCE model suite.
 
-**Not implemented/verified:** the Textual ESSENCE interface and its split/fullscreen presentations ([§4](#4-interaction-model-and-inquiry-contract)); a general experiment picker (only `S` exists); target/reference scope selection; word-frequency comparison; parameter dashboard; GPU/model registry; task/capability registry and adapters; the model-history encyclopedia; ESSENCE on ordinary files without CORE (every study imports `sol.core` today); syntactic research panel; UltraBERT embedding pipeline; TensorFlow Projector launch as a SOL command; durable research context/experiment history; a terminal-independent BEING–ESSENCE UI. Do not describe these as shipping features until code and tests verify them.
+**Not implemented/verified:** the Textual ESSENCE interface and its split/fullscreen presentations ([§4](#4-interaction-model-and-inquiry-contract)); a general experiment picker; target/reference scope selection; word-frequency comparison; parameter dashboard; GPU/model registry; task/capability registry and adapters; the model-history encyclopedia; ESSENCE on ordinary files without CORE (every study imports `sol.core` today); syntactic research panel; UltraBERT embedding pipeline; TensorFlow Projector launch as a SOL command; durable research context/experiment history; a terminal-independent BEING–ESSENCE UI. Do not describe these as shipping features until code and tests verify them.
 
 ### Existing commands
 
@@ -119,7 +119,7 @@ A result should distinguish **reproducing the exact experiment generation** (str
 
 **Open decisions** (each needs its own review before implementation):
 
-- ~~the key that opens ESSENCE~~ **decided 18 October 2026:** `E` in the reader (unmapped until now); `S` stays the quick sentence study ([BEING §6](BEING.md#6-being--essence-without-terminal-dogma));
+- ~~the key that opens ESSENCE~~ **decided 18 October 2026:** `E` in the reader (unmapped until now); `S` stayed the quick sentence study until the maintainer removed it on 19 October 2026 ([BEING §6](BEING.md#6-being--essence-without-terminal-dogma));
 - the default split side, minimum widths and focus transitions;
 - the persistence format of an investigation, and what happens to explicitly started background jobs on exit;
 - the provider/adapter API, its versioning, and when (if ever) to publish separate distributions;
