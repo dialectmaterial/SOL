@@ -12,73 +12,78 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: ESSENCE stage 1, the interface shell
+## Claude Code: ESSENCE stage 3, the interface side
 
-**Status:** In review
-**Branch:** `claude/essence-shell`
+**Status:** In progress
+**Branch:** `claude/essence-comparison-ui`
 **Requested:** 18 October 2026, by the maintainer
 
 ### Goal
 
-From the reader, `E` opens ESSENCE as a Textual application in a Neovim
-terminal buffer beside the reader; a key toggles fullscreen and back without
-restarting it; focus moves predictably; leaving ESSENCE ends its process and
-restores the exact reading position. Screens are mock content for now.
+In ESSENCE, a target/reference count shows Codex's comparison measures, can be
+exported as CSV or TSV, and a word's source passage opens in the reader;
+returning to the earlier reading position stays a separate step. A long count
+can be cancelled.
 
 ### Scope
 
-[ESSENCE §4–§5 stage 1](../ESSENCE.md#4-interaction-model-and-inquiry-contract),
-[BEING §6](../BEING.md#6-being--essence-without-terminal-dogma): `sol/terminal/`
-(Neovim side and controller), a new `sol/essence/tui/` package (the Textual app),
-`pyproject.toml` (the `essence` optional extra), tests, BEING/ESSENCE §4 and
-CHANGELOG.
+[ESSENCE §4–§5 stage 3](../ESSENCE.md#5-prioritized-experiments),
+[BEING §6](../BEING.md#6-being--essence-without-terminal-dogma):
+`sol/essence/tui/`, `sol/terminal/` (the reader side of opening a source),
+tests, ESSENCE §4, BEING §6 and CHANGELOG. Also the two stage 1 leftovers:
+quitting the reader while ESSENCE is open saves ESSENCE's state, and reader
+popups (`c`, search) centre in the reader's columns rather than over ESSENCE.
 
 ### Constraints
 
-Textual only as the optional extra; without it, `E` explains how to install
-it and the reader is unaffected. No existing key remapped. No model imports.
-Do not touch the rest of `sol/essence/` (Codex's task).
+Call `sol.essence.compare_words` / `export_word_comparison` (PR #29) rather
+than computing measures in the interface. Opening a source goes through the
+reader's ordinary guarded navigation; an artifact's locations are never
+authority to navigate without CORE's checks. No existing reader key remapped.
+Do not touch `sol/essence/` outside `sol/essence/tui/` (Codex's task).
 
 ### Acceptance
 
-Headless Neovim and Textual pilot tests for open, toggle, focus, close and
-failure; the reader position survives; a manual check on a real terminal is
-reported separately.
+Textual pilot and headless Neovim tests for the comparison table, export,
+source opening and return, cancellation, quitting with ESSENCE open, and popup
+placement; documentation check and full suite pass; a real-book run reported.
 
-## Codex: ESSENCE stage 3 engine, comparison measures and export
+## Codex: ESSENCE sentence study without CORE
 
-**Status:** In review
-**Branch:** `codex/essence-comparison`
-**Requested:** 19 October 2026, by the maintainer
+**Status:** Ready
+**Branch:** `codex/sentence-file-provider`
+**Requested:** 18 October 2026, by the maintainer
 
 ### Goal
 
-Comparing a target with a reference says more than two rates side by side:
-per-word comparison measures with explicit denominators, and an export that
-other tools can read, without book text.
+The sentence study runs on an ordinary UTF-8 text file as well as on the CORE
+corpus, through the same provider boundary as the word engine, so that `S` can
+later move into the ESSENCE interface and ESSENCE §4 decision 7 (CORE optional)
+holds for a second study.
 
 ### Scope
 
-[ESSENCE §5 stage 3](../ESSENCE.md#5-prioritized-experiments): `sol/essence/`
-except `sol/essence/tui/`, tests, ESSENCE §5 and CHANGELOG. Propose and
-implement a small, documented set of measures (for example a rate difference
-and a log ratio with a stated handling of zero counts; a keyness statistic
-only with its formula and a note on what it does not show). Export the
-frequency table and measures as CSV/TSV from the CLI. A Python function the
-interface can call, documented in the handoff.
+[ESSENCE §4 decision 7, §5 Experiment A](../ESSENCE.md#5-prioritized-experiments):
+`sol/essence/` except `sol/essence/tui/`, tests, ESSENCE §2 and §5, and
+CHANGELOG. Accept `CoreProvider`/`FileProvider` (and their scopes, including
+spans) in the sentence study; `sol analyze sentences --file PATH [--span S E]`;
+`sol analyze check` support with explicit file paths, as for words. A Python
+function the interface can call, documented in the handoff.
 
 ### Constraints
 
-No change to the shape of `sol.word-frequencies` v1 without a new version;
-existing artifacts still check. Measures never imply conceptual similarity or
-significance beyond what their method states. No book text in exports beyond
-the words themselves. No new dependency. Do not touch `sol/essence/tui/`,
-`sol/terminal/`, `sol/core/` or `sol/corpus/` (Claude Code's tasks).
+`punctuation-rules-v1` and existing `sol.sentence-study` v1 artifacts are
+unchanged and still check; a file result needs a new version or a separately
+named method if its shape must differ. The reader's `S` keeps working
+unchanged. File input stores no book text, only digests and offsets. No new
+dependency. Do not touch `sol/essence/tui/`, `sol/terminal/`, `sol/core/`,
+`sol/corpus/`, `sol/reader/` or `pyproject.toml` (Claude Code's task).
 
 ### Acceptance
 
-Tests for each measure (including zero counts and unequal denominators), export
-round trips, and refusal of stale inputs. Documentation check and full suite
+Tests for both providers, spans that cut sentences, Unicode, empty input, a
+changed file refused by `check`, CORE-free import for file input, and existing
+sentence artifacts byte-for-byte unchanged. Documentation check and full suite
 pass.
 
 <!--
