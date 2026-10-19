@@ -47,7 +47,7 @@ full suite pass.
 
 ## Codex: Proposal for the ESSENCE encyclopedia (stage 4)
 
-**Status:** Ready
+**Status:** In progress
 **Branch:** `codex/encyclopedia-proposal`
 **Requested:** 19 October 2026, by the maintainer
 
