@@ -189,12 +189,11 @@ def _passage(count, identifier):
 
 
 def _file_text(count, side):
+    # Verbatim and verified against the counted bytes (CRLF and BOM kept).
     if side not in count.texts:
         provider = count.target if side == "target" else count.reference
-        try:
-            count.texts[side] = Path(provider.path).read_text(encoding="utf-8")
-        except (AttributeError, OSError, UnicodeError):
-            count.texts[side] = None
+        path = getattr(provider, "path", None)
+        count.texts[side] = None if path is None else verified_file_text(path, count.study[side]["binding"]["sha256"])
     return count.texts[side]
 
 

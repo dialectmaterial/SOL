@@ -623,6 +623,12 @@ class WordContextTests(unittest.TestCase):
                                              "right": " reader useful without extracting any…"})
         self.assertEqual(reference["context"]["word"], "research")
         self.assertEqual(reference["context"]["left"], "Before the ")
+        # CRLF line endings keep their offsets.
+        crlf = root / "crlf.txt"
+        crlf.write_bytes("First line.\r\nThe research reader, in context.\r\nEnd.".encode("utf-8"))
+        windows = tui_words.run(real, "passage", "file", reference_file=str(crlf))
+        at = next(n for n, row in enumerate(windows.study["frequencies"]) if row["word"] == "research")
+        self.assertEqual(tui_words.sources(windows, at)[1]["context"]["left"], "First line. The ")
         # A file changed since the count shows no context rather than the wrong one.
         reference_file.write_text("Something else entirely, research included.", encoding="utf-8")
         count.texts.clear()
