@@ -986,6 +986,22 @@ end
     vim.api.nvim_feedkeys(vim.keycode('<C-c>'), 'xt', false)
     report[tostring(columns)].closed = geometry(reader.window)
   end
+  -- Reported by Codex's review of #36: :q! left the page shifted.
+  -- Drafts live on the reader's channel; a stand-in keeps them here.
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '', writer = {write = function() end}}
+  vim.o.columns = 160
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  local reader = SOLNvimReader
+  local before = geometry(reader.window)
+  reader.note()
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, {'A draft to keep'})
+  vim.cmd('stopinsert')
+  vim.cmd('q!')
+  vim.wait(50)
+  report.forced = {before = before, after = geometry(reader.window),
+                   focused = vim.api.nvim_get_current_win() == reader.window}
+  reader.note()
+  report.forced.draft = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 """, integrated=True)
         wide, narrow = report["160"], report["100"]
         self.assertLess(wide["page"]["col"], wide["centred"]["col"])
@@ -995,6 +1011,10 @@ end
         # Too narrow: over the page as before, which stays centred.
         self.assertEqual(narrow["page"], narrow["centred"])
         self.assertLess(narrow["editor"]["col"], narrow["page"]["col"] + narrow["page"]["width"])
+        forced = report["forced"]
+        self.assertEqual(forced["after"], forced["before"])
+        self.assertTrue(forced["focused"])
+        self.assertEqual(forced["draft"], ["A draft to keep"])
 
     def test_note_editor_quotes_the_selection_exactly(self):
         text = self.sample.passages[1].text

@@ -70,6 +70,14 @@ return function(reader)
       api.nvim_buf_set_extmark(editor, note_namespace, 0, 0, { virt_lines = lines, virt_lines_above = true })
       vim.fn.winrestview({ topfill = #lines })
     end
+    -- Closed another way (:q!, :close): tidy up as discard does, after the
+    -- close completes; the draft is kept by the BufWipeout handler below.
+    local opened = panels.window
+    api.nvim_create_autocmd('WinClosed', { pattern = tostring(opened), once = true, callback = function()
+      vim.schedule(function()
+        if panels.window == opened then close_popup(); restore(packet) end
+      end)
+    end })
     local finished = false
     local function body()
       return table.concat(api.nvim_buf_get_lines(editor, 0, -1, false), '\n')
