@@ -20,12 +20,13 @@ ESSENCE is not currently a complete model environment. The inspected code contai
 
 - `sol.essence.prose.export_prose` and `sol analyze prose --json`: a **verified, Hegel-specific** prose-only analysis view over the current corpus.
 - `sol analyze term WORD`: a reproducible lexical-distribution experiment with reference-bound source matches; `sol analyze check FILE` checks its result against a current corpus generation.
-- `sol analyze sentences [--within PATH]`: a reproducible sentence-length study (Experiment A's first half, below), run from the reader with `S` until 19 October, when the maintainer removed that key; `sol analyze check FILE` verifies it too.
+- `sol analyze sentences [--within PATH]`: the existing v1 corpus sentence-length study (run from the reader with `S` until 19 October, when the maintainer removed that key). `sol analyze sentences --file PATH [--span START END]` and the provider API add v2 studies over UTF-8 files or independently scoped CORE inputs; `sol analyze check FILE --input-file PATH` verifies file studies against an explicit local source.
+- The optional Textual interface and the word engine's CORE/file counts, comparison measures and CSV/TSV export described in §4–§5. The sentence provider API is headless; moving the sentence study into that interface (it left the reader as `S` on 19 October) is still future work.
 - `sol.core` public snapshot/reference APIs, including source/edition/generation binding and batch captures; these are usable without opening BEING.
 - A narrow optional `sol-kitty` + Zsh handoff for a source passage, with an explicit proposed return to BEING. The handoff carries **references**, not an ML result database or unrestricted authority to save notes.
 - Checkout-only reading/rendering research, not an installed ESSENCE model suite.
 
-**Not implemented/verified:** the Textual ESSENCE interface and its split/fullscreen presentations ([§4](#4-interaction-model-and-inquiry-contract)); a general experiment picker; target/reference scope selection; word-frequency comparison; parameter dashboard; GPU/model registry; task/capability registry and adapters; the model-history encyclopedia; ESSENCE on ordinary files without CORE (every study imports `sol.core` today); syntactic research panel; UltraBERT embedding pipeline; TensorFlow Projector launch as a SOL command; durable research context/experiment history; a terminal-independent BEING–ESSENCE UI. Do not describe these as shipping features until code and tests verify them.
+**Not implemented/verified:** a general experiment picker beyond the word experiment; parameter dashboard; GPU/model registry; task/capability registry and adapters; the model-history encyclopedia; file providers for the older term/prose and segmentation-review workflows; syntactic research panel; UltraBERT embedding pipeline; TensorFlow Projector launch as a SOL command; durable research context/experiment history. Sustained human acceptance of the reader and investigation interface remains open. Do not describe these as shipping features until code and tests verify them.
 
 ### Existing commands
 
@@ -38,10 +39,12 @@ sol analyze term ground --json > ground.sol-analysis.json
 sol analyze check ground.sol-analysis.json
 sol analyze sentences --within /BEING/i-determinateness-quality
 sol analyze sentences --json > quality.sol-analysis.json
+sol analyze sentences --file /absolute/path/to/text.txt --span 0 500 --json > sentences.sol-analysis.json
+sol analyze check sentences.sol-analysis.json --input-file /absolute/path/to/text.txt
 sol reference capture RECORD_UUID --corpus local-corpus | sol reference check --corpus local-corpus
 ```
 
-The first `prose` command summarizes eligible records. The JSON export is for consumption by scripts. The lexical study measures exact normalized token occurrences and can break results down by the three doctrines, but a word occurrence does not prove concept identity. `check` verifies the **term study** and the **sentence study** by recomputation, not arbitrary generated model outputs or `prose` exports.
+The first `prose` command summarizes eligible records. The JSON export is for consumption by scripts. The lexical study measures exact normalized token occurrences and can break results down by the three doctrines, but a word occurrence does not prove concept identity. `check` verifies term, word-frequency and sentence studies by recomputation, not arbitrary generated model outputs or `prose` exports. File analysis through the Python API or `python -m sol.essence.cli` needs no CORE import or configured corpus; the installed `sol` entry point still loads BEING's command dispatcher.
 
 ## 3. Proper model inputs: projections, not destructive cleaning
 
@@ -315,6 +318,64 @@ Design a minimal, inspectable analysis rather than jumping straight to a large m
 A sentence-length comparison can be deterministic, cheap, and independently validated against a hand-checked sample.
 
 **Implemented (17 October): the sentence-length half.** `sol.essence.sentences` selects eligible Hegel main text exactly as the term study does (pending-review records are excluded and counted), masks converter facsimile labels, and segments with declared rules (`punctuation-rules-v1`): a sentence ends at `.`, `!`, `?` or an ellipsis (with closing quotes/brackets) followed by whitespace and a capital, digit, opening quote/bracket or dash; never inside a bracket opened within the sentence (citations such as *(Princ. Math. Phil. Natu. Lib. II, …)*), after a listed abbreviation (single letters only in lower case, so a logical term like *S-U-P.* still ends a sentence) or within a chain of initials; a newline always ends one. Length is counted in the term study's word tokens. The artifact (`sol.sentence-study` v1) stores record IDs, digests, codepoint offsets and token counts — **no book text** — plus the distribution, percentiles, means by place in the paragraph (first/middle/last/only) and the longest sentences; `check` recomputes it exactly against the current generation. Rules were tuned on the local corpus: of 9,127 sentences (median 31 words), the three longest (150, 148, 146 words) were read and are genuine Hegel sentences, a random sample of boundaries was correct, and the 40 held-back periods followed by capitals were almost all citation abbreviations; one known miss is a full sentence inside a parenthesis opened mid-sentence. **Not yet done:** a formal hand-checked sample with a reported error rate, part-of-speech/dependency statistics, and sentence-level scopes smaller than a loaded section from the reader. POS tagging and parsing will be probabilistic/error-prone, so present them as **model annotations**, not source facts. The linguistic conclusions describe the chosen translator's text; contrast with Hegel's German only if a distinct German source is actually available and audited in a future research cycle.
+
+#### Sentence providers and file input — implemented 19 October 2026
+
+`sol.essence.analyze_sentences(provider, *, origin=None)` accepts the **same**
+`CoreProvider(snapshot, scope=None)` and `FileProvider(path, scope=None)` as
+the word engine. CORE scopes are `corpus`, `within` a reader path, exact
+`passages` IDs, or a `span` with one exact `id`, `start` and `end`. Files use
+`file` or a `span` with `start` and `end`. Set scope on the provider; a separate
+`scope=` argument remains available only for the legacy snapshot API.
+
+The original complete text is segmented with unchanged `punctuation-rules-v1`
+**before** the half-open codepoint span is applied. Only complete sentences
+contained in the span are measured. A sentence cut at either boundary is
+excluded, with the count in `exclusions.outside_span`; no fragment becomes a
+new sentence. File bytes decode as UTF-8 without rewriting CRLF, Unicode or a
+BOM. The existing word tokenizer measures lengths. A whole file is one input
+row: `by_position` describes the retained sentence sequence in that row,
+not inferred paragraphs. CORE rows retain their passage boundaries and the
+word engine's attribution/type/review filters and facsimile policy. Empty
+inputs yield zero sentences and null means/percentiles.
+
+Explicit providers produce **`sol.sentence-study` v2**, with the separately
+named method `sentence-length-distribution-providers-v1`. Its `input` records
+provider, binding, scope and input rows (digests, spans, sentence counts and,
+for CORE, source identities/provenance); `sentences` rows are
+`[input_index, start, end, token_count]`. Summaries, histogram, positional
+statistics and longest-row indexes use the same calculations as v1. No input
+text or local file path is stored. Files bind the complete original byte
+digest and byte length; even a change outside a selected span is stale. CORE
+retains strict corpus/edition/generation checks. A file has no CORE source
+return guarantee or CORE reference anchor.
+
+`encode_sentence_result`, `decode_sentence_result` and
+`check_sentence_result(provider, result)` handle v2; a checker needs the
+caller-selected provider **with the recorded scope**, never a path from the
+artifact. The CLI reconstructs the recorded scope after decoding, but file
+checks always require `--input-file PATH`. V2 is bounded to 16 MiB, allowing
+whole-book provenance, and files to the shared 64 MiB input bound. V1 keeps
+its 1 MiB bound and original encoding/method; bare-snapshot calls, existing
+artifacts and ordinary corpus CLI output remain v1 (as did the reader's `S` until its removal on 19 October).
+
+```sh
+sol analyze sentences --file /absolute/path/to/text.txt
+sol analyze sentences --file /absolute/path/to/text.txt --span 10 500 --json > sentences.sol-analysis.json
+sol analyze check sentences.sol-analysis.json --input-file /absolute/path/to/text.txt
+sol analyze sentences --corpus local-corpus --passage RECORD_UUID --span 10 500 --json
+```
+
+```python
+from sol.essence import FileProvider, analyze_sentences, check_sentence_result
+provider = FileProvider("/absolute/path/to/text.txt", {"kind": "span", "start": 10, "end": 500})
+result = analyze_sentences(provider)
+checked = check_sentence_result(provider, result)
+```
+
+This adds no model, dependency, corpus/workspace contract or interface control.
+The underlying segmenter's known limitations and the need for human boundary
+validation remain unchanged.
 
 #### Measuring segmentation error against private marks
 

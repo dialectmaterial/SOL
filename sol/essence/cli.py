@@ -24,8 +24,8 @@ def build_parser() -> argparse.ArgumentParser:
     term.add_argument("--limit", type=int, default=10, metavar="N",
                       help="maximum representative passages (default: 10)")
     sentences = commands.add_parser("sentences", help="measure sentence lengths in the English translation")
-    sentences.add_argument("--within", metavar="PATH",
-                           help="only passages under this reader path, e.g. /BEING/i-determinateness-quality")
+    from sol.essence.word_cli import add_input_arguments
+    add_input_arguments(sentences, words=True, unit="sentences")
     sentences.add_argument("--reference", metavar="FILE|-", help="optional CORE reference anchor; it does not restrict the scope")
     words = commands.add_parser("words", help="count normalized words with explicit target/reference denominators")
     from sol.essence.word_cli import add_arguments
@@ -136,6 +136,9 @@ def render_result(result: dict) -> str:
 
 def render_sentences(result: dict) -> str:
     """Summarize a sentence study; locations only, never stored book text."""
+    if result.get("version") == 2:
+        from sol.essence.sentence_cli import render_sentences as render_provider_sentences
+        return render_provider_sentences(result)
     summary = result["summary"]
     scope = result["scope"]
     label = {"corpus": "whole corpus", "within": scope.get("path"), "passages": f"{len(scope.get('ids', []))} chosen passages"}
@@ -179,6 +182,10 @@ def main(arguments: list[str] | None = None) -> int:
         if options.action == "words":
             from sol.essence.word_cli import run
             return run(options)
+        if options.action == "sentences" and (options.input_file is not None or options.provider is not None
+                                               or options.passage is not None or options.span is not None):
+            from sol.essence.sentence_cli import run
+            return run(options)
         raw = None
         if options.action == "check":
             from sol.essence.word_cli import read_artifact, run
@@ -193,6 +200,10 @@ def main(arguments: list[str] | None = None) -> int:
                 header = None
             if isinstance(header, dict) and header.get("protocol") == "sol.word-frequencies":
                 return run(options, decode_word_result(data))
+            if isinstance(header, dict) and header.get("protocol") == "sol.sentence-study":
+                from sol.essence.sentences import decode_sentence_result
+                from sol.essence.sentence_cli import run as run_sentences
+                return run_sentences(options, decode_sentence_result(data))
         from sol.core import MAX_REFERENCE_BYTES, decode_reference, discover_corpus, load_snapshot
         from sol.core.wire import read_json_input
         from sol.essence.terms import (

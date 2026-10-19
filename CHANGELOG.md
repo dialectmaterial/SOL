@@ -19,6 +19,17 @@
 - `S` (sentence lengths) is gone from the reader; `sol analyze sentences`
   still runs the study.
 
+### Sentence studies over UTF-8 files and CORE providers — 19 October 2026
+
+`sol analyze sentences --file PATH [--span START END]` measures ordinary text
+without a configured corpus. The Python sentence API accepts the word engine's
+CORE/file providers and scopes; `sol analyze check FILE --input-file PATH`
+verifies file results against the caller's explicit source. Provider studies
+use a v2 artifact with digests and original offsets, without input text or
+local file paths. Spans retain only complete sentences; cut sentences are
+reported as excluded. The original segmenter, v1 artifacts and reader `S`
+remain unchanged. V2 allows 16 MiB of result/provenance data; v1 retains 1 MiB.
+
 ### Comparison and sources in ESSENCE — 18 October 2026
 
 When ESSENCE compares a target with a reference, Results shows how much more

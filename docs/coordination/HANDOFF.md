@@ -65,6 +65,74 @@ Write "None." rather than deleting a heading.
 - **Defaults (the maintainer's two open questions):** `Ctrl-q` is removed as a quit key too; ESSENCE keeps `q` (it only closes ESSENCE).
 - **Other defaults:** side panel at 34–64 columns; footnotes, search results and help also open beside; the status line's content; `:wq`/`:x` counted as quitting; OSC 52 as the fallback.
 
+## ESSENCE sentence study without CORE — 19 October 2026
+
+**Task:** [Codex: ESSENCE sentence study without CORE](https://github.com/dialectmaterial/SOL/blob/759338cff70384edf44b6c8cb595156fdbae72b1/docs/coordination/CURRENT_TASK.md#codex-essence-sentence-study-without-core).
+**Branch / PR:** `codex/sentence-file-provider` · opened with `gh pr create --base main`; status `In review`.
+**Last implementation commit:** `7dd17efe99cae3b6ca0c4845ea57be8c71a66957` (this report follows).
+
+### Changed files
+
+- `sol/essence/sentences.py`, `sentence_inputs.py` — the existing word engine's CORE/file providers and scopes, v2 input/provenance envelope, complete-sentence span filtering, strict source-bound verification; original segmenter and v1 snapshot behavior preserved.
+- `sol/essence/validation.py`, `terms.py` — move existing inert validation helpers/error type into a CORE-free module, with the term module's previous names re-exported unchanged. Sentence CORE imports are deferred to CORE operations.
+- `sol/essence/cli.py`, `sentence_cli.py`, `word_cli.py`, `__init__.py` — shared target-provider arguments, file/span CLI and explicit-file verification, lazy sentence exports and bounded v1/v2 codecs. Decode precedes source discovery; saved paths are never opened.
+- `tests/test_sentence_providers.py`, `fixtures_sentence_v1.py` — 22 tests and four original synthetic v1 encodings, including file/CORE scopes, cut sentences, Unicode/CRLF/BOM, empty inputs, stale/altered data, file guards, CORE-free execution, CLI dispatch and v1 byte compatibility. The synthetic fixture is Python source, so source-archive tests retain it without changing packaging.
+- `docs/ESSENCE.md` §2/§5, `CHANGELOG.md`, `CURRENT_TASK.md` — implementation, method/bounds, CLI/API and task status. No interface, terminal, CORE, corpus, reader, dependency or legacy file changed.
+
+### Python contract for the interface
+
+All four functions are available from `sol.essence` and `sol.essence.sentences`:
+
+```python
+analyze_sentences(provider, *, origin=None) -> dict
+check_sentence_result(provider, result) -> dict
+encode_sentence_result(result) -> str
+decode_sentence_result(data: bytes | str) -> dict
+```
+
+`provider` is the **existing** `CoreProvider(snapshot, scope=None)` or
+`FileProvider(path, scope=None)`. CORE scopes are corpus/within/passages/span;
+a CORE span names one exact `id`. File scopes are file/span. Offsets are
+half-open codepoints in the complete original text. Segment first, then retain
+only whole contained sentences; `exclusions.outside_span` counts excluded
+segments. A file is one input row; positional statistics describe its retained
+sentence sequence, without inferring paragraphs. An optional CORE reference
+anchor is allowed only for CORE.
+
+Explicit providers produce `sol.sentence-study` **v2**, method
+`sentence-length-distribution-providers-v1`, using unchanged
+`punctuation-rules-v1` and word tokens. `input` contains provider, binding,
+scope and rows; `sentences` contains `[input_index, start, end, tokens]`.
+There is no input text or local file path. Verification requires the caller's
+provider with the recorded scope; CLI `check` restores that scope after
+decoding but always needs `--input-file PATH` for file results. Files bind
+every original byte, including BOM/CRLF and text outside a span. CORE retains
+strict edition/generation checks. Refusals expose `status`/`code` through
+existing study errors or filesystem errors.
+
+Bare-snapshot `analyze_sentences(snapshot, *, scope=None, origin=None)` stays
+v1, as do the ordinary corpus CLI and the reader's `S`. Both codecs still
+check existing v1 artifacts; v1 retains 1 MiB. V2 allows 16 MiB (the real-book
+provenance exceeds 1 MiB); input files keep the word provider's 64 MiB bound.
+`save_sentence_result` retains its existing non-overwriting, owner-only policy.
+
+### Tests performed
+
+- 100 focused sentence/term/word/comparison tests passed; docs and whitespace checks passed. Full suite: **1,710 tests, OK (12 skipped, 4 existing expected failures)**, isolated XDG config/data/state/cache. Approved escalation was required because the restricted sandbox stalls an existing Textual test during asyncio executor shutdown; the isolated test and all full suites pass outside that restriction.
+- A subprocess blocks all CORE/corpus/reader/terminal/TUI imports and successfully runs file analysis, v2 encode/decode/check and the ESSENCE CLI. The installed `sol` dispatcher also runs with an explicit file and no configured corpus; that dispatcher itself still imports BEING.
+- Four pre-change synthetic v1 artifacts (whole corpus, within, chosen passage plus origin, empty scope) still check and encode byte-for-byte, allowing only the declared Unicode-runtime version to differ between supported Python versions. V1 sentence JSON/human output, check JSON/human output and term JSON/stdout/stderr match main byte-for-byte on invented inputs.
+- Read-only real-book trial: v2 whole corpus has **9,127 sentences / 312,481 tokens**, **1,124,157 encoded bytes**; every sentence row, summary and positional statistic matches v1. V2 codec and recomputation pass; corpus generation remains current. Nothing saved or modified.
+- Before implementation: resolved #29's task-board-only conflict and merged it at the maintainer's explicit instruction ([record](https://github.com/dialectmaterial/SOL/pull/29#issuecomment-6263268001)); reviewed/merged #30 after docs, 1,688 tests, GitHub checks, 11 malformed-source persistence refusals and 91,999 real-book word-source offsets ([review](https://github.com/dialectmaterial/SOL/pull/30#issuecomment-6263328023)). Claude's working files and local `AGENTS.md` were untouched.
+
+### Outstanding issues
+
+- `S` has not moved into the interface; no file-based reader/source-return feature or file-based segmentation-review workflow is added. These are outside the assigned engine task.
+- Known punctuation-rule limitations remain. No new human segmentation error rate or manual reading-quality claim.
+
+### Decisions requiring approval
+
+- None **(reserved)**. Defaults for review: explicit providers use v2 while bare snapshots stay v1; whole contained sentences for spans; one file input row; retained-sequence positional statistics; verbatim UTF-8/CRLF/BOM; complete-source digest checks; CORE-only anchors; 16 MiB v2 and unchanged 1 MiB v1 bounds. No Decision statement, CORE/reference/corpus/workspace contract, dependency or deletion/overwrite policy changed.
+
 ## ESSENCE stage 3, the interface side — 18 October 2026
 
 **Task:** "Claude Code: ESSENCE stage 3, the interface side", assigned in task-board [PR #28](https://github.com/dialectmaterial/SOL/pull/28) (approved by the maintainer on 18 October 2026; not yet merged, so this branch's `CURRENT_TASK.md` is left as it was to avoid a conflict).
