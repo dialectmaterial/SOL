@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import json
 
+from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual import work
@@ -36,6 +37,13 @@ tokenization, tagging or embedding, and the installed implementations.
     "experiment": ("Experiment", None),
     "results": ("Results", None),
 }
+
+
+def in_context(context):
+    """The words around an occurrence, the word itself in bold."""
+    if context is None:
+        return Text("(the text has changed since the count)", style="dim")
+    return Text.assemble(context["left"], (context["word"], "bold"), context["right"])
 
 
 class EssenceApp(App):
@@ -250,9 +258,9 @@ class EssenceApp(App):
     def show_sources(self, index) -> None:
         table = self.query_one("#sources", DataTable)
         table.clear(columns=True)
-        table.add_columns("Side", "Count", "Where")
+        table.add_columns("Side", "Count", "In context", "Where")
         self.shown_sources = () if index is None else tuple(words.sources(self.last_count, index))
-        table.add_rows([(item["side"], str(item["count"]),
+        table.add_rows([(item["side"], str(item["count"]), in_context(item["context"]),
                          item["label"] + ("" if item["open"] else " (not in the reader)"))
                         for item in self.shown_sources])
 

@@ -32,6 +32,28 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Words in context in ESSENCE — 19 October 2026
+
+**Task:** the maintainer's "go on" on 19 October, taking the third candidate offered in the session (a word's sources with headings, pages and context); no task-board slot.
+**Branch / PR:** `claude/essence-word-sources`, stacked on #34 · opened with `gh pr create`
+**Last implementation commit:** `f941a2acaf25ee05effc273d9dfbd77481290f99`
+
+### Changed files
+- `sol/essence/tui/words.py`: `Count` keeps the loaded book and texts read, for display only; `sources` gives each row the passage heading and page and a `context` (words either side of the first occurrence), or None when the text no longer has the counted digest.
+- `sol/essence/tui/app.py`: the sources table shows Side | Count | In context (word in bold) | Where.
+- `tests/test_essence_tui.py`: real engine with a corpus passage and a text file (exact context, label, cut marks), a file changed after the count shows none; the fixture gained `text_sha256`.
+- `docs/ESSENCE.md` §4, `CHANGELOG.md`.
+
+### Tests performed
+- Docs OK; full suite **1,715 tests, OK** (12 skipped, 4 expected failures).
+- Real session in tmux on the book, ESSENCE fullscreen: each source showed its context and heading and page, e.g. *Remark 1 | p. 120*.
+
+### Outstanding issues
+- Still one row per passage, at the word's first occurrence there (the v1 artifact keeps only that); every occurrence would need either the study to keep them or the interface to search the text again.
+
+### Decisions requiring approval
+- **Defaults:** 40 characters of context each side, cut at whole words with "…"; no context when the digest differs.
+
 ## The sentence study in ESSENCE — 19 October 2026
 
 **Task:** "Claude Code: The sentence study in ESSENCE", assigned in task-board PR #33 (not yet merged; this branch leaves `CURRENT_TASK.md` alone to avoid a conflict).

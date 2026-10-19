@@ -396,10 +396,11 @@ def comparison_count():
     digest = "c" * 64
     core_side = {"provider": "core", "scope": {"kind": "corpus"},
                  "summary": {"token_count": 30, "type_count": 2, "input_count": 1},
-                 "inputs": [{"id": TARGET, "content_sha256": digest, "reader_path": "/BEING/quality",
-                             "sources": [{"printed_page": "7"}]}]}
+                 "inputs": [{"id": TARGET, "content_sha256": digest, "text_sha256": digest,
+                             "reader_path": "/BEING/quality", "sources": [{"printed_page": "7"}]}]}
     file_side = {"provider": "file", "scope": {"kind": "file"},
-                 "summary": {"token_count": 10, "type_count": 1, "input_count": 1}, "inputs": [{"span": [0, 40]}]}
+                 "summary": {"token_count": 10, "type_count": 1, "input_count": 1},
+                 "inputs": [{"span": [0, 40], "text_sha256": digest}]}
     cell = lambda count, total, locations: {"count": count, "denominator": total, "locations": locations,
                                             "rate_per_10000_tokens": round(count * 10000 / total, 6)}
     study = {"target": core_side, "reference": file_side, "warnings": [],
@@ -591,6 +592,47 @@ class RealComparisonTests(unittest.TestCase):
         alone = tui_words.run(real, "passage", "none")
         with self.assertRaisesRegex(ValueError, "Export needs a reference"):
             tui_words.export(alone, "csv", data_home=data_home)
+
+
+@unittest.skipUnless(_engine_installed(), "the ESSENCE engines are not installed")
+class WordContextTests(unittest.TestCase):
+    """A word's sources name their heading and page and show the words around it."""
+
+    def test_sources_show_where_and_in_what_words(self):
+        from fixtures_corpus import write_runtime_corpus
+        from sol import core
+        from sol.corpus import contract
+
+        temporary = tempfile.TemporaryDirectory(prefix="sol-essence-context-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        corpus = root / "corpus"
+        identifier, _ = write_runtime_corpus(corpus)
+        contract.initialize_corpus_identity(corpus)
+        snapshot = core.load_snapshot(corpus)
+        reference_file = root / "reference.txt"
+        reference_file.write_text("Before the research reader, a long invented preamble of filler words "
+                                  "appears; then the word research again, and more words after it here.",
+                                  encoding="utf-8")
+        real = {**context(), "corpus": str(corpus), "reference": core.capture_reference(snapshot, identifier)}
+        count = tui_words.run(real, "passage", "file", reference_file=str(reference_file))
+        index = next(n for n, row in enumerate(count.study["frequencies"]) if row["word"] == "research")
+        target, reference = tui_words.sources(count, index)
+        self.assertEqual(target["label"], "Synthetic section | p. 7")
+        self.assertEqual(target["context"], {"left": "…invented passage makes this installed ", "word": "research",
+                                             "right": " reader useful without extracting any…"})
+        self.assertEqual(reference["context"]["word"], "research")
+        self.assertEqual(reference["context"]["left"], "Before the ")
+        # CRLF line endings keep their offsets.
+        crlf = root / "crlf.txt"
+        crlf.write_bytes("First line.\r\nThe research reader, in context.\r\nEnd.".encode("utf-8"))
+        windows = tui_words.run(real, "passage", "file", reference_file=str(crlf))
+        at = next(n for n, row in enumerate(windows.study["frequencies"]) if row["word"] == "research")
+        self.assertEqual(tui_words.sources(windows, at)[1]["context"]["left"], "First line. The ")
+        # A file changed since the count shows no context rather than the wrong one.
+        reference_file.write_text("Something else entirely, research included.", encoding="utf-8")
+        count.texts.clear()
+        self.assertIsNone(tui_words.sources(count, index)[1]["context"])
 
 
 @unittest.skipUnless(_engine_installed(), "the ESSENCE engines are not installed")
