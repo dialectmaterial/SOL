@@ -437,7 +437,12 @@ class ComparisonScreenTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn(tui_words.METHOD_LINE, str(app.query_one("#summary").render()))
                 sources = app.query_one("#sources")
                 self.assertEqual(sources.row_count, 2)
-                sources.focus()
+                # The keyboard path: words are focused after a count, Enter
+                # goes to the word's sources, Enter there opens one.
+                self.assertIs(app.focused, table)
+                await pilot.press("enter")
+                await pilot.pause()
+                self.assertIs(app.focused, sources)
                 await pilot.press("enter")
                 await pilot.pause()
                 requests = [data for data in written if data.startswith("\x1b]5379;sol-essence;")]
@@ -452,6 +457,14 @@ class ComparisonScreenTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
                 self.assertEqual(len([data for data in written if data.startswith("\x1b]5379;")]), 1)
                 self.assertIn("cannot be opened", str(app.query_one("#result-status").render()))
+                await pilot.press("escape")
+                await pilot.pause()
+                self.assertIs(app.focused, table)
+                # Switching screens starts on that screen's first control.
+                await pilot.press("3")
+                self.assertEqual(app.focused.id, "target")
+                await pilot.press("4")
+                self.assertIs(app.focused, table)
                 app.exit()
 
     async def test_export_writes_only_in_workspace_sessions(self):

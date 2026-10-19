@@ -51,7 +51,8 @@ class EssenceApp(App):
     .choices RadioSet { width: 1fr; }
     #run-row { height: auto; padding: 1 0 0 0; }
     #status, #summary { padding: 0 1; }
-    #frequencies { height: 1fr; }
+    #summary-box { height: auto; max-height: 8; }
+    #frequencies { height: 1fr; min-height: 6; }
     #sources-label { padding: 1 1 0 1; color: $text-muted; }
     #sources { height: 8; }
     #export-row { height: auto; }
@@ -92,7 +93,8 @@ class EssenceApp(App):
         yield Footer()
 
     def compose_experiment(self) -> ComposeResult:
-        with VerticalScroll():
+        # Tab goes straight to the choices, not to the scrolling container.
+        with VerticalScroll(can_focus=False):
             yield Label("Word frequencies: count the words of a target, optionally against a reference.")
             with Horizontal(classes="choices"):
                 with RadioSet(id="target"):
@@ -109,10 +111,14 @@ class EssenceApp(App):
             yield Static("", id="status")
 
     def compose_results(self) -> ComposeResult:
-        yield Static("No count yet. Choose a target in Experiment and press Count words.", id="summary")
+        # Denominators, formulas and warnings can run long; they scroll so the
+        # table keeps most of the height.
+        with VerticalScroll(id="summary-box"):
+            yield Static("No count yet. Choose a target in Experiment and press Count words.", id="summary")
         yield DataTable(id="frequencies", zebra_stripes=True, cursor_type="row")
-        yield Static("Sources of the highlighted word. Enter opens one in the reader; "
-                     "Alt-Left there returns to where you were.", id="sources-label")
+        yield Static("Sources of the highlighted word: Enter on a word comes here, Enter here opens it in the "
+                     "reader (Alt-Left there returns to where you were), Escape goes back to the words.",
+                     id="sources-label")
         yield DataTable(id="sources", cursor_type="row")
         with Horizontal(id="export-row"):
             yield Button("Export CSV", id="export-csv", disabled=True)
@@ -202,6 +208,8 @@ class EssenceApp(App):
             button.disabled = count.reference is None
         self.show_sources(0 if total else None)
         self.query_one("#screens", TabbedContent).active = "results"
+        # Words first: arrows choose a word, Enter goes to its sources.
+        table.focus()
 
     def show_sources(self, index) -> None:
         table = self.query_one("#sources", DataTable)
@@ -217,6 +225,9 @@ class EssenceApp(App):
             self.show_sources(event.cursor_row)
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        if event.data_table.id == "frequencies":
+            self.query_one("#sources", DataTable).focus()
+            return
         if event.data_table.id != "sources" or not 0 <= event.cursor_row < len(self.shown_sources):
             return
         source = self.shown_sources[event.cursor_row]["open"]
@@ -255,13 +266,25 @@ class EssenceApp(App):
         self.query_one("#result-status", Static).update(
             f"Not exported: {outcome}" if isinstance(outcome, Exception) else f"Exported: {outcome}")
 
+    def on_key(self, event) -> None:
+        if event.key == "escape" and self.focused is self.query_one("#sources", DataTable):
+            self.query_one("#frequencies", DataTable).focus()
+            event.stop()
+
     def on_mount(self) -> None:
         screen = self.state.get("screen")
         if screen in SCREENS:
-            self.query_one("#screens", TabbedContent).active = screen
+            self.action_screen(screen)
 
     def action_screen(self, name: str) -> None:
+        # Let go of focus first: a focused widget on the old screen would pull
+        # it back to the front.
+        self.set_focus(None)
         self.query_one("#screens", TabbedContent).active = name
+        # Then start on the screen's first control.
+        first = {"experiment": "#target", "results": "#frequencies"}.get(name)
+        if first:
+            self.query_one(first).focus()
 
     def action_leave(self) -> None:
         self.count_serial += 1  # A count still running is abandoned.
