@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### The note editor opens beside the text — 19 October 2026
+
+`a` (and `e` in `c`) now opens the note editor beside the passage when there
+is room, like the context panel, so the text you are writing about stays in
+view. **Fixed:** the selection quoted above the editor lost every letter "s".
+
 ### Copying, quitting, the context panel and the status line — 19 October 2026
 
 - `y` now copies to your system clipboard; it failed before because the reader
