@@ -13,14 +13,13 @@ import re
 import statistics
 import unicodedata
 
-from sol import core
-from sol.essence.terms import (
-    TermExperimentError, _binding, _current, _facsimile_spans, _fresh, _integer, _json, _json_value,
-    _keys, _reader_doctrine, _tokens, _validate_binding,
-)
+from sol.essence.word_inputs import CoreProvider, FileProvider
+from sol.essence.tokenization import word_tokens as _tokens
+from sol.essence.validation import TermExperimentError, _integer, _json, _json_value, _keys, _validate_binding
 
 
 MAX_RESULT_BYTES = 1048576
+PROVIDER_MAX_RESULT_BYTES = 16 * 1024 * 1024
 LONGEST = 12
 _TYPES = {"paragraph", "quotation", "list_item"}
 _REASONS = ("attribution", "record_type", "review", "reader_path", "scope")
@@ -155,6 +154,8 @@ def _in_scope(record, scope):
 
 
 def _selection(record, scope):
+    from sol.essence.terms import _reader_doctrine
+
     attribution = record["attribution"]
     if not _in_scope(record, scope):
         return "scope"
@@ -182,7 +183,30 @@ def _summary(lengths):
             "max": ordered[-1]}
 
 
+def _measure(passages, rows):
+    """Shared descriptive statistics over input-row sentence counts and offsets."""
+    lengths = [row[3] for row in rows]
+    histogram = [{"from": low, "to": high,
+                  "sentences": sum(1 for value in lengths if value >= low and (high is None or value <= high))}
+                 for low, high in _BINS]
+    by_position = {name: [] for name in _POSITIONS}
+    first = 0
+    for passage in passages:
+        own = lengths[first:first + passage["sentences"]]
+        for number, value in enumerate(own):
+            name = ("only" if len(own) == 1 else "first" if number == 0
+                    else "last" if number == len(own) - 1 else "middle")
+            by_position[name].append(value)
+        first += passage["sentences"]
+    longest = sorted(range(len(rows)), key=lambda number: (-rows[number][3], number))[:LONGEST]
+    return {"summary": _summary(lengths), "histogram": histogram,
+            "by_position": {name: _summary(values) for name, values in by_position.items()}, "longest": longest}
+
+
 def _analyze(snapshot, scope, origin):
+    from sol import core
+    from sol.essence.terms import _binding, _current, _facsimile_spans
+
     binding = _binding(snapshot)
     if origin is not None:
         try:
@@ -218,30 +242,21 @@ def _analyze(snapshot, scope, origin):
                          "reader_path": record["reader_path"], "sentences": count,
                          "sources": [{key: value for key, value in source.items()
                                       if key in {"pdf_page", "printed_page"}} for source in record["sources"]]})
-    lengths = [row[3] for row in rows]
-    histogram = [{"from": low, "to": high,
-                  "sentences": sum(1 for value in lengths if value >= low and (high is None or value <= high))}
-                 for low, high in _BINS]
-    by_position = {name: [] for name in _POSITIONS}
-    first = 0
-    for passage in passages:
-        own = lengths[first:first + passage["sentences"]]
-        for number, value in enumerate(own):
-            name = ("only" if len(own) == 1 else "first" if number == 0
-                    else "last" if number == len(own) - 1 else "middle")
-            by_position[name].append(value)
-        first += passage["sentences"]
-    longest = sorted(range(len(rows)), key=lambda number: (-rows[number][3], number))[:LONGEST]
     result = {"protocol": "sol.sentence-study", "version": 1, **binding, "method": dict(_METHOD),
-              "scope": scope, "origin": origin, "summary": _summary(lengths), "histogram": histogram,
-              "by_position": {name: _summary(values) for name, values in by_position.items()},
-              "longest": longest, "passages": passages, "sentences": rows, "exclusions": exclusions}
+              "scope": scope, "origin": origin, **_measure(passages, rows),
+              "passages": passages, "sentences": rows, "exclusions": exclusions}
     _validate(result)
     _current(snapshot)
     return result
 
 
 def _validate(result):
+    if isinstance(result, dict) and result.get("protocol") == "sol.sentence-study" and result.get("version") == 2:
+        from sol.essence.sentence_inputs import validate_result
+        return validate_result(result)
+    from sol import core
+    from sol.essence.terms import _reader_doctrine
+
     result = _json_value(result)
     _keys(result, {"protocol", "version", "corpus", "generation", "method", "scope", "origin", "summary",
                    "histogram", "by_position", "longest", "passages", "sentences", "exclusions"},
@@ -300,13 +315,35 @@ def _validate(result):
 
 
 def analyze_sentences(snapshot, *, scope=None, origin=None):
-    """Segment and measure every eligible sentence in scope, in corpus order."""
+    """Measure sentences from an explicit provider, or retain the legacy snapshot API.
+
+    Providers carry their own scope and produce v2; bare snapshots preserve v1
+    and the reader's S command. File input never imports CORE or the reader.
+    """
+    if isinstance(snapshot, (CoreProvider, FileProvider)):
+        if scope is not None:
+            raise SentenceStudyError("Set the sentence scope on the provider", code="invalid_scope")
+        from sol.essence.sentence_inputs import analyze_provider
+        return analyze_provider(snapshot, origin=origin)
+    from sol.essence.terms import _fresh
+
     scope = _scope({"kind": "corpus"} if scope is None else _json_value(scope))
     return _analyze(_fresh(snapshot), scope, origin)
 
 
 def check_sentence_result(snapshot, result):
-    """Recompute; return fresh data only after exact agreement."""
+    """Recompute; return fresh data only after exact agreement with explicit inputs."""
+    if isinstance(result, dict) and result.get("version") == 2:
+        from sol.essence.sentence_inputs import check_provider_result
+        return check_provider_result(snapshot, result)
+    if isinstance(snapshot, FileProvider):
+        raise SentenceStudyError("File providers require a v2 sentence study", code="invalid_provider")
+    if isinstance(snapshot, CoreProvider):
+        if snapshot.scope is not None and _json(snapshot.scope) != _json(result.get("scope")):
+            raise SentenceStudyError("Provider scope differs from the saved study", status="mismatch", code="scope_mismatch")
+        snapshot = snapshot.snapshot
+    from sol.essence.terms import _binding, _current, _fresh
+
     result = _validate(result)
     fresh = _fresh(snapshot)
     expected_binding = _binding(fresh)
@@ -327,8 +364,8 @@ def check_sentence_result(snapshot, result):
 def decode_sentence_result(data):
     """Decode one bounded UTF-8 result; duplicate/nonfinite fields are refused."""
     raw = data.encode("utf-8") if isinstance(data, str) else data
-    if not isinstance(raw, bytes) or len(raw) > MAX_RESULT_BYTES:
-        raise SentenceStudyError("Sentence study must be UTF-8 JSON of at most 1 MiB", code="size_limit")
+    if not isinstance(raw, bytes) or len(raw) > PROVIDER_MAX_RESULT_BYTES:
+        raise SentenceStudyError("Sentence study must be UTF-8 JSON of at most 16 MiB (1 MiB for v1)", code="size_limit")
 
     def unique(pairs):
         value = {}
@@ -346,6 +383,8 @@ def decode_sentence_result(data):
         if isinstance(error, SentenceStudyError):
             raise
         raise SentenceStudyError("Invalid sentence-study JSON", code="invalid_json") from error
+    if (not isinstance(result, dict) or result.get("version") != 2) and len(raw) > MAX_RESULT_BYTES:
+        raise SentenceStudyError("Sentence study must be UTF-8 JSON of at most 1 MiB", code="size_limit")
     return _validate(result)
 
 
