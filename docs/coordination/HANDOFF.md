@@ -32,6 +32,25 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## ESSENCE follows T — 20 October 2026
+
+**Task:** maintainer's "go" (20 October 2026) on the live-theme follow-up from the Catppuccin PR; no CURRENT_TASK entry.
+**Branch / PR:** `claude/essence-live-theme` · see the pull request
+**Last implementation commit:** `e7cf8a47628ee4a0f559b47ed18c677a4ddd6b12` (this report is committed after it)
+
+### Changed files
+- `sol/terminal/neovim_reader.py` — creates `<context>.theme` (0600, O_EXCL) with the current theme; launch passes `--theme-file` and `theme_file`.
+- `sol/terminal/neovim_essence.lua` — validates `theme_file` (absolute path); `set_theme` replaces it atomically; written on open with the live reader's theme.
+- `sol/terminal/neovim_view.lua` — `T` calls `SOLEssence.set_theme`.
+- `sol/essence/tui/__main__.py`, `app.py` — `--theme-file`; a 0.5 s interval reads at most 32 bytes and applies only known names.
+- Tests (controller, headless Neovim, Textual), BEING §4, CHANGELOG.
+
+### Tests performed
+- `scripts/check_docs.py` — OK; full unittest suite — OK (skipped=12, expected failures=4).
+
+### Outstanding issues
+- Not yet seen by eye in a real terminal.
+
 ## Every occurrence of a word in ESSENCE — 20 October 2026
 
 **Task:** maintainer request in session (20 October 2026): list every occurrence of a word, not only the first per passage; no CURRENT_TASK entry.
