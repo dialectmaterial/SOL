@@ -105,6 +105,34 @@ class EssenceAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.query_one("#screens").active, "encyclopedia")
             await pilot.press("q")
 
+    async def test_methods_screen_browses_every_method(self):
+        from textual.widgets import Markdown, OptionList
+        from sol.essence.tui.app import EssenceApp
+
+        app = EssenceApp(context())
+        async with app.run_test(size=(100, 30)) as pilot:
+            await pilot.press("2")
+            listing = app.query_one("#methods-list", OptionList)
+            self.assertIs(app.focused, listing)
+            methods = app.methods["entries"]
+            self.assertEqual(listing.option_count, len(methods))
+            titles = {entry["id"]: entry["title"] for entry in app.catalog["entries"]}
+            for number, method in enumerate(methods):
+                await pilot.pause()
+                shown = app.query_one("#methods-entry", Markdown).source
+                self.assertIn(method["title"], shown)
+                self.assertIn(method["cli"], shown)
+                if method["encyclopedia"] is not None:
+                    # The encyclopedia entry by its title, not its ID.
+                    self.assertIn(titles[method["encyclopedia"]], shown)
+                if number < len(methods) - 1:
+                    await pilot.press("down")
+            await pilot.press("enter")
+            self.assertIs(app.focused, app.query_one("#methods-detail"))
+            await pilot.press("escape")
+            self.assertIs(app.focused, listing)
+            await pilot.press("q")
+
     async def test_the_command_palette_is_off(self):
         from sol.essence.tui.app import EssenceApp
 

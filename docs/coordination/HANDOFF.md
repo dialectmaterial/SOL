@@ -32,6 +32,23 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## ESSENCE's Methods screen — 20 October 2026
+
+**Task:** maintainer's "go" (20 October 2026); data from Codex's #44; no CURRENT_TASK entry.
+**Branch / PR:** `claude/methods-screen` · see the pull request
+**Last implementation commit:** `572e5b41d636a72c421ea6117e97a83d34c5403a` (this report is committed after it)
+
+### Changed files
+- `sol/essence/tui/app.py` — Encyclopedia and Methods share one browser (`BROWSERS`, `compose_browser`); Methods renders `method_markdown` with the encyclopedia entry by title; Escape and screen focus cover both.
+- `tests/test_essence_tui.py` — browses every method, checks title, command line and encyclopedia title.
+- ESSENCE §2, CHANGELOG.
+
+### Tests performed
+- `scripts/check_docs.py` — OK; full unittest suite — OK (skipped=12, expected failures=4).
+
+### Outstanding issues
+- Not yet seen by eye in a real terminal.
+
 ## ESSENCE follows T — 20 October 2026
 
 **Task:** maintainer's "go" (20 October 2026) on the live-theme follow-up from the Catppuccin PR; no CURRENT_TASK entry.

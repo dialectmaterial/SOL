@@ -18,6 +18,7 @@ from textual.widgets import (Button, DataTable, Footer, Input, Label, Markdown, 
                              TabbedContent, TabPane)
 
 from sol.essence.encyclopedia import entry_markdown, load_catalog
+from sol.essence.methods import load_methods, method_markdown
 from sol.essence.tui import sentences, words
 from sol.essence.tui.context import load_state, save_state
 from sol.reader.options import DEFAULT_READER_THEME
@@ -27,14 +28,17 @@ TEXTUAL_THEMES = {"mocha": "catppuccin-mocha", "latte": "catppuccin-latte", "ter
 SOURCES_HELP = ("Every occurrence of the highlighted word: Enter on a word comes here, Enter here opens it "
                 "in the reader (Alt-Left there returns to where you were), Escape goes back to the words.")
 
+# Screens that browse a bundled catalog, with their one-line help.
+BROWSERS = {
+    "encyclopedia": "Methods · arrows browse · Enter reads · Escape returns to the list. "
+                    "Links open only when selected.",
+    "methods": "What ESSENCE runs: inputs, settings, output, limits and the command line · arrows browse · "
+               "Enter reads · Escape returns to the list.",
+}
+
 SCREENS = {
     "encyclopedia": ("Encyclopedia", None),
-    "methods": ("Methods", """\
-## Methods
-
-*Not built yet (stage 5).* What can run on this machine: tasks such as
-tokenization, tagging or embedding, and the installed implementations.
-"""),
+    "methods": ("Methods", None),
     "experiment": ("Experiment", None),
     "results": ("Results", None),
 }
@@ -53,9 +57,9 @@ class EssenceApp(App):
     TITLE = "SOL ESSENCE"
     ENABLE_COMMAND_PALETTE = False
     CSS = """
-    #encyclopedia-list { height: 7; }
-    #encyclopedia-help { height: auto; padding: 0 1; }
-    #encyclopedia-detail { height: 1fr; }
+    .browser-list { height: 7; }
+    .browser-help { height: auto; padding: 0 1; }
+    .browser-detail { height: 1fr; }
     #origin { padding: 0 1; color: $text-muted; }
     #layout-hint { padding: 0 1; color: $text-muted; }
     Markdown { padding: 0 1; }
@@ -87,6 +91,7 @@ class EssenceApp(App):
         self.theme = TEXTUAL_THEMES[theme]
         self.theme_file = theme_file
         self.catalog = load_catalog()
+        self.methods = load_methods()
         self.context = context
         self.state_file = context["state_file"]
         self.state = load_state(self.state_file) if self.state_file else {}
@@ -98,8 +103,8 @@ class EssenceApp(App):
             with TabbedContent(id="screens"):
                 for name, (label, text) in SCREENS.items():
                     with TabPane(label, id=name):
-                        if name == "encyclopedia":
-                            yield from self.compose_encyclopedia()
+                        if name in BROWSERS:
+                            yield from self.compose_browser(name)
                         elif name == "experiment":
                             yield from self.compose_experiment()
                         elif name == "results":
@@ -110,22 +115,37 @@ class EssenceApp(App):
                      id="layout-hint")
         yield Footer()
 
-    def compose_encyclopedia(self) -> ComposeResult:
-        yield Static("Methods · arrows browse · Enter reads · Escape returns to the list. "
-                     "Links open only when selected.", id="encyclopedia-help")
-        yield OptionList(*(item["title"] for item in self.catalog["entries"]), id="encyclopedia-list")
-        with VerticalScroll(id="encyclopedia-detail"):
-            yield Markdown(entry_markdown(self.catalog, self.catalog["entries"][0]), id="encyclopedia-entry")
+    # Encyclopedia and Methods: a list of entries above the highlighted one's text.
+    def browser_items(self, name):
+        return (self.catalog if name == "encyclopedia" else self.methods)["entries"]
+
+    def browser_markdown(self, name, index):
+        item = self.browser_items(name)[index]
+        if name == "encyclopedia":
+            return entry_markdown(self.catalog, item)
+        # Name the encyclopedia entry, not its ID, and say how to get there.
+        titles = {entry["id"]: entry["title"] for entry in self.catalog["entries"]}
+        reference = item["encyclopedia"]
+        return method_markdown(dict(item, encyclopedia=None if reference is None else
+                                    f"*{titles.get(reference, reference)}*, on the Encyclopedia screen (1)."))
+
+    def compose_browser(self, name) -> ComposeResult:
+        yield Static(BROWSERS[name], classes="browser-help")
+        yield OptionList(*(item["title"] for item in self.browser_items(name)), id=f"{name}-list",
+                         classes="browser-list")
+        with VerticalScroll(id=f"{name}-detail", classes="browser-detail"):
+            yield Markdown(self.browser_markdown(name, 0), id=f"{name}-entry")
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
-        if event.option_list.id == "encyclopedia-list":
-            self.query_one("#encyclopedia-entry", Markdown).update(
-                entry_markdown(self.catalog, self.catalog["entries"][event.option_index]))
-            self.query_one("#encyclopedia-detail", VerticalScroll).scroll_home(animate=False)
+        name = (event.option_list.id or "").removesuffix("-list")
+        if name in BROWSERS:
+            self.query_one(f"#{name}-entry", Markdown).update(self.browser_markdown(name, event.option_index))
+            self.query_one(f"#{name}-detail", VerticalScroll).scroll_home(animate=False)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if event.option_list.id == "encyclopedia-list":
-            self.query_one("#encyclopedia-detail").focus()
+        name = (event.option_list.id or "").removesuffix("-list")
+        if name in BROWSERS:
+            self.query_one(f"#{name}-detail").focus()
 
     def compose_experiment(self) -> ComposeResult:
         # Tab goes straight to the choices, not to the scrolling container.
@@ -354,9 +374,9 @@ class EssenceApp(App):
             f"Not exported: {outcome}" if isinstance(outcome, Exception) else f"Exported: {outcome}")
 
     def on_key(self, event) -> None:
-        if (event.key == "escape"
-                and self.query_one("#screens", TabbedContent).active == "encyclopedia"):
-            self.query_one("#encyclopedia-list").focus()
+        active = self.query_one("#screens", TabbedContent).active
+        if event.key == "escape" and active in BROWSERS:
+            self.query_one(f"#{active}-list").focus()
             event.stop()
         if event.key == "escape" and self.focused is self.query_one("#sources", DataTable):
             self.query_one("#frequencies", DataTable).focus()
@@ -385,7 +405,7 @@ class EssenceApp(App):
         self.set_focus(None)
         self.query_one("#screens", TabbedContent).active = name
         # Then start on the screen's first control.
-        first = {"encyclopedia": "#encyclopedia-list", "experiment": "#study", "results": "#frequencies"}.get(name)
+        first = {"encyclopedia": "#encyclopedia-list", "methods": "#methods-list", "experiment": "#study", "results": "#frequencies"}.get(name)
         if first:
             self.query_one(first).focus()
 
