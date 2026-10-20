@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### SOL's own themes and a reading window — 20 October 2026
+
+- **Paper** and **Night** join the themes: SOL's own, from actualspirit.com —
+  cream paper, ink and the Actual Spirit purple, or the site's dark band with
+  lilac headings. `T` cycles Mocha, Latte, Paper, Night and Terminal; ESSENCE
+  follows.
+- **`sol-window`** opens the reader in a window of its own (foot, kitty or
+  Alacritty) in Libertinus Mono, a monospaced book face bundled with SOL, on
+  Paper. Your terminal keeps its own font.
+- **Fixed:** at narrow widths the status line's page ran into the reading mode
+  ("p. 7Continuous"); the section path now gives way instead.
+- A saved `paper` theme now opens SOL's Paper (it meant Catppuccin Latte since
+  this morning).
+
 ### ESSENCE's Methods screen — 20 October 2026
 
 Methods (`2`) is no longer a placeholder: it lists each study ESSENCE and
