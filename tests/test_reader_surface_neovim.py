@@ -627,6 +627,27 @@ end
         self.assertIn("No graphical image viewer", fallback)
         self.assertIn("/cache/1.png", fallback)
 
+    def test_gp_asks_for_a_printed_page(self):
+        report = self.run_lua(r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local answers = {'p. 240', '', 'two hundred'}
+  vim.fn.input = function() return table.remove(answers, 1) end
+  local warned = {}
+  vim.notify = function(message) warned[#warned + 1] = message end
+  for _ = 1, 3 do
+    _G.SOLReaderChannel.navigation_pending = nil
+    vim.api.nvim_feedkeys('gp', 'xt', false)
+  end
+  report.sent = sent
+  report.warned = warned
+''', integrated=True)
+        self.assertEqual([(row["op"], row["page"]) for row in report["sent"]], [("page_open", 240)])
+        self.assertEqual(report["warned"], ["Type a printed page number, e.g. 240"])
+
     def test_note_editor_saves_restores_selection_and_protects_drafts(self):
         report = self.run_lua(r'''
   local sent = {}

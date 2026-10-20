@@ -219,6 +219,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         "marker_set": [("slot", lambda slot: type(slot) is int and slot in (1, 2, 3),
                         "reader markers have slots 1, 2 and 3")],
         "node_open": [("node", lambda node: True, "")],
+        "page_open": [("page", lambda page: type(page) is int and 1 <= page <= 100000,
+                       "type a printed page number")],
         "source_preview": [("page", lambda page: type(page) is int, "choose a source page by number")],
         "search": [("query", lambda query: isinstance(query, str) and 1 <= len(query.strip()) <= 256,
                     "search needs 1–256 characters")],
@@ -236,9 +238,9 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                             "choose a source passage listed in ESSENCE")],
     }
     extra_fields["marker_clear"] = extra_fields["marker_open"] = extra_fields["marker_set"]
-    navigation_actions = {"next", "previous", "passage_next", "passage_previous", "node_open", "marker_open",
-                          "search_open", "search_next", "search_previous", "history_back", "history_forward",
-                          "essence_source"}
+    navigation_actions = {"next", "previous", "passage_next", "passage_previous", "node_open", "page_open",
+                          "marker_open", "search_open", "search_next", "search_previous", "history_back",
+                          "history_forward", "essence_source"}
 
     def search_panel(request, identifier):
         # Searching does not move the cursor, save a visit or erase a selection.
@@ -424,6 +426,14 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             if row is None or row["target"] is None:
                 raise ValueError("this tree branch has no readable passage")
             target, offset = row["target"], 0
+        elif operation == "page_open":
+            # The first paragraph printed on that page, or running onto it.
+            wanted = request["page"]
+            passage = next((row for row in book.passages if row.end_printed_page >= wanted), None)
+            if passage is None or wanted < book.passages[0].printed_page:
+                raise ValueError(f"printed pages run from {book.passages[0].printed_page} "
+                                 f"to {book.passages[-1].end_printed_page}")
+            target, offset = passage.identifier, 0
         elif operation.startswith("passage_"):
             at = next(i for i, row in enumerate(book.passages) if row.identifier ==
                       request["packet"]["reference"]["reference"]["target_id"])
