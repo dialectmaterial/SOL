@@ -32,6 +32,30 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## The printed page in a zoomable PDF viewer — 20 October 2026
+
+**Task:** [The printed page in a zoomable PDF viewer](https://github.com/dialectmaterial/SOL/blob/69189ea2620e4ce168ef4e88aa9da9f8c25a63f3/docs/coordination/CURRENT_TASK.md)
+**Branch / PR:** `claude/pdf-companion` · see the pull request
+**Last implementation commit:** `69189ea2620e4ce168ef4e88aa9da9f8c25a63f3` (this report is committed after it)
+
+### Changed files
+- `sol/terminal/source.py` — `open_pdf`: verified snapshot at a physical page in Zathura/Sioyek/Okular/Evince/MuPDF or `SOL_PDF_VIEWER`; reuses SOL's Zathura window over D-Bus.
+- `sol/terminal/neovim_reader.py` — `source_pdf` request, sharing the source capture with `s`.
+- `sol/terminal/neovim_{controls,panels,requests}.lua` — `S` in the reader and the `s` popup; echo on success, popup naming the file without a viewer; help line.
+- Tests in `test_source_viewer.py`, `test_neovim_reader.py`, `test_reader_surface_neovim.py`; BEING §2/§5/§7, CHANGELOG.
+
+### Tests performed
+- Documentation check and full suite — OK (12 skipped, 4 expected failures).
+- Real corpus: `open_pdf` on two passages opened PDF page 102 (printed 29), then turned the same Zathura window to page 435 (printed 362); one Zathura process.
+- Not done: pressing `S` in a live terminal session (the screen was locked).
+
+### Outstanding issues
+- The passage is not highlighted on the page; there is no return from the PDF to the text.
+- Pressing `S` again before Zathura registers on D-Bus (large PDF, about 3 s) opens a second window.
+
+### Decisions requiring approval
+- Default: `S` is the key (the old sentence-study binding, now free).
+
 ## Clearer help and outline in the reader — 20 October 2026
 
 **Task:** maintainer request (20 October 2026): a better reader UI; no CURRENT_TASK entry.
