@@ -7,6 +7,13 @@
 Switching the reader's theme with `T` now restyles an open ESSENCE too, within
 half a second, instead of only the next time it opens.
 
+### ESSENCE method descriptions — 20 October 2026
+
+Bundled method descriptions now document word frequencies, comparison, sentence
+lengths and every other `sol analyze` operation, including inputs, settings,
+artifacts, save locations, limits and CLI examples. The offline loader and
+Markdown renderer are ready for the Methods screen; this change adds no UI.
+
 ### Every occurrence of a word in ESSENCE — 20 October 2026
 
 A word's sources in ESSENCE now list every occurrence, not just the first in

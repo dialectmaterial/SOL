@@ -22,7 +22,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_FILES = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol").rglob("*.py")}
 PACKAGE_ASSETS = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol" / "terminal").glob("*.lua")}
-PACKAGE_ASSETS.add("sol/essence/encyclopedia.json")
+PACKAGE_ASSETS.update({"sol/essence/encyclopedia.json", "sol/essence/methods.json"})
 ENTRY_POINTS = {
     "sol": "sol:cli",
     "sol-kitty": "sol.terminal.kitty:main",
@@ -119,6 +119,11 @@ catalog = load_catalog()
 assert len(catalog['entries']) == 9
 for entry in catalog['entries']:
     assert entry['quote'] in entry_markdown(catalog, entry)
+from sol.essence.methods import load_methods, method_markdown
+methods = load_methods()
+assert len(methods['entries']) == 10
+for method in methods['entries']:
+    assert method['summary'] in method_markdown(method)
 print(catalog['license'])
 """
         result = subprocess.run([sys.executable, "-I", "-c", program, str(installed)],
