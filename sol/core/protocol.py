@@ -216,13 +216,17 @@ def _remember(fresh):
     copy, so the copy must meet every rule of _json_value, including the
     64-level nesting bound; a refusal raises and is not cached.
     """
-    _json_value(fresh.manifest)
-    _json_value(fresh.records)
-    manifest_text = json.dumps(fresh.manifest, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
-    records_text = json.dumps(fresh.records, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
-    # The parsed copies serve only comparisons; they are never returned.
-    cached = (manifest_text, records_text, _json(fresh.manifest), _json(fresh.records),
-              json.loads(manifest_text), json.loads(records_text))
+    key = _generation_key(fresh)
+    previous = _VERIFIED_GENERATIONS.get(key)
+    if previous is not None and (_unmodified(fresh.manifest, previous[2], previous[4])
+                                 and _unmodified(fresh.records, previous[3], previous[5])):
+        return previous
+    # Validation already produces detached JSON containers. Keep those for
+    # comparisons rather than serializing and parsing a second private copy.
+    manifest = _json_value(fresh.manifest)
+    records = _json_value(fresh.records)
+    manifest_text, records_text = _json(manifest), _json(records)
+    cached = (manifest_text, records_text, manifest_text, records_text, manifest, records)
     while len(_VERIFIED_GENERATIONS) >= _VERIFIED_LIMIT:
         _VERIFIED_GENERATIONS.pop(next(iter(_VERIFIED_GENERATIONS)))
     _VERIFIED_GENERATIONS[_generation_key(fresh)] = cached

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Faster verified reader startup — 20 October 2026
+
+Reader exports reuse the selection source/provenance guard directly instead of
+constructing navigation sessions for every record. Verified-generation caching
+reuses equal, detached JSON data, and export snapshots use a JSON copy instead
+of per-object deepcopy. Full memory comparisons, final export checks and disk
+fingerprint verification remain in place; no persistent Book index is added.
+
 ### ESSENCE's Methods screen — 20 October 2026
 
 Methods (`2`) is no longer a placeholder: it lists each study ESSENCE and

@@ -39,6 +39,27 @@ class ReaderSurfaceExportGuardTests(fixtures.CorpusFixture, unittest.TestCase):
             records.append(record)
         self.write_records(records)
 
+    def test_direct_source_guard_refuses_every_reader_provenance_change(self):
+        from dataclasses import replace
+        from sol.reader.surface import _agree_with_core
+        reference = core.check_reference(
+            self.book.corpus_snapshot,
+            core.capture_reference(self.book.corpus_snapshot, self.identifier))
+        original = self.book.find_passage(self.identifier)
+        index = self.book.passages.index(original)
+        for field, value in (("text", "Invented altered text."), ("kind", "formula"),
+                             ("path", ("BEING", "other.txt")), ("pdf_page", 99),
+                             ("printed_page", 99), ("end_pdf_page", 99),
+                             ("end_printed_page", 99)):
+            with self.subTest(field=field):
+                self.book.passages[index] = replace(original, **{field: value})
+                try:
+                    with self.assertRaises(ValueError):
+                        _agree_with_core(self.book, reference)
+                finally:
+                    self.book.passages[index] = original
+        _agree_with_core(self.book, reference)
+
     def test_render_captures_each_main_record_and_shared_note_only_once(self):
         note_id = self.add_note()
         records = self.records()
