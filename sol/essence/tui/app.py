@@ -81,10 +81,11 @@ class EssenceApp(App):
           for number, (name, (label, _)) in enumerate(SCREENS.items(), 1)),
     ]
 
-    def __init__(self, context, theme=DEFAULT_READER_THEME):
+    def __init__(self, context, theme=DEFAULT_READER_THEME, theme_file=None):
         super().__init__()
         # Textual's own Catppuccin themes; Terminal uses the terminal's ANSI colors.
         self.theme = TEXTUAL_THEMES[theme]
+        self.theme_file = theme_file
         self.catalog = load_catalog()
         self.context = context
         self.state_file = context["state_file"]
@@ -361,7 +362,20 @@ class EssenceApp(App):
             self.query_one("#frequencies", DataTable).focus()
             event.stop()
 
+    def follow_reader_theme(self) -> None:
+        """Take the theme the reader last wrote; anything unreadable or unknown is ignored."""
+        try:
+            with open(self.theme_file, encoding="utf-8") as stream:
+                name = stream.read(32).strip()
+        except (OSError, UnicodeDecodeError):
+            return
+        if name in TEXTUAL_THEMES and self.theme != TEXTUAL_THEMES[name]:
+            self.theme = TEXTUAL_THEMES[name]
+
     def on_mount(self) -> None:
+        if self.theme_file:
+            # A stat-sized read twice a second; T in the reader shows here within half a second.
+            self.set_interval(0.5, self.follow_reader_theme)
         screen = self.state.get("screen")
         self.action_screen(screen if screen in SCREENS else "encyclopedia")
 

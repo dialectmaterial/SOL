@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### ESSENCE follows `T` — 20 October 2026
+
+Switching the reader's theme with `T` now restyles an open ESSENCE too, within
+half a second, instead of only the next time it opens.
+
 ### Every occurrence of a word in ESSENCE — 20 October 2026
 
 A word's sources in ESSENCE now list every occurrence, not just the first in

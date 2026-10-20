@@ -22,6 +22,17 @@ return function(reader)
   local function alive()
     return state.window ~= nil and api.nvim_win_is_valid(state.window)
   end
+  -- ESSENCE follows the reader's theme by reading this owner-only file, which
+  -- Python created beside its context; replaced whole so it is never half-written.
+  function state.set_theme(name)
+    if not state.theme_file or type(name) ~= 'string' or not name:match('^[a-z]+$') then return end
+    local temporary = state.theme_file .. '.tmp'
+    local descriptor = vim.uv.fs_open(temporary, 'w', tonumber('600', 8))
+    if not descriptor then return end
+    vim.uv.fs_write(descriptor, name)
+    vim.uv.fs_close(descriptor)
+    vim.uv.fs_rename(temporary, state.theme_file)
+  end
   local function split_width()
     return math.max(40, math.floor(vim.o.columns * 0.45))
   end
@@ -186,6 +197,14 @@ return function(reader)
       if type(part) ~= 'string' then fail('invalid ESSENCE launch') end
     end
     if spec.env ~= nil and type(spec.env) ~= 'table' then fail('invalid ESSENCE launch') end
+    if spec.theme_file ~= nil and (type(spec.theme_file) ~= 'string' or spec.theme_file:sub(1, 1) ~= '/') then
+      fail('invalid ESSENCE launch')
+    end
+    state.theme_file = spec.theme_file
+    -- The reader's theme now, which may have changed since Python last heard of it.
+    local live = rawget(_G, 'SOLNvimReader')
+    local current = live and live.theme and live.theme()
+    if current then state.set_theme(current) end
     for name, value in pairs(spec.env or {}) do
       if type(name) ~= 'string' or not name:match('^[A-Z_]+$') or type(value) ~= 'string' then
         fail('invalid ESSENCE launch')
