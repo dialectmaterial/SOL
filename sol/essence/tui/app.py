@@ -21,6 +21,9 @@ from sol.essence.encyclopedia import entry_markdown, load_catalog
 from sol.essence.tui import sentences, words
 from sol.essence.tui.context import load_state, save_state
 
+SOURCES_HELP = ("Every occurrence of the highlighted word: Enter on a word comes here, Enter here opens it "
+                "in the reader (Alt-Left there returns to where you were), Escape goes back to the words.")
+
 SCREENS = {
     "encyclopedia": ("Encyclopedia", None),
     "methods": ("Methods", """\
@@ -146,9 +149,7 @@ class EssenceApp(App):
         with VerticalScroll(id="summary-box"):
             yield Static("Nothing yet. Choose a study and a target in Experiment, then press Run.", id="summary")
         yield DataTable(id="frequencies", zebra_stripes=True, cursor_type="row")
-        yield Static("Sources of the highlighted word: Enter on a word comes here, Enter here opens it in the "
-                     "reader (Alt-Left there returns to where you were), Escape goes back to the words.",
-                     id="sources-label")
+        yield Static(SOURCES_HELP, id="sources-label")
         yield DataTable(id="sources", cursor_type="row")
         with Horizontal(id="export-row"):
             yield Button("Export CSV", id="export-csv", disabled=True)
@@ -276,11 +277,19 @@ class EssenceApp(App):
     def show_sources(self, index) -> None:
         table = self.query_one("#sources", DataTable)
         table.clear(columns=True)
-        table.add_columns("Side", "Count", "In context", "Where")
+        table.add_columns("Side", "Occurrence", "In context", "Where")
         self.shown_sources = () if index is None else tuple(words.sources(self.last_count, index))
-        table.add_rows([(item["side"], str(item["count"]), in_context(item["context"]),
+        table.add_rows([(item["side"], f"{item['number']} of {item['count']}" if item["number"]
+                         else f"{item['count']} here", in_context(item["context"]),
                          item["label"] + ("" if item["open"] else " (not in the reader)"))
                         for item in self.shown_sources])
+        if index is not None:
+            row = self.last_count.study["frequencies"][index]
+            total = sum(row[side]["count"] for side in ("target", "reference") if row[side] is not None)
+            # Fewer rows than occurrences: the list was cut short, or some
+            # passage's later occurrences could not be confirmed.
+            self.query_one("#sources-label", Static).update(SOURCES_HELP if len(self.shown_sources) == total else
+                f"Listing {len(self.shown_sources):,} of {total:,} occurrences. " + SOURCES_HELP)
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if (event.data_table.id == "frequencies" and self.last_count is not None

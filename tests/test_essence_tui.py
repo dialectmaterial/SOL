@@ -575,7 +575,8 @@ class RealComparisonTests(unittest.TestCase):
         text = next(p for p in core.load_corpus_book(corpus).passages if p.identifier == identifier).text
         start = corpus_sources[0]["open"]["start"]
         self.assertEqual(text[start:start + len("invented")].casefold(), "invented")
-        self.assertEqual([item["open"] for item in found if item["side"] == "reference"], [None])
+        # The reference file says "invented" twice; a file's words never open in the reader.
+        self.assertEqual([item["open"] for item in found if item["side"] == "reference"], [None, None])
         data_home = root / "data"
         exported = tui_words.export(count, "csv", data_home=data_home)
         self.assertEqual(exported.suffix, ".csv")
@@ -617,8 +618,15 @@ class WordContextTests(unittest.TestCase):
         real = {**context(), "corpus": str(corpus), "reference": core.capture_reference(snapshot, identifier)}
         count = tui_words.run(real, "passage", "file", reference_file=str(reference_file))
         index = next(n for n, row in enumerate(count.study["frequencies"]) if row["word"] == "research")
-        target, reference = tui_words.sources(count, index)
+        target, reference, again = tui_words.sources(count, index)
         self.assertEqual(target["label"], "Synthetic section | p. 7")
+        # Every occurrence is listed, numbered within its input, in reading order.
+        self.assertEqual((target["number"], reference["number"], again["number"]), (None, 1, 2))
+        self.assertEqual(again["context"]["left"], "…of filler words appears; then the word ")
+        self.assertEqual([item["label"] for item in (reference, again)],
+                         ["text file, at character 11", f"text file, at character {again['label'].split()[-1]}"])
+        self.assertLess(int(reference["label"].split()[-1]), int(again["label"].split()[-1].replace(",", "")))
+        self.assertEqual(len(tui_words.sources(count, index, limit=2)), 2)
         self.assertEqual(target["context"], {"left": "…invented passage makes this installed ", "word": "research",
                                              "right": " reader useful without extracting any…"})
         self.assertEqual(reference["context"]["word"], "research")
@@ -630,9 +638,13 @@ class WordContextTests(unittest.TestCase):
         at = next(n for n, row in enumerate(windows.study["frequencies"]) if row["word"] == "research")
         self.assertEqual(tui_words.sources(windows, at)[1]["context"]["left"], "First line. The ")
         # A file changed since the count shows no context rather than the wrong one.
+        # Nor can its later occurrences be found again: only the recorded first is listed.
         reference_file.write_text("Something else entirely, research included.", encoding="utf-8")
         count.texts.clear()
-        self.assertIsNone(tui_words.sources(count, index)[1]["context"])
+        changed = tui_words.sources(count, index)
+        self.assertEqual(len(changed), 2)
+        self.assertIsNone(changed[1]["context"])
+        self.assertIsNone(changed[1]["number"])
 
 
 @unittest.skipUnless(_engine_installed(), "the ESSENCE engines are not installed")

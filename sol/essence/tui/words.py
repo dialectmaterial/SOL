@@ -144,13 +144,18 @@ def rows(count, limit=ROW_LIMIT):
     return table, len(count.study["frequencies"])
 
 
-def sources(count, index):
-    """Where row `index`'s word occurs: one entry per contributing input and side.
+def sources(count, index, limit=None):
+    """Where row `index`'s word occurs: one entry per occurrence, in reading order.
 
     An entry from the corpus carries what the reader needs to open it (the
-    record ID, the word's first offset and the counted text's digest); an
-    entry from a text file has none, since the reader cannot show it.
+    record ID, the occurrence's offset and the counted text's digest); an
+    entry from a text file has none, since the reader cannot show it. The
+    study keeps only each input's first occurrence; the others are found again
+    in the verified text at display time and never saved. Where they cannot be
+    confirmed (the text changed, or masked tokens were left out), only the
+    first is listed. At most `limit` entries (default OCCURRENCE_LIMIT).
     """
+    limit = OCCURRENCE_LIMIT if limit is None else limit
     row = count.study["frequencies"][index]
     found = []
     for side in ("target", "reference"):
@@ -166,14 +171,42 @@ def sources(count, index):
                     label = f"{passage.heading or passage.node.title} | p. {passage.printed_page}"
                 else:
                     label = f"{item['reader_path']} | p. {pages}" if pages else item["reader_path"]
-                opens = {"id": item["id"], "start": start, "content_sha256": item["content_sha256"]}
                 text = passage.text if passage is not None else None
             else:
-                label, opens = f"text file, at character {start:,}", None
-                text = _file_text(count, side)
-            found.append({"side": side, "count": occurrences, "label": label, "open": opens,
-                          "context": _context(text, item["text_sha256"], start, end)})
+                label, text = None, _file_text(count, side)
+            if not _verified(text, item["text_sha256"]):
+                text = None
+            spans = _occurrences(text, row["word"], item, occurrences, (start, end))
+            for number, (begin, finish) in enumerate(spans, 1):
+                if len(found) == limit:
+                    return found
+                opens = None
+                if part["provider"] == "core":
+                    opens = {"id": item["id"], "start": begin, "content_sha256": item["content_sha256"]}
+                found.append({"side": side, "count": occurrences, "number": number if len(spans) > 1 else None,
+                              "label": label or f"text file, at character {begin:,}", "open": opens,
+                              "context": _context(text, begin, finish)})
     return found
+
+
+OCCURRENCE_LIMIT = 1000  # entries listed for one word; a very common word lists its first ones
+
+
+def _verified(text, digest):
+    return text is not None and hashlib.sha256(text.encode("utf-8")).hexdigest() == digest
+
+
+def _occurrences(text, word, item, counted, first):
+    """Every counted occurrence's offsets, or only the first when they cannot be confirmed."""
+    if text is None or counted == 1:
+        return [first]
+    from sol.essence.tokenization import word_tokens
+    span = item["span"]
+    spans = [(start, end) for token, start, end in word_tokens(text)
+             if token == word and span[0] <= start < end <= span[1]]
+    # Masked tokens are neither counted nor located; a different number means
+    # some occurrence here was masked, and listing it would be wrong.
+    return spans if len(spans) == counted and spans[0] == tuple(first) else [first]
 
 
 CONTEXT = 40  # characters of text shown on each side of an occurrence
@@ -197,13 +230,13 @@ def _file_text(count, side):
     return count.texts[side]
 
 
-def _context(text, digest, start, end):
-    """The words around an occurrence, or None when the text is not what was counted.
+def _context(text, start, end):
+    """The words around an occurrence, or None without a verified text.
 
-    The digest is the counted text's; a file or passage changed since then
-    shows no context rather than the wrong one.
+    Callers pass only text matching the counted digest; a file or passage
+    changed since then shows no context rather than the wrong one.
     """
-    if text is None or hashlib.sha256(text.encode("utf-8")).hexdigest() != digest:
+    if text is None:
         return None
     before, after = text[max(0, start - CONTEXT):start], text[end:end + CONTEXT]
     # Cut at whole words, and say so; line breaks show as spaces.
