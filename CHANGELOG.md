@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### SOL is licensed under the GPL — 20 October 2026
+
+SOL is now free software under the GNU General Public License, version 3 or
+later; see [LICENSE](LICENSE). The book you read with it is not covered and is
+never part of the repository.
+
 ### The note editor opens beside the text — 19 October 2026
 
 `a` (and `e` in `c`) now opens the note editor beside the passage when there
