@@ -632,9 +632,13 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         self.write_records(records)
         build = neovim.build_payload
         # Each live navigation route, with the request that makes it available first.
-        routes = {"next": ({}, None), "passage_next": ({}, None), "marker_open": ({"slot": 1}, None),
+        routes = {"next": ({}, None), "previous": ({}, None),
+                  "passage_next": ({}, None), "passage_previous": ({}, None),
+                  "node_open": ({"node": "/"}, None), "marker_open": ({"slot": 1}, None),
                   "search_open": ({"result": 1}, {"op": "search", "query": "paragraph 2"}),
                   "search_next": ({}, {"op": "search", "query": "paragraph 2"}),
+                  "search_previous": ({}, {"op": "search", "query": "paragraph 2"}),
+                  "history_forward": ({}, [{"op": "passage_previous"}, {"op": "history_back"}]),
                   "history_back": ({}, {"op": "passage_previous"}),
                   "essence_source": ({"source": {"id": self.book.passages[2].identifier, "start": 0,
                                                  "content_sha256": core.capture_reference(
@@ -660,8 +664,8 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
 
                 def native(payload, _, on_request):
                     shown = payload
-                    if setup is not None:
-                        shown = on_request({**setup, "packet": shown["restore"],
+                    for step in ([] if setup is None else setup if isinstance(setup, list) else [setup]):
+                        shown = on_request({**step, "packet": shown["restore"],
                                             "mode": "continuous"}).get("payload", shown)
                     origin = deepcopy(shown["restore"])
                     origin["cursor_offset"] = 6
@@ -691,6 +695,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
                     self.assertEqual(self.run_view(service), 0)
                 reopened = ReaderActions(self.book, service)
                 reopened.restore()
+                self.assertEqual(reopened.snapshot().current.identifier, service.store.get_state()["current_id"])
                 self.assertEqual(reopened.snapshot().cursor_offset, 6)
 
     def test_refused_destination_leaves_mode_and_theme_for_the_next_view(self):
@@ -725,6 +730,101 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
                          (first["mode"], first["focus"], first["theme"]))
         self.assertEqual(second["records"][0]["id"], self.book.passages[1].identifier)
 
+    def test_destination_checkpoint_failure_allows_retry_history_and_reopen(self):
+        """Fail after projection, when the staged destination reaches storage."""
+        self.extend(3)
+        destination = self.book.passages[2].identifier
+        for failure in (OSError("injected storage failure"), ValueError("injected CORE failure")):
+            with self.subTest(failure=type(failure).__name__):
+                service = self.service(self.root / f"checkpoint-{type(failure).__name__}.sqlite3")
+                self.position(service, 4, self.book.passages[1].identifier)
+                attempts = []
+                capture = service._capture_position
+                save = service.store.save_state
+
+                def capture_position(session):
+                    if isinstance(failure, ValueError) and session.current().identifier == destination:
+                        attempts.append(destination)
+                        raise failure
+                    return capture(session)
+
+                def save_state(values, expected_revision=None):
+                    if isinstance(failure, OSError) and values["current_id"] == destination:
+                        attempts.append(destination)
+                        raise failure
+                    return save(values, expected_revision=expected_revision)
+
+                def native(payload, _, on_request):
+                    origin = deepcopy(payload["restore"])
+                    origin["cursor_offset"] = 6
+                    request = {"op": "passage_next", "packet": origin, "mode": "continuous"}
+                    with patch.object(service, "_capture_position", side_effect=capture_position), \
+                            patch.object(service.store, "save_state", side_effect=save_state):
+                        with self.assertRaisesRegex(type(failure), "injected"):
+                            on_request(deepcopy(request))
+                    self.assertEqual(attempts, [destination])
+                    state = service.store.get_state()
+                    self.assertEqual((state["current_id"], state["position"]["cursor_offset"]),
+                                     (self.book.passages[1].identifier, 6))
+                    opened = on_request(deepcopy(request))["payload"]["restore"]
+                    self.assertEqual(opened["reference"]["reference"]["target_id"], destination)
+                    back = on_request({"op": "history_back", "packet": opened,
+                                       "mode": "continuous"})["payload"]["restore"]
+                    self.assertEqual(back, origin)
+                    # Reopen at the accepted destination, rather than only testing quit at origin.
+                    again = on_request({"op": "history_forward", "packet": back,
+                                        "mode": "continuous"})["payload"]["restore"]
+                    self.assertEqual(again, opened)
+                    return 0, {"action": "quit", "packet": again}
+
+                with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                        patch.object(neovim, "launch_payload", side_effect=native):
+                    self.assertEqual(self.run_view(service), 0)
+                reopened = self.service(service.store.path)
+                actions = ReaderActions(self.book, reopened)
+                actions.restore()
+                self.assertEqual(actions.snapshot().current.identifier, destination)
+                self.assertEqual(actions.snapshot().cursor_offset, 0)
+
+    def test_competing_save_during_destination_preparation_is_not_rolled_back(self):
+        self.extend(3)
+        service = self.service()
+        self.position(service, 4)
+        other = self.service(service.store.path)
+        build = neovim.build_payload
+        competing_state = []
+
+        def build_with_competing_save(*args, **kwargs):
+            prepared = build(*args, **kwargs)
+            competing = ReaderActions(self.book, other)
+            competing.restore()
+            competing.open(self.book.passages[2].identifier)
+            competing.set_cursor(9)
+            competing.save_position()
+            competing_state.append(other.store.get_state())
+            return prepared
+
+        def native(payload, _, on_request):
+            request = {"op": "next", "packet": payload["restore"], "mode": "continuous"}
+            with patch.object(neovim, "build_payload", side_effect=build_with_competing_save):
+                with self.assertRaises(WorkspaceConflict):
+                    on_request(deepcopy(request))
+            self.assertEqual(len(competing_state), 1)
+            self.assertEqual(service.store.get_state(), competing_state[0])
+            with self.assertRaises(WorkspaceConflict):
+                on_request(deepcopy(request))
+            self.assertEqual(service.store.get_state(), competing_state[0])
+            return 1, None
+
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 1)
+        reopened = self.service(service.store.path)
+        actions = ReaderActions(self.book, reopened)
+        actions.restore()
+        self.assertEqual(actions.snapshot().current.identifier, self.book.passages[2].identifier)
+        self.assertEqual(actions.snapshot().cursor_offset, 9)
+
     def test_competing_save_refuses_navigation_without_moving_this_reader(self):
         self.extend(3)
         service = self.service()
@@ -744,6 +844,38 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             with self.assertRaises(WorkspaceConflict):
                 on_request({"op": "passage_next", "packet": payload["restore"], "mode": "continuous"})
             self.assertEqual(service.store.get_state(), saved)
+            return 1, None
+
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 1)
+
+    def test_corpus_change_during_destination_preparation_refuses_commit(self):
+        self.extend(3)
+        service = self.service()
+        self.position(service, 4)
+        build = neovim.build_payload
+
+        def build_then_change_generation(*args, **kwargs):
+            prepared = build(*args, **kwargs)
+            source = self.corpus / "sample.md"
+            source.write_text(source.read_text() + "\nAn unindexed edit.\n")
+            return prepared
+
+        def native(payload, _, on_request):
+            origin = deepcopy(payload["restore"])
+            origin["cursor_offset"] = 6
+            request = {"op": "next", "packet": origin, "mode": "continuous"}
+            with patch.object(neovim, "build_payload", side_effect=build_then_change_generation):
+                with self.assertRaises(ValueError):
+                    on_request(deepcopy(request))
+            saved = service.store.get_state()
+            self.assertEqual((saved["current_id"], saved["position"]["cursor_offset"]),
+                             (self.identifier, 6))
+            with self.assertRaises(ValueError):
+                on_request(deepcopy(request))
+            self.assertEqual(service.store.get_state(), saved)
+            # A failed/crashed editor exits without writing a stale packet.
             return 1, None
 
         with patch.object(neovim_reader, "SECTION_BUDGET", 1), \

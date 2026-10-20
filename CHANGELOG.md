@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Rechecked navigation refusal on current main: retained the existing staging fix and added coverage for tree/reverse moves, destination CORE/storage failures, and competing saves or stale generations during preparation; retry, history and UUID/codepoint resume are verified. Removed `study_open` is excluded; editor publication recovery and manual terminal limits remain documented.
+
 - Encyclopedia excerpts starting mid-sentence now display a leading … without changing the stored quote; packaging checks verify the wheel’s GPL-3.0-or-later declaration and LICENSE payload.
 
 ### Catppuccin throughout — 20 October 2026
