@@ -102,7 +102,7 @@
           "meaning": "Overall weight is the mean of unrounded normalized document weights across all N documents; N=0 gives an empty result. Round final scores to 12 decimals, sort by decreasing rounded score then normalized word, and take top_n."
         }
       ],
-      "output": "sol.tfidf v1 JSON on stdout with --json; redirect to save. Includes documents[].input_index and top_terms, overall top terms, and a complete text-free sol.word-frequencies v1 word_study receipt. No automatic persistence or TUI execution yet.",
+      "output": "sol.tfidf v1 JSON on stdout with --json; redirect to save. Includes documents[].input_index and top_terms, overall top terms, and a complete text-free sol.word-frequencies v1 word_study receipt. Experiment also runs TF-IDF with the default top 20: passage terms first, then overall weights. Enter opens a CORE passage in the reader. Workspace sessions save checkable artifacts; temporary sessions save nothing.",
       "limits": [
         "CORE uses the word study’s eligible Hegel prose projection and facsimile masking; file text is verbatim. Each retained input row is one document; paragraphs in files are not split.",
         "A single file has N=1 and idf=1 for every term, so its ranking reduces to normalized term counts. Weights describe these lexical inputs, not concepts, similarity or statistical significance.",

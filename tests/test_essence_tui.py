@@ -318,6 +318,7 @@ class WordScreenTests(unittest.IsolatedAsyncioTestCase):
                 app.query_one("#target-file").value = str(text)
                 for button in app.query("#target RadioButton"):
                     button.value = button.name == "file"
+                await pilot.pause()
                 await pilot.click("#run")
                 await app.workers.wait_for_complete()
                 await pilot.pause()
@@ -554,7 +555,7 @@ class ComparisonScreenTests(unittest.IsolatedAsyncioTestCase):
             async with app.run_test(size=(120, 40)) as pilot:
                 await self.counted(app, pilot)
                 self.assertTrue(app.query_one("#export-csv").disabled)
-                self.assertEqual(len(app.query_one("#frequencies").columns), 5)
+                self.assertEqual(len(app.query_one("#frequencies").columns), 3)
                 app.exit()
 
     async def test_a_cancelled_count_shows_and_saves_nothing(self):
@@ -832,8 +833,8 @@ class SentenceScreenTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(app.query_one("#screens").active, "results")
                 table = app.query_one("#frequencies")
                 self.assertEqual([str(column.label) for column in table.columns.values()], ["Words", "Beginning", "Where"])
-                self.assertEqual(table.get_row_at(0)[::2], ["8", "/BEING/b.txt"])
-                self.assertEqual(table.get_row_at(1)[::2], ["3", "First heading | p. 7"])
+                self.assertEqual([str(cell) for cell in table.get_row_at(0)[::2]], ["8", "/BEING/b.txt"])
+                self.assertEqual([str(cell) for cell in table.get_row_at(1)[::2]], ["3", "First heading\np. 7"])
                 self.assertFalse(app.query_one("#sources").display)
                 self.assertFalse(app.query_one("#export-row").display)
                 summary = str(app.query_one("#summary").render())
@@ -847,3 +848,127 @@ class SentenceScreenTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(payload["source"], {"id": TARGET.replace("2", "3"), "start": 4,
                                                      "content_sha256": digest})
                 app.exit()
+
+
+@unittest.skipUnless(tui.textual_available(), "needs Textual")
+class RefinedLayoutTests(unittest.IsolatedAsyncioTestCase):
+    async def test_conditional_fields_and_reference_free_columns(self):
+        from sol.essence.tui.app import EssenceApp, BROWSERS
+        app = EssenceApp(context())
+        async with app.run_test(size=(100, 36)) as pilot:
+            await pilot.press('3')
+            self.assertFalse(app.query_one('#target-file').display)
+            self.assertFalse(app.query_one('#reference-file').display)
+            self.assertTrue(BROWSERS['encyclopedia'].startswith('Encyclopedia'))
+            for button in app.query('#target RadioButton'):
+                button.value = button.name == 'file'
+            for button in app.query('#reference RadioButton'):
+                button.value = button.name == 'file'
+            await pilot.pause()
+            self.assertTrue(app.query_one('#target-file').display)
+            self.assertTrue(app.query_one('#reference-file').display)
+            for button in app.query('#study RadioButton'):
+                button.value = button.name == 'tfidf'
+            await pilot.pause()
+            self.assertFalse(app.query_one('#reference-group').display)
+            self.assertFalse(app.query_one('#reference-file').display)
+            count = tui_words.Count(FakeWords.analyze_words(object()), None, object(), None)
+            app.show_result(count, None)
+            await pilot.pause()
+            self.assertEqual([str(c.label) for c in app.query_one('#frequencies').columns.values()],
+                             ['Word', 'Target', 'per 10,000'])
+            self.assertNotIn('Reference:', str(app.query_one('#summary').render()))
+            self.assertIn('1 input (', str(app.query_one('#summary').render()))
+            self.assertFalse(app.query_one('#export-row').display)
+
+    async def test_context_keeps_boundary_spaces_and_folds_with_location_visible(self):
+        from rich.console import Console
+        from sol.essence.tui.app import EssenceApp, in_context
+        text = 'This objective thinking is thus the content of pure science.'
+        start = text.index('is thus')
+        context_text = tui_words._context(text, start, start + 2)
+        rendered = in_context(context_text)
+        self.assertEqual(rendered.plain, text)
+        self.assertEqual(rendered.plain[rendered.spans[0].start:rendered.spans[0].end], ' is ')
+        lines = Console().render_lines(rendered, Console().options.update(width=28), pad=False)
+        folded = ' '.join(''.join(segment.text for segment in line) for line in lines).replace('\u00a0', ' ')
+        self.assertIn('thinking is thus', ' '.join(folded.split()))
+        self.assertNotIn('isthus', folded)
+        count, _ = comparison_count()
+        app = EssenceApp(context())
+        async with app.run_test(size=(90, 36)) as pilot:
+            app.show_result(count, None)
+            await pilot.pause()
+            table = app.query_one('#sources')
+            self.assertEqual([str(c.label) for c in table.columns.values()][2], 'Where')
+            self.assertIn('p. 7', table.get_row_at(0)[2].plain)
+            self.assertGreaterEqual(next(iter(table.rows.values())).height, 2)
+            app.query_one('#result-status').update('Checking sources and exporting…')
+            app.query_one('#export-csv').disabled = True
+            await pilot.resize_terminal(70, 30)
+            await pilot.pause()
+            self.assertTrue(app.query_one('#export-csv').disabled)
+            self.assertIn('exporting', str(app.query_one('#result-status').render()))
+            columns = list(table.columns.values())
+            self.assertLessEqual(sum(c.width + 2 for c in columns), 70)
+
+
+@unittest.skipUnless(tui.textual_available() and _engine_installed(), "needs Textual and engines")
+class TfidfStudyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_tfidf_engine_save_passage_navigation_and_file_switch(self):
+        from fixtures_corpus import write_runtime_corpus
+        from sol import core
+        from sol.corpus import contract
+        from sol.essence import check_tfidf_result, decode_tfidf_result
+        from sol.essence.tui import tfidf
+        from sol.essence.tui.app import EssenceApp
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            corpus = root / 'corpus'
+            identifier, _ = write_runtime_corpus(corpus)
+            contract.initialize_corpus_identity(corpus)
+            snapshot = core.load_snapshot(corpus)
+            real = {**context(), 'corpus': str(corpus), 'reference': core.capture_reference(snapshot, identifier)}
+            count = tfidf.run(real, 'section')
+            self.assertEqual(count.study['protocol'], 'sol.tfidf')
+            self.assertIn('Synthetic section\np. 7', tfidf.rows(count)[0][0])
+            saved = tfidf.save(count, data_home=root / 'data')
+            self.assertEqual(saved.stat().st_mode & 0o777, 0o600)
+            check_tfidf_result(count.target, decode_tfidf_result(saved.read_bytes()))
+            self.assertNotIn('Synthetic section', saved.read_text())
+            source = tfidf.source(count, 0)
+            self.assertEqual(source['id'], identifier)
+            app = EssenceApp(real)
+            real_run = tfidf.run
+            with patch.object(tfidf, 'run', return_value=count):
+                async with app.run_test(size=(100, 36)) as pilot:
+                    await pilot.press('3', 'down', 'down', 'enter')
+                    await pilot.pause()
+                    self.assertEqual(app.choice('study'), 'tfidf')
+                    await pilot.click('#run')
+                    await app.workers.wait_for_complete()
+                    await pilot.pause()
+                    self.assertEqual(app.query_one('#screens').active, 'results')
+                    self.assertEqual(app.query_one('#frequencies').row_count, len(count.study['documents']))
+                    self.assertTrue(app.query_one('#overall').display)
+                    self.assertFalse(app.query_one('#sources').display)
+                    with patch.object(app, 'open_in_reader') as opened:
+                        await pilot.press('enter')
+                        opened.assert_called_once_with(source)
+                    path = root / 'input.txt'
+                    path.write_text('Being and nothing. Being becomes.', encoding='utf-8')
+                    file_count = real_run({**context(), 'corpus': ''}, 'file', target_file=str(path))
+                    self.assertIsNone(tfidf.source(file_count, 0))
+                    app.show_result(file_count, None)
+                    await pilot.pause()
+                    await pilot.press('enter')
+                    self.assertIn('cannot be opened', str(app.query_one('#result-status').render()))
+                    app.show_result(tui_words.run({**context(), 'corpus': ''}, 'file', 'none', target_file=str(path)), None)
+                    self.assertFalse(app.query_one('#overall').display)
+            with self.assertRaisesRegex(ValueError, 'no CORE corpus'):
+                tfidf.run({**context(), 'corpus': ''}, 'book')
+            file = corpus / 'sample.md'
+            file.write_text(file.read_text().replace('An invented passage', 'A changed passage', 1))
+            contract.reindex(corpus)
+            with self.assertRaises(core.ProtocolError):
+                tfidf.run(real, 'section')

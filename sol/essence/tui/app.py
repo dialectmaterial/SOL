@@ -1,4 +1,4 @@
-"""ESSENCE interface: four logical screens, word counts and comparison.
+"""ESSENCE interface: four logical screens and reproducible lexical studies.
 
 Neovim owns the outer layout (beside the reader or fullscreen, Alt-F, and
 Alt-R back to the reader); this app owns only what is inside its window.
@@ -20,7 +20,7 @@ from textual.widgets import (Button, DataTable, Footer, Input, Label, Markdown, 
 
 from sol.essence.encyclopedia import entry_markdown, load_catalog
 from sol.essence.methods import load_methods, method_markdown
-from sol.essence.tui import sentences, words
+from sol.essence.tui import sentences, tfidf, words
 from sol.essence.tui.context import load_state, save_state
 from sol.reader.options import DEFAULT_READER_THEME
 
@@ -36,12 +36,12 @@ SOL_THEMES = (
           panel="#2a2531", dark=True),
 )
 
-SOURCES_HELP = ("Every occurrence of the highlighted word: Enter on a word comes here, Enter here opens it "
-                "in the reader (Alt-Left there returns to where you were), Escape goes back to the words.")
+SOURCES_HELP = ("Sources · Enter on a word focuses its occurrences; Enter here opens the reader. "
+                "Escape returns to words · Alt-Left in the reader returns.")
 
 # Screens that browse a bundled catalog, with their one-line help.
 BROWSERS = {
-    "encyclopedia": "Methods · arrows browse · Enter reads · Escape returns to the list. "
+    "encyclopedia": "Encyclopedia · arrows browse · Enter reads · Escape returns to the list. "
                     "Links open only when selected.",
     "methods": "What ESSENCE runs: inputs, settings, output, limits and the command line · arrows browse · "
                "Enter reads · Escape returns to the list.",
@@ -59,7 +59,15 @@ def in_context(context):
     """The words around an occurrence, the word itself in bold."""
     if context is None:
         return Text("(the text has changed since the count)", style="dim")
-    return Text.assemble(context["left"], (context["word"], "bold"), context["right"])
+    # Keep the word's boundary spaces in the same styled segment. This also
+    # preserves their placement in SVG screenshots, where separate runs may
+    # otherwise collapse or visually shift a space beside the bold glyphs.
+    left, word, right = context["left"], context["word"], context["right"]
+    if left.endswith(" "):
+        left, word = left[:-1], " " + word
+    if right.startswith(" "):
+        word, right = word + " ", right[1:]
+    return Text.assemble(left, (word, "bold"), right)
 
 
 class EssenceApp(App):
@@ -68,22 +76,32 @@ class EssenceApp(App):
     TITLE = "SOL ESSENCE"
     ENABLE_COMMAND_PALETTE = False
     CSS = """
-    .browser-list { height: 7; }
-    .browser-help { height: auto; padding: 0 1; }
-    .browser-detail { height: 1fr; }
-    #origin { padding: 0 1; color: $text-muted; }
-    #layout-hint { padding: 0 1; color: $text-muted; }
+    TabPane { padding: 1 1 0 1; }
+    .browser-list { height: 11; max-height: 40%; border: none; background: $surface; padding: 1; }
+    .browser-help { height: auto; padding: 0 0 1 0; color: $text-muted; }
+    .browser-detail { height: 1fr; margin-top: 1; }
+    #origin, #layout-hint { padding: 0 2; color: $text-muted; }
     Markdown { padding: 0 1; }
     .choices { height: auto; }
-    .choices RadioSet { width: 1fr; }
-    #run-row { height: auto; padding: 1 0 0 0; }
-    #status, #summary { padding: 0 1; }
-    #summary-box { height: auto; max-height: 8; }
-    #frequencies { height: 1fr; min-height: 6; }
-    #sources-label { padding: 1 1 0 1; color: $text-muted; }
-    #sources { height: 8; }
-    #export-row { height: auto; }
-    #result-status { padding: 0 1; }
+    .choice-group { height: auto; width: 1fr; margin-top: 1; }
+    .section-label { color: $text-muted; text-style: bold; height: 1; }
+    RadioSet { border: none; padding: 0; background: transparent; height: auto; }
+    RadioButton { border: none; padding: 0 1; background: transparent; }
+    RadioButton:focus { text-style: bold; }
+    Input { margin-top: 1; }
+    #run-row { height: auto; padding-top: 1; }
+    Button { min-width: 12; height: 3; margin-right: 1; border: none; }
+    #cancel { background: transparent; }
+    #status { padding-top: 1; color: $text-muted; }
+    #summary { padding: 0 0 1 0; }
+    #summary-box { height: auto; max-height: 9; }
+    #frequencies { height: 1fr; min-height: 5; }
+    DataTable { background: $background; }
+    #sources-label, #overall-label { padding: 1 0 0 0; color: $text-muted; height: auto; }
+    #sources { height: 10; max-height: 40%; }
+    #overall { height: 8; max-height: 30%; }
+    #export-row { height: auto; padding-top: 1; }
+    #result-status { color: $text-muted; height: auto; }
     """
     # The private terminal sequence that asks the reader to open a source; the
     # reader checks it and navigates only through its own guarded actions.
@@ -163,22 +181,27 @@ class EssenceApp(App):
     def compose_experiment(self) -> ComposeResult:
         # Tab goes straight to the choices, not to the scrolling container.
         with VerticalScroll(can_focus=False):
-            yield Label("Count the words of a target, optionally against a reference, or measure its "
-                        "sentence lengths (no reference).")
+            yield Label("Choose a study and its source.", classes="browser-help")
+            yield Label("Study", classes="section-label")
             with RadioSet(id="study"):
                 yield RadioButton("Word frequencies", value=True, name="words")
                 yield RadioButton("Sentence lengths", name="sentences")
+                yield RadioButton("TF-IDF · top terms by passage", name="tfidf")
             with Horizontal(classes="choices"):
-                with RadioSet(id="target"):
-                    for key, label in words.TARGETS.items():
-                        yield RadioButton(f"Target: {label}", value=key == "passage", name=key)
-                with RadioSet(id="reference"):
-                    for key, label in words.REFERENCES.items():
-                        yield RadioButton(f"Reference: {label}", value=key == "none", name=key)
-            yield Input(placeholder="Target text file (UTF-8), when 'A text file' is chosen", id="target-file")
-            yield Input(placeholder="Reference text file (UTF-8), when 'A text file' is chosen", id="reference-file")
+                with Vertical(classes="choice-group"):
+                    yield Label("Target", classes="section-label")
+                    with RadioSet(id="target"):
+                        for key, label in words.TARGETS.items():
+                            yield RadioButton(label, value=key == "passage", name=key)
+                with Vertical(id="reference-group", classes="choice-group"):
+                    yield Label("Compare with", classes="section-label")
+                    with RadioSet(id="reference"):
+                        for key, label in words.REFERENCES.items():
+                            yield RadioButton(label, value=key == "none", name=key)
+            yield Input(placeholder="Target file · UTF-8 path", id="target-file")
+            yield Input(placeholder="Reference file · UTF-8 path", id="reference-file")
             with Horizontal(id="run-row"):
-                yield Button("Run", id="run", variant="primary")
+                yield Button("Run study", id="run")
                 yield Button("Cancel", id="cancel", disabled=True)
             yield Static("", id="status")
 
@@ -188,6 +211,8 @@ class EssenceApp(App):
         with VerticalScroll(id="summary-box"):
             yield Static("Nothing yet. Choose a study and a target in Experiment, then press Run.", id="summary")
         yield DataTable(id="frequencies", zebra_stripes=True, cursor_type="row")
+        yield Static("Overall · mean passage weights", id="overall-label")
+        yield DataTable(id="overall", cursor_type="row", zebra_stripes=True)
         yield Static(SOURCES_HELP, id="sources-label")
         yield DataTable(id="sources", cursor_type="row")
         with Horizontal(id="export-row"):
@@ -198,6 +223,15 @@ class EssenceApp(App):
     def choice(self, name: str) -> str:
         pressed = self.query_one(f"#{name}", RadioSet).pressed_button
         return pressed.name if pressed is not None else {"target": "passage", "study": "words"}.get(name, "none")
+
+    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        self.update_choices()
+
+    def update_choices(self) -> None:
+        comparison = self.choice("study") == "words"
+        self.query_one("#reference-group").display = comparison
+        self.query_one("#target-file").display = self.choice("target") == "file"
+        self.query_one("#reference-file").display = comparison and self.choice("reference") == "file"
 
     count_serial = 0
     last_count = None
@@ -233,7 +267,9 @@ class EssenceApp(App):
     def count_words(self, serial, target, reference, target_file, reference_file, study="words") -> None:
         # The engine reads the corpus or files; keep the interface responsive.
         try:
-            if study == "sentences":
+            if study == "tfidf":
+                outcome = tfidf.run(self.context, target, target_file=target_file)
+            elif study == "sentences":
                 outcome = sentences.run(self.context, target, target_file=target_file)
             else:
                 outcome = words.run(self.context, target, reference, target_file=target_file,
@@ -255,7 +291,8 @@ class EssenceApp(App):
             status.update(f"Not counted: {outcome}")
             return
         try:
-            module = sentences if isinstance(outcome, sentences.SentenceCount) else words
+            module = (tfidf if isinstance(outcome, tfidf.TfidfCount) else
+                      sentences if isinstance(outcome, sentences.SentenceCount) else words)
             saved = module.save(outcome) if self.state_file else None
         except (words.EngineMissing, ValueError, OSError) as error:
             status.update(f"Counted, but not saved: {error}")
@@ -263,15 +300,18 @@ class EssenceApp(App):
         self.show_result(outcome, saved)
 
     def show_result(self, count, saved) -> None:
+        if isinstance(count, tfidf.TfidfCount):
+            return self.show_tfidf(count, saved)
         if isinstance(count, sentences.SentenceCount):
             return self.show_sentences(count, saved)
         self.set_word_widgets(True)
         table = self.query_one("#frequencies", DataTable)
         table.clear(columns=True)
-        table.add_columns("Word", "Target", "per 10,000", "Reference", "per 10,000",
+        table.add_columns("Word", "Target", "per 10,000",
+                          *(("Reference", "per 10,000") if count.reference is not None else ()),
                           *(("Difference", "Log₂ ratio") if count.comparison is not None else ()))
         shown, total = words.rows(count)
-        table.add_rows(shown)
+        table.add_rows(shown if count.reference is not None else [row[:3] for row in shown])
         lines = words.summary(count)
         if len(shown) < total:
             lines.append(f"Showing the {len(shown):,} most frequent of {total:,} words.")
@@ -281,14 +321,18 @@ class EssenceApp(App):
         self.query_one("#result-status", Static).update("")
         self.query_one("#status", Static).update(f"Counted {total:,} distinct words; see Results (4).")
         self.last_count = count
+        self.last_saved = saved
         for button in self.query("#export-row Button"):
             button.disabled = count.reference is None
+        self.query_one("#export-row").display = count.reference is not None
         self.show_sources(0 if total else None)
         self.query_one("#screens", TabbedContent).active = "results"
         # Words first: arrows choose a word, Enter goes to its sources.
         table.focus()
 
     def set_word_widgets(self, shown) -> None:
+        self.query_one("#overall").display = False
+        self.query_one("#overall-label").display = False
         # Sources and export belong to word counts only.
         for selector in ("#sources-label", "#sources", "#export-row"):
             self.query_one(selector).display = shown
@@ -297,8 +341,12 @@ class EssenceApp(App):
         self.set_word_widgets(False)
         table = self.query_one("#frequencies", DataTable)
         table.clear(columns=True)
-        table.add_columns("Words", "Beginning", "Where")
-        table.add_rows(sentences.rows(count))
+        table.add_column("Words", width=7)
+        table.add_column("Beginning", width=max(15, self.size.width - 47))
+        table.add_column("Where", width=30)
+        for row in sentences.rows(count):
+            table.add_row(row[0], Text(row[1], overflow="fold"),
+                          Text(row[2].replace(" | p. ", "\np. "), overflow="fold"), height=None)
         lines = sentences.summary(count)
         if count.study["longest"]:
             lines.append("The longest sentences are below; Enter opens one in the reader (Alt-Left there returns).")
@@ -309,6 +357,31 @@ class EssenceApp(App):
         self.query_one("#status", Static).update(
             f"Measured {count.study['summary']['sentences']:,} sentences; see Results (4).")
         self.last_count = count
+        self.last_saved = saved
+        self.shown_sources = ()
+        self.query_one("#screens", TabbedContent).active = "results"
+        table.focus()
+
+    def show_tfidf(self, count, saved) -> None:
+        self.set_word_widgets(False)
+        table = self.query_one("#frequencies", DataTable)
+        table.clear(columns=True)
+        table.add_column("Passage · Enter to open", width=min(34, max(20, self.size.width // 3)))
+        table.add_column("Top terms · weight", width=max(24, self.size.width - 43))
+        for label, terms in tfidf.rows(count):
+            table.add_row(Text(label, overflow="fold"), Text(terms, overflow="fold"), height=None)
+        overall = self.query_one("#overall", DataTable)
+        overall.clear(columns=True)
+        overall.add_columns("Term", "Mean weight")
+        overall.add_rows((row["word"], f"{row['score']:.4f}") for row in count.study["overall"])
+        overall.display = self.query_one("#overall-label").display = True
+        lines = tfidf.summary(count)
+        lines.append(f"Saved: {saved}" if saved else "Not saved: this reader session has no workspace.")
+        self.query_one("#summary", Static).update("\n".join(lines))
+        self.query_one("#result-status", Static).update("")
+        self.query_one("#status", Static).update("Ranked top terms; see Results (4).")
+        self.last_count = count
+        self.last_saved = saved
         self.shown_sources = ()
         self.query_one("#screens", TabbedContent).active = "results"
         table.focus()
@@ -316,12 +389,16 @@ class EssenceApp(App):
     def show_sources(self, index) -> None:
         table = self.query_one("#sources", DataTable)
         table.clear(columns=True)
-        table.add_columns("Side", "Occurrence", "In context", "Where")
+        table.add_column("Side", width=9)
+        table.add_column("Occurrence", width=10)
+        table.add_column("Where", width=min(34, max(20, self.size.width // 3)))
+        table.add_column("In context", width=max(20, self.size.width - 65))
         self.shown_sources = () if index is None else tuple(words.sources(self.last_count, index))
-        table.add_rows([(item["side"], f"{item['number']} of {item['count']}" if item["number"]
-                         else f"{item['count']} here", in_context(item["context"]),
-                         item["label"] + ("" if item["open"] else " (not in the reader)"))
-                        for item in self.shown_sources])
+        for item in self.shown_sources:
+            label = item["label"].replace(" | p. ", "\np. ")
+            table.add_row(item["side"], f"{item['number']} of {item['count']}" if item["number"]
+                          else f"{item['count']} here", Text(label, overflow="fold"),
+                          in_context(item["context"]), height=None)
         if index is not None:
             row = self.last_count.study["frequencies"][index]
             total = sum(row[side]["count"] for side in ("target", "reference") if row[side] is not None)
@@ -332,11 +409,18 @@ class EssenceApp(App):
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if (event.data_table.id == "frequencies" and self.last_count is not None
-                and not isinstance(self.last_count, sentences.SentenceCount)):
+                and isinstance(self.last_count, words.Count)):
             self.show_sources(event.cursor_row)
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         if event.data_table.id == "frequencies":
+            if isinstance(self.last_count, tfidf.TfidfCount):
+                source = tfidf.source(self.last_count, event.cursor_row)
+                if source is None:
+                    self.query_one("#result-status", Static).update("A text file cannot be opened in the reader.")
+                else:
+                    self.open_in_reader(source)
+                return
             if isinstance(self.last_count, sentences.SentenceCount):
                 if not 0 <= event.cursor_row < len(self.last_count.study["longest"][:sentences.ROW_LIMIT]):
                     return
@@ -386,6 +470,31 @@ class EssenceApp(App):
         self.query_one("#result-status", Static).update(
             f"Not exported: {outcome}" if isinstance(outcome, Exception) else f"Exported: {outcome}")
 
+    def on_resize(self) -> None:
+        if self.last_count is not None:
+            self.call_after_refresh(self.reflow_result)
+
+    def reflow_result(self) -> None:
+        table = self.query_one("#frequencies", DataTable)
+        if isinstance(self.last_count, words.Count):
+            sources = self.query_one("#sources", DataTable)
+            row = sources.cursor_row
+            self.show_sources(table.cursor_row if table.row_count else None)
+            sources.move_cursor(row=row)
+            return
+        screen = self.query_one("#screens", TabbedContent).active
+        focused = self.focused
+        row = table.cursor_row
+        messages = [(widget, widget.content) for widget in
+                    (self.query_one("#status", Static), self.query_one("#result-status", Static))]
+        self.show_result(self.last_count, self.last_saved)
+        table.move_cursor(row=row)
+        for widget, content in messages:
+            widget.update(content)
+        self.query_one("#screens", TabbedContent).active = screen
+        if focused is not None and focused.display:
+            focused.focus()
+
     def on_key(self, event) -> None:
         active = self.query_one("#screens", TabbedContent).active
         if event.key == "escape" and active in BROWSERS:
@@ -406,6 +515,8 @@ class EssenceApp(App):
             self.theme = TEXTUAL_THEMES[name]
 
     def on_mount(self) -> None:
+        self.update_choices()
+        self.set_word_widgets(False)
         if self.theme_file:
             # A stat-sized read twice a second; T in the reader shows here within half a second.
             self.set_interval(0.5, self.follow_reader_theme)

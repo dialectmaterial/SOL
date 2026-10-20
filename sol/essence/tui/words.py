@@ -259,9 +259,9 @@ def summary(count):
         totals = part["summary"]
         where = part["scope"].get("path") or part["scope"]["kind"]
         return (f"{name}: {totals['token_count']:,} tokens, {totals['type_count']:,} distinct words, "
-                f"{totals['input_count']:,} inputs ({part['provider']}, {where})")
+                f"{totals['input_count']:,} input{'s' if totals['input_count'] != 1 else ''} ({part['provider']}, {where})")
     if count.comparison is None:
-        return [side("Target", result["target"]), side("Reference", result["reference"]),
+        return ["Word frequencies", side("Target", result["target"]),
                 *(f"Note: {warning}" for warning in result["warnings"])]
     return [side("Target", result["target"]), side("Reference", result["reference"]), METHOD_LINE,
             *(f"Note: {warning}" for warning in count.comparison["warnings"])]

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### ESSENCE study interface and TF-IDF — 20 October 2026
+
+- Calmer Experiment controls, conditional file/reference fields, taller catalog lists and corrected Encyclopedia help.
+- Results omit unused reference columns, use singular input grammar, and keep source headings/pages visible alongside wrapping contexts. Spaces beside highlighted words survive folding; layouts reflow on resize using theme colors.
+- TF-IDF is now a study: top terms per passage in reading order, then overall mean weights. Enter opens a passage in the reader; workspace artifacts retain the engine's checkable provenance.
+
 ### SOL's own themes and a reading window — 20 October 2026
 
 - **Paper** and **Night** join the themes: SOL's own, from actualspirit.com —
