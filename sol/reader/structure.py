@@ -17,7 +17,8 @@ def structure_payload(book, current):
         seen.add(key)
         nodes.append({"key": key, "parent": parent, "title": node.title,
                       "children": [display_path(node_path(child)) for child in node.children],
-                      "target": first.get(path)})
+                      "target": first.get(path),
+                      "page": None if node.start_page is None else str(node.start_page)})
         for child in node.children:
             visit(child, key)
     visit(book.root)

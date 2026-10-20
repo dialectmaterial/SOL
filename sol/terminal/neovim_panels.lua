@@ -37,8 +37,9 @@ return function(reader)
       height = math.max(1, placed.height - 2) }
   end
   -- Beside the page when there is room, else over the page as before.
-  -- marks: {line, group[, first, last]} in bytes.
-  local function show_lines(lines, return_packet, marks)
+  -- marks: {line, group[, first, last]} in bytes. hanging: wrapped lines
+  -- continue under this column (a key/description table).
+  local function show_lines(lines, return_packet, marks, hanging)
     return_packet = return_packet or panels.return_packet
     close_popup()
     if vim.fn.mode(1) ~= 'n' then normal_escape() end
@@ -60,6 +61,9 @@ return function(reader)
     config.style, config.border, config.zindex = "minimal", "single", 50
     panels.window = api.nvim_open_win(panel, true, config)
     vim.wo[panels.window].wrap, vim.wo[panels.window].linebreak = true, true
+    if hanging then
+      vim.wo[panels.window].breakindent, vim.wo[panels.window].breakindentopt = true, 'shift:' .. hanging
+    end
     vim.wo[panels.window].winhighlight = "NormalFloat:SOLPanel,FloatBorder:SOLPanelBorder"
     panels.return_packet = return_packet
     local opened = panels.window

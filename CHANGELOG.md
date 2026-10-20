@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Clearer help and outline in the reader — 20 October 2026
+
+- `?` now groups the keys into Reading, Finding your way, Text, sources and
+  notes, ESSENCE and Leaving; long descriptions wrap under their own column.
+- `t` shows the outline as a centred panel with ▾/▸ for open and closed
+  sections, ● on where you are, and each section's page on the right.
+
 ### SOL's own themes and a reading window — 20 October 2026
 
 - **Paper** and **Night** join the themes: SOL's own, from actualspirit.com —
