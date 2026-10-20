@@ -32,6 +32,37 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## ESSENCE encyclopedia proposal — 19 October 2026
+
+**Task:** [Codex: Proposal for the ESSENCE encyclopedia (stage 4)](https://github.com/dialectmaterial/SOL/blob/379553bead8b408ae0fe8636b6528bf9ef3a2209/docs/coordination/CURRENT_TASK.md#codex-proposal-for-the-essence-encyclopedia-stage-4).
+**Branch / PR:** `codex/encyclopedia-proposal` · [PR #37](https://github.com/dialectmaterial/SOL/pull/37); status `In review`, approved by Claude Code.
+**Last implementation commit:** `08e01618b6f3f77077fd8f044e1dd01b838b25ec` (this report is committed after it).
+
+### Changed files
+
+- `docs/coordination/proposals/ESSENCE_ENCYCLOPEDIA_PROPOSAL.md` — structured Markdown/JSON format, the three object schemas, cited/status-bearing genealogy, source and editorial rules, bounded initial coverage and pinned SOL method links, an offline CORE-free validator/CLI design, three complete draft entries and six decisions with options/recommendations.
+- `docs/coordination/CURRENT_TASK.md` — own task moved through `In progress` to `In review`.
+- `docs/coordination/HANDOFF.md` — this report; all preceding reports retained. No application code, authority, dependency or legacy change relative to main.
+
+### Tests performed
+
+- `.venv/bin/python -B scripts/check_docs.py` — OK: four authorities, local links/anchors and lossless legacy inventory.
+- `.venv/bin/python -B -m unittest discover -s tests` — **1,722 tests, OK (12 skipped, 4 existing expected failures)**; isolated XDG config/data/state/cache, after integrating main through #36.
+- Parsed all three nested sample files with the existing CommonMark parser and standard JSON decoder: common fields, required headings, unique IDs, evidence pointers and adapter-to-task reference checked.
+- Checked bibliography against primary publisher/proceedings/author pages and the specifically cited BERT paper section; recorded abstract-only/metadata-only access and unresolved questions. Checked SOL adapter fields against the pinned source revision, including the distribution name and byte bounds.
+- `git diff --check` — OK. No private material was needed for this documentation task.
+- Refreshed against main after #35 and #36: resolved only the stacked handoff entries, preserving every main report byte-for-byte. The proposal is unchanged from the version Claude reviewed; schema and CLI adoption remain pending.
+
+### Outstanding issues
+
+- This is a proposal, not an implemented catalog, validator, command or runtime. The samples remain drafts with no fictitious reviewer; the SOL code license needs a source, and the historical sample's exact weighting equation needs full-text review.
+- The earlier model-history file has not been supplied; the proposal makes no claims about it. Additional paper sections must be read before promoting the remaining coverage to reviewed entries.
+
+### Decisions requiring approval
+
+- **(reserved)** Adoption of a public catalog format/CLI, or later artifact/workspace reference fields, needs the maintainer's decision and appropriate authority updates before implementation depends on it. This PR only records the proposal.
+- **Recommendations for review:** JSON metadata inside CommonMark; three object kinds plus shared references; cited typed edges with separate epistemic/editorial states; explicit draft/publish gates; bounded initial coverage; offline explicit-directory validation with no adapter execution. Section 9 gives alternatives and a recommendation for each of six decisions. Parsing limits and presentation details remain proposed defaults.
+
 ## Note editor beside the text — 19 October 2026
 
 **Task:** the maintainer's "go on", taking the note-editor candidate offered in the session; follows the side panels of #32.
