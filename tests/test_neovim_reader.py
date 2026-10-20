@@ -631,6 +631,47 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         with patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(), 0)
 
+    def test_complete_search_counts_and_steps_occurrences_across_sections(self):
+        self.extend(25)
+        def native(payload, _, on_request):
+            def request(op, **fields):
+                return on_request({"op": op, "packet": payload["restore"] or self.reply(payload)["packet"],
+                                   "mode": "paragraph", **fields})
+            result = request("search", query="invented")
+            self.assertEqual(len(result["search"]["rows"]), 25)
+            self.assertEqual(result["search"]["total"], 25)
+            payload = request("search_open", result=25)["payload"]
+            self.assertEqual(payload["search_marks"]["position"], 25)
+            self.assertEqual(payload["search_marks"]["total"], 25)
+            payload = request("search_next")["payload"]
+            self.assertEqual(payload["search_marks"]["position"], 1)
+            self.assertEqual(payload["restore"]["reference"]["reference"]["target_id"], self.identifier)
+            payload = request("search_previous")["payload"]
+            self.assertEqual(payload["search_marks"]["position"], 25)
+            return 0, {"action": "quit", "packet": payload["restore"]}
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(), 0)
+
+    def test_printed_page_opens_its_first_paragraph_and_refuses_pages_outside_the_book(self):
+        self.extend(3)
+        passages = self.book.passages
+        def native(payload, _, on_request):
+            packet = self.reply(payload, record=2)["packet"]
+            page = passages[-1].printed_page
+            expected = next(row for row in passages if row.end_printed_page >= page)
+            result = on_request({"op": "page_open", "page": page, "packet": packet, "mode": "continuous"})
+            self.assertEqual(result["payload"]["restore"]["reference"]["reference"]["target_id"], expected.identifier)
+            for outside in (passages[0].printed_page - 1, passages[-1].end_printed_page + 1):
+                with self.subTest(page=outside), self.assertRaisesRegex(ValueError, "printed pages run from"):
+                    on_request({"op": "page_open", "page": outside, "packet": packet, "mode": "continuous"})
+            for bad in (0, "7", True, 7.0):
+                with self.subTest(page=bad), self.assertRaises(ValueError):
+                    on_request({"op": "page_open", "page": bad, "packet": packet, "mode": "continuous"})
+            return 0, {"action": "quit", "packet": result["payload"]["restore"]}
+        with patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(), 0)
+
     def test_search_crosses_loaded_sections_and_history_restores_exact_selection(self):
         self.extend(3)
         service = self.service()

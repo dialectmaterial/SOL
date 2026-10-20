@@ -9,6 +9,20 @@ where it can be zoomed and read in context; pressing it again turns the same
 Zathura window to the new page. It also works from the `s` popup. The viewer
 shows SOL's verified copy of the PDF; `SOL_PDF_VIEWER` chooses another viewer.
 
+### Complete reader search — 20 October 2026
+
+- `/` reaches every matching passage and reports the total number of literal
+  occurrences; the 20-passage ceiling is removed from the reader.
+- Ctrl-N / Ctrl-P step through occurrences within passages and across sections,
+  wrapping in both directions. The status line shows `N of M` for the opened match.
+- Reuse text-keyed occurrence projections and align ordinary text directly to
+  keep common-word searches responsive; Unicode fallback warnings remain explicit.
+
+### Go to a printed page — 20 October 2026
+
+`gp` asks for a printed page and opens the first paragraph on it, so a
+citation such as "p. 240" is one step away.
+
 ### The opening screen says SOL's own name — 20 October 2026
 
 The line *Science Organizes Logic* under the title is gone: the title is

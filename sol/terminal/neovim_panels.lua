@@ -93,7 +93,7 @@ return function(reader)
   end
   local show_search, show_source, show_pdf
   show_search = function(result)
-    local lines = {'Search: ' .. result.query, 'Whole book, literal and case-insensitive. Up to ' .. result.limit .. ' passages.', ''}
+    local lines = {'Search: ' .. result.query, 'Whole book, literal and case-insensitive. ' .. result.total .. ' matches in ' .. #result.rows .. ' passages.', ''}
     local rows = {}
     for _, item in ipairs(result.rows) do
       lines[#lines + 1] = item.number .. '. ' .. item.label

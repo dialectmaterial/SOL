@@ -27,7 +27,8 @@ class ReaderSearchProjectionTests(unittest.TestCase):
     def test_literal_repeated_matches_keep_source_offsets(self):
         source = "Ground is ground; GROUND remains."
         result = self.project(source, "ground")
-        self.assertEqual(result, SearchProjection(((0, 6), (10, 16), (18, 24))))
+        self.assertEqual(result, SearchProjection(((0, 6), (10, 16), (18, 24)),
+                                                  occurrences=((0, 6), (10, 16), (18, 24))))
         self.assertEqual(source, "Ground is ground; GROUND remains.")
 
     def test_query_is_literal_not_a_regular_expression(self):

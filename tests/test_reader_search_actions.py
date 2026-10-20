@@ -192,13 +192,98 @@ class ReaderSearchActionsTests(unittest.TestCase):
 
     def test_search_next_wraps_passages_but_enters_matching_source_offsets(self):
         self.actions.search('invented', ())
-        for identifier in (IDS[1], IDS[2], IDS[0]):
+        for identifier in (IDS[0], IDS[1], IDS[2], IDS[0]):
             target = self.actions.search_next()
             self.assertEqual(target.identifier, identifier)
             self.assertEqual(self.actions.cursor_offset, target.text.index('invented'))
         target = self.actions.search_next(reverse=True)
         self.assertEqual(target.identifier, IDS[2])
         self.assertEqual(self.actions.cursor_offset, target.text.index('invented'))
+
+    def test_every_occurrence_is_counted_and_reachable_in_both_directions(self):
+        self.replace_text('Ground, ground, GROUND.')
+        self.actions.search('ground', (), whole_word=True, limit=None)
+        self.actions.open_result(1)
+        expected = [(IDS[0], 0), (IDS[0], 8), (IDS[0], 16),
+                    (IDS[2], self.book.passages[2].text.index('ground'))]
+        for index, (identifier, offset) in enumerate(expected, 1):
+            self.assertEqual((self.actions.snapshot().current.identifier, self.actions.cursor_offset),
+                             (identifier, offset))
+            self.assertEqual(self.actions.search_position(), (index, 4))
+            self.actions.search_next()
+        self.assertEqual(self.actions.search_position(), (1, 4))
+        for index in (4, 3, 2, 1):
+            self.actions.search_next(reverse=True)
+            self.assertEqual(self.actions.search_position(), (index, 4))
+
+    def test_complete_search_has_neither_twenty_nor_thousand_passage_ceiling(self):
+        original = self.book.passages[0]
+        self.book.canonical_records = {}
+        self.book.passages = [replace(original, identifier=f'passage-{i}', text='the and the')
+                              for i in range(1005)]
+        self.actions = ReaderActions(self.book)
+        self.actions.read((), first=True)
+        self.assertEqual(len(self.actions.search('the', (), limit=None)), 1005)
+        self.actions.open_result(1005)
+        self.assertEqual(self.actions.search_position(), (2009, 2010))
+        self.actions.search_next()
+        self.assertEqual(self.actions.search_position(), (2010, 2010))
+        self.actions.search_next()
+        self.assertEqual(self.actions.search_position(), (1, 2010))
+        self.actions.search_next(reverse=True)
+        self.assertEqual(self.actions.search_position(), (2010, 2010))
+
+    def test_partial_unicode_matches_keep_their_ordinal_without_guessed_spans(self):
+        self.replace_text('ß s')
+        self.actions.search('s', (), whole_word=False, limit=1)
+        self.actions.open_result(1)
+        self.assertEqual(self.actions.search_position(), (1, 3))
+        self.assertEqual(self.actions.cursor_offset, 0)
+        self.actions.search_next()
+        self.assertEqual(self.actions.search_position(), (2, 3))
+        self.assertEqual(self.actions.cursor_offset, 0)
+        self.actions.history_back()
+        self.assertEqual(self.actions.search_position(), (1, 3))
+        self.actions.history_forward()
+        self.assertEqual(self.actions.search_position(), (2, 3))
+        self.actions.search_next()
+        self.assertEqual(self.actions.search_position(), (3, 3))
+        self.assertEqual(self.actions.cursor_offset, 2)
+        self.assertEqual(self.actions.search_highlights().spans, ((2, 3),))
+
+    def test_refused_same_passage_occurrence_restores_index_and_retry(self):
+        self.replace_text('ground ground')
+        self.actions.search('ground', (), limit=None)
+        self.actions.open_result(1)
+        with self.assertRaises(ValueError):
+            with self.actions.staged():
+                self.actions.search_next()
+                raise ValueError('view refused')
+        self.assertEqual(self.actions.search_position(), (1, 4))
+        self.actions.search_next()
+        self.assertEqual(self.actions.search_position(), (2, 4))
+
+    def test_cached_occurrences_are_reused_but_text_replacement_invalidates(self):
+        from sol.reader.search import search_projection
+        self.actions.search('ground', (), limit=None)
+        self.actions.search_occurrences()
+        with patch('sol.reader.search.search_projection', wraps=search_projection) as project:
+            self.actions.search_position()
+            self.actions.search_occurrences()
+            self.assertEqual(project.call_count, 0)
+            self.replace_text('ground ground')
+            self.assertEqual(self.actions.search_position()[1], 4)
+            self.assertGreater(project.call_count, 0)
+
+    def test_motion_between_matches_steps_from_live_source_cursor(self):
+        self.replace_text('ground then ground')
+        self.actions.search('ground', (), whole_word=True, limit=1)
+        self.actions.set_cursor(7)
+        self.actions.search_next()
+        self.assertEqual(self.actions.cursor_offset, 12)
+        self.actions.set_cursor(7)
+        self.actions.search_next(reverse=True)
+        self.assertEqual(self.actions.cursor_offset, 0)
 
     def test_search_mode_defaults_to_substring_in_snapshot(self):
         self.assertFalse(self.actions.snapshot().search_whole_word)

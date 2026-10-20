@@ -20,6 +20,8 @@ class SearchProjection:
     spans: tuple[tuple[int, int], ...] = ()
     degraded: bool = False
     reason: str | None = None
+    # One entry per normalized match, including explicit unmappable visits.
+    occurrences: tuple[tuple[int, int] | None, ...] = ()
 
 
 # Verification of internal boundaries is quadratic in one normalization
@@ -102,6 +104,55 @@ def search_projection(text: str, query: str, whole_word: bool = False,
     if not matches:
         return SearchProjection()
 
+    # Most prose needs no boundary proof per character: if independent folds
+    # reproduce the whole normalization with one codepoint each, indices align.
+    direct = presented.isascii()
+    if not direct and not any(map(unicodedata.combining, presented)):
+        folded_characters = tuple(_fold(char) for char in presented)
+        direct = (all(len(char) == 1 for char in folded_characters)
+                  and "".join(folded_characters) == normalized)
+    boundaries, oversized = (None, False) if direct else _verified_boundaries(presented, normalized)
+    if not direct and boundaries is None:
+        return SearchProjection(degraded=True, reason=(
+            "Search found this passage, but Unicode normalization could not "
+            "be aligned safely with its source characters."), occurrences=(None,) * len(matches))
+
+    spans: list[tuple[int, int]] = []
+    occurrences = []
+    ambiguous = False
+    for match in matches:
+        start = match.start() if direct else boundaries.get(match.start())
+        end = match.end() if direct else boundaries.get(match.end())
+        if start is None or end is None or start == end:
+            ambiguous = True
+            occurrences.append(None)
+            continue
+        original_start = source_indices[start]
+        original_end = source_indices[end - 1] + 1
+        if original_end - original_start != end - start or (
+                _fold(presented[start:end]) != match.group()):
+            ambiguous = True
+            occurrences.append(None)
+            continue
+        spans.append((original_start, original_end))
+        occurrences.append((original_start, original_end))
+    if ambiguous:
+        reason = (
+            "Some search matches have no exact contiguous source span; "
+            "only verified matches are highlighted."
+        )
+        if oversized:
+            reason = (
+                "An unusually long Unicode combining sequence prevented "
+                "safe alignment of some matches; only verified matches "
+                "are highlighted."
+            )
+        return SearchProjection(tuple(spans), degraded=True, reason=reason,
+                                occurrences=tuple(occurrences))
+    return SearchProjection(tuple(spans), occurrences=tuple(occurrences))
+
+
+def _verified_boundaries(presented, normalized):
     boundaries: dict[int, int] = {0: 0}
     projected_parts: list[str] = []
     projected_offset = 0
@@ -121,35 +172,5 @@ def search_projection(text: str, query: str, whole_word: bool = False,
             oversized = True
         projected_offset += len(folded)
     if "".join(projected_parts) != normalized:
-        return SearchProjection(degraded=True, reason=(
-            "Search found this passage, but Unicode normalization could not "
-            "be aligned safely with its source characters."))
-
-    spans: list[tuple[int, int]] = []
-    ambiguous = False
-    for match in matches:
-        start = boundaries.get(match.start())
-        end = boundaries.get(match.end())
-        if start is None or end is None or start == end:
-            ambiguous = True
-            continue
-        original_start = source_indices[start]
-        original_end = source_indices[end - 1] + 1
-        if original_end - original_start != end - start or (
-                _fold(presented[start:end]) != match.group()):
-            ambiguous = True
-            continue
-        spans.append((original_start, original_end))
-    if ambiguous:
-        reason = (
-            "Some search matches have no exact contiguous source span; "
-            "only verified matches are highlighted."
-        )
-        if oversized:
-            reason = (
-                "An unusually long Unicode combining sequence prevented "
-                "safe alignment of some matches; only verified matches "
-                "are highlighted."
-            )
-        return SearchProjection(tuple(spans), degraded=True, reason=reason)
-    return SearchProjection(tuple(spans))
+        return None, oversized
+    return boundaries, oversized

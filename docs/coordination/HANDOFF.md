@@ -56,6 +56,33 @@ Write "None." rather than deleting a heading.
 ### Decisions requiring approval
 - Default: `S` is the key (the old sentence-study binding, now free).
 
+## Complete reader search — 20 October 2026
+
+**Task:** [Codex: Complete reader search](https://github.com/dialectmaterial/SOL/blob/5d82026a94fe7af2456251a10066b9fcf25b850e/docs/coordination/CURRENT_TASK.md#codex-complete-reader-search).
+**Branch / PR:** `codex/complete-search` · [branch PR](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fcomplete-search); Claude reviews, author does not merge.
+**Last implementation commit:** `7afff521c51b3f56638e2500e9c85e16a08fd6be` (this report is committed after it).
+
+### Changed files
+- `sol/reader/actions.py`, `sol/reader/search.py` — complete reader search without changing CORE's bounded search API; text-keyed occurrence reuse, direct alignment for ordinary prose, occurrence stepping/counts, Unicode fallback ordinals, history and staged rollback.
+- `sol/terminal/neovim_reader.py`, `neovim_panels.lua`, `neovim_view.lua`, `neovim_controls.lua` — remove the reader's 20-passage request ceiling, list/count all matches, show `N of M` in the status line and describe occurrence navigation.
+- Reader action/controller/headless Neovim tests, BEING §2, CHANGELOG; `scripts/reader_timings.py` updates its now-obsolete limit description. `sol/terminal/source.py` is untouched.
+- `CURRENT_TASK.md` changes only Codex's status to `In review`. The original worktree's Git metadata is read-only, so implementation/publication uses `/tmp/sol-complete-search`, cloned from `origin/main`.
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — OK; external URLs were not network-checked. `git diff --check` — OK.
+- `.venv/bin/python -B -m unittest discover -s tests` with the existing ESSENCE extra installed — 1,777 tests, OK (12 skipped, 4 expected failures).
+- Focused search tests (50), controller tests (44), headless Neovim tests (45), and updated cursor/reading-experience tests — OK. Coverage includes every occurrence within/across passages and sections, forward/reverse wrap, 1,005 matching passages, live cursor stepping, Unicode partial-match visits, history, cache invalidation/reuse and refused staged moves.
+- Read-only local book: `the` gives 41,144 occurrences in 1,783 passages; `a` gives 107,543 in 1,796. Warm-process projection/search medians (three runs after one discarded warmup): 379 ms for `the`, 430 ms for `a`. Controller medians: search 728 ms, open 923 ms, next 927 ms, previous 923 ms, opening the final matching passage 1,075 ms. Controller timings use real source verification, temporary SQLite workspaces, full view preparation and a replaced terminal boundary; no personal workspace was opened. The complete `the` panel reply is 396,524 JSON bytes, below the existing 16 MiB channel budget.
+- Headless Neovim stress check, invented labels/snippets at that real result-list size: 5,353 panel lines, 2.3–4.7 ms to build/redraw, and Enter selects passage 1,783. Physical terminal painting/IPC is excluded. Local measurement harnesses: `/tmp/sol-search-probe.py`, `/tmp/sol-search-controller-probe.py`, `/tmp/sol-search-panel-probe.py`; no private corpus text or exports added to Git.
+
+### Outstanding issues
+- Common-word next/previous still includes roughly a second of existing verification/save/full-view work; occurrence reuse avoids rescanning/reprojecting the book on each key, but this is not a general navigation-latency fix.
+- No physical-keyboard terminal session or sustained human reading trial. The status count describes the opened search visit; Esc hides it with the marks. Unicode fragments without an exact contiguous source span remain distinct counted visits at passage start, with an explicit warning and no invented highlight.
+
+### Decisions requiring approval
+None reserved. Defaults: keep a passage-based result list, Enter opens its first occurrence; step non-overlapping literal occurrences with wrap; keep unprojectable occurrences as explicit fallback visits; reuse only derived projections whose text/query values still agree. Canonical text, UUIDs, source offsets, public CORE contracts, workspace schemas and dependencies are unchanged.
+
+
 ## Clearer help and outline in the reader — 20 October 2026
 
 **Task:** maintainer request (20 October 2026): a better reader UI; no CURRENT_TASK entry.

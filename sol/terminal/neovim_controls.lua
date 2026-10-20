@@ -52,6 +52,13 @@ return function(reader)
     local query = vim.fn.input('Search book: ')
     if query:match('%S') then request('search', {query = query}) end
   end
+  local function page()
+    -- A printed page, as the edition numbers it and the status line shows it.
+    local answer = vim.fn.input('Printed page: ')
+    local number = tonumber(answer:match('^%s*[Pp]?%.?%s*(%d+)%s*$') or '')
+    if number then request('page_open', {page = number})
+    elseif answer:match('%S') then vim.notify('Type a printed page number, e.g. 240', vim.log.levels.WARN) end
+  end
   local function marker(slot, operation)
     request(operation or 'marker_set', {slot = slot})
   end
@@ -292,8 +299,9 @@ return function(reader)
           { "T", "theme: Mocha, Latte, Paper, Night, Terminal (this session)" } } },
         { "Finding your way", {
           { "t", "book outline: h/l fold, Enter read" },
+          { "gp", "go to a printed page, e.g. gp 240 Enter" },
           { "/", "search the whole book" },
-          { "Ctrl-P / Ctrl-N", "previous / next search result" },
+          { "Ctrl-P / Ctrl-N", "previous / next search occurrence" },
           { "Esc", "hide the search marks" },
           { "Alt-Left/Right", "back / forward through your reading" },
           { "m1 m2 m3", "set a paragraph marker; '1 '2 '3 jump, dm1… clear" } } },
@@ -460,6 +468,7 @@ return function(reader)
     vim.keymap.set('n', 'b', guarded(function() passage(-1) end), {buffer = buffer, silent = true})
     vim.keymap.set('n', 'n', guarded(function() passage(1) end), {buffer = buffer, silent = true})
     vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
+    vim.keymap.set('n', 'gp', guarded(page), {buffer = buffer, silent = true})
     vim.keymap.set({'n', 'x'}, 'E', guarded(function()
       -- Capture the exact position and selection; ESSENCE returns to it with
       -- Alt-R and on closing. Visual mode stays until ESSENCE actually opens
