@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### ESSENCE follows `T` — 20 October 2026
+
+Switching the reader's theme with `T` now restyles an open ESSENCE too, within
+half a second, instead of only the next time it opens.
+
 ### ESSENCE method descriptions — 20 October 2026
 
 Bundled method descriptions now document word frequencies, comparison, sentence
