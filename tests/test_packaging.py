@@ -22,6 +22,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_FILES = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol").rglob("*.py")}
 PACKAGE_ASSETS = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol" / "terminal").glob("*.lua")}
+PACKAGE_ASSETS.add("sol/essence/encyclopedia.json")
 ENTRY_POINTS = {
     "sol": "sol:cli",
     "sol-kitty": "sol.terminal.kitty:main",
@@ -95,6 +96,35 @@ class PackagingTests(unittest.TestCase):
         self.assertTrue(PACKAGE_ASSETS <= set(names))
         self.assertTrue(all(name in PACKAGE_FILES | PACKAGE_ASSETS
                             or ".dist-info/" in name for name in names))
+
+    def test_installed_encyclopedia_loads_offline_without_optional_dependencies(self):
+        installed = Path(self.temporary.name) / "installed-encyclopedia"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        program = """
+import builtins, socket, sys
+sys.path.insert(0, sys.argv[1])
+original_import = builtins.__import__
+def guarded(name, *args, **kwargs):
+    if name.startswith(('sol.core', 'sol.corpus', 'textual', 'torch', 'transformers')):
+        raise AssertionError(name)
+    return original_import(name, *args, **kwargs)
+def no_network(*args, **kwargs):
+    raise AssertionError('network access')
+builtins.__import__ = guarded
+socket.create_connection = no_network
+socket.socket.connect = no_network
+from sol.essence.encyclopedia import load_catalog, entry_markdown
+catalog = load_catalog()
+assert len(catalog['entries']) == 9
+for entry in catalog['entries']:
+    assert entry['quote'] in entry_markdown(catalog, entry)
+print(catalog['license'])
+"""
+        result = subprocess.run([sys.executable, "-I", "-c", program, str(installed)],
+                                cwd=self.temporary.name, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.strip(), "CC BY-SA 4.0")
 
     def test_metadata_and_console_entry_points(self):
         with zipfile.ZipFile(self.wheel) as archive:
