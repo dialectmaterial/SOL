@@ -11,6 +11,12 @@ def interactive_input_available() -> bool:
     return bool(sys.stdin.isatty())
 
 
+def _close_splash():
+    """Questions are asked on the ordinary screen, not under the opening screen."""
+    from sol.terminal import splash
+    splash.stop()
+
+
 def shell_identity(book: Book, args) -> None:
     """Resolve explicit launch choices, then ask only when no remembered choice exists.
 
@@ -32,6 +38,7 @@ def shell_identity(book: Book, args) -> None:
     if args.actor is None and preferences['last_actor'] in registered_names:
         args.actor = preferences['last_actor']
     if args.actor is None:
+        _close_splash()
         if not interactive_input_available():
             raise ValueError("actor setup needs interactive input. Supply --actor NAME --workspace NAME, "
                              "use sol -n for a temporary reader, or sol -r for a random passage.")
@@ -68,6 +75,7 @@ def shell_identity(book: Book, args) -> None:
     if not interactive_input_available():
         raise ValueError("workspace setup needs interactive input. Supply --workspace NAME --actor NAME, "
                          "use sol -n for a temporary reader, or sol -r for a random passage.")
+    _close_splash()
     from sol.workspace.catalog import discover_workspaces
     recent = discover_workspaces(book.corpus_manifest['corpus_id'], source_digest, args.workspace_dir)
     if recent:
