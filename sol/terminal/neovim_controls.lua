@@ -277,38 +277,54 @@ return function(reader)
   end
   local function help()
     if integrated then
-      show_lines({ "SOL reader (" .. mode .. ")", "",
-        "j/k, Ctrl-d/u    wrapped reading lines / half-window scroll",
-        "h/l, w           character / forward word motions",
-        "gg/G             start / end of this loaded reading section",
-        "b / n            previous / next paragraph",
-        "p                toggle continuous / one-paragraph reading",
-        "m1, m2, m3       attach/move one of three paragraph markers",
-        "'1, '2, '3       jump to a marker; dm1/dm2/dm3 clear it",
-        "y                copy the selection (or this paragraph) to the clipboard",
-        "mouse            scroll; drag to select, and the selection is copied",
-        "t                book outline: h/l branches, Enter read, Esc return",
-        "/                literal search across the whole book",
-        "Ctrl-P / Ctrl-N  previous / next search-result passage",
-        "Esc              hide the search-match marks",
-        "E                open ESSENCE beside the reader; in it Alt-F fullscreen, Alt-R back",
-        "Alt-Left/Right   return / forward through reading history",
-        "v                select text; y copies it, even across paragraphs",
-        "c                beside the text: pages, footnotes, your notes, markers",
-        "c, then Enter    read one book footnote; Enter follows a further link",
-        "Backspace / Esc  in a footnote: previous panel / exact passage selection",
-        "s                show the printed source of this passage (formulas)",
-        "a                write a personal note on this passage (workspace)",
-        "c, then e / r    edit your note under the cursor / show its earlier versions",
-        "f                toggle quiet focus mode",
-        "T                cycle Mocha / Latte / Paper / Night / Terminal for this session",
-        ":q  or  :qa      save your exact place and quit",
-        ":qa!             quit without saving the current cursor", "",
-        "In paragraph mode, j/k stay here. Use b/n to change paragraph.",
-        "In continuous mode, j/k can continue across reading sections.",
-        "Selections are transient; no annotation is created automatically.",
-        "Canonical text is read-only. Personal Neovim configuration is not loaded.",
-        "Esc closes this help." })
+      -- Sections of key / description; a wrapped description continues under
+      -- its own column, and the section names carry the heading colour.
+      local KEY = 17
+      local sections = {
+        { "Reading", {
+          { "j/k  Ctrl-d/u", "lines / half a window" },
+          { "h/l  w", "character / word motions" },
+          { "b / n", "previous / next paragraph" },
+          { "gg / G", "start / end of the loaded section" },
+          { "p", "continuous or one-paragraph reading" },
+          { "f", "quiet focus mode" },
+          { "T", "theme: Mocha, Latte, Paper, Night, Terminal (this session)" } } },
+        { "Finding your way", {
+          { "t", "book outline: h/l fold, Enter read" },
+          { "/", "search the whole book" },
+          { "Ctrl-P / Ctrl-N", "previous / next search result" },
+          { "Esc", "hide the search marks" },
+          { "Alt-Left/Right", "back / forward through your reading" },
+          { "m1 m2 m3", "set a paragraph marker; '1 '2 '3 jump, dm1… clear" } } },
+        { "Text, sources and notes", {
+          { "v  then y", "select; copy to the clipboard, across paragraphs too" },
+          { "mouse", "scroll; drag to select and copy" },
+          { "c", "beside the text: pages, footnotes, your notes, markers" },
+          { "c, Enter", "read a footnote; Backspace back, Esc to the passage" },
+          { "s", "the printed page of this passage (formulas)" },
+          { "a", "write a note on this passage (workspace)" },
+          { "c, e / r", "edit your note / its earlier versions" } } },
+        { "ESSENCE", {
+          { "E", "open beside the reader; inside, Alt-F fullscreen, Alt-R back" } } },
+        { "Leaving", {
+          { ":q  :qa", "save your exact place and quit" },
+          { ":qa!", "quit without saving" } } },
+      }
+      local lines, marks = { "SOL reader · " .. (mode == "paragraph" and "one paragraph" or "continuous") }, { { 1, "SOLSourceHeading" } }
+      for _, section in ipairs(sections) do
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = section[1]
+        marks[#marks + 1] = { #lines, "SOLSourceHeading" }
+        for _, row in ipairs(section[2]) do
+          lines[#lines + 1] = row[1] .. string.rep(" ", math.max(1, KEY - vim.fn.strdisplaywidth(row[1]))) .. row[2]
+        end
+      end
+      for _, note in ipairs({ "", "In one-paragraph reading j/k stay in the paragraph; b/n move on.",
+          "Selections are not saved; the book's text cannot be edited.", "Esc closes this help." }) do
+        lines[#lines + 1] = note
+        if note ~= "" then marks[#marks + 1] = { #lines, "NonText" } end
+      end
+      show_lines(lines, nil, marks, KEY)
       return
     end
     show_lines({ "Reader experiment — not a workspace editor", "",

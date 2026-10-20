@@ -469,6 +469,48 @@ end
 ''', integrated=True)
         self.assertTrue(report["restored"])
 
+    def test_help_groups_keys_and_wraps_under_their_descriptions(self):
+        report = self.run_lua(r'''
+  vim.o.columns, vim.o.lines = 120, 40
+  reader.help()
+  local panel = vim.api.nvim_get_current_win()
+  report.lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  report.breakindent = vim.wo[panel].breakindent
+  report.shift = vim.wo[panel].breakindentopt
+''', integrated=True)
+        lines = report["lines"]
+        for section in ("Reading", "Finding your way", "Text, sources and notes", "ESSENCE", "Leaving"):
+            self.assertIn(section, lines)
+        self.assertTrue(any(line.startswith(":qa!") and line[17:].startswith("quit without saving") for line in lines))
+        self.assertTrue(report["breakindent"])
+        self.assertEqual(report["shift"], "shift:17")
+
+    def test_outline_marks_folds_the_current_section_and_pages(self):
+        from sol.reader.structure import structure_payload
+        from unittest.mock import patch
+        from sol.terminal import neovim
+        original = neovim.build_payload
+        def payload(*args, **kwargs):
+            value = original(*args, **kwargs)
+            value["structure"] = structure_payload(self.sample.book, self.sample.passages[0])
+            return value
+        with patch.object(neovim, "build_payload", side_effect=payload):
+            report = self.run_lua(r'''
+  vim.o.columns, vim.o.lines = 140, 40
+  local tree = reader.tree()
+  report.lines = vim.api.nvim_buf_get_lines(tree.buffer, 0, -1, false)
+  report.width = vim.api.nvim_win_get_width(tree.window)
+''', integrated=True)
+        lines, width = report["lines"], report["width"]
+        self.assertLessEqual(width, 84)
+        self.assertTrue(any("▾" in line for line in lines))
+        current = [line for line in lines if "●" in line]
+        self.assertEqual(len(current), 1)
+        paged = [line for line in lines[2:] if line.rstrip().endswith(tuple("0123456789"))]
+        self.assertTrue(paged)
+        # Pages sit at the right edge of the panel.
+        self.assertTrue(all(len(line) == width for line in paged), paged)
+
     def test_missing_clipboard_provider_retains_register_but_refuses_success(self):
         report = self.run_lua(r'''
   local original = vim.fn.has

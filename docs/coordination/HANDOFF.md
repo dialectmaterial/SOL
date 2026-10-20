@@ -32,6 +32,26 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Clearer help and outline in the reader — 20 October 2026
+
+**Task:** maintainer request (20 October 2026): a better reader UI; no CURRENT_TASK entry.
+**Branch / PR:** `claude/reader-panels` · see the pull request
+**Last implementation commit:** `628f59fe9687b31f69f616e40ed85f36ca403be8` (this report is committed after it)
+
+### Changed files
+- `sol/terminal/neovim_controls.lua` — help in five sections, headings marked.
+- `sol/terminal/neovim_panels.lua` — `show_lines(..., hanging)` sets breakindent/shift.
+- `sol/terminal/neovim_tree.lua` — centred ≤84-column panel, rounded border and title, ▾/▸, ●, right-aligned pages, ellipsis for long titles.
+- `sol/reader/structure.py` — nodes carry `page`.
+- Tests (two new headless Neovim tests), BEING §2, CHANGELOG.
+
+### Tests performed
+- `scripts/check_docs.py` — OK; full unittest suite — OK (skipped=12, expected failures=4).
+- foot on the book, before and after screenshots of `?` and `t`.
+
+### Outstanding issues
+- None known.
+
 ## An opening screen while SOL loads — 20 October 2026
 
 **Task:** maintainer request (20 October 2026): a loading screen with Science Organizes Logic and something moving; no CURRENT_TASK entry.
