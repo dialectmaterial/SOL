@@ -132,7 +132,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         _, notice = actions.restore()
     else:
         actions.read((), first=True)
-    transient_markers = {}
+    transient_markers, transient_landmarks = {}, {}
     source_service, source_requests = None, {}
     mode = "continuous"
     focused = False
@@ -158,6 +158,36 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                     row["label"] = "saved paragraph is unavailable; replace or clear this marker"
             rows.append(row)
         return {"persistent": workspace_reader is not None, "slots": rows}
+
+    def landmark_name(name):
+        # A reader's own words; SOL's internal "sol:" names stay out of reach.
+        if not isinstance(name, str) or not 1 <= len(name.strip()) <= 80 or name.strip().startswith("sol:") \
+                or any(unicodedata.category(c) in {"Cc", "Cf", "Cs", "Zl", "Zp"} for c in name):
+            raise ValueError("a landmark name is 1–80 characters of ordinary text")
+        return name.strip()
+
+    def landmark_rows():
+        saved = (dict(transient_landmarks) if workspace_reader is None else
+                 {row["name"]: row for row in workspace_reader.store.list_bookmarks()
+                  if not row["name"].startswith("sol:")})
+        rows = []
+        for name in sorted(saved, key=str.casefold):
+            row = {"name": safe_label(name), "target": None, "label": "saved paragraph is unavailable"}
+            try:
+                passage = book.find_passage(saved[name]["target_id"])
+                snippet = " ".join(passage.text.split())[:64]
+                row.update(target=saved[name]["target_id"],
+                           label=f"{passage.heading or passage.node.title} | p. {passage.printed_page} | {snippet}")
+            except ValueError:
+                pass
+            rows.append(row)
+        return rows
+
+    def landmarks(action, name=None):
+        return {"landmarks": {"persistent": workspace_reader is not None, "action": action,
+                              "name": safe_label(name or ""), "rows": [
+                                  {key: row[key] for key in ("name", "label")} | {"available": row["target"] is not None}
+                                  for row in landmark_rows()]}}
 
     def personal_notes(shown):
         """The workspace's notes on the shown passages, following retired IDs.
@@ -230,6 +260,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         "marker_set": [("slot", lambda slot: type(slot) is int and slot in (1, 2, 3),
                         "reader markers have slots 1, 2 and 3")],
         "node_open": [("node", lambda node: True, "")],
+        "landmark_set": [("name", lambda name: isinstance(name, str), "name the landmark")],
+        "landmark_open": [("name", lambda name: isinstance(name, str), "choose a listed landmark")],
         "page_open": [("page", lambda page: type(page) is int and 1 <= page <= 100000,
                        "type a printed page number")],
         "source_preview": [("page", lambda page: type(page) is int, "choose a source page by number")],
@@ -250,9 +282,10 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                             "choose a source passage listed in ESSENCE")],
     }
     extra_fields["marker_clear"] = extra_fields["marker_open"] = extra_fields["marker_set"]
+    extra_fields["landmark_clear"] = extra_fields["landmark_set"]
     navigation_actions = {"next", "previous", "passage_next", "passage_previous", "node_open", "page_open",
-                          "marker_open", "search_open", "search_next", "search_previous", "history_back",
-                          "history_forward", "essence_source"}
+                          "landmark_open", "marker_open", "search_open", "search_next", "search_previous",
+                          "history_back", "history_forward", "essence_source"}
 
     def search_panel(request, identifier):
         # Searching does not move the cursor, save a visit or erase a selection.
@@ -296,6 +329,23 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         else:
             workspace_reader.remove_bookmark(marker_name(slot))
         return {"markers": markers()}
+
+    def landmark_panel(request, identifier):
+        operation = request["op"]
+        if operation == "landmark_list":
+            return landmarks("list")
+        name = landmark_name(request["name"])
+        if operation == "landmark_set":
+            if workspace_reader is None:
+                transient_landmarks[name] = {"target_id": identifier}
+            else:
+                workspace_reader.save_bookmark(name, actions.session, identifier, replace=True)
+            return landmarks("set", name)
+        if workspace_reader is None:
+            transient_landmarks.pop(name, None)
+        else:
+            workspace_reader.remove_bookmark(name)
+        return landmarks("cleared", name)
 
     def note_panel(request, identifier):
         # The note binds the requested passage and its content digest through
@@ -394,7 +444,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                             "env": environment}}
 
     panels = {"search": search_panel, "source_preview": source_panel, "source_pdf": source_panel,
-              "marker_set": marker_panel, "marker_clear": marker_panel, "note_add": note_panel,
+              "marker_set": marker_panel, "marker_clear": marker_panel, "landmark_list": landmark_panel,
+              "landmark_set": landmark_panel, "landmark_clear": landmark_panel, "note_add": note_panel,
               "note_edit": note_edit_panel, "note_history": note_history_panel, "footnote_open": footnote_panel, "essence_open": essence_panel}
 
     def handle(request):
@@ -443,6 +494,12 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             row = next((row for row in payload["structure"]["nodes"] if row["key"] == request["node"]), None)
             if row is None or row["target"] is None:
                 raise ValueError("this tree branch has no readable passage")
+            target, offset = row["target"], 0
+        elif operation == "landmark_open":
+            name = landmark_name(request["name"])
+            row = next((row for row in landmark_rows() if row["name"] == name), None)
+            if row is None or row["target"] is None:
+                raise ValueError("that landmark is gone or its paragraph is unavailable")
             target, offset = row["target"], 0
         elif operation == "page_open":
             # The first paragraph printed on that page, or running onto it.

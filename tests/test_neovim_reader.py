@@ -315,6 +315,54 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             self.assertEqual(self.run_view(), 0)
         self.assertEqual(self.files(), before)
 
+    def test_named_landmarks_use_workspace_bookmarks_and_open_their_paragraph(self):
+        self.extend(3)
+        service = self.service()
+        actions = self.position(service)
+        service.save_bookmark("An ordinary named bookmark", actions.session)
+        def native(payload, _, on_request):
+            def request(op, record=0, **fields):
+                return on_request({"op": op, "packet": self.reply(payload, record=record)["packet"],
+                                   "mode": "continuous", **fields})
+            on_request({"op": "marker_set", "slot": 1, "packet": self.reply(payload)["packet"], "mode": "continuous"})
+            result = request("landmark_set", record=2, name="  Being and nothing  ")["landmarks"]
+            self.assertEqual((result["action"], result["name"], result["persistent"]), ("set", "Being and nothing", True))
+            self.assertEqual(service.store.get_bookmark("Being and nothing")["target_id"],
+                             self.book.passages[2].identifier)
+            listed = request("landmark_list")["landmarks"]["rows"]
+            # Shell bookmarks are landmarks too; SOL's marker slots are not.
+            self.assertEqual([row["name"] for row in listed], ["An ordinary named bookmark", "Being and nothing"])
+            self.assertTrue(all(row["available"] for row in listed))
+            shown = request("landmark_open", name="Being and nothing")["payload"]
+            self.assertEqual(shown["restore"]["reference"]["reference"]["target_id"], self.book.passages[2].identifier)
+            for bad in ("", "sol:reader-marker:1", "x" * 81, "line\nbreak"):
+                with self.subTest(name=bad), self.assertRaises(ValueError):
+                    request("landmark_set", name=bad)
+            with self.assertRaisesRegex(ValueError, "landmark is gone"):
+                request("landmark_open", name="Never named")
+            cleared = request("landmark_clear", name="Being and nothing")["landmarks"]
+            self.assertEqual([row["name"] for row in cleared["rows"]], ["An ordinary named bookmark"])
+            self.assertIsNotNone(service.store.get_bookmark("sol:reader-marker:1"))
+            return 0, {"action": "quit", "packet": shown["restore"]}
+        with patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+
+    def test_temporary_landmarks_last_for_the_session_without_a_workspace(self):
+        self.extend(3)
+        before = self.files()
+        def native(payload, _, on_request):
+            packet = self.reply(payload, record=1)["packet"]
+            result = on_request({"op": "landmark_set", "name": "Quality", "packet": packet, "mode": "paragraph"})
+            self.assertFalse(result["landmarks"]["persistent"])
+            shown = on_request({"op": "landmark_open", "name": "Quality", "packet": packet,
+                                "mode": "paragraph"})["payload"]
+            self.assertEqual(shown["restore"]["reference"]["reference"]["target_id"], self.book.passages[1].identifier)
+            return 0, {"action": "quit", "packet": shown["restore"]}
+        with patch.object(neovim, "launch_payload", side_effect=native), \
+                patch("sol.workspace.store.Workspace", side_effect=AssertionError("No personal store")):
+            self.assertEqual(self.run_view(), 0)
+        self.assertEqual(self.files(), before)
+
     def test_live_section_transition_does_not_restart_the_native_process(self):
         self.extend(3)
         def native(payload, _, on_request):

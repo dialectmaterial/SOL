@@ -678,6 +678,41 @@ end
         self.assertIn("No PDF viewer is available (install Zathura", missing)
         self.assertIn("Recorded region of PDF page 7", missing)
 
+    def test_landmarks_are_named_listed_opened_and_forgotten(self):
+        report = self.run_lua(r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local resting = reader.capture('n', nil, reader.source_point(data.records[1].id, 7))
+  reader.restore(resting)
+  vim.fn.input = function() return 'Being and nothing' end
+  vim.api.nvim_feedkeys('M', 'xt', false)
+  assert(#sent == 1 and sent[1].op == 'landmark_set' and sent[1].name == 'Being and nothing')
+  _G.SOLReaderChannel.pending[sent[1].id]({landmarks = {action = 'set', name = 'Being and nothing',
+    persistent = true, rows = {}}})
+  assert(vim.api.nvim_get_current_win() == reader.window, 'naming a landmark opens no panel')
+  vim.api.nvim_feedkeys('L', 'xt', false)
+  assert(sent[2].op == 'landmark_list')
+  local rows = {{name = 'Being and nothing', label = 'Quality | p. 81 | Being, pure being', available = true},
+                {name = 'Measure', label = 'saved paragraph is unavailable', available = false}}
+  _G.SOLReaderChannel.pending[sent[2].id]({landmarks = {action = 'list', name = '', persistent = true, rows = rows}})
+  report.panel = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  vim.api.nvim_feedkeys('D', 'xt', false)
+  assert(sent[3].op == 'landmark_clear' and sent[3].name == 'Being and nothing')
+  _G.SOLReaderChannel.pending[sent[3].id]({landmarks = {action = 'cleared', name = 'Being and nothing',
+    persistent = true, rows = rows}})
+  vim.api.nvim_feedkeys(vim.keycode('<CR>'), 'xt', false)
+  assert(sent[4].op == 'landmark_open' and sent[4].name == 'Being and nothing')
+  report.count = #sent
+''', integrated=True)
+        panel = "\n".join(report["panel"])
+        self.assertIn("Landmarks", panel)
+        self.assertIn("Quality | p. 81 | Being, pure being", panel)
+        self.assertIn("Enter reads a landmark; D forgets it", panel)
+        self.assertEqual(report["count"], 4)
+
     def test_note_editor_saves_restores_selection_and_protects_drafts(self):
         report = self.run_lua(r'''
   local sent = {}

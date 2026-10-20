@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Named landmarks — 20 October 2026
+
+`M` names the place you are reading and `L` lists your named places; Enter
+opens one and `D` forgets it. They are the workspace's bookmarks, so names
+made with the shell's `bookmark` appear too. Temporary `-n` sessions keep them
+until the session ends.
+
 ### The printed page in Zathura — 20 October 2026
 
 `S` opens the passage's printed page in a PDF viewer (Zathura when installed),

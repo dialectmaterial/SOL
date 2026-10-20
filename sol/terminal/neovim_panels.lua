@@ -91,7 +91,7 @@ return function(reader)
     end
     return capture()
   end
-  local show_search, show_source, show_pdf
+  local show_search, show_source, show_pdf, show_landmarks
   show_search = function(result)
     local lines = {'Search: ' .. result.query, 'Whole book, literal and case-insensitive. ' .. result.total .. ' matches in ' .. #result.rows .. ' passages.', ''}
     local rows = {}
@@ -111,6 +111,42 @@ return function(reader)
       local number = rows[api.nvim_win_get_cursor(panels.window)[1]]
       if not number then return end
       close_popup(); request('search_open', {result = number})
+    end, {buffer = panel, silent = true})
+  end
+  -- Named landmarks: the workspace's bookmarks, or this session's when temporary.
+  -- Naming one only echoes; the list opens one with Enter and forgets one with D.
+  show_landmarks = function(result)
+    if result.action == 'set' then
+      api.nvim_echo({{'Landmark "' .. result.name .. '" is here' ..
+        (result.persistent and '' or ' for this session'), 'None'}}, false, {})
+      return
+    end
+    local lines = {'Landmarks' .. (result.persistent and '' or ' (this session only)'), ''}
+    local rows = {}
+    for _, item in ipairs(result.rows) do
+      lines[#lines + 1] = item.name
+      rows[#lines] = item
+      lines[#lines + 1] = '   ' .. item.label
+      rows[#lines] = item
+    end
+    if #result.rows == 0 then lines[#lines + 1] = 'None yet: M names the place you are reading.' end
+    lines[#lines + 1] = ''
+    lines[#lines + 1] = 'Enter reads a landmark; D forgets it; Esc returns unchanged.'
+    show_lines(lines, nil, {{1, 'SOLSourceHeading'}})
+    local panel = api.nvim_get_current_buf()
+    if #result.rows > 0 then api.nvim_win_set_cursor(panels.window, {3, 0}) end
+    local function chosen()
+      return rows[api.nvim_win_get_cursor(panels.window)[1]]
+    end
+    vim.keymap.set('n', '<CR>', function()
+      local item = chosen()
+      if not item then return end
+      if not item.available then vim.notify('That landmark\'s paragraph is unavailable', vim.log.levels.WARN); return end
+      close_popup(); request('landmark_open', {name = item.name})
+    end, {buffer = panel, silent = true})
+    vim.keymap.set('n', 'D', function()
+      local item = chosen()
+      if item then request('landmark_clear', {name = item.name}) end
     end, {buffer = panel, silent = true})
   end
   -- The printed page is the authority for formulas the typed text cannot carry.
@@ -172,7 +208,7 @@ return function(reader)
 
   panels.close_popup, panels.show_lines, panels.current_packet = close_popup, show_lines, current_packet
   panels.side_config = side_config
-  panels.show_search, panels.show_source = show_search, show_source
+  panels.show_search, panels.show_source, panels.show_landmarks = show_search, show_source, show_landmarks
   panels.source, panels.source_pdf, panels.show_pdf = source, source_pdf, show_pdf
   return panels
 end
