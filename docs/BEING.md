@@ -54,6 +54,7 @@ The current implementation also includes literal book search, source-positioned 
 | `t` | Dynamic structure tree (Vim-style navigation) |
 | `c` | Beside the text when there is room: pages, footnotes, your notes, markers and the record; Enter on a footnote reads it, `e` edits your note and `r` shows its versions |
 | `a` | Write a personal note on this passage, saved in the workspace (`Ctrl-S` or `:w` saves, `Ctrl-C` discards) |
+| `gp` | Go to a printed page: type its number (the status line shows the page you are on) |
 | `s` | Printed source of this passage (formulas), cropped from the verified PDF, in a separate image viewer |
 | `E` | Open ESSENCE beside the reader (needs the `essence` extra); in ESSENCE, Alt-F toggles fullscreen and Alt-R returns to the reader; a word's source chosen in ESSENCE opens here, and Alt-Left returns |
 | `f` | Quiet focus mode; keep important warnings |
@@ -281,7 +282,7 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 ## 7. Boundaries and known limitations
 
 - Current normal reading is bounded by chapters/64-record sections, not a whole-book text buffer.
-- `gg`/`G` reach the ends of the loaded section, not the book, and there is no jump to a printed page although the status line shows it.
+- `gg`/`G` reach the ends of the loaded section, not the book; `gp` jumps to a printed page (20 October), the outline to any section.
 - `/` lists at most 20 matching passages and `Ctrl-N`/`Ctrl-P` step between passages, not occurrences; later passages of a common word are out of reach and no count is shown.
 - The reader exposes three quick markers; the workspace's named bookmarks are not yet listed or reachable from it.
 - Reader keys are fixed: the private Neovim configuration has no user keymap file.

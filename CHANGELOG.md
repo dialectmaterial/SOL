@@ -11,6 +11,11 @@
 - Reuse text-keyed occurrence projections and align ordinary text directly to
   keep common-word searches responsive; Unicode fallback warnings remain explicit.
 
+### Go to a printed page — 20 October 2026
+
+`gp` asks for a printed page and opens the first paragraph on it, so a
+citation such as "p. 240" is one step away.
+
 ### The opening screen says SOL's own name — 20 October 2026
 
 The line *Science Organizes Logic* under the title is gone: the title is
