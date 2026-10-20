@@ -129,6 +129,11 @@ class ThemeConfigurationTests(unittest.TestCase):
         path.write_text(json.dumps({"version": 1, "theme": "sepia"}), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "sol --set-theme NAME"):
             config.configured_theme(READER_THEMES)
+        # Malformed values get the same diagnostic, not a TypeError from the rename lookup.
+        for malformed in ([], {}, ["dark"]):
+            path.write_text(json.dumps({"version": 1, "theme": malformed}), encoding="utf-8")
+            with self.subTest(theme=malformed), self.assertRaisesRegex(ValueError, "sol --set-theme NAME"):
+                config.configured_theme(READER_THEMES, LEGACY_READER_THEMES)
         with self.assertRaises(ValueError):
             config.save_theme("sepia", READER_THEMES)
 

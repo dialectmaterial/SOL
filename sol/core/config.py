@@ -183,7 +183,8 @@ def configured_theme(choices, renamed=None) -> str | None:
     """
     data = _read_config("sol --set-theme NAME")
     value = None if data is None else data.get("theme")
-    value = (renamed or {}).get(value, value)
+    if isinstance(value, str):
+        value = (renamed or {}).get(value, value)
     if value is not None and value not in choices:
         raise ValueError(f"Invalid SOL configuration {config_path()}: theme must be one of "
                          f"{', '.join(choices)}.\nReset it with sol --set-theme NAME.")
