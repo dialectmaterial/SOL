@@ -32,6 +32,27 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## SOL's own themes and a reading window — 20 October 2026
+
+**Task:** maintainer request (20 October 2026): a SOL theme like actualspirit.com, with its fonts; no CURRENT_TASK entry.
+**Branch / PR:** `claude/spirit-theme` · see the pull request
+**Last implementation commit:** `153112ca14d7a54a3444b89ed824e15cb5155a3a` (this report is committed after it)
+
+### Changed files
+- `sol/terminal/theme.py`, `sol/reader/options.py` — Paper and Night palettes (contrast-tested); presets carry `background`; `paper` is no longer a legacy alias.
+- `sol/terminal/neovim_view.lua` — validates and uses each preset's background; status line keeps a gap, trimming the path from its start.
+- `sol/essence/tui/app.py` — `sol-paper` / `sol-night` Textual themes.
+- `sol/terminal/window.py`, `sol/terminal/fonts/` (Libertinus Mono + OFL), `pyproject.toml`, `MANIFEST.in` — `sol-window`.
+- Tests (`test_window.py` new; theme, surface, packaging), BEING §1/§2/§4, ARCHITECTURE, README, CHANGELOG.
+
+### Tests performed
+- `scripts/check_docs.py` — OK; full unittest suite — OK (skipped=12, expected failures=4).
+- Real window: `sol-window -n` on the book in foot, screenshotted: Libertinus Mono on Paper, purple heading, italics synthesized by foot. Proportional Source Serif 4 was tried in foot and kitty and rejected (letter-spaced / refused).
+
+### Outstanding issues
+- Kitty and Alacritty paths are tested as command lines only, not opened.
+- Defaults the maintainer may overrule: Mocha stays the default for `sol`; `sol-window` defaults to Paper; font size 13.
+
 ## Verified reader startup speed — 20 October 2026
 
 **Task:** maintainer request via Claude in session; profile the real book and reduce startup without weakening verification. No CURRENT_TASK entry.

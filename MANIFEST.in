@@ -4,6 +4,7 @@ recursive-include docs *.md
 include docs/legacy/inventory.json
 include pyproject.toml MANIFEST.in
 recursive-include sol *.py *.lua
+include sol/terminal/fonts/LibertinusMono-Regular.ttf sol/terminal/fonts/OFL.txt
 include sol/essence/encyclopedia.json
 include sol/essence/methods.json
 recursive-include tests *.py

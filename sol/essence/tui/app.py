@@ -12,6 +12,7 @@ import json
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.theme import Theme
 from textual import work
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import (Button, DataTable, Footer, Input, Label, Markdown, OptionList, RadioButton, RadioSet, Static,
@@ -23,7 +24,17 @@ from sol.essence.tui import sentences, words
 from sol.essence.tui.context import load_state, save_state
 from sol.reader.options import DEFAULT_READER_THEME
 
-TEXTUAL_THEMES = {"mocha": "catppuccin-mocha", "latte": "catppuccin-latte", "terminal": "ansi-dark"}
+TEXTUAL_THEMES = {"mocha": "catppuccin-mocha", "latte": "catppuccin-latte", "paper": "sol-paper",
+                  "night": "sol-night", "terminal": "ansi-dark"}
+# SOL's own, matching the reader's Paper and Night (actualspirit.com).
+SOL_THEMES = (
+    Theme(name="sol-paper", primary="#55308a", secondary="#45424d", accent="#55308a", warning="#9b2c2c",
+          error="#9b2c2c", success="#3d6b3a", foreground="#17151c", background="#f3f0e6", surface="#ebe7d9",
+          panel="#e4dfcf", dark=False),
+    Theme(name="sol-night", primary="#c3a6ee", secondary="#a29cae", accent="#c3a6ee", warning="#e8a87c",
+          error="#e8a87c", success="#a6c99a", foreground="#ece7da", background="#1b1820", surface="#221e28",
+          panel="#2a2531", dark=True),
+)
 
 SOURCES_HELP = ("Every occurrence of the highlighted word: Enter on a word comes here, Enter here opens it "
                 "in the reader (Alt-Left there returns to where you were), Escape goes back to the words.")
@@ -87,6 +98,8 @@ class EssenceApp(App):
 
     def __init__(self, context, theme=DEFAULT_READER_THEME, theme_file=None):
         super().__init__()
+        for sol_theme in SOL_THEMES:
+            self.register_theme(sol_theme)
         # Textual's own Catppuccin themes; Terminal uses the terminal's ANSI colors.
         self.theme = TEXTUAL_THEMES[theme]
         self.theme_file = theme_file

@@ -49,7 +49,8 @@ George di Giovanni PDF if no corpus exists, converts it locally once, then sets
 up an actor and workspace. An existing corpus can be selected with
 `sol --set-corpus /absolute/path/to/local-corpus`. The book is not bundled or
 downloaded. Use `b/n` for paragraphs, `p` for reading mode, `?` for keys, and
-`:q` to save and leave; `sol guide` is a compact introduction.
+`:q` to save and leave; `sol guide` is a compact introduction. `sol-window`
+opens the reader in a window of its own, in a book face (Libertinus Mono) on SOL's Paper theme.
 
 ## Documentation
 

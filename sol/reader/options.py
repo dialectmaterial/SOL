@@ -11,11 +11,12 @@ from sol import __version__ as VERSION
 
 DEFAULT_READER_WIDTH = 72
 # Presentation presets; their highlight data lives in sol.terminal.theme.
-# Catppuccin Mocha and Latte (catppuccin.com); Terminal inherits your own colors.
-READER_THEMES = ("mocha", "latte", "terminal")
+# Paper and Night are SOL's own, from actualspirit.com; Catppuccin Mocha and
+# Latte (catppuccin.com); Terminal inherits your own colors.
+READER_THEMES = ("mocha", "latte", "paper", "night", "terminal")
 DEFAULT_READER_THEME = "mocha"
-# Names saved before Catppuccin replaced the Dark and Paper presets.
-LEGACY_READER_THEMES = {"dark": "mocha", "paper": "latte"}
+# A name saved before Catppuccin replaced the earlier Dark preset.
+LEGACY_READER_THEMES = {"dark": "mocha"}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -72,7 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--set-source-pdf", type=Path, metavar="PATH",
                       help="verify and remember the corpus's original PDF for source previews (s in the reader)")
     mode.add_argument("--set-theme", choices=READER_THEMES, metavar="{" + ",".join(READER_THEMES) + "}",
-                      help="remember the reader's theme: Catppuccin mocha (dark) or latte (light); terminal inherits your colors")
+                      help="remember the reader's theme: Catppuccin mocha (dark) or latte (light); SOL's paper (light) or night (dark); terminal inherits your colors")
     mode.add_argument("--resume", action="store_true", help="resume the named workspace's saved passage")
     mode.add_argument("--workspace-export", action="store_true", help="export a workspace snapshot (JSON by default)")
     mode.add_argument("--workspace-check", action="store_true", help="report unresolved, retired and versioned workspace references")
