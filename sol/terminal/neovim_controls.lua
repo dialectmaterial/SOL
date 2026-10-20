@@ -292,7 +292,7 @@ return function(reader)
         { "Finding your way", {
           { "t", "book outline: h/l fold, Enter read" },
           { "/", "search the whole book" },
-          { "Ctrl-P / Ctrl-N", "previous / next search result" },
+          { "Ctrl-P / Ctrl-N", "previous / next search occurrence" },
           { "Esc", "hide the search marks" },
           { "Alt-Left/Right", "back / forward through your reading" },
           { "m1 m2 m3", "set a paragraph marker; '1 '2 '3 jump, dm1… clear" } } },

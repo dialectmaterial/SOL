@@ -260,7 +260,7 @@ class ReaderCursorTests(unittest.TestCase):
     def test_search_navigation_wraps_latest_results_in_both_directions(self):
         self.actions.read((), first=True)
         self.actions.search('invented', ())
-        for identifier in (IDS[1], IDS[2], IDS[0]):
+        for identifier in (IDS[0], IDS[1], IDS[2], IDS[0]):
             self.assertEqual(self.actions.search_next().identifier, identifier)
             self.assertEqual(self.actions.cursor_offset, self.actions.snapshot().current.text.index('invented'))
         self.assertEqual(self.actions.search_next(reverse=True).identifier, IDS[2])

@@ -45,7 +45,7 @@ The current implementation also includes literal book search, source-positioned 
 | `p` | Continuous / single-paragraph mode |
 | `gg` / `G` | Start / end of *loaded section*, not entire book |
 | `/` + Enter | Literal case-insensitive search across book; select result; its matches are marked, `Esc` hides the marks until the next result |
-| `Ctrl-N` / `Ctrl-P` | Next / previous result paragraph |
+| `Ctrl-N` / `Ctrl-P` | Next / previous search occurrence, wrapping through the whole book |
 | `Alt-Left` / `Alt-Right` | Session reading history back / forward |
 | `v`, move, `Esc` | Transient selection; notes and `E` take one passage, `y` may span several |
 | `y` | Copy the selection (exact source text, paragraphs joined by a blank line) or the current paragraph to the system clipboard |
@@ -63,6 +63,21 @@ The current implementation also includes literal book search, source-positioned 
 | `:qa!` | Quit without saving the current position |
 
 `n` means *next paragraph*, **not** Neovim's default next regex match. `gg/G` operate only within the loaded section. Selections are not automatically saved as annotations; one that spans paragraphs can be copied, but notes and ESSENCE take a single passage. A note written with `a` attaches to the whole passage through the same workspace service as the shell's `note add` (actor, content digest, revision history); a selection is shown above the editor as context but is not stored, because no workspace schema records spans. Drafts survive closing the editor or a failed save, until saved or discarded with `Ctrl-C`. The `c` popup lists the workspace's notes on the passage; temporary `-n` sessions refuse personal notes. Footnotes are the edition's own notes, separate from yours: each footnote's number is drawn as a dim superscript (`⁹⁵`, or `[k]` for lettered notes) where the canonical Markdown records its callout. In `c`, move onto a book footnote and press Enter to read it in a separate view. The number is display only — it is not in `plain_text`, so search, selection and offsets ignore it. Search and passage navigation preserve source offsets as far as the verified projection allows.
+
+**Complete book search (20 October):** `/` lists every matching passage without a
+20-passage ceiling and gives the total occurrence count. Enter opens a passage's
+first occurrence; `Ctrl-N` / `Ctrl-P` visit individual occurrences in source
+order, across paragraphs and loaded sections, wrapping in both directions. The
+status line shows the opened match as `12 of 87` while its search marks are
+visible. `Esc` hides the marks and count. Search remains literal,
+case-insensitive NFC/casefold substring matching, excluding generated facsimile
+captions. A Unicode fragment or a match across an excluded caption can have no
+exact contiguous source span: it still counts and has its own visit, at the
+passage start with the existing projection warning, without a guessed highlight
+or source offset. Occurrence data is transient, reused only while the query and
+source text values agree; opening results still verifies the canonical source
+and stages the destination before saving. Automated controller and headless
+Neovim checks cover these behaviors; sustained manual reading remains untested.
 
 **Book footnote reading (18 October):** `c` works from a cursor or a passage-local visual selection. Its book notes, personal notes and technical source context have separate headings. Enter on a book-note row opens only that note, with its canonical `note_paragraph` children ordered by `order`, original emphasis, per-paragraph attribution, review warnings and display-only callouts. Enter on a listed further footnote follows that link. Backspace returns to the preceding note at its earlier panel cursor, or to `c`; Esc or `q` returns directly to the exact passage cursor and selection in the same reading mode. Resizing closes the panel and restores the passage. Opening or following a note checks the source again and saves no reading visit or workspace data. A refused request leaves the preceding panel available; a reply received after that panel closes is ignored.
 

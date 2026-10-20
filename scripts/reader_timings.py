@@ -237,7 +237,7 @@ def benchmark(corpus=None, *, repeats=5, warmups=1, width=72):
                                "Startup includes fresh book load, temporary SQLite creation and first controller payload.",
                                "Controller operations include real validation, persistence and payload preparation.",
                                "Study includes saving its artifact in isolated temporary XDG data.",
-                               "Search uses the first 80 whitespace-normalized characters of the first passage, limit 20.",
+                               "Search uses the first 80 whitespace-normalized characters of the first passage, all matching passages.",
                                "Typography is a standalone single pass, not an attributed part of payload time.",
                                "Stage/operation timings overlap; do not add them or infer causation from subtraction.",
                                "Ordinary=min linked notes, heavy=max; section lengths are not matched."],

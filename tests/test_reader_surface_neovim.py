@@ -1439,7 +1439,7 @@ while True:
     def test_search_marks_highlight_matches_until_escape(self):
         report = self.run_lua(r'''
   local payload = vim.deepcopy(data)
-  payload.search_marks = {id = data.records[1].id, spans = {{0, 3}}}
+  payload.search_marks = {id = data.records[1].id, spans = {{0, 3}}, position = 12, total = 87}
   assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(payload)
   reader = SOLNvimReader
   local function count()
@@ -1449,6 +1449,7 @@ while True:
     end
     return found
   end
+  report.status = SOLStatus()
   report.before = count()
   vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
   report.after = count()
@@ -1456,8 +1457,31 @@ while True:
   broken.search_marks = {id = data.records[1].id, spans = {{2, 1}}}
   report.refused = not pcall(loadfile(os.getenv('SOL_NVIM_ADAPTER')), broken)
 ''', integrated=True)
+        self.assertIn("12 of 87", report["status"])
         self.assertEqual((report["before"], report["after"]), (1, 0))
         self.assertTrue(report["refused"])
+
+    def test_search_panel_counts_all_matches_and_opens_a_late_passage(self):
+        report = self.run_lua(r'''
+  local directory = vim.fn.fnamemodify(os.getenv('SOL_NVIM_ADAPTER'), ':h')
+  local full = {text = assert(loadfile(directory .. '/neovim_text.lua'))()}
+  full.view = assert(loadfile(directory .. '/neovim_view.lua'))()(full, data)
+  full.requests = {request = function(op, fields) report.op = op; report.number = fields.result end}
+  full.panels = assert(loadfile(directory .. '/neovim_panels.lua'))()(full)
+  local rows = {}
+  for i = 1, 25 do rows[i] = {number = i, label = 'Passage ' .. i, snippet = 'Invented match.'} end
+  full.panels.show_search({query = 'match', total = 87, rows = rows})
+  local lines = vim.api.nvim_buf_get_lines(vim.api.nvim_get_current_buf(), 0, -1, false)
+  assert(lines[2]:find('87 matches in 25 passages', 1, true))
+  for i, line in ipairs(lines) do
+    if line:find('25. Passage 25', 1, true) then
+      vim.api.nvim_win_set_cursor(full.panels.window, {i, 0})
+      vim.api.nvim_feedkeys(vim.keycode('<CR>'), 'xt', false)
+      break
+    end
+  end
+''', integrated=True)
+        self.assertEqual((report["op"], report["number"]), ("search_open", 25))
 
     def test_dismissed_search_marks_stay_hidden_until_a_new_result(self):
         report = self.run_lua(r'''

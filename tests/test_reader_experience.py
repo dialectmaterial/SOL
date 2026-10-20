@@ -369,7 +369,9 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
             pipe.send_text("\r")
             await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[0])
             pipe.send_text("\x0e")
-            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[1])
+            await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[0]
+                                and actions.cursor_offset == actions.book.passages[0].text.index("e",
+                                    actions.book.passages[0].text.index("e") + 1))
             pipe.send_text("\x10")
             await self.wait_for(lambda: actions.snapshot().current.identifier == IDS[0])
             pipe.send_text("\x10")
@@ -419,8 +421,10 @@ class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
                                 for style, _ in fragments[last:last + 6]))
             trail = len(actions._trail)
             pipe.send_text("\x0e")
-            await self.wait_for(lambda: view.application.layout.has_focus(view.body))
-            self.assertEqual(len(actions._trail), trail)
+            await self.wait_for(lambda: actions.cursor_offset == last)
+            self.assertEqual(len(actions._trail), trail + 1)
+            pipe.send_text("\x1b[1;3D")
+            await self.wait_for(lambda: actions.cursor_offset == len(prefix))
             pipe.send_text("\x1b[1;3D")
             await self.wait_for(lambda: actions.cursor_offset == 4)
             self.assertEqual(actions.selection, selected)
