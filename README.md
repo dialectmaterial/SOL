@@ -1,4 +1,4 @@
-# SOL — SOL Organizes Logic
+# SOL Organizes Logic
 
 SOL is a recursive acronym that stands for SOL Organizes Logic. It is a reader and research workspace centered on Hegel’s *Science of Logic*. Its larger ambition is to become an encyclopedic system for studying how texts, concepts, and the Idea are organized, bringing philosophical science into conversation with computational linguistics, machine learning, deep learning and operating systems.
 
