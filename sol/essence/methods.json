@@ -1,0 +1,310 @@
+{
+  "entries": [
+    {
+      "id": "words",
+      "title": "Word frequencies",
+      "summary": "Count literal words and report each count and its rate per 10,000 included word tokens. Words are normalized with NFC, case folding and straight apostrophes; the result keeps source digests and first-occurrence offsets for each word in each input.",
+      "inputs": [
+        "A verified local CORE corpus, selected with --corpus DIRECTORY or corpus discovery.",
+        "Or an explicit regular UTF-8 text file."
+      ],
+      "settings": [
+        {
+          "name": "--provider / --input-file (alias --file)",
+          "meaning": "Use CORE or an explicit regular UTF-8 file; a file selects the file provider by default."
+        },
+        {
+          "name": "--within / --passage",
+          "meaning": "Choose a CORE reader subtree or repeat exact passage UUIDs; otherwise use the whole source."
+        },
+        {
+          "name": "--span START END",
+          "meaning": "Half-open offsets in original Unicode codepoints, in a file or exactly one --passage; do not combine with --within."
+        },
+        {
+          "name": "--compare / --reference-*",
+          "meaning": "Optionally count an independent reference; --compare alone uses the whole target source. Reference provider, file or corpus, subtree, passages and span can be chosen separately."
+        },
+        {
+          "name": "Tokenization (fixed)",
+          "meaning": "Unicode letters with combining marks and internal apostrophes; numbers and punctuation are not word tokens. No stemming or stop-word removal."
+        }
+      ],
+      "output": "sol.word-frequencies v1 JSON: CLI --json prints to stdout (redirect to save). ESSENCE Save writes words-<timestamp>[-N].sol-analysis.json under $XDG_DATA_HOME/sol/studies, or ~/.local/share/sol/studies.",
+      "limits": [
+        "CORE includes eligible Hegel main-text paragraphs, quotations and list items under the three doctrine reader paths; pending source reviews and non-prose records are excluded, and trailing facsimile labels are masked. File input is verbatim and has no CORE eligibility filters.",
+        "Only wholly contained tokens count in a span; zero-token rates are null. JSON is limited to 16 MiB; input files to 64 MiB.",
+        "Rows sort by decreasing target count, then word; ESSENCE displays at most 2,000 rows and 1,000 occurrences for a selected word. Saved locations contain only the first occurrence per input.",
+        "Lexical counts do not measure concepts or similarity."
+      ],
+      "cli": "sol analyze words --input-file target.txt --json > words.sol-analysis.json",
+      "encyclopedia": "word-counts"
+    },
+    {
+      "id": "word-comparison",
+      "title": "Word comparison",
+      "summary": "Compare a target and a reference by their word rates, using each side’s own token denominator. Report target minus reference per 10,000 tokens and the log base two of target rate divided by reference rate; this is a descriptive comparison, without significance tests.",
+      "inputs": [
+        "A word-frequency study with both target and reference.",
+        "Explicit current CORE or UTF-8 file sources for both sides when checking or exporting."
+      ],
+      "settings": [
+        {
+          "name": "--reference-* / --compare",
+          "meaning": "Set independent reference input and scope on sol analyze words; --compare alone uses the whole target source."
+        },
+        {
+          "name": "--format csv|tsv",
+          "meaning": "Choose the words-export table format; default csv."
+        },
+        {
+          "name": "Zero policy (fixed)",
+          "meaning": "No smoothing: a zero count makes the log ratio undefined; an empty denominator makes both measures undefined. Export leaves undefined numeric cells empty and supplies a status."
+        }
+      ],
+      "output": "The saved study is still sol.word-frequencies v1; comparison measures are derived. ESSENCE Export writes words-<timestamp>[-N].csv or .tsv beside studies; CLI words-export prints the verified table to stdout for redirection, including source bindings and the study SHA-256.",
+      "limits": [
+        "CORE includes eligible Hegel main-text paragraphs, quotations and list items under the three doctrine reader paths; pending source reviews and non-prose records are excluded, and trailing facsimile labels are masked. File input is verbatim and has no CORE eligibility filters.",
+        "Overlapping scopes are permitted, including a passage compared with its whole book. Differences in edition, language or projection require care.",
+        "No p-values, confidence intervals or conceptual-similarity claims. Export recomputes against the selected sources and refuses changed bindings or counts.",
+        "The table retains study order, not order by effect size; an empty vocabulary produces a header only."
+      ],
+      "cli": "sol analyze words-export words.sol-analysis.json --input-file target.txt --reference-file reference.txt --format csv > comparison.csv",
+      "encyclopedia": "frequency-comparison"
+    },
+    {
+      "id": "sentences",
+      "title": "Sentence lengths",
+      "summary": "Split text with deterministic punctuation rules and count word tokens in each sentence. Report mean, lower median, nearest-rank 10th and 90th percentiles, a length histogram, means by position within each input, and the twelve longest sentences.",
+      "inputs": [
+        "A verified local CORE corpus, selected with --corpus DIRECTORY or corpus discovery.",
+        "Or an explicit regular UTF-8 text file; the entire file is one input, not separate paragraphs."
+      ],
+      "settings": [
+        {
+          "name": "--provider / --input-file (alias --file)",
+          "meaning": "Use CORE or an explicit regular UTF-8 file; a file selects the file provider by default."
+        },
+        {
+          "name": "--within / --passage",
+          "meaning": "Choose a CORE reader subtree or repeat exact passage UUIDs; otherwise use the whole source."
+        },
+        {
+          "name": "--span START END",
+          "meaning": "Half-open offsets in original Unicode codepoints, in a file or exactly one --passage; do not combine with --within."
+        },
+        {
+          "name": "--reference FILE|-",
+          "meaning": "Optional CORE origin anchor, not a scope restriction; unavailable for file input."
+        },
+        {
+          "name": "Segmentation (fixed)",
+          "meaning": "Punctuation . ! ? … with abbreviation, initial and bracket rules; a newline always ends a sentence. No language model or adjustable segmentation thresholds."
+        }
+      ],
+      "output": "sol.sentence-study JSON: CORE legacy calls produce v1, explicit providers/files/passages/spans produce v2, and ESSENCE saves v2. CLI --json prints to stdout; ESSENCE Save writes sentences-<timestamp>[-N].sol-analysis.json in $XDG_DATA_HOME/sol/studies (default ~/.local/share/sol/studies). Artifacts contain offsets and digests, not sentence text.",
+      "limits": [
+        "CORE includes eligible Hegel main-text paragraphs, quotations and list items under the three doctrine reader paths; pending source reviews and non-prose records are excluded, and trailing facsimile labels are masked. File input is verbatim and has no CORE eligibility filters.",
+        "Punctuation rules target the English translation and can split or miss boundaries; lengths are not a model of Hegel’s syntax.",
+        "Spans keep only complete sentences, with cut sentences excluded. File position means describe the file’s retained sentences, not paragraph positions.",
+        "Legacy v1 JSON is limited to 1 MiB; provider v2 to 16 MiB; input files to 64 MiB."
+      ],
+      "cli": "sol analyze sentences --input-file target.txt --json > sentences.sol-analysis.json",
+      "encyclopedia": "sentences"
+    },
+    {
+      "id": "term",
+      "title": "Exact term occurrences",
+      "summary": "Count one normalized lexical token across the corpus or one doctrine. Report total occurrences, rates per 10,000 tokens by doctrine, and representative passages with the first match in context.",
+      "inputs": [
+        "A verified local CORE corpus, selected with --corpus DIRECTORY or corpus discovery.",
+        "One WORD that normalizes to exactly one word token."
+      ],
+      "settings": [
+        {
+          "name": "--doctrine being|essence|concept",
+          "meaning": "Restrict the count to one doctrine; default all three."
+        },
+        {
+          "name": "--limit N",
+          "meaning": "Maximum representative passages, 1–100 (default 10); does not cap counted occurrences."
+        },
+        {
+          "name": "--reference FILE|-",
+          "meaning": "Optional CORE origin anchor; does not restrict scope."
+        },
+        {
+          "name": "--json",
+          "meaning": "Print the complete result rather than a human summary."
+        }
+      ],
+      "output": "sol.term-study v1 JSON on stdout with --json; redirect to a chosen file. Includes representative context text and source locations; this CLI does not automatically save a study.",
+      "limits": [
+        "Eligible Hegel main prose only; pending reviews and non-prose are excluded and facsimile labels masked.",
+        "Exact normalized lexical matching only: no phrases, stemming, synonym matching or conceptual similarity.",
+        "Result JSON is limited to 1 MiB; representatives may be truncated even though totals cover the full scope."
+      ],
+      "cli": "sol analyze term being --json > term.sol-analysis.json",
+      "encyclopedia": "concordance"
+    },
+    {
+      "id": "prose",
+      "title": "Prose-only input",
+      "summary": "Prepare eligible Hegel prose as a derived input for later analysis. Remove headings and images from the feature text while retaining canonical ancestry, headings and source references as metadata; no model is trained.",
+      "inputs": [
+        "A verified local CORE corpus, selected with --corpus DIRECTORY or corpus discovery."
+      ],
+      "settings": [
+        {
+          "name": "--corpus DIRECTORY",
+          "meaning": "Select the complete canonical corpus; this command has no subtree or span setting."
+        },
+        {
+          "name": "--json",
+          "meaning": "Export full prose text and metadata; otherwise print only a summary."
+        }
+      ],
+      "output": "sol.prose-input v1 JSON on stdout with --json; redirect to a private chosen file. passages[].text contains book text; no file is saved automatically.",
+      "limits": [
+        "Requires a permanent corpus identity and a current verified generation.",
+        "Includes only Hegel main-text paragraphs, quotations and list items without generated-text or pending-review flags; empty projected text is excluded.",
+        "The projection is not canonical text and has no lexical normalization; headings are metadata, not features."
+      ],
+      "cli": "sol analyze prose --json > prose.json",
+      "encyclopedia": "prose"
+    },
+    {
+      "id": "segmentation-sample",
+      "title": "Blind sentence-marking sample",
+      "summary": "Select the same explicit number of eligible whole passages from each doctrine using a reproducible seed. The private sample contains source text without the segmenter’s predicted boundaries, ready for human marking.",
+      "inputs": [
+        "A verified local CORE corpus, selected with --corpus DIRECTORY or corpus discovery."
+      ],
+      "settings": [
+        {
+          "name": "--per-doctrine N",
+          "meaning": "Required number of passages per doctrine, from 1 to 1,000; each doctrine must have enough eligible passages."
+        },
+        {
+          "name": "--seed N",
+          "meaning": "Required integer from 0 to 4,294,967,295; passage UUIDs and seed determine a SHA-256 ranking."
+        },
+        {
+          "name": "--output FILE",
+          "meaning": "Required new private JSON path outside all Git checkouts; its parent must exist."
+        }
+      ],
+      "output": "Private review_version 1 JSON at --output, created owner-only without overwriting. Stdout is a receipt, optionally JSON with --json.",
+      "limits": [
+        "Contains book text; maximum 8 MiB. Requires reader paths under /BEING, /ESSENCE and /CONCEPT.",
+        "Equal passage counts by doctrine form a stratified pilot, not a weighted book-wide error estimate.",
+        "A sample has no human marks and cannot yet be scored."
+      ],
+      "cli": "sol analyze segmentation-sample --per-doctrine 5 --seed 42 --output /private/sample.json",
+      "encyclopedia": "sentences"
+    },
+    {
+      "id": "segmentation-export",
+      "title": "Sentence-marking text form",
+      "summary": "Turn an original unmarked sample into a blind UTF-8 form for a text editor. The reviewer adds sentence breaks while preserving the original characters and spaces.",
+      "inputs": [
+        "A verified local CORE corpus, selected with --corpus DIRECTORY or corpus discovery.",
+        "An original unmarked sample JSON, as FILE or piped stdin (-)."
+      ],
+      "settings": [
+        {
+          "name": "--output FILE",
+          "meaning": "Required new private text path outside Git; its parent must exist."
+        }
+      ],
+      "output": "A private marking form at --output, owner-only and never overwritten; stdout is a receipt. The form contains book text and no predicted boundaries.",
+      "limits": [
+        "The sample must still match the current corpus and be unmarked.",
+        "Reserved form delimiters in source passages are refused. The form is limited to 8 MiB."
+      ],
+      "cli": "sol analyze segmentation-export /private/sample.json --output /private/form.txt",
+      "encyclopedia": "sentences"
+    },
+    {
+      "id": "segmentation-import",
+      "title": "Import human sentence marks",
+      "summary": "Read added sentence breaks from a completed marking form against its original unmarked sample. Produce a new review JSON with declared human sentences or explicit passage exclusions, preserving the original sample.",
+      "inputs": [
+        "A verified local CORE corpus, selected with --corpus DIRECTORY or corpus discovery.",
+        "The original sample JSON and its completed UTF-8 marking form."
+      ],
+      "settings": [
+        {
+          "name": "--reviewer NAME",
+          "meaning": "Required nonempty reviewer label; this declares authorship but does not certify human review."
+        },
+        {
+          "name": "--output FILE",
+          "meaning": "Required new private review JSON outside Git; its parent must exist."
+        },
+        {
+          "name": "FILE / FORM",
+          "meaning": "Either input can be - for piped stdin, but not both."
+        }
+      ],
+      "output": "Private review_version 1 JSON at --output, owner-only without overwriting; stdout is a receipt, optionally JSON.",
+      "limits": [
+        "Original source text and form structure must be preserved; changed characters or spaces are refused.",
+        "Inputs must match the current corpus; private JSON and marking forms are limited to 8 MiB.",
+        "Import does not score or certify the marks."
+      ],
+      "cli": "sol analyze segmentation-import /private/sample.json /private/form.txt --reviewer Reader --output /private/review.json",
+      "encyclopedia": "sentences"
+    },
+    {
+      "id": "segmentation-check",
+      "title": "Sentence-boundary evaluation",
+      "summary": "Compare the unchanged punctuation segmenter with declared human sentence boundaries in a completed review. Report false splits, missed boundaries, precision, recall and F1 overall and by doctrine, with exact error offsets in JSON.",
+      "inputs": [
+        "A verified local CORE corpus, selected with --corpus DIRECTORY or corpus discovery.",
+        "A completed private review JSON, as FILE or piped stdin (-)."
+      ],
+      "settings": [
+        {
+          "name": "--json",
+          "meaning": "Print the full report with per-doctrine counts and error offsets instead of the summary."
+        }
+      ],
+      "output": "A boundary-evaluation report on stdout, JSON with --json; redirect to save. No study or review file is automatically written.",
+      "limits": [
+        "Final passage ends are excluded from boundary scoring; explicitly excluded passages are not scored.",
+        "Undefined metrics are null when their denominator is zero. Scores measure declared marks, not proof of human review.",
+        "Requires current sample bindings and valid complete marks; equal per-doctrine sampling is not a weighted whole-book error rate. Review input is limited to 8 MiB."
+      ],
+      "cli": "sol analyze segmentation-check /private/review.json --json > /private/boundary-report.json",
+      "encyclopedia": "sentences"
+    },
+    {
+      "id": "check",
+      "title": "Verify a saved study",
+      "summary": "Recompute a saved term, word-frequency or sentence study against its current sources. Refuse invalid or stale results rather than treating their stored counts or paths as authority.",
+      "inputs": [
+        "Saved sol.term-study v1, sol.word-frequencies v1 or sol.sentence-study v1/v2 JSON, as FILE or piped stdin (-).",
+        "The current CORE corpus or explicitly supplied original UTF-8 target and reference files."
+      ],
+      "settings": [
+        {
+          "name": "--corpus / --input-file / --reference-*",
+          "meaning": "Supply sources appropriate to the saved study; file paths are not recovered from artifacts. Saved provider scopes are reused unless explicitly overridden."
+        },
+        {
+          "name": "--json",
+          "meaning": "Print a verification receipt; without it, print a verified study summary."
+        }
+      ],
+      "output": "Verification receipt or human summary on stdout; redirect if needed. Does not rewrite the artifact or automatically save a new study.",
+      "limits": [
+        "Matching counts alone are insufficient: source bindings, digests and provenance must verify.",
+        "Verification establishes reproducibility against these inputs, not the quality of transcription, human review or interpretation.",
+        "Legacy term and sentence v1 artifacts are limited to 1 MiB; word and sentence v2 artifacts to 16 MiB."
+      ],
+      "cli": "sol analyze check words.sol-analysis.json --input-file target.txt --json",
+      "encyclopedia": null
+    }
+  ]
+}
