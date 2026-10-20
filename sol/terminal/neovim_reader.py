@@ -11,7 +11,7 @@ import os
 import sys
 import unicodedata
 
-from sol.core.protocol import single_action
+from sol.core.protocol import capture_reference, single_action
 from sol.reader.actions import ReaderActions
 from sol.reader.surface import Sample
 from sol.reader.structure import structure_payload
@@ -230,7 +230,9 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         extent = reading_section(book, state.current.identifier)
         sample = Sample(book, tuple(book.passages[extent.first:extent.last + 1]), ReaderActions(book))
         requested_ids = {state.current.identifier: state.requested_id}
-        restored = {"reference": actions.capture_active_reference(),
+        # build_payload checks this reference against the exact reader projection
+        # and requested identity; capture_active_reference would check it twice.
+        restored = {"reference": capture_reference(book.corpus_snapshot, state.requested_id),
                     "selection": None if state.selection is None else asdict(state.selection),
                     "cursor_offset": state.cursor_offset}
         payload = neovim.build_payload(sample, width, restored,
@@ -247,6 +249,20 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         neovim._safe_metadata({"notice": payload["notice"], "markers": payload["markers"], "structure": structure,
                                "theme": payload["theme"], "personal": payload["personal"]})
         return payload, sample, extent
+
+    def prepare_position():
+        # Reuse only the presentation already on screen. Checking its exact
+        # packet still verifies CORE and the reader projection on every move.
+        state = actions.snapshot()
+        row = next(row for row in payload["records"] if row["id"] == state.current.identifier)
+        restored = {"reference": row["reference"], "cursor_offset": state.cursor_offset,
+                    "selection": None if state.selection is None else asdict(state.selection)}
+        if row["reference"]["reference"]["requested_id"] != state.requested_id:
+            raise ValueError("shown reference disagrees with the destination identity")
+        neovim._check_sample_packet(sample, restored, payload["records"])
+        position = {"restore": restored, "notice": notice, "search_marks": search_marks}
+        neovim._safe_metadata(position)
+        return position
 
     with single_action(book.corpus_snapshot):
         payload, sample, extent = prepare()
@@ -542,6 +558,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         # it, so it may be saved even if the move below is refused.
         actions.accept_return_position(request["packet"]["reference"], request["packet"]["cursor_offset"], selected)
         shown = mode, start_tree, notice, search_marks, focused, theme
+        cursor_update = None
         try:
             # The destination is saved only once its view is ready; a failure
             # leaves the shown view, the saved position and history as they were.
@@ -564,12 +581,21 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                                     "spans": [[start, end] for start, end in projection.spans]}
                 focused = request.get("focus", focused)
                 theme = request.get("theme", theme)
-                prepared = prepare()
+                state = actions.snapshot()
+                if (operation in ("search_next", "search_previous")
+                        and state.current.identifier == request["packet"]["reference"]["reference"]["target_id"]
+                        and state.requested_id == request["packet"]["reference"]["reference"]["requested_id"]
+                        and (mode, focused, theme) == (shown[0], shown[4], shown[5])
+                        and notice == payload["notice"] and not shown[1]):
+                    cursor_update = prepare_position()
+                    prepared = ({**payload, **cursor_update}, sample, extent)
+                else:
+                    prepared = prepare()
         except BaseException:
             mode, start_tree, notice, search_marks, focused, theme = shown
             raise
         payload, sample, extent = prepared
-        return {"payload": payload}
+        return {"position": cursor_update} if cursor_update is not None else {"payload": payload}
 
     while True:
         status, result = neovim.launch_payload(payload, executable, on_request=handle)

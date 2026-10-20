@@ -43,7 +43,7 @@ Controller and headless Neovim tests; documentation check and full suite.
 
 ## Codex: Measure and cut reader navigation latency
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/navigation-latency`
 **Requested:** 20 October 2026, by the maintainer via Claude (reader backlog, item 4)
 

@@ -7,6 +7,7 @@ Reported operations overlap: independent stage times must not be added together.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from contextlib import contextmanager
 import json
 import os
@@ -36,7 +37,9 @@ from sol.workspace.store import Workspace
 OPERATIONS = ("snapshot_load", "corpus_book_load", "core_verify", "payload_ordinary",
               "payload_footnote_heavy", "typography_ordinary", "typography_footnote_heavy",
               "startup_python_first_payload", "controller_next", "controller_previous",
-              "controller_search", "controller_search_open", "controller_history_back")
+              "controller_search", "controller_search_open", "controller_history_back",
+              "controller_occurrence_next", "controller_occurrence_previous",
+              "controller_passage_next", "controller_passage_previous", "controller_outline_open")
 
 
 def synthetic_corpus(directory):
@@ -140,13 +143,15 @@ def controller_session(directory, root, number, width, measure):
         if not query:
             raise ValueError("first passage has no searchable text")
 
-        def request(operation, **fields):
+        def request(operation, *, packet=None, **fields):
             nonlocal payload
             row = payload["records"][0]
-            packet = {"reference": row["reference"], "selection": None, "cursor_offset": 0}
+            packet = packet or payload.get("restore") or {"reference": row["reference"], "selection": None, "cursor_offset": 0}
             response = on_request({"op": operation, "packet": packet, "mode": "continuous", **fields})
             if "payload" in response:
                 payload = response["payload"]
+            elif "position" in response:
+                payload = {**payload, **response["position"]}
             return response
 
         measure("controller_next", lambda: request("next"))
@@ -166,6 +171,30 @@ def controller_session(directory, root, number, width, measure):
         measure("controller_history_back", lambda: request("history_back"))
         if payload["records"][0]["id"] != destination:
             raise ValueError("history did not restore the previous section")
+        request("previous")
+        # Prefer an ordinary repeated word; fall back to a repeated letter for
+        # very short opening paragraphs. Never export this private query.
+        text = first["plain_text"].casefold()
+        counts = Counter(char for char in text if char.isalpha())
+        if not counts or counts.most_common(1)[0][1] < 2:
+            raise ValueError("occurrence timing needs a repeated letter in the opening passage")
+        repeated = "the" if text.count("the") >= 2 else counts.most_common(1)[0][0]
+        request("search", query=repeated)
+        request("search_open", result=1)
+        origin = payload["restore"]["reference"]["reference"]["target_id"]
+        for name, op in (("controller_occurrence_next", "search_next"),
+                         ("controller_occurrence_previous", "search_previous")):
+            measure(name, lambda: request(op))
+            if payload["restore"]["reference"]["reference"]["target_id"] != origin:
+                raise ValueError("occurrence probe must stay in the shown passage")
+        last = payload["records"][-1]
+        boundary = {"reference": last["reference"], "selection": None, "cursor_offset": len(last["plain_text"])}
+        measure("controller_passage_next", lambda: request("passage_next", packet=boundary))
+        if payload["records"][0]["id"] != destination:
+            raise ValueError("paragraph probe must cross the loaded section boundary")
+        measure("controller_passage_previous", lambda: request("passage_previous"))
+        node = next(row for row in payload["structure"]["nodes"] if row["target"] == destination)
+        measure("controller_outline_open", lambda: request("node_open", node=node["key"]))
         return 0, None  # Exit without a fake editor quit packet.
 
     try:
@@ -222,7 +251,7 @@ def benchmark(corpus=None, *, repeats=5, warmups=1, width=72):
                 if number >= warmups:
                     values["startup_python_first_payload"].append(elapsed * 1000)
             core.verify_snapshot_current(book.corpus_snapshot)
-            return {"measurement_version": 1, "clock": "time.perf_counter", "repeats": repeats,
+            return {"measurement_version": 2, "clock": "time.perf_counter", "repeats": repeats,
                     "discarded_warmups": warmups, "width": width,
                     "host": {"python": platform.python_version(), "platform": platform.platform(),
                              "logical_cpus": os.cpu_count()},
@@ -236,7 +265,7 @@ def benchmark(corpus=None, *, repeats=5, warmups=1, width=72):
                                "No Neovim process, IPC, painting, terminal or human-latency measurement.",
                                "Startup includes fresh book load, temporary SQLite creation and first controller payload.",
                                "Controller operations include real validation, persistence and payload preparation.",
-                               "Study includes saving its artifact in isolated temporary XDG data.",
+                               "Occurrence steps stay in one passage; paragraph steps cross the loaded section boundary; outline opens the second section.",
                                "Search uses the first 80 whitespace-normalized characters of the first passage, all matching passages.",
                                "Typography is a standalone single pass, not an attributed part of payload time.",
                                "Stage/operation timings overlap; do not add them or infer causation from subtraction.",

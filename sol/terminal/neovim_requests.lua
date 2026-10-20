@@ -70,7 +70,8 @@ return function(reader)
       if channel.navigation_pending == message.id then channel.navigation_pending = nil end
       if not result then vim.notify(tostring(problem), vim.log.levels.ERROR); return end
       local ok, error = pcall(function()
-        if result.payload then reload(result.payload)
+        if result.position then reader.view.update_position(result.position)
+        elseif result.payload then reload(result.payload)
         elseif result.search then reader.panels.show_search(result.search)
         elseif result.source then reader.panels.show_source(result.source)
         elseif result.pdf then reader.panels.show_pdf(result.pdf)
