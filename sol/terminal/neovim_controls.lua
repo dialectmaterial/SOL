@@ -40,6 +40,7 @@ return function(reader)
   local toggle_mode = reader.requests.toggle_mode
   local toggle_focus = reader.requests.toggle_focus
   local source = reader.panels.source
+  local source_pdf = reader.panels.source_pdf
   local note = reader.notes.note
   local open_footnote = reader.footnotes.open
   local show_footnote = reader.footnotes.show
@@ -310,6 +311,7 @@ return function(reader)
           { "c", "beside the text: pages, footnotes, your notes, markers" },
           { "c, Enter", "read a footnote; Backspace back, Esc to the passage" },
           { "s", "the printed page of this passage (formulas)" },
+          { "S", "the whole printed page in a PDF viewer, to zoom" },
           { "a", "write a note on this passage (workspace)" },
           { "c, e / r", "edit your note / its earlier versions" } } },
         { "ESSENCE", {
@@ -483,6 +485,7 @@ return function(reader)
       data.search_marks = vim.NIL
     end, {buffer = buffer, silent = true})
     vim.keymap.set('n', 's', guarded(source), {buffer = buffer, silent = true})
+    vim.keymap.set('n', 'S', guarded(source_pdf), {buffer = buffer, silent = true})
     vim.keymap.set({'n', 'x'}, 'a', guarded(note), {buffer = buffer, silent = true})
     vim.keymap.set('n', '<C-n>', guarded(function() request('search_next') end), {buffer = buffer, silent = true})
     vim.keymap.set('n', '<C-p>', guarded(function() request('search_previous') end), {buffer = buffer, silent = true})

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### The printed page in Zathura — 20 October 2026
+
+`S` opens the passage's printed page in a PDF viewer (Zathura when installed),
+where it can be zoomed and read in context; pressing it again turns the same
+Zathura window to the new page. It also works from the `s` popup. The viewer
+shows SOL's verified copy of the PDF; `SOL_PDF_VIEWER` chooses another viewer.
+
 ### Complete reader search — 20 October 2026
 
 - `/` reaches every matching passage and reports the total number of literal

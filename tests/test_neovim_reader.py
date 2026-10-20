@@ -417,6 +417,37 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         after.pop("exported_at")
         self.assertEqual(after, before)
 
+    def test_source_pdf_opens_the_page_for_the_current_passage(self):
+        service = self.service()
+        self.position(service, 4)
+        captured = {"version": 1, "title": "Synthetic section", "target_id": self.identifier,
+                    "source": {"verified_pdf": "/cache/pdf/x.pdf"},
+                    "sources": [{"pdf_page": 7, "printed_page": "5"}, {"pdf_page": 8, "printed_page": None}]}
+        opened, viewers = [], ["zathura"]
+        class Service:
+            def __init__(self, book):
+                pass
+            def capture(self, identifier):
+                return captured
+        def native(payload, _, on_request):
+            packet = self.packet(3, 14)
+            result = on_request({"op": "source_pdf", "page": 2, "packet": packet, "mode": "continuous"})["pdf"]
+            self.assertEqual(result, {"viewer": "zathura", "pdf_page": 8, "printed_page": "unnumbered"})
+            # Without a PDF viewer, the crop of that page is shown instead.
+            viewers.append(None)
+            crop = on_request({"op": "source_pdf", "page": 2, "packet": packet, "mode": "continuous"})["source"]
+            self.assertEqual((crop["shown"], crop["pdf_missing"], crop["image"]), (2, True, "/cache/1.png"))
+            with self.assertRaises(ValueError):
+                on_request({"op": "source_pdf", "page": 3, "packet": packet, "mode": "continuous"})
+            return 0, None
+        with patch("sol.terminal.source.SourceService", Service), \
+                patch("sol.terminal.source.open_pdf", side_effect=lambda request, index: opened.append(index) or viewers[-1]), \
+                patch("sol.terminal.source.render_region", return_value=("/cache/1.png", False)), \
+                patch("sol.terminal.source.open_viewer", return_value="invented-viewer"), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+        self.assertEqual(opened, [1, 1])
+
     def test_stale_source_capture_is_replaced_on_the_next_request(self):
         from sol.terminal.source import SourceError
         captures = []

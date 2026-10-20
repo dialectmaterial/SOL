@@ -91,7 +91,7 @@ return function(reader)
     end
     return capture()
   end
-  local show_search, show_source
+  local show_search, show_source, show_pdf
   show_search = function(result)
     local lines = {'Search: ' .. result.query, 'Whole book, literal and case-insensitive. ' .. result.total .. ' matches in ' .. #result.rows .. ' passages.', ''}
     local rows = {}
@@ -124,6 +124,9 @@ return function(reader)
         (result.cropped and '' or '; no region was recorded'),
       'Transcription: ' .. result.status }
     if result.note ~= '' then lines[#lines + 1] = result.note end
+    if result.pdf_missing then
+      lines[#lines + 1] = 'No PDF viewer is available (install Zathura, or set SOL_PDF_VIEWER), so this is the crop.'
+    end
     lines[#lines + 1] = ''
     if result.viewer ~= vim.NIL then
       lines[#lines + 1] = 'Opened in ' .. result.viewer .. '. Rendered from the verified source PDF.'
@@ -140,9 +143,12 @@ return function(reader)
       end
     end
     lines[#lines + 1] = ''
+    lines[#lines + 1] = 'S opens the whole page in a PDF viewer, to zoom and read it in context.'
     lines[#lines + 1] = (#result.pages > 1 and 'A page number shows that page. ' or '') .. 'Esc returns to reading.'
     show_lines(lines)
     local panel = api.nvim_get_current_buf()
+    local shown = result.shown
+    vim.keymap.set('n', 'S', function() request('source_pdf', {page = shown}) end, {buffer = panel, silent = true})
     for _, row in ipairs(result.pages) do
       if row.number <= 9 then
         local number = row.number
@@ -154,10 +160,19 @@ return function(reader)
   local function source()
     request('source_preview', {page = 1})
   end
+  -- The printed page itself, zoomable and in context, in a PDF viewer beside the
+  -- reader; without a viewer Python sends the crop instead. The position never moves.
+  show_pdf = function(result)
+    api.nvim_echo({{'Printed page ' .. result.printed_page .. ' (PDF page ' .. result.pdf_page ..
+      ') in ' .. result.viewer, 'None'}}, false, {})
+  end
+  local function source_pdf()
+    request('source_pdf', {page = 1})
+  end
 
   panels.close_popup, panels.show_lines, panels.current_packet = close_popup, show_lines, current_packet
   panels.side_config = side_config
   panels.show_search, panels.show_source = show_search, show_source
-  panels.source = source
+  panels.source, panels.source_pdf, panels.show_pdf = source, source_pdf, show_pdf
   return panels
 end

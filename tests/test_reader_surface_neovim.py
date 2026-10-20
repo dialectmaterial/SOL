@@ -648,6 +648,36 @@ end
         self.assertEqual([(row["op"], row["page"]) for row in report["sent"]], [("page_open", 240)])
         self.assertEqual(report["warned"], ["Type a printed page number, e.g. 240"])
 
+    def test_pdf_key_opens_the_printed_page_without_moving(self):
+        report = self.run_lua(r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local resting = reader.capture('n', nil, reader.source_point(data.records[1].id, 7))
+  reader.restore(resting)
+  local echoed = {}
+  local echo = vim.api.nvim_echo
+  vim.api.nvim_echo = function(chunks, ...) echoed[#echoed + 1] = chunks[1][1]; return echo(chunks, ...) end
+  vim.api.nvim_feedkeys('S', 'xt', false)
+  assert(#sent == 1 and sent[1].op == 'source_pdf' and sent[1].page == 1)
+  _G.SOLReaderChannel.pending[sent[1].id]({pdf = {viewer = 'zathura', pdf_page = 7, printed_page = '5'}})
+  assert(vim.api.nvim_get_current_win() == reader.window, 'a found viewer needs no popup')
+  report.echo = table.concat(echoed, '\n')
+  vim.api.nvim_feedkeys('S', 'xt', false)
+  _G.SOLReaderChannel.pending[sent[2].id]({source = {title = 'Synthetic section', record = data.records[1].id,
+    status = 'needs visual review', note = '', pages = {{number = 1, pdf_page = 7, printed_page = '5', region = true}},
+    shown = 1, cropped = true, image = '/cache/0.png', viewer = 'xdg-open', pdf_missing = true}})
+  report.missing = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  assert(vim.deep_equal(SOLNvimReader.capture(), resting), 'the PDF key moved the reading position')
+''', integrated=True)
+        self.assertIn("Printed page 5 (PDF page 7) in zathura", report["echo"])
+        missing = "\n".join(report["missing"])
+        self.assertIn("No PDF viewer is available (install Zathura", missing)
+        self.assertIn("Recorded region of PDF page 7", missing)
+
     def test_note_editor_saves_restores_selection_and_protects_drafts(self):
         report = self.run_lua(r'''
   local sent = {}
@@ -957,13 +987,13 @@ end
   report.alive = vim.api.nvim_buf_is_valid(reader.buffer)
   local normal = {}
   for _, map in ipairs(vim.api.nvim_buf_get_keymap(reader.buffer, 'n')) do normal[map.lhs] = true end
-  report.study_key = normal['S'] == true
+  report.pdf_key = normal['S'] == true
   vim.fn.writefile({vim.json.encode(report)}, os.getenv('SOL_NVIM_TEST_REPORT'))
   vim.api.nvim_feedkeys(':qa!\\r', 'xt', false)
 ''', integrated=True, automatic_quit=False)
         self.assertEqual(report["hint"], ["Type :q to save your place and quit (:qa! quits without saving)"] * 2)
         self.assertTrue(report["alive"])
-        self.assertFalse(report["study_key"])
+        self.assertTrue(report["pdf_key"])  # S is the printed page now, not the old sentence study
         self.assertFalse(self.output.exists())
 
     def test_status_line_says_where_and_how_the_book_is_read(self):
