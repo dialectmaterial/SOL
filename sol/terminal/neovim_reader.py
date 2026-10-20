@@ -111,8 +111,7 @@ def source_pdf(request, page):
         raise ValueError(f"this passage has {len(request['sources'])} source page(s)")
     row = request["sources"][page - 1]
     return {"viewer": open_pdf(request, page - 1), "pdf_page": row["pdf_page"],
-            "printed_page": safe_label(row.get("printed_page") or "unnumbered"),
-            "file": safe_label(request["source"]["verified_pdf"])}
+            "printed_page": safe_label(row.get("printed_page") or "unnumbered")}
 
 
 def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_tree=False, tree_depth=2,
@@ -272,7 +271,11 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             source_requests[target] = source_service.capture(target)
         try:
             if request["op"] == "source_pdf":
-                return {"pdf": source_pdf(source_requests[target], request["page"])}
+                opened = source_pdf(source_requests[target], request["page"])
+                if opened["viewer"] is not None:
+                    return {"pdf": opened}
+                # No PDF viewer: the crop is still the printed evidence.
+                return {"source": {**source_preview(source_requests[target], request["page"]), "pdf_missing": True}}
             return {"source": source_preview(source_requests[target], request["page"])}
         except SourceError:
             # A changed corpus or PDF snapshot needs a fresh capture next time.

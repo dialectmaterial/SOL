@@ -641,21 +641,21 @@ end
   vim.api.nvim_echo = function(chunks, ...) echoed[#echoed + 1] = chunks[1][1]; return echo(chunks, ...) end
   vim.api.nvim_feedkeys('S', 'xt', false)
   assert(#sent == 1 and sent[1].op == 'source_pdf' and sent[1].page == 1)
-  _G.SOLReaderChannel.pending[sent[1].id]({pdf = {viewer = 'zathura', pdf_page = 7, printed_page = '5',
-    file = '/cache/pdf/x.pdf'}})
+  _G.SOLReaderChannel.pending[sent[1].id]({pdf = {viewer = 'zathura', pdf_page = 7, printed_page = '5'}})
   assert(vim.api.nvim_get_current_win() == reader.window, 'a found viewer needs no popup')
   report.echo = table.concat(echoed, '\n')
   vim.api.nvim_feedkeys('S', 'xt', false)
-  _G.SOLReaderChannel.pending[sent[2].id]({pdf = {viewer = vim.NIL, pdf_page = 7, printed_page = '5',
-    file = '/cache/pdf/x.pdf'}})
+  _G.SOLReaderChannel.pending[sent[2].id]({source = {title = 'Synthetic section', record = data.records[1].id,
+    status = 'needs visual review', note = '', pages = {{number = 1, pdf_page = 7, printed_page = '5', region = true}},
+    shown = 1, cropped = true, image = '/cache/0.png', viewer = 'xdg-open', pdf_missing = true}})
   report.missing = vim.api.nvim_buf_get_lines(0, 0, -1, false)
   vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
   assert(vim.deep_equal(SOLNvimReader.capture(), resting), 'the PDF key moved the reading position')
 ''', integrated=True)
         self.assertIn("Printed page 5 (PDF page 7) in zathura", report["echo"])
         missing = "\n".join(report["missing"])
-        self.assertIn("No PDF viewer is available.", missing)
-        self.assertIn("/cache/pdf/x.pdf", missing)
+        self.assertIn("No PDF viewer is available (install Zathura", missing)
+        self.assertIn("Recorded region of PDF page 7", missing)
 
     def test_note_editor_saves_restores_selection_and_protects_drafts(self):
         report = self.run_lua(r'''

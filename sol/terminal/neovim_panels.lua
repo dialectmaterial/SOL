@@ -124,6 +124,9 @@ return function(reader)
         (result.cropped and '' or '; no region was recorded'),
       'Transcription: ' .. result.status }
     if result.note ~= '' then lines[#lines + 1] = result.note end
+    if result.pdf_missing then
+      lines[#lines + 1] = 'No PDF viewer is available (install Zathura, or set SOL_PDF_VIEWER), so this is the crop.'
+    end
     lines[#lines + 1] = ''
     if result.viewer ~= vim.NIL then
       lines[#lines + 1] = 'Opened in ' .. result.viewer .. '. Rendered from the verified source PDF.'
@@ -158,17 +161,10 @@ return function(reader)
     request('source_preview', {page = 1})
   end
   -- The printed page itself, zoomable and in context, in a PDF viewer beside the
-  -- reader; the reading position never moves.
+  -- reader; without a viewer Python sends the crop instead. The position never moves.
   show_pdf = function(result)
-    if result.viewer ~= vim.NIL then
-      api.nvim_echo({{'Printed page ' .. result.printed_page .. ' (PDF page ' .. result.pdf_page ..
-        ') in ' .. result.viewer, 'None'}}, false, {})
-    else
-      show_lines({ 'No PDF viewer is available.', '',
-        'Install Zathura, or set SOL_PDF_VIEWER to a viewer command ({page} and {file}',
-        'are replaced). The verified PDF, at PDF page ' .. result.pdf_page .. ':', result.file, '',
-        'Esc returns to reading.' })
-    end
+    api.nvim_echo({{'Printed page ' .. result.printed_page .. ' (PDF page ' .. result.pdf_page ..
+      ') in ' .. result.viewer, 'None'}}, false, {})
   end
   local function source_pdf()
     request('source_pdf', {page = 1})

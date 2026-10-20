@@ -41,7 +41,7 @@ Write "None." rather than deleting a heading.
 ### Changed files
 - `sol/terminal/source.py` — `open_pdf`: verified snapshot at a physical page in Zathura/Sioyek/Okular/Evince/MuPDF or `SOL_PDF_VIEWER`; reuses SOL's Zathura window over D-Bus.
 - `sol/terminal/neovim_reader.py` — `source_pdf` request, sharing the source capture with `s`.
-- `sol/terminal/neovim_{controls,panels,requests}.lua` — `S` in the reader and the `s` popup; echo on success, popup naming the file without a viewer; help line.
+- `sol/terminal/neovim_{controls,panels,requests}.lua` — `S` in the reader and the `s` popup; echo on success, the crop popup (with a line saying so) without a PDF viewer; help line.
 - Tests in `test_source_viewer.py`, `test_neovim_reader.py`, `test_reader_surface_neovim.py`; BEING §2/§5/§7, CHANGELOG.
 
 ### Tests performed
