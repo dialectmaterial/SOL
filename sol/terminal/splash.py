@@ -148,6 +148,8 @@ class Splash:
 
 
 _current = None
+# Handed to Neovim but not yet known to have started: still ours to restore.
+_handed = None
 
 
 def start(theme):
@@ -164,20 +166,32 @@ def start(theme):
 
 
 def handoff():
-    """Neovim is about to draw: stop moving and leave the frame for it to replace."""
-    _finish(restore=False)
+    """Neovim is about to start: stop moving and leave the frame for it to replace.
+
+    Until `forget()` says Neovim ran, `stop()` can still restore the screen.
+    """
+    global _current, _handed
+    current, _current = _current, None
+    if current is not None:
+        current.finish(restore=False)
+        _handed = current
+
+
+def forget():
+    """Neovim ran and restored the terminal itself; nothing is left to undo."""
+    global _handed
+    _handed = None
 
 
 def stop():
     """Put the terminal back as it was, for a prompt, an error or an exit."""
-    _finish(restore=True)
-
-
-def _finish(restore):
-    global _current
+    global _current, _handed
     current, _current = _current, None
+    handed, _handed = _handed, None
     if current is not None:
-        current.finish(restore)
+        current.finish(restore=True)
+    elif handed is not None:
+        handed._write(LEAVE)
 
 
 def _quiet_input():

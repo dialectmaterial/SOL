@@ -63,6 +63,33 @@ class LifecycleTests(unittest.TestCase):
         finally:
             os.close(write)
 
+    def test_a_launch_that_fails_after_handoff_is_still_restored(self):
+        read, write = os.pipe()
+        self.addCleanup(os.close, read)
+        self.addCleanup(os.close, write)
+        for neovim_ran in (False, True):
+            with self.subTest(neovim_ran=neovim_ran):
+                splash._current = splash.Splash("mocha", output=write).start()
+                splash.handoff()
+                if neovim_ran:
+                    splash.forget()
+                splash.stop()
+                output = os.read(read, 1 << 20).decode("utf-8")
+                # Restored only when Neovim never took the screen.
+                self.assertEqual(output.endswith(splash.LEAVE), not neovim_ran)
+                self.assertIsNone(splash._handed)
+
+    def test_neovim_launch_hands_over_at_the_last_moment(self):
+        from pathlib import Path
+        from sol.terminal import neovim
+        order = []
+        with patch.object(neovim, "_isolated_environment", side_effect=lambda *a: order.append("prepared") or {}), \
+                patch.object(splash, "handoff", side_effect=lambda: order.append("handoff")), \
+                patch.object(neovim.subprocess, "run", side_effect=FileNotFoundError("nvim")):
+            with self.assertRaises(FileNotFoundError):
+                neovim.launch_payload({"records": []}, "/missing/nvim")
+        self.assertEqual(order, ["prepared", "handoff"])
+
 
 if __name__ == "__main__":
     unittest.main()
