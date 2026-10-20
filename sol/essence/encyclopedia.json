@@ -80,7 +80,7 @@
       "article_url": "https://en.wikipedia.org/wiki/Concordance_(publishing)",
       "quote": "listing every instance of each word with its immediate context.",
       "quote_starts_mid_sentence": true,
-      "essence": "Runs in ESSENCE: term distributions and reference-bound matches; word results list contributing passages with context around the first occurrence. This is a limited source view, not a complete concordance of every occurrence.",
+      "essence": "Runs in ESSENCE: term distributions and reference-bound matches; word results list every occurrence with the words around it, up to 1,000 per word. Occurrences past each passage's first are found again at display time and not saved in the study.",
       "further": [
         {
           "title": "SOL term study",
