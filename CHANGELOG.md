@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### ESSENCE's Methods screen — 20 October 2026
+
+Methods (`2`) is no longer a placeholder: it lists each study ESSENCE and
+`sol analyze` run, and shows what it takes, its settings, what it produces,
+its limits and the command that runs it, with the matching encyclopedia entry.
+
 ### ESSENCE follows `T` — 20 October 2026
 
 Switching the reader's theme with `T` now restyles an open ESSENCE too, within
