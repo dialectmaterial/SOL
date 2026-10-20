@@ -679,6 +679,120 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         with patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(), 0)
 
+    def test_same_passage_occurrences_reuse_view_in_both_modes(self):
+        self.extend(3)
+        records = self.rows()
+        records[1].update(markdown="界 target é target end.", plain_text="界 target é target end.")
+        self.write_records(records)
+        for mode in ("continuous", "paragraph"):
+            with self.subTest(mode=mode):
+                service = self.service(self.root / f"fast-{mode}.sqlite3")
+                def native(payload, _, on_request):
+                    def request(op, packet, **fields):
+                        return on_request({"op": op, "packet": packet, "mode": mode, **fields})
+                    packet = self.reply(payload, offset=0)["packet"]
+                    request("search", packet, query="target")
+                    shown = request("search_open", packet, result=1)["payload"]
+                    first = shown["restore"]
+                    with patch.object(neovim, "build_payload", side_effect=AssertionError("full view rebuilt")):
+                        forward = request("search_next", first)
+                        self.assertEqual(set(forward), {"position"})
+                        second = forward["position"]["restore"]
+                        self.assertEqual(second["cursor_offset"], 12)
+                        self.assertEqual(forward["position"]["search_marks"]["position"], 2)
+                        backward = request("search_previous", second)["position"]
+                        self.assertEqual(backward["restore"], first)
+                        self.assertEqual(backward["search_marks"]["position"], 1)
+                        request("search_next", first)
+                    back = request("history_back", second)["payload"]
+                    self.assertEqual(back["restore"], first)
+                    self.assertEqual(service.store.get_state()["position"]["cursor_offset"], first["cursor_offset"])
+                    selected = deepcopy(first)
+                    selected["selection"] = {"requested_id": self.identifier, "target_id": self.identifier,
+                        "start": 2, "end": 8, "text": "target",
+                        "content_sha256": first["reference"]["reference"]["content_sha256"],
+                        "plain_text_sha256": shown["records"][0]["plain_text_sha256"]}
+                    opened = request("search_next", selected)["position"]["restore"]
+                    self.assertIsNone(opened["selection"])
+                    back = request("history_back", opened)["payload"]
+                    self.assertEqual(back["restore"], selected)
+                    return 0, {"action": "quit", "packet": back["restore"]}
+                with patch.object(neovim, "launch_payload", side_effect=native):
+                    self.assertEqual(self.run_view(service), 0)
+
+    def test_occurrence_from_retired_reference_prepares_canonical_identity(self):
+        rows = self.rows()
+        rows[1].update(markdown="target and target again", plain_text="target and target again")
+        retired = deepcopy(rows[1])
+        retired.update(id=RETIRED, type="retired_record", redirect_id=self.identifier, order=2,
+                       markdown="An invented retired record.", plain_text="An invented retired record.")
+        rows.append(retired)
+        self.write_records(rows)
+        service = self.service()
+        self.position(service, 0, RETIRED)
+        def native(payload, _, on_request):
+            packet = payload["restore"]
+            on_request({"op": "search", "query": "target", "packet": packet, "mode": "continuous"})
+            result = on_request({"op": "search_next", "packet": packet, "mode": "continuous"})
+            self.assertIn("payload", result)
+            opened = result["payload"]["restore"]
+            self.assertEqual(opened["reference"]["reference"]["requested_id"], self.identifier)
+            self.assertEqual(opened["cursor_offset"], 11)
+            return 0, {"action": "quit", "packet": opened}
+        with patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+
+    def test_same_passage_fast_path_refusals_keep_outgoing_position_and_allow_retry(self):
+        self.extend(3)
+        records = self.rows()
+        records[1].update(markdown="target and target again", plain_text="target and target again")
+        self.write_records(records)
+        for failure in ("prepare", "save", "generation"):
+            with self.subTest(failure=failure):
+                service = self.service(self.root / f"fast-refused-{failure}.sqlite3")
+                def native(payload, _, on_request):
+                    def request(op, packet, **fields):
+                        return on_request({"op": op, "packet": packet, "mode": "continuous", **fields})
+                    packet = self.reply(payload, offset=0)["packet"]
+                    request("search", packet, query="target")
+                    shown = request("search_open", packet, result=1)["payload"]
+                    origin = shown["restore"]
+                    outgoing = deepcopy(origin)
+                    outgoing["cursor_offset"] = 1
+                    validate = neovim._safe_metadata
+                    canonical = self.corpus / "sample.md"
+                    original = canonical.read_bytes()
+                    save = service.store.save_state
+                    calls = []
+                    def fail_save(*args, **kwargs):
+                        calls.append(True)
+                        if len(calls) == 2:
+                            raise WorkspaceConflict("injected competing revision")
+                        return save(*args, **kwargs)
+                    def prepare(value):
+                        validate(value)
+                        if isinstance(value, dict) and "restore" in value and "search_marks" in value:
+                            if failure == "prepare":
+                                raise RuntimeError("injected position preparation failure")
+                            if failure == "generation":
+                                canonical.write_bytes(original + b"\n")
+                    try:
+                        with patch.object(neovim, "_safe_metadata", side_effect=prepare), \
+                                patch.object(service.store, "save_state", side_effect=fail_save if failure == "save" else save):
+                            with self.assertRaises((RuntimeError, ValueError)):
+                                request("search_next", outgoing)
+                    finally:
+                        canonical.write_bytes(original)
+                    saved = service.store.get_state()
+                    self.assertEqual((saved["current_id"], saved["position"]["cursor_offset"]), (self.identifier, 1))
+                    result = request("search_next", outgoing)["position"]
+                    self.assertEqual(result["restore"]["cursor_offset"], 11)
+                    back = request("history_back", result["restore"])["payload"]
+                    self.assertEqual(back["restore"], outgoing)
+                    return 0, {"action": "quit", "packet": back["restore"]}
+                with patch.object(neovim, "launch_payload", side_effect=native):
+                    self.assertEqual(self.run_view(service), 0)
+
     def test_complete_search_counts_and_steps_occurrences_across_sections(self):
         self.extend(25)
         def native(payload, _, on_request):

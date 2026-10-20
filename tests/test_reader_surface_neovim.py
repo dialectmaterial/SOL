@@ -1522,6 +1522,43 @@ while True:
 ''', integrated=True)
         self.assertTrue(report["ok"])
 
+    def test_occurrence_reply_moves_exact_cursor_without_rebuilding_view(self):
+        report = self.run_lua(r'''
+  for _, mode in ipairs({'continuous', 'paragraph'}) do
+    _G.SOLReaderChannel = {serial = 0, pending = {}, writer = {write = function() end}}
+    local payload = vim.deepcopy(data)
+    payload.mode = mode
+    payload.restore = {reference = payload.records[1].reference, selection = vim.NIL, cursor_offset = 0}
+    assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(payload)
+    reader = SOLNvimReader
+    local buffer, window = reader.buffer, reader.window
+    local lines = vim.api.nvim_buf_get_lines(buffer, 0, -1, false)
+    local styles = vim.api.nvim_buf_get_extmarks(buffer, reader.namespace, 0, -1, {details = true})
+    local function reply(offset, position, spans)
+      vim.api.nvim_feedkeys(vim.keycode('<C-n>'), 'xt', false)
+      local channel = _G.SOLReaderChannel
+      local packet = {reference = payload.records[1].reference, selection = vim.NIL, cursor_offset = offset}
+      channel.pending[channel.serial]({position = {restore = packet, notice = '',
+        search_marks = {id = payload.records[1].id, spans = spans or {{5, 6}, {7, 14}}, position = position, total = 2}}})
+    end
+    reply(5, 1) -- Exact astral-codepoint boundary in the invented source.
+    assert(reader.capture().cursor_offset == 5)
+    assert(SOLStatus():find('1 of 2', 1, true))
+    vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+    assert(not SOLStatus():find('1 of 2', 1, true))
+    reply(7, 2)
+    assert(reader.capture().cursor_offset == 7)
+    assert(SOLStatus():find('2 of 2', 1, true))
+    reply(5, 1, {{2, 1}}) -- Malformed marks must refuse before moving.
+    assert(reader.capture().cursor_offset == 7)
+    assert(reader.buffer == buffer and reader.window == window)
+    assert(vim.deep_equal(lines, vim.api.nvim_buf_get_lines(buffer, 0, -1, false)))
+    assert(vim.deep_equal(styles, vim.api.nvim_buf_get_extmarks(buffer, reader.namespace, 0, -1, {details = true})))
+  end
+  report.ok = true
+''', integrated=True)
+        self.assertTrue(report["ok"])
+
     def test_search_marks_highlight_matches_until_escape(self):
         report = self.run_lua(r'''
   local payload = vim.deepcopy(data)

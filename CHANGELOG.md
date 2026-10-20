@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Faster occurrence navigation — 20 October 2026
+
+- Ctrl-N / Ctrl-P within the shown passage updates the exact cursor and search
+  marks without rebuilding its Neovim buffer, in either reading mode.
+- Keep source verification and staged saves on this path, including refusal,
+  retry and history; avoid a redundant check during full view preparation.
+- Extend the text-free timing probe to cover occurrence steps, paragraph moves
+  across section boundaries and an outline jump on an explicitly chosen book.
+
 ### Named landmarks — 20 October 2026
 
 `M` names the place you are reading and `L` lists your named places; Enter

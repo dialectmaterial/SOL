@@ -466,8 +466,8 @@ return function(reader, supplied)
   -- After a search jump, the opened passage's verified matches are marked;
   -- Esc hides them. Marks are display only, like the search itself.
   local search_namespace = api.nvim_create_namespace("sol-search-marks")
-  if data.search_marks ~= nil and data.search_marks ~= vim.NIL then
-    local marks = data.search_marks
+  local function check_search_marks(marks)
+    if marks == nil or marks == vim.NIL then return end
     if type(marks) ~= "table" or type(marks.id) ~= "string" or type(marks.spans) ~= "table" then
       fail("invalid search marks")
     end
@@ -478,13 +478,35 @@ return function(reader, supplied)
       if not record or type(span) ~= "table" or not integer(span[1]) or not integer(span[2])
         or span[1] < 0 or span[1] >= span[2] or span[2] > record._length then fail("invalid search mark") end
     end
-    if record and positions[record.id] then
+  end
+  local function draw_search_marks(marks)
+    api.nvim_buf_clear_namespace(buffer, search_namespace, 0, -1)
+    if type(marks) == "table" and positions[marks.id] then
       for _, span in ipairs(marks.spans) do
-        local first, last = source_point(record.id, span[1]), source_point(record.id, span[2])
+        local first, last = source_point(marks.id, span[1]), source_point(marks.id, span[2])
         api.nvim_buf_set_extmark(buffer, search_namespace, first.row - 1, first.byte,
           { end_row = last.row - 1, end_col = last.byte, hl_group = "Search", priority = 150 })
       end
     end
+  end
+  check_search_marks(data.search_marks)
+  draw_search_marks(data.search_marks)
+
+  local function update_position(position)
+    if not exact_keys(position, {"restore", "notice", "search_marks"})
+      or type(position.notice) ~= "string" or position.notice ~= data.notice then fail("invalid reading position update") end
+    boundaries(position.notice)
+    verified_projection()
+    local record = validate_packet(position.restore)
+    if not positions[record.id] then fail("position update is outside the shown passage") end
+    check_search_marks(position.search_marks)
+    if type(position.search_marks) ~= "table" or position.search_marks.id ~= record.id then
+      fail("search marks disagree with the reading position")
+    end
+    restore(position.restore)
+    data.restore, data.notice, data.search_marks = position.restore, position.notice, position.search_marks
+    draw_search_marks(data.search_marks)
+    vim.cmd("redrawstatus")
   end
   -- Footnote callouts are hidden from the source text; each is shown where
   -- the canonical Markdown places it, as inline display text only.
@@ -539,6 +561,7 @@ return function(reader, supplied)
     set_exact_cursor = set_exact_cursor,
     normal_escape = normal_escape,
     restore = restore,
+    update_position = update_position,
     export = export,
     apply_theme = apply_theme,
     semantic_group = semantic_group,

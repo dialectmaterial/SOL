@@ -82,6 +82,21 @@ source text values agree; opening results still verifies the canonical source
 and stages the destination before saving. Automated controller and headless
 Neovim checks cover these behaviors; sustained manual reading remains untested.
 
+**Navigation latency (20 October):** `Ctrl-N` / `Ctrl-P` within the passage
+already shown sends a checked position and search-mark update, keeping the
+Neovim buffer, layout, typography and callouts. It works in both reading modes;
+a changed reading mode, theme, focus or warning uses full view preparation.
+Every step still verifies the source, accepts the outgoing cursor and stages
+the destination before the guarded save. A refused update preserves the shown
+view, accepted position and history, and can be retried. Cross-passage and
+section moves retain full destination preparation, which avoids one redundant
+active-reference check already performed by the payload validator. No source
+trust is cached across actions. `scripts/reader_timings.py` measures same-passage
+occurrences, section changes, paragraph moves across a section boundary and an
+outline jump against an explicit local corpus, using temporary workspaces and
+text-free reports. Its controller times exclude Neovim IPC and terminal painting;
+headless checks separately verify cursor updates without rebuilding the buffer.
+
 **Book footnote reading (18 October):** `c` works from a cursor or a passage-local visual selection. Its book notes, personal notes and technical source context have separate headings. Enter on a book-note row opens only that note, with its canonical `note_paragraph` children ordered by `order`, original emphasis, per-paragraph attribution, review warnings and display-only callouts. Enter on a listed further footnote follows that link. Backspace returns to the preceding note at its earlier panel cursor, or to `c`; Esc or `q` returns directly to the exact passage cursor and selection in the same reading mode. Resizing closes the panel and restores the passage. Opening or following a note checks the source again and saves no reading visit or workspace data. A refused request leaves the preceding panel available; a reply received after that panel closes is ignored.
 
 The note path is limited to eight distinct notes; links back to an open note are marked as cycles. A view accepts at most 64 body paragraphs, lists up to 128 further links, and refuses text over 1 MiB or a presentation over 4 MiB. Limits are disclosed rather than silently truncating source text. Missing/unlinked notes are refused without substituted text; the corpus contract already refuses broken canonical note links on load. Backspace revisits the checked panel already shown, while following a new link makes a new checked request. These are presentation defaults. Controller and headless Neovim checks cover both modes, forward/reverse selections, styling, callouts, nested links, refusal and narrow widths; sustained manual terminal reading remains untested.
