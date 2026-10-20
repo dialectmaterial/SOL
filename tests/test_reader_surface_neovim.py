@@ -725,7 +725,10 @@ end
   reader = SOLNvimReader
   local normal = {}
   for _, map in ipairs(vim.api.nvim_buf_get_keymap(reader.buffer, 'n')) do normal[map.lhs] = true end
-  report.gp, report.P = normal['gp'] == true, normal['P'] == true
+  report.P = normal['P'] == true
+  vim.v.errmsg = ''
+  vim.api.nvim_feedkeys('gp', 'xt', false)
+  report.gp_sent, report.gp_error = #sent, vim.v.errmsg
   vim.api.nvim_feedkeys('M', 'xt', false)
   report.first = sent[1] and sent[1].op
   report.warned = warned
@@ -733,8 +736,8 @@ end
   vim.api.nvim_feedkeys('?', 'xt', false)
   report.help = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 ''', integrated=True)
-        self.assertFalse(report["gp"])
         self.assertTrue(report["P"])
+        self.assertEqual((report["gp_sent"], report["gp_error"]), (0, ""))  # moved away: does nothing
         self.assertEqual(report["first"], "landmark_list")  # L and M swapped
         self.assertEqual(report["warned"], ["keys.json names keys SOL does not use: zz9"])
         help_text = "\n".join(report["help"])
