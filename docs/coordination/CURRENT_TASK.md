@@ -45,42 +45,41 @@ Textual pilot tests for choices, results, saving and opening a sentence; the
 real-engine test; a real session on the book reported. Documentation check and
 full suite pass.
 
-## Codex: Proposal for the ESSENCE encyclopedia (stage 4)
+## Codex: Preserve reading state when navigation is refused (stage 1)
 
 **Status:** In review
-**Branch:** `codex/encyclopedia-proposal`
-**Requested:** 19 October 2026, by the maintainer
+**Branch:** `codex/navigation-refusal`
+**Requested:** 20 October 2026, by the maintainer via Claude
 
 ### Goal
 
-A reviewed proposal the maintainer can decide on, so that stage 4 can then be
-built: how encyclopedia entries are written, sourced, related and checked.
+An unsuccessful destination preparation or guarded save leaves a coherent
+current screen, saved reading position and return history. Reconcile the
+[assigned candidate task](proposals/CODEX_READER_WORKSPACE_PLAN.md#candidate-first-task-for-maintainer-assignment)
+with current main before changing code.
 
 ### Scope
 
-[ESSENCE §4 open decisions, §5 stage 4, §7](../ESSENCE.md#7-model-history-encyclopedia-and-task-registry-proposed):
-a new `docs/coordination/proposals/ESSENCE_ENCYCLOPEDIA_PROPOSAL.md`. Cover the
-source format (plain, structured Markdown per §7), the fields of the three
-knowledge objects (historical entry, task/capability record, runnable
-adapter), how relations in the genealogy carry a citation and a status, what
-counts as a source, editorial and provenance rules, initial coverage (a short
-list of entries, e.g. from n-gram counts and TF-IDF to word vectors and
-transformer encoders), how entries link back to SOL's own methods, and a
-design for a CORE-free validator and CLI. Include two or three complete
-sample entries with real, checked citations, and say what is unknown.
+[BEING §§2–3, 8](../BEING.md#2-what-is-implemented),
+[CORE §§5–7](../CORE.md#5-source-bound-positions-and-typography):
+`sol/terminal/neovim_reader.py`, `sol/reader/actions.py` only if necessary,
+focused regression tests, BEING, CHANGELOG and the handoff.
 
 ### Constraints
 
-A proposal, not an implementation: no application code, no change to the four
-authorities, no dependency. Do not invent citations: every reference must be
-one you can name exactly (authors, year, title, venue), or be marked as
-needing a source. Do not touch Claude Code's files (`sol/essence/tui/`,
-`sol/terminal/`).
+Preserve canonical text, source offsets, UUIDs, CORE/reference v1, workspace
+schemas, actor/revision guards, 64-record loading and the single Neovim
+frontend. No force-save, automatic reconversion or rollback of another
+session's work. Skip removed `S`/`study_open`; exercise `essence_source`.
 
 ### Acceptance
 
-The documentation check passes; the proposal lists the decisions it asks the
-maintainer to take, each with options and a recommendation.
+First run the injected next-payload failure against current main; report
+whether it still reproduces. Cover preparation failure, stale generation,
+competing save, successful retry, history return and reopen. Run focused
+tests, documentation check and full suite. Describe recovery after editor
+publication failure and distinguish automated checks from real-terminal
+acceptance. Open a PR; completion remains with the maintainer.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
