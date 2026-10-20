@@ -32,6 +32,46 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Clearer help and outline in the reader — 20 October 2026
+
+**Task:** maintainer request (20 October 2026): a better reader UI; no CURRENT_TASK entry.
+**Branch / PR:** `claude/reader-panels` · see the pull request
+**Last implementation commit:** `628f59fe9687b31f69f616e40ed85f36ca403be8` (this report is committed after it)
+
+### Changed files
+- `sol/terminal/neovim_controls.lua` — help in five sections, headings marked.
+- `sol/terminal/neovim_panels.lua` — `show_lines(..., hanging)` sets breakindent/shift.
+- `sol/terminal/neovim_tree.lua` — centred ≤84-column panel, rounded border and title, ▾/▸, ●, right-aligned pages, ellipsis for long titles.
+- `sol/reader/structure.py` — nodes carry `page`.
+- Tests (two new headless Neovim tests), BEING §2, CHANGELOG.
+
+### Tests performed
+- `scripts/check_docs.py` — OK; full unittest suite — OK (skipped=12, expected failures=4).
+- foot on the book, before and after screenshots of `?` and `t`.
+
+### Outstanding issues
+- None known.
+
+## An opening screen while SOL loads — 20 October 2026
+
+**Task:** maintainer request (20 October 2026): a loading screen with Science Organizes Logic and something moving; no CURRENT_TASK entry.
+**Branch / PR:** `claude/splash` · see the pull request
+**Last implementation commit:** `980bf525328dcec3705acda0430f64a85ea0a8a1` (this report is committed after it)
+
+### Changed files
+- `sol/terminal/splash.py` — frames (title from the maintainer's screensaver, subtitle, Being/Nothing/Becoming movement), daemon thread on the alternate screen, echo off and input flushed.
+- `sol/reader/app.py` — starts it for READER/DYNAMIC_STRUCTURE after the theme is known; closes it before printed errors, interrupts and first-run onboarding.
+- `sol/reader/launch.py` — closes it before actor/workspace questions.
+- `sol/terminal/neovim.py` — `handoff()` just before Neovim starts.
+- `tests/test_splash.py`, BEING §2, CHANGELOG.
+
+### Tests performed
+- `scripts/check_docs.py` — OK; full unittest suite — OK (skipped=12, expected failures=4).
+- Real launch on the book in foot (`sol -n --theme paper`), screenshotted at 0.4 s, 0.9 s and 3.4 s: title and movement, then the reader drawn over it.
+
+### Outstanding issues
+- Not tried in kitty/Alacritty or over SSH; a terminal without truecolor gets the escape codes anyway (palette themes already assume 256-colour or better).
+
 ## ESSENCE study interface and TF-IDF — 20 October 2026
 
 **Task:** maintainer request via Claude in session: improve ESSENCE's screens and add the merged TF-IDF engine as a study; no CURRENT_TASK entry.

@@ -366,7 +366,12 @@ def launch_payload(payload, executable, *, on_request=None):
         _write_json(input_path, payload)
         command = [executable, "--clean", "-u", "NONE", "-i", "NONE", "-n", "--noplugin",
                    "--cmd", _READ_ONLY_OPTIONS, "-c", _STOP_SERVERS, "-c", _LOAD_ADAPTER]
+        from sol.terminal import splash
         try:
+            # Neovim draws over the opening screen's last frame. Handed over at
+            # the last moment, so keys typed while preparing never reach it; if
+            # Neovim cannot start, the CLI's cleanup still restores the screen.
+            splash.handoff()
             # Inherit the real terminal: its screen is not embedded or piped.
             # Optional action pipes carry data only, with no shell or listener.
             # Native startup briefly creates its own
@@ -377,7 +382,10 @@ def launch_payload(payload, executable, *, on_request=None):
                 from sol.terminal.reader_channel import run_native
                 code = run_native(command, cwd=root, env=environment, handler=on_request)
         except KeyboardInterrupt:
+            splash.forget()
             return 130, None
+        # Neovim ran and restored the screen itself.
+        splash.forget()
         if code:
             return (code if code > 0 else 128 - code), None
         return 0, _read_packet(output_path) if output_path.exists() else None

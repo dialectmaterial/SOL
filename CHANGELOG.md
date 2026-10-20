@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Clearer help and outline in the reader — 20 October 2026
+
+- `?` now groups the keys into Reading, Finding your way, Text, sources and
+  notes, ESSENCE and Leaving; long descriptions wrap under their own column.
+- `t` shows the outline as a centred panel with ▾/▸ for open and closed
+  sections, ● on where you are, and each section's page on the right.
+
+### An opening screen while SOL loads — 20 October 2026
+
+Starting the reader now shows SOL's title, *Science Organizes Logic*, while
+the book loads: beneath it Being (●) and Nothing (○) move into each other and
+vanish into Becoming (◉), and part again. It uses the reader's theme, gives
+way to any question SOL asks, and ignores keys pressed while loading.
+`SOL_NO_SPLASH=1` turns it off.
+
 ### ESSENCE study interface and TF-IDF — 20 October 2026
 
 - Calmer Experiment controls, conditional file/reference fields, taller catalog lists and corrected Encyclopedia help.

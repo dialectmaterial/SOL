@@ -20,25 +20,43 @@ function M.open(structure, callbacks)
   local buffer = api.nvim_create_buf(false, true)
   vim.bo[buffer].buftype, vim.bo[buffer].bufhidden = 'nofile', 'wipe'
   local window
-  local function config()
+  local namespace = api.nvim_create_namespace('SOLOutline')
+  local WIDEST = 84
+  local function width()
     -- Beside ESSENCE, the outline keeps to the reader's columns.
     local essence = rawget(_G, 'SOLEssence')
     local columns = vim.o.columns - (essence and essence.reserved and essence.reserved() or 0)
-    return {relative = 'editor', row = 1, col = 1, width = math.max(1, columns - 4),
-      height = math.max(1, vim.o.lines - 4), style = 'minimal', border = 'single', zindex = 60}
+    return math.max(1, math.min(WIDEST, columns - 4)), columns
+  end
+  local function config()
+    local inner, columns = width()
+    return {relative = 'editor', row = 1, col = math.max(1, math.floor((columns - inner) / 2) - 1), width = inner,
+      height = math.max(1, vim.o.lines - 4), style = 'minimal', border = 'rounded', zindex = 60,
+      title = ' Outline ', title_pos = 'center'}
   end
   local function draw()
-    local lines = {'Book outline | * current branch',
-      'j/k move | h parent/collapse | l expand/child | Enter read | Esc return',
-      'Reading: ' .. current.key, ''}
+    local inner = width()
+    local lines, marks = {'j/k move · h/l fold · Enter read · Esc back', ''}, {{1, 'NonText'}}
     local cursor_row
     rows = {}
     local function visit(key, level)
       local node = nodes[key]
-      lines[#lines + 1] = string.rep('  ', level) ..
-        (#node.children == 0 and '    ' or expanded[key] and '[-] ' or '[+] ') ..
-        (key == current.key and '* ' or '  ') .. node.title:gsub('%s+', ' ')
+      local fold = #node.children == 0 and '  ' or expanded[key] and '▾ ' or '▸ '
+      local here = key == current.key and '● ' or '  '
+      local label = string.rep('  ', level) .. fold .. here .. node.title:gsub('%s+', ' ')
+      local page = node.page and ('p. ' .. node.page) or ''
+      -- The page sits at the right edge; a long title gives way with an ellipsis.
+      local room = inner - vim.fn.strdisplaywidth(page) - 2
+      if vim.fn.strdisplaywidth(label) > room then
+        label = vim.fn.strcharpart(label, 0, math.max(1, vim.fn.strchars(label) - (vim.fn.strdisplaywidth(label) - room) - 1)) .. '…'
+      end
+      local line = label .. string.rep(' ', math.max(1, inner - vim.fn.strdisplaywidth(label) - vim.fn.strdisplaywidth(page))) .. page
+      lines[#lines + 1] = line
       rows[#lines] = key
+      local glyphs = #(string.rep('  ', level) .. fold)
+      if fold ~= '  ' then marks[#marks + 1] = {#lines, 'NonText', #string.rep('  ', level), glyphs} end
+      if key == current.key then marks[#marks + 1] = {#lines, 'SOLSourceHeading', glyphs, #label} end
+      if page ~= '' then marks[#marks + 1] = {#lines, 'NonText', #line - #page, #line} end
       if key == selected then cursor_row = #lines end
       if expanded[key] then for _, child in ipairs(node.children) do visit(child, level + 1) end end
     end
@@ -46,6 +64,11 @@ function M.open(structure, callbacks)
     vim.bo[buffer].readonly, vim.bo[buffer].modifiable = false, true
     api.nvim_buf_set_lines(buffer, 0, -1, false, lines)
     vim.bo[buffer].modifiable, vim.bo[buffer].readonly = false, true
+    api.nvim_buf_clear_namespace(buffer, namespace, 0, -1)
+    for _, mark in ipairs(marks) do
+      api.nvim_buf_set_extmark(buffer, namespace, mark[1] - 1, mark[3] or 0,
+        {end_col = math.min(#lines[mark[1]], mark[4] or #lines[mark[1]]), hl_group = mark[2]})
+    end
     if window and api.nvim_win_is_valid(window) then
       api.nvim_win_set_cursor(window, {assert(cursor_row, 'outline selection is not visible'), 0})
     end
