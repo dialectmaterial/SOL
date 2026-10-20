@@ -51,6 +51,7 @@ The current implementation also includes literal book search, source-positioned 
 | `y` | Copy the selection (exact source text, paragraphs joined by a blank line) or the current paragraph to the system clipboard |
 | Mouse | Wheel scrolls; dragging selects, and the selection is copied when the button is released |
 | `m1`–`m3`; `'1`–`'3`; `dm1`–`dm3` | Set, open, clear one of three paragraph markers |
+| `M`; `L` | Name the current place; list named places (Enter reads one, `D` forgets it). They are the workspace's named bookmarks, shell bookmarks included; a temporary session keeps them until it ends |
 | `t` | Dynamic structure tree (Vim-style navigation) |
 | `c` | Beside the text when there is room: pages, footnotes, your notes, markers and the record; Enter on a footnote reads it, `e` edits your note and `r` shows its versions |
 | `a` | Write a personal note on this passage, saved in the workspace (`Ctrl-S` or `:w` saves, `Ctrl-C` discards) |
@@ -287,7 +288,7 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 - Current normal reading is bounded by chapters/64-record sections, not a whole-book text buffer.
 - `gg`/`G` reach the ends of the loaded section, not the book; `gp` jumps to a printed page (20 October), the outline to any section.
 - `/` lists at most 20 matching passages and `Ctrl-N`/`Ctrl-P` step between passages, not occurrences; later passages of a common word are out of reach and no count is shown.
-- The reader exposes three quick markers; the workspace's named bookmarks are not yet listed or reachable from it.
+- Besides three quick markers, `M` and `L` name, list and open the workspace's named bookmarks (20 October); they cannot yet be renamed or sorted other than by name.
 - Reader keys are fixed: the private Neovim configuration has no user keymap file.
 - These gaps, found by comparing the reader with Zathura (20 October), are ranked in the [reader backlog](coordination/proposals/READER_GAPS_AFTER_ZATHURA.md).
 - No native cross-paragraph span selection; normal visual selection is transient and passage-local.

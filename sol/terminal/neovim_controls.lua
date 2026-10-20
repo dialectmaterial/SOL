@@ -59,6 +59,10 @@ return function(reader)
     if number then request('page_open', {page = number})
     elseif answer:match('%S') then vim.notify('Type a printed page number, e.g. 240', vim.log.levels.WARN) end
   end
+  local function landmark()
+    local name = vim.fn.input('Name this place: ')
+    if name:match('%S') then request('landmark_set', {name = name}) end
+  end
   local function marker(slot, operation)
     request(operation or 'marker_set', {slot = slot})
   end
@@ -304,7 +308,8 @@ return function(reader)
           { "Ctrl-P / Ctrl-N", "previous / next search occurrence" },
           { "Esc", "hide the search marks" },
           { "Alt-Left/Right", "back / forward through your reading" },
-          { "m1 m2 m3", "set a paragraph marker; '1 '2 '3 jump, dm1… clear" } } },
+          { "m1 m2 m3", "set a paragraph marker; '1 '2 '3 jump, dm1… clear" },
+          { "M / L", "name this place / list named places (Enter reads)" } } },
         { "Text, sources and notes", {
           { "v  then y", "select; copy to the clipboard, across paragraphs too" },
           { "mouse", "scroll; drag to select and copy" },
@@ -469,6 +474,8 @@ return function(reader)
     vim.keymap.set('n', 'n', guarded(function() passage(1) end), {buffer = buffer, silent = true})
     vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
     vim.keymap.set('n', 'gp', guarded(page), {buffer = buffer, silent = true})
+    vim.keymap.set('n', 'M', guarded(landmark), {buffer = buffer, silent = true})
+    vim.keymap.set('n', 'L', guarded(function() request('landmark_list') end), {buffer = buffer, silent = true})
     vim.keymap.set({'n', 'x'}, 'E', guarded(function()
       -- Capture the exact position and selection; ESSENCE returns to it with
       -- Alt-R and on closing. Visual mode stays until ESSENCE actually opens

@@ -14,7 +14,7 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ## Claude Code: Named landmarks in the reader
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `claude/landmarks`
 **Requested:** 20 October 2026, by the maintainer (reader backlog, item 5)
 
