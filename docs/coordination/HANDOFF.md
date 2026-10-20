@@ -32,6 +32,35 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## ESSENCE Methods catalog — 20 October 2026
+
+**Task:** maintainer request via Claude in session: supply engine-backed Methods screen content; Claude implements the screen. No CURRENT_TASK entry.
+**Branch / PR:** `codex/methods-catalog` · [PR #44](https://github.com/dialectmaterial/SOL/pull/44).
+**Last implementation commit:** `d4754f65aeadacd84ffc59c5f044468bdba6f8ff` (this report follows it).
+
+### Changed files
+
+- `sol/essence/methods.json` — ten descriptions traced to the current CLI, word/sentence engines, comparison, prose and segmentation-review code. Each has the requested fields; `output` is a string describing both artifact and save destination, including stdout/redirection where no automatic save exists.
+- `sol/essence/methods.py` — standard-library-only `load_methods()` returns `{"entries": [...]}` afresh; `method_markdown(method)` renders one entry without mutation. IDs: `words`, `word-comparison`, `sentences`, `term`, `prose`, `check`, `segmentation-sample`, `segmentation-export`, `segmentation-import`, `segmentation-check`. `encyclopedia` is an existing topic ID or null; renderer prints the ID for the screen to resolve. No runnable adapters are claimed for encyclopedia-only reading topics.
+- `pyproject.toml`, `MANIFEST.in`, `tests/test_packaging.py` — bundle the JSON in wheel and sdist; extend installed offline resource checks to load and render Methods with CORE, UI and model imports blocked.
+- `tests/test_methods.py`, `CHANGELOG.md` — schema/topic references, parseable examples covering every current analysis action, complete rendering without mutation and fresh loads; release note.
+
+### Tests performed
+
+- `/tmp/sol-polish-venv/bin/python -B -m unittest discover -s tests -p test_methods.py` — 4 passed.
+- Installed-catalog packaging check — passed, including real wheel/sdist builds and isolated offline loading from outside the checkout.
+- `/tmp/sol-polish-venv/bin/python -B -m unittest discover -s tests` — 1,737 tests in 128 seconds; OK (12 skipped, 4 expected failures).
+- `/tmp/sol-polish-venv/bin/python -B scripts/check_docs.py` and `git diff --check` — passed; external URLs were not network-checked.
+
+### Outstanding issues
+
+- Screen integration belongs to Claude; `sol/essence/tui/` is untouched. No manual terminal or private-corpus run was needed for these bundled descriptions.
+- Publication uses `/tmp/sol-methods-catalog` because the original checkout’s Git metadata is read-only. Changed files are also copied back into the shared workspace.
+
+### Decisions requiring approval
+
+None.
+
 ## Every occurrence of a word in ESSENCE — 20 October 2026
 
 **Task:** maintainer request in session (20 October 2026): list every occurrence of a word, not only the first per passage; no CURRENT_TASK entry.
