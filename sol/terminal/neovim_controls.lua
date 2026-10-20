@@ -301,7 +301,7 @@ return function(reader)
         "a                write a personal note on this passage (workspace)",
         "c, then e / r    edit your note under the cursor / show its earlier versions",
         "f                toggle quiet focus mode",
-        "T                cycle Terminal / Dark / Paper theme for this session",
+        "T                cycle Mocha / Latte / Terminal theme for this session",
         ":q  or  :qa      save your exact place and quit",
         ":qa!             quit without saving the current cursor", "",
         "In paragraph mode, j/k stay here. Use b/n to change paragraph.",

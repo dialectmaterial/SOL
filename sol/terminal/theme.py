@@ -1,4 +1,4 @@
-"""Three reading presets, sent to the Neovim reader as highlight data only.
+"""Three reading presets (Catppuccin Mocha and Latte, and Terminal), sent to the Neovim reader as highlight data only.
 
 Presentation never reaches canonical text, source offsets or workspace records.
 No colorscheme file is sourced and the user's terminal theme is not changed;
@@ -11,24 +11,27 @@ import re
 
 from sol.reader.options import DEFAULT_READER_THEME as DEFAULT_THEME, READER_THEMES as THEMES
 
-LABELS = {"terminal": "Terminal", "dark": "Dark", "paper": "Paper"}
+LABELS = {"mocha": "Catppuccin Mocha", "latte": "Catppuccin Latte", "terminal": "Terminal"}
 
 # Highlight groups the reader owns. Lua refuses any other name or attribute.
 GROUPS = ("Normal", "SOLPanel", "SOLPanelBorder", "SOLSourceHeading", "SOLSourceWarning",
           "StatusLine", "StatusLineNC", "Visual", "Search", "CurSearch", "IncSearch",
           "CursorLine", "ErrorMsg", "WarningMsg", "NonText", "EndOfBuffer")
 
-# Body text meets WCAG AAA (7:1) against the page and panel; status, warning
-# and match text meet at least AA (4.5:1). tests/test_reader_theme.py checks it.
+# Catppuccin's own colors (catppuccin.com/palette, MIT), chosen so body text
+# meets WCAG AAA (7:1) against the page and panel and status, warning and
+# match text at least AA (4.5:1); tests/test_reader_theme.py checks it. Search
+# backgrounds blend yellow into the base, as Catppuccin's Neovim port does.
+# Latte's panel stays on Base: its Text reaches only 6.6:1 on Mantle.
 _PALETTES = {
-    "dark": {"page": "#1c1b19", "text": "#d9d3c5", "heading": "#efe8d8", "muted": "#9a9384",
-             "warning": "#e0a85e", "panel": "#262420", "border": "#4d483f",
-             "selection": "#3b4452", "search": "#5a4b25", "search_text": "#efe8d8",
-             "current": "#c9a650", "current_text": "#1c1b19"},
-    "paper": {"page": "#f5f0e4", "text": "#2a2620", "heading": "#16130f", "muted": "#6a6253",
-              "warning": "#8c4a0c", "panel": "#ece5d5", "border": "#b5aa93",
-              "selection": "#d3dbe6", "search": "#ead59a", "search_text": "#2a2620",
-              "current": "#d9b65e", "current_text": "#16130f"},
+    "mocha": {"page": "#1e1e2e", "text": "#cdd6f4", "heading": "#b4befe", "muted": "#9399b2",
+              "warning": "#fab387", "panel": "#181825", "border": "#45475a",
+              "selection": "#45475a", "search": "#554f4e", "search_text": "#cdd6f4",
+              "current": "#fab387", "current_text": "#11111b"},
+    "latte": {"page": "#eff1f5", "text": "#4c4f69", "heading": "#8839ef", "muted": "#5c5f77",
+              "warning": "#d20f39", "panel": "#eff1f5", "border": "#bcc0cc",
+              "selection": "#ccd0da", "search": "#ead3b4", "search_text": "#4c4f69",
+              "current": "#8839ef", "current_text": "#eff1f5"},
 }
 _HEX = re.compile(r"#[0-9a-f]{6}")
 _CUBE = (0, 95, 135, 175, 215, 255)
@@ -125,7 +128,7 @@ def _terminal_groups(colored):
 def theme_payload(active=DEFAULT_THEME, environment=None):
     """All three presets, so the reader can switch without a Python round trip.
 
-    Without 256-color support, Dark and Paper fall back to Terminal visibly
+    Without 256-color support, Mocha and Latte fall back to Terminal visibly
     rather than drawing approximate colors. NO_COLOR removes Terminal's accent.
     """
     if active not in THEMES:
@@ -133,10 +136,11 @@ def theme_payload(active=DEFAULT_THEME, environment=None):
     environment = os.environ if environment is None else environment
     capability = color_capability(environment)
     colored = not environment.get("NO_COLOR")
-    presets = [{"name": "terminal", "label": LABELS["terminal"],
-                "groups": _terminal_groups(colored), "notice": ""}]
-    for name in ("dark", "paper"):
-        if capability == "basic":
+    presets = []
+    for name in THEMES:
+        if name == "terminal":
+            presets.append({"name": name, "label": LABELS[name], "groups": _terminal_groups(colored), "notice": ""})
+        elif capability == "basic":
             presets.append({"name": name, "label": LABELS[name], "groups": _terminal_groups(colored),
                             "notice": f"{LABELS[name]} needs a 256-color or truecolor terminal; "
                                       "showing Terminal colors instead."})

@@ -32,6 +32,28 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Catppuccin throughout — 20 October 2026
+
+**Task:** maintainer request in session (20 October 2026): make Catppuccin SOL's theme everywhere; no CURRENT_TASK entry.
+**Branch / PR:** `claude/catppuccin` · see the pull request
+**Last implementation commit:** `5b892c255b22a12955a580e4987d772a52d4cf9d` (this report is committed after it)
+
+### Changed files
+- `sol/terminal/theme.py` — Catppuccin Mocha and Latte palettes replace Dark and Paper; presets follow `READER_THEMES` order.
+- `sol/reader/options.py`, `sol/core/config.py`, `sol/reader/app.py` — names `mocha`, `latte`, `terminal`; default `mocha`; saved `dark`/`paper` map to the new names.
+- `sol/terminal/neovim_view.lua`, `neovim_controls.lua` — background per preset; help text.
+- `sol/terminal/neovim_reader.py`, `sol/essence/tui/__main__.py`, `app.py` — ESSENCE launches with `--theme` and uses Textual's Catppuccin themes.
+- Tests and BEING §4, ARCHITECTURE, CHANGELOG.
+
+### Tests performed
+- `scripts/check_docs.py` — OK.
+- Full unittest suite — OK (skipped=12, expected failures=4).
+- ESSENCE under each theme in Textual's test harness — catppuccin-mocha, catppuccin-latte, ansi-dark applied.
+
+### Outstanding issues
+- Pressing `T` in the reader while ESSENCE is open does not restyle ESSENCE; it follows the theme at its next opening.
+- Not yet looked at by eye in a real terminal.
+
 ## ESSENCE methods table of contents — 20 October 2026
 
 **Task:** maintainer's session decision: implement a modest methods table of contents; proposal §9 deferred.

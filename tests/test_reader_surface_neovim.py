@@ -512,8 +512,8 @@ end
   local before = vim.api.nvim_buf_get_lines(reader.buffer, 0, -1, false)
   local packet = reader.capture('v', reader.source_point(data.records[1].id, 5), reader.source_point(data.records[1].id, 12))
   local function normal() return vim.api.nvim_get_hl(0, {name = 'Normal'}) end
-  assert(reader.theme() == 'paper' and vim.o.termguicolors and vim.o.background == 'light')
-  assert(normal().bg == tonumber('f5f0e4', 16), 'paper page color was not applied')
+  assert(reader.theme() == 'latte' and vim.o.termguicolors and vim.o.background == 'light')
+  assert(normal().bg == tonumber('eff1f5', 16), 'latte page color was not applied')
   assert(vim.api.nvim_get_hl(0, {name = 'SOLSourceHeading'}).bold)
   assert(vim.wo[reader.window].winhighlight == 'NormalFloat:Normal')
   assert(vim.o.fillchars:find('lastline: ', 1, true) and vim.o.fillchars:find('eob: ', 1, true))
@@ -531,7 +531,7 @@ end
   reader.cycle_theme()
   assert(reader.theme() == 'terminal' and not vim.o.termguicolors and next(normal()) == nil)
   reader.cycle_theme()
-  assert(vim.o.background == 'dark' and normal().bg == tonumber('1c1b19', 16))
+  assert(vim.o.background == 'dark' and normal().bg == tonumber('1e1e2e', 16))
   assert(vim.deep_equal(before, vim.api.nvim_buf_get_lines(reader.buffer, 0, -1, false)))
   reader.verified_projection()
   assert(vim.deep_equal(reader.capture('v', reader.source_point(data.records[1].id, 5),
@@ -539,9 +539,9 @@ end
   -- A host background change resets default groups; the preset returns.
   vim.o.background = 'light'
   vim.wait(100, function() return vim.o.background == 'dark' end)
-  assert(vim.o.background == 'dark' and normal().bg == tonumber('1c1b19', 16))
-''', theme="paper")
-        self.assertEqual(report["order"], ["terminal", "dark", "paper"])
+  assert(vim.o.background == 'dark' and normal().bg == tonumber('1e1e2e', 16))
+''', theme="latte")
+        self.assertEqual(report["order"], ["terminal", "mocha", "latte"])
 
     def test_source_preview_popup_requests_pages_and_returns_to_the_same_position(self):
         report = self.run_lua(r'''
@@ -1484,7 +1484,7 @@ while True:
   reader.cycle_theme()
   vim.api.nvim_feedkeys('p', 'xt', false)
   reader = SOLNvimReader
-  assert(reader.mode == 'paragraph' and reader.theme() == 'paper')
+  assert(reader.mode == 'paragraph' and reader.theme() == 'latte')
   vim.api.nvim_feedkeys('T', 'xt', false)
   assert(SOLNvimReader.theme() == 'terminal')
   local adapter = os.getenv('SOL_NVIM_ADAPTER')
@@ -1503,7 +1503,7 @@ while True:
     if not accepted then refused = refused + 1 end
   end
   report.refused = refused
-''', theme="dark", integrated=True)
+''', theme="mocha", integrated=True)
         self.assertEqual(report["refused"], 6)
 
 

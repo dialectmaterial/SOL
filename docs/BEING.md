@@ -31,7 +31,7 @@ implementation split only; controls, packets, drafts and reading behavior are
 unchanged. Wheel and source-archive checks include every Lua asset, with a
 headless reading check from a wheel installed in a temporary environment.
 
-The reader presently uses a centered maximum width of **72 terminal columns** (configurable), native word-aware wrap, semantic emphasis/strong/code spans, headings, a source-context display and review warnings. It is a character-cell presentation, not proportional typesetting. It runs in capable terminal hosts including Alacritty and Kitty; terminal capability heuristics can choose italic or underline fallback. Three presentation presets (Terminal, Dark, Paper) are implemented; see section 4.
+The reader presently uses a centered maximum width of **72 terminal columns** (configurable), native word-aware wrap, semantic emphasis/strong/code spans, headings, a source-context display and review warnings. It is a character-cell presentation, not proportional typesetting. It runs in capable terminal hosts including Alacritty and Kitty; terminal capability heuristics can choose italic or underline fallback. Three presentation presets (Catppuccin Mocha, the default, Catppuccin Latte and Terminal) are implemented; see section 4.
 
 The current implementation also includes literal book search, source-positioned results, a dynamic outline/tree, selection and copy, markers, focus/paragraph modes, a session navigation trail, saved reading position, annotated workspaces, comparisons, notes and source-review operations. The most mature workspace operations are additionally exposed via `sol --shell`; not every operation has an equally convenient Neovim keybinding. Avoid claiming full GUI/TUI parity.
 
@@ -57,7 +57,7 @@ The current implementation also includes literal book search, source-positioned 
 | `s` | Printed source of this passage (formulas), cropped from the verified PDF, in a separate image viewer |
 | `E` | Open ESSENCE beside the reader (needs the `essence` extra); in ESSENCE, Alt-F toggles fullscreen and Alt-R returns to the reader; a word's source chosen in ESSENCE opens here, and Alt-Left returns |
 | `f` | Quiet focus mode; keep important warnings |
-| `T` | Cycle Terminal / Dark / Paper theme for this session |
+| `T` | Cycle Mocha / Latte / Terminal theme for this session |
 | `?` | Help |
 | `:q`, `:qa` | Save the exact position and quit (`q` and `Ctrl-q` only say so) |
 | `:qa!` | Quit without saving the current position |
@@ -89,8 +89,8 @@ sol                                  # Reader, remembered actor/workspace
 sol -n                               # Temporary reader, no workspace/profile writes
 sol --actor "Researcher" --workspace logic-study
 sol --width 64                       # Adjust prose measure
-sol --theme paper                    # Theme for this session: terminal, dark or paper
-sol --set-theme dark                 # Remember a theme in ~/.config/sol/config.json
+sol --theme latte                    # Theme for this session: mocha, latte or terminal
+sol --set-theme mocha                # Remember a theme in ~/.config/sol/config.json
 sol --set-source-pdf PATH            # Verify and remember the original PDF for s (first import does this)
 sol --structure --depth 2            # Printable book structure
 sol --dynamic-structure              # Standalone dynamic tree
@@ -142,11 +142,13 @@ Workspace report exports retain references, questions, notes/revisions, reading 
 
 | Preset | Intent | Technical rule |
 |---|---|---|
+| **Mocha** (default) | [Catppuccin](https://catppuccin.com/palette) Mocha, dark | Catppuccin's own colors; readable contrast and restrained differentiation of hierarchy, notes, search and warnings |
+| **Latte** | Catppuccin Latte, light | Catppuccin's own colors; legible dark text on a light page |
 | **Terminal** | Existing host's native appearance | Inherit foreground/background; use minimal highlight overrides |
-| **Dark** | Quiet, carefully tuned TUI reading | Readable contrast and restrained differentiation of hierarchy, notes, search and warnings |
-| **Paper** | Book-like page | Light paper-toned background with legible dark text and restrained accents |
 
-**Implemented (17 October):** the three presets above. Python (`sol/terminal/theme.py`) owns the palettes as inert highlight data; the Lua reader validates group names and attributes again and sources no colorscheme file. Terminal clears the reader's colors so the host's foreground, background and 16-color palette show through. Dark and Paper use 24-bit color when `COLORTERM` declares it, a computed xterm-256 approximation otherwise, and fall back to Terminal with a visible notice on basic terminals. `NO_COLOR` removes Terminal's single color accent. Body text meets WCAG AAA (7:1) against page and panel; headings, warnings, status and search meet at least AA (4.5:1); tests enforce these ratios. The default is Terminal. `T` cycles presets for the session only; `sol --theme NAME` selects one for a launch and `sol --set-theme NAME` saves it in the existing `config.json` alongside the corpus pointer. Reading floats share the page color; popups and the outline use a distinct panel color; `~` end-of-buffer and `@@@` last-line markers are hidden. Themes never alter canonical text, offsets, selection identity or workspace data. **Not yet done:** the visual audit below (spacing, heading density, status-line weight, popup intrusion) and sustained manual reading trials in each preset.
+**Decision (maintainer, 20 October 2026):** SOL's look is Catppuccin throughout. Mocha and Latte replace the earlier Dark and Paper presets (a saved `dark` or `paper` reads as `mocha` or `latte`), Mocha is the default, and ESSENCE opens in the reader's theme with Textual's matching Catppuccin theme (Terminal: the terminal's ANSI colors).
+
+**Implemented (17 October):** the three presets above. Python (`sol/terminal/theme.py`) owns the palettes as inert highlight data; the Lua reader validates group names and attributes again and sources no colorscheme file. Terminal clears the reader's colors so the host's foreground, background and 16-color palette show through. Mocha and Latte use 24-bit color when `COLORTERM` declares it, a computed xterm-256 approximation otherwise, and fall back to Terminal with a visible notice on basic terminals. `NO_COLOR` removes Terminal's single color accent. Body text meets WCAG AAA (7:1) against page and panel; headings, warnings, status and search meet at least AA (4.5:1); tests enforce these ratios. Latte's panels stay on its page color, since its text falls short of 7:1 on Catppuccin's Mantle. The default is Mocha. `T` cycles presets for the session only; `sol --theme NAME` selects one for a launch and `sol --set-theme NAME` saves it in the existing `config.json` alongside the corpus pointer. Reading floats share the page color; popups and the outline use a distinct panel color; `~` end-of-buffer and `@@@` last-line markers are hidden. Themes never alter canonical text, offsets, selection identity or workspace data. **Not yet done:** the visual audit below (spacing, heading density, status-line weight, popup intrusion) and sustained manual reading trials in each preset.
 
 Do not confuse installing a Neovim color scheme with designing a reading surface. Evaluate: paragraph spacing, inter-section gaps, measure, top/bottom breathing room, heading density, how emphasis maps to actual fonts, whether the always-visible status hints dominate, line-wrap behavior, warning visibility, tree/search popup intrusion and preservation of position after resizing. The present source defines a centered floating window without border and a verbose action statusline; these are concrete starting points for visual audit.
 

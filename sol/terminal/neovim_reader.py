@@ -362,7 +362,9 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         # SOL program and saves studies where the reader does, so it gets the
         # reader's own values back (empty means unset, as XDG treats it).
         environment = {name: os.environ.get(name, "") for name in ESSENCE_ENVIRONMENT}
-        return {"essence": {"command": [sys.executable, "-m", "sol.essence.tui", "--context", str(context)],
+        # ESSENCE opens in the reader's current theme.
+        return {"essence": {"command": [sys.executable, "-m", "sol.essence.tui", "--context", str(context),
+                                        "--theme", theme],
                             "env": environment}}
 
     panels = {"search": search_panel, "source_preview": source_panel, "marker_set": marker_panel,

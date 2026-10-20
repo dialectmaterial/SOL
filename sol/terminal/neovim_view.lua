@@ -402,7 +402,7 @@ return function(reader, supplied)
   -- Semantic spans map once from source codepoints to UTF-8 extmark boundaries.
   -- Styling never enters canonical strings. Unknown/basic terminals underline em.
   local italic_capable = data.emphasis == "italic"
-  -- Terminal restores the host's own background setting; Dark/Paper declare theirs.
+  -- Terminal restores the host's own background setting; Mocha/Latte declare theirs.
   if rawget(_G, 'SOLInitialBackground') == nil then _G.SOLInitialBackground = vim.o.background end
   local function apply_theme()
     if not data.theme then
@@ -411,7 +411,7 @@ return function(reader, supplied)
       return
     end
     local active = data.theme.active
-    local background = active == "paper" and "light" or active == "dark" and "dark" or _G.SOLInitialBackground
+    local background = active == "latte" and "light" or active == "mocha" and "dark" or _G.SOLInitialBackground
     vim.o.termguicolors = active ~= "terminal" and data.theme.truecolor
     -- Changing 'background' resets Neovim's default groups, so it precedes ours.
     if vim.o.background ~= background then vim.o.background = background end
