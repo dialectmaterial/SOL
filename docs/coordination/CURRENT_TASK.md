@@ -12,74 +12,65 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: The sentence study in ESSENCE
+## Claude Code: The printed page in a zoomable PDF viewer
 
-**Status:** Ready
-**Branch:** `claude/essence-sentences-ui`
-**Requested:** 19 October 2026, by the maintainer
-
-### Goal
-
-The sentence-length study, removed from the reader as `S`, runs from ESSENCE's
-Experiment screen beside word frequencies, on a passage, section, the whole
-book or a text file, and a listed sentence opens in the reader.
-
-### Scope
-
-[ESSENCE §4–§5, Experiment A](../ESSENCE.md#experiment-a--syntax-and-positionality-highest-priority),
-[BEING §6](../BEING.md#6-being--essence-without-terminal-dogma): `sol/essence/tui/`,
-`sol/terminal/` only if opening a sentence needs it, tests, ESSENCE §4 and CHANGELOG.
-Call `sol.essence.sentences.analyze_sentences` with the v2 providers (#31);
-Results shows counts, the histogram, means by place in the paragraph and the
-longest sentences; Enter opens one through the reader's `essence_source`.
-
-### Constraints
-
-No change to `sol/essence/` outside `sol/essence/tui/` (Codex's lane) and no
-change to the v1/v2 artifacts. Workspace sessions save the artifact; temporary
-sessions save nothing. No new dependency.
-
-### Acceptance
-
-Textual pilot tests for choices, results, saving and opening a sentence; the
-real-engine test; a real session on the book reported. Documentation check and
-full suite pass.
-
-## Codex: Preserve reading state when navigation is refused (stage 1)
-
-**Status:** In review
-**Branch:** `codex/navigation-refusal`
-**Requested:** 20 October 2026, by the maintainer via Claude
+**Status:** In progress
+**Branch:** `claude/pdf-companion`
+**Requested:** 20 October 2026, by the maintainer (reader backlog, item 2)
 
 ### Goal
 
-An unsuccessful destination preparation or guarded save leaves a coherent
-current screen, saved reading position and return history. Reconcile the
-[assigned candidate task](proposals/CODEX_READER_WORKSPACE_PLAN.md#candidate-first-task-for-maintainer-assignment)
-with current main before changing code.
+From the current passage, one key opens the verified PDF in a PDF viewer
+(Zathura when installed) at the passage's physical page, so the printed page
+can be zoomed and read in context; the crop popup of `s` stays.
 
 ### Scope
 
-[BEING §§2–3, 8](../BEING.md#2-what-is-implemented),
-[CORE §§5–7](../CORE.md#5-source-bound-positions-and-typography):
-`sol/terminal/neovim_reader.py`, `sol/reader/actions.py` only if necessary,
-focused regression tests, BEING, CHANGELOG and the handoff.
+[BEING §5](../BEING.md#5-mathematical-notation-and-source-fidelity),
+[reader backlog](proposals/READER_GAPS_AFTER_ZATHURA.md):
+`sol/terminal/source.py`, the reader key and help in `sol/terminal/neovim_*.lua`
+only where the source action lives, tests, BEING §5, CHANGELOG.
 
 ### Constraints
 
-Preserve canonical text, source offsets, UUIDs, CORE/reference v1, workspace
-schemas, actor/revision guards, 64-record loading and the single Neovim
-frontend. No force-save, automatic reconversion or rollback of another
-session's work. Skip removed `S`/`study_open`; exercise `essence_source`.
+Opens the private, fingerprint-checked PDF snapshot, never an unverified file.
+No new dependency; a viewer that is missing falls back to the crop. Does not
+touch search (Codex's task).
 
 ### Acceptance
 
-First run the injected next-payload failure against current main; report
-whether it still reproduces. Cover preparation failure, stale generation,
-competing save, successful retry, history return and reopen. Run focused
-tests, documentation check and full suite. Describe recovery after editor
-publication failure and distinguish automated checks from real-terminal
-acceptance. Open a PR; completion remains with the maintainer.
+Unit tests for the viewer command and fallback; a real session on the book.
+Documentation check and full suite pass.
+
+## Codex: Complete reader search
+
+**Status:** In progress
+**Branch:** `codex/complete-search`
+**Requested:** 20 October 2026, by the maintainer (reader backlog, item 1)
+
+### Goal
+
+`/` reaches every match in the book: occurrence-level next/previous, the total
+count and the current position shown (for example "12 of 87"), and no
+20-passage ceiling.
+
+### Scope
+
+[BEING §2](../BEING.md#2-what-is-implemented),
+[reader backlog](proposals/READER_GAPS_AFTER_ZATHURA.md):
+`sol/terminal/neovim_reader.py` search request, `sol/reader/actions.py` search
+navigation, the Lua search display, tests, BEING, CHANGELOG.
+
+### Constraints
+
+Preserve canonical text, offsets, UUIDs and the refused-move guarantees.
+Literal search semantics unchanged. No change to `sol/terminal/source.py`
+(Claude's task).
+
+### Acceptance
+
+Tests for counts, occurrence stepping across passages and sections, and a
+common word with more than 20 passages; documentation check and full suite.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.

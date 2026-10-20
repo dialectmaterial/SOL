@@ -266,6 +266,11 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 ## 7. Boundaries and known limitations
 
 - Current normal reading is bounded by chapters/64-record sections, not a whole-book text buffer.
+- `gg`/`G` reach the ends of the loaded section, not the book, and there is no jump to a printed page although the status line shows it.
+- `/` lists at most 20 matching passages and `Ctrl-N`/`Ctrl-P` step between passages, not occurrences; later passages of a common word are out of reach and no count is shown.
+- The reader exposes three quick markers; the workspace's named bookmarks are not yet listed or reachable from it.
+- Reader keys are fixed: the private Neovim configuration has no user keymap file.
+- These gaps, found by comparing the reader with Zathura (20 October), are ranked in the [reader backlog](coordination/proposals/READER_GAPS_AFTER_ZATHURA.md).
 - No native cross-paragraph span selection; normal visual selection is transient and passage-local.
 - Printed-source preview is implemented and was used in a real terminal (17 October); the reader judged the separate viewer helpful but awkward. Native 2-D mathematical typesetting remains unimplemented; retyped linear mathematics awaits human review.
 - The outline/search/marker UI is functional but readability, styling, and mode transitions require actual use testing.
