@@ -713,6 +713,34 @@ end
         self.assertIn("Enter reads a landmark; D forgets it", panel)
         self.assertEqual(report["count"], 4)
 
+    def test_keys_json_moves_reader_keys_and_lists_them_in_help(self):
+        report = self.run_lua(r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  vim.env.SOL_NVIM_KEYS = vim.json.encode({['gp'] = 'P', ['L'] = 'M', ['M'] = 'L', ['zz9'] = 'Q'})
+  local warned = {}
+  vim.notify = function(message) warned[#warned + 1] = message end
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local normal = {}
+  for _, map in ipairs(vim.api.nvim_buf_get_keymap(reader.buffer, 'n')) do normal[map.lhs] = true end
+  report.gp, report.P = normal['gp'] == true, normal['P'] == true
+  vim.api.nvim_feedkeys('M', 'xt', false)
+  report.first = sent[1] and sent[1].op
+  report.warned = warned
+  _G.SOLReaderChannel.navigation_pending = nil
+  vim.api.nvim_feedkeys('?', 'xt', false)
+  report.help = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+''', integrated=True)
+        self.assertFalse(report["gp"])
+        self.assertTrue(report["P"])
+        self.assertEqual(report["first"], "landmark_list")  # L and M swapped
+        self.assertEqual(report["warned"], ["keys.json names keys SOL does not use: zz9"])
+        help_text = "\n".join(report["help"])
+        self.assertIn("Your keys (keys.json)", help_text)
+        self.assertIn("does what gp does above", help_text)
+
     def test_note_editor_saves_restores_selection_and_protects_drafts(self):
         report = self.run_lua(r'''
   local sent = {}

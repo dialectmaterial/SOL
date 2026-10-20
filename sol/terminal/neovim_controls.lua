@@ -287,6 +287,8 @@ return function(reader)
       end
     end
   end
+  -- The reader's key remappings, from keys.json through Python (see neovim.user_keys).
+  local remap = vim.json.decode(vim.env.SOL_NVIM_KEYS or '{}', {luanil = {object = true, array = true}}) or {}
   local function help()
     if integrated then
       -- Sections of key / description; a wrapped description continues under
@@ -325,6 +327,10 @@ return function(reader)
           { ":q  :qa", "save your exact place and quit" },
           { ":qa!", "quit without saving" } } },
       }
+      local yours = {}
+      for from, to in pairs(remap) do yours[#yours + 1] = { to, "does what " .. from .. " does above" } end
+      table.sort(yours, function(left, right) return left[1] < right[1] end)
+      if #yours > 0 then sections[#sections + 1] = { "Your keys (keys.json)", yours } end
       local lines, marks = { "SOL reader · " .. (mode == "paragraph" and "one paragraph" or "continuous") }, { { 1, "SOLSourceHeading" } }
       for _, section in ipairs(sections) do
         lines[#lines + 1] = ""
@@ -511,6 +517,27 @@ return function(reader)
   vim.keymap.set("n", "?", help, { buffer = buffer, silent = true })
   if data.theme then vim.keymap.set("n", "T", guarded(cycle_theme), { buffer = buffer, silent = true }) end
   if not integrated then api.nvim_create_user_command("SOLExport", guarded(function() export() end), {}) end
+  -- The reader's own keys.json: each SOL key moves to the reader's chosen key.
+  -- All moves are collected before any is made, so two keys can swap.
+  local moves, missing = {}, {}
+  for from, to in pairs(remap) do
+    local found = false
+    for _, mode_name in ipairs({'n', 'x'}) do
+      for _, map in ipairs(api.nvim_buf_get_keymap(buffer, mode_name)) do
+        if vim.keycode(map.lhs) == vim.keycode(from) then
+          moves[#moves + 1] = {mode_name, map.lhs, to, map.callback or map.rhs}
+          found = true
+        end
+      end
+    end
+    if not found then missing[#missing + 1] = from end
+  end
+  for _, move in ipairs(moves) do vim.keymap.del(move[1], move[2], {buffer = buffer}) end
+  for _, move in ipairs(moves) do vim.keymap.set(move[1], move[3], move[4], {buffer = buffer, silent = true}) end
+  if #missing > 0 then
+    table.sort(missing)
+    vim.notify('keys.json names keys SOL does not use: ' .. table.concat(missing, ' '), vim.log.levels.WARN)
+  end
   local group = api.nvim_create_augroup('SOLReaderView', {clear = true})
   api.nvim_create_autocmd("VimResized", { group = group, callback = function()
     if tree_view then tree_view.resize() else close_popup() end

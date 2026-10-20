@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Your own reader keys — 20 October 2026
+
+`~/.config/sol/keys.json` moves the reader's keys, for example
+`{"version": 1, "keys": {"n": "J", "b": "K"}}`; `?` lists them.
+
 ### Named landmarks — 20 October 2026
 
 `M` names the place you are reading and `L` lists your named places; Enter

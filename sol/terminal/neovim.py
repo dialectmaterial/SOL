@@ -328,6 +328,32 @@ def clipboard_command(environment=None, which=None, platform=None):
     return None
 
 
+def user_keys(path=None):
+    """The reader's key remappings from ~/.config/sol/keys.json, checked.
+
+    {"version": 1, "keys": {"n": "J"}} makes J do what n does; n then does
+    nothing. Only SOL's reader keys are remapped, never panel keys, and the
+    file is data: names are short key notations, never commands.
+    """
+    if path is None:
+        from sol.core.config import config_path
+        path = config_path().with_name("keys.json")
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError, UnicodeError) as error:
+        raise ValueError(f"Cannot read SOL key remappings {path}: {error}") from error
+    keys = data.get("keys") if isinstance(data, dict) and data.get("version") == 1 and set(data) == {"version", "keys"} else None
+    def notation(key):
+        return isinstance(key, str) and 1 <= len(key) <= 16 and key.isprintable() and " " not in key
+    if (not isinstance(keys, dict) or len(keys) > 64 or not all(map(notation, keys))
+            or not all(map(notation, keys.values())) or len(set(keys.values())) != len(keys)):
+        raise ValueError(f"SOL key remappings {path} must be {{\"version\": 1, \"keys\": {{\"n\": \"J\"}}}}: "
+                         "up to 64 distinct short key names, without spaces")
+    return dict(keys)
+
+
 def _isolated_environment(root, input_path, output_path):
     clipboard = clipboard_command()
     environment = os.environ.copy()
@@ -346,7 +372,7 @@ def _isolated_environment(root, input_path, output_path):
     environment.update(SOL_NVIM_INPUT=str(input_path), SOL_NVIM_OUTPUT=str(output_path),
                        SOL_NVIM_ADAPTER=str(Path(__file__).with_name("neovim.lua").resolve()),
                        NVIM_LOG_FILE=str(root / "neovim.log"), NVIM_APPNAME="sol-reader",
-                       SOL_NVIM_CLIPBOARD=json.dumps(clipboard))
+                       SOL_NVIM_CLIPBOARD=json.dumps(clipboard), SOL_NVIM_KEYS=json.dumps(user_keys()))
     return environment
 
 
