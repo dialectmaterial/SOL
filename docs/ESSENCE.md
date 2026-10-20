@@ -1,6 +1,6 @@
 # SOL ESSENCE — Computational Inquiry and Reproducible Experiments
 
-**Status:** implemented foundation and bounded research roadmap, 17 October 2026; interface and long-term direction revised 18 October 2026 (supporting research: [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf)).  
+**Status:** implemented foundation and bounded research roadmap, 17 October 2026; interface and encyclopedia scope revised 20 October 2026 (supporting research: [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf)).
 **Repository baseline:** `dialectmaterial/SOL` `main` at `1d200e4fcbff1ca69f48b5dc96c55765f215f303`.  
 **Companions:** [Architecture](ARCHITECTURE.md) · [BEING](BEING.md) · [CORE](CORE.md).
 
@@ -10,7 +10,7 @@ ESSENCE investigates patterns, distinctions and relations in the present *Scienc
 
 **Guiding rule:** reuse mature software (Python scientific stack, spaCy/Stanza, scikit-learn, PyTorch, model libraries, TensorFlow Projector, command-line tools or R when justified) through stable inputs/outputs. Write SOL-specific adapters for provenance, state, reproducibility and return-to-reading. Do not reimplement algorithms simply to place the SOL name on them. Never make CORE load a model or runtime merely to inspect a book.
 
-**Decision (maintainer, 18 October 2026): ESSENCE orchestrates experiments; it is not an ML framework.** Simple, auditable transformations (tokenization, counts, sentence segmentation) may run in ESSENCE itself. Heavier methods run through task interfaces and adapters to existing libraries or models (spaCy, scikit-learn, PyTorch, Hugging Face, remote APIs), never as reimplementations. The long-term aim is an **investigative encyclopedia and laboratory** of computational methods: learn why a method was built, what its authors found inadequate in its predecessors, what trade-offs remain, and then put it to work on philosophical text ([§7](#7-model-history-encyclopedia-and-task-registry-proposed)). The immediate goal is much narrower: a reversible interface between reading in BEING and investigation in ESSENCE ([§4](#4-interaction-model-and-inquiry-contract)).
+**Decision (maintainer, 18 October 2026): ESSENCE orchestrates experiments; it is not an ML framework.** Simple, auditable transformations (tokenization, counts, sentence segmentation) may run in ESSENCE itself. Heavier methods run through task interfaces and adapters to existing libraries or models (spaCy, scikit-learn, PyTorch, Hugging Face, remote APIs), never as reimplementations. The encyclopedia is a modest table of contents of methods, with short attributed Wikipedia excerpts and further links ([§7](#7-methods-encyclopedia)). The immediate goal is much narrower: a reversible interface between reading in BEING and investigation in ESSENCE ([§4](#4-interaction-model-and-inquiry-contract)).
 
 The relation between Hegel's explicit argument and the output of an algorithm is always **a research question**. Model similarity and a visual cluster are not equivalent to the logical movement of a concept. Preserve the boundary between measurement, statistical inference, interpretive hypothesis and argued philosophical necessity.
 
@@ -24,9 +24,10 @@ ESSENCE is not currently a complete model environment. The inspected code contai
 - The optional Textual interface and the word engine's CORE/file counts, comparison measures and CSV/TSV export described in §4–§5. The interface also runs the sentence-length study through the provider API (19 October).
 - `sol.core` public snapshot/reference APIs, including source/edition/generation binding and batch captures; these are usable without opening BEING.
 - A narrow optional `sol-kitty` + Zsh handoff for a source passage, with an explicit proposed return to BEING. The handoff carries **references**, not an ML result database or unrestricted authority to save notes.
+- A bundled, offline methods encyclopedia on screen `1`, with nine entries and individually attributed Wikipedia excerpts ([§7](#7-methods-encyclopedia)).
 - Checkout-only reading/rendering research, not an installed ESSENCE model suite.
 
-**Not implemented/verified:** a general experiment picker beyond the word experiment; parameter dashboard; GPU/model registry; task/capability registry and adapters; the model-history encyclopedia; file providers for the older term/prose and segmentation-review workflows; syntactic research panel; UltraBERT embedding pipeline; TensorFlow Projector launch as a SOL command; durable research context/experiment history. Sustained human acceptance of the reader and investigation interface remains open. Do not describe these as shipping features until code and tests verify them.
+**Not implemented/verified:** a general experiment picker beyond the word experiment; parameter dashboard; GPU/model registry; task/capability registry and adapters; file providers for the older term/prose and segmentation-review workflows; syntactic research panel; UltraBERT embedding pipeline; TensorFlow Projector launch as a SOL command; durable research context/experiment history. Sustained human acceptance of the reader and investigation interface remains open. Do not describe these as shipping features until code and tests verify them.
 
 ### Existing commands
 
@@ -81,10 +82,10 @@ In particular, avoid these errors:
 3. **Two presentations, one investigation.** ESSENCE appears either **beside** BEING (one split, the reader still visible) or **fullscreen**. Switching between them reuses the same process and investigation; it does not restart anything. Together with plain reading there are three visible states.
 4. **Outer versus inner layout.** Neovim owns the outer geometry (split or fullscreen); Textual owns the layout inside its terminal buffer. Textual screens are logical views *within* ESSENCE (encyclopedia, method, experiment, results), not the two outer presentations.
 5. **Interface before analytical breadth.** First prove launch, both presentations, focus, state preservation, close and return; then add the smallest real operation, a word tokenizer and frequency table ([§5](#5-prioritized-experiments)).
-6. **One capability, interactive and headless.** Every operation the interface offers also runs from the CLI with the same inputs and the same artifact, so results can be scripted, checked and reproduced without the UI.
+6. **One capability, interactive and headless.** Every analytical operation the interface offers also runs from the CLI with the same inputs and the same artifact, so results can be scripted, checked and reproduced without the UI. The read-only encyclopedia browser has no CLI.
 7. **CORE is optional for ESSENCE.** ESSENCE accepts ordinary text files; CORE is the provider that adds verified identity, provenance and source return when present. The path is staged in [Architecture §2](ARCHITECTURE.md#2-component-responsibilities); today every study requires CORE.
 
-**Implemented (18 October 2026), stage 1 shell:** `sol.essence.tui` is a Textual application with four screens (Encyclopedia, Methods, Experiment, Results) holding placeholder text that says what each will contain; the reader's origin is shown at the top. `1`–`4` switch screens, `q` or Ctrl-Q leaves; the command palette is off. Leaving saves only the open screen and the origin record, owner-only, under `$XDG_STATE_HOME/sol/essence/` for workspace sessions (temporary `-n` sessions save nothing); the next opening returns to that screen. Opening it imports no model. Measured on this machine inside Neovim's terminal: start-up about 110 ms; a split-to-fullscreen change reflows without a restart; Escape, Alt-Left/Right, Alt+letters, Ctrl-S/N, Tab, function keys and arrows arrive intact through terminal mode. Textual reads Escape-then-letter as Alt+letter, binds Ctrl-Q to quit and Ctrl-P to its palette, so ESSENCE avoids those for other purposes. Reader-side behaviour: [BEING §6](BEING.md#6-being--essence-without-terminal-dogma).
+**Implemented (18 October 2026), stage 1 shell:** `sol.essence.tui` is a Textual application with four screens (Encyclopedia, Methods, Experiment, Results) initially holding placeholder text; Encyclopedia now browses the bundled catalog (§7), while Methods remains a placeholder; the reader's origin is shown at the top. `1`–`4` switch screens, `q` or Ctrl-Q leaves; the command palette is off. Leaving saves only the open screen and the origin record, owner-only, under `$XDG_STATE_HOME/sol/essence/` for workspace sessions (temporary `-n` sessions save nothing); the next opening returns to that screen. Opening it imports no model. Measured on this machine inside Neovim's terminal: start-up about 110 ms; a split-to-fullscreen change reflows without a restart; Escape, Alt-Left/Right, Alt+letters, Ctrl-S/N, Tab, function keys and arrows arrive intact through terminal mode. Textual reads Escape-then-letter as Alt+letter, binds Ctrl-Q to quit and Ctrl-P to its palette, so ESSENCE avoids those for other purposes. Reader-side behaviour: [BEING §6](BEING.md#6-being--essence-without-terminal-dogma).
 
 **Implemented (18 October 2026), stage 2 interface side:** the Experiment screen chooses a **target** (this passage, its section, the whole book, or a UTF-8 text file) and an optional **reference** (its section, the whole book, or a text file) and runs the stage 2 word-frequency engine (`sol.essence.words.analyze_words`) in a background worker. Results shows, for each side, tokens, distinct words, inputs, provider and scope, the engine's warnings (unequal denominators, different projections), and a table of the most frequent 2,000 words with counts and rates per 10,000 tokens; an undefined rate is shown as such. Workspace sessions save the artifact owner-only as `~/.local/share/sol/studies/words-*.sol-analysis.json` for `sol analyze check`; temporary sessions save nothing. Choosing only text files needs no CORE corpus. Opening a word's passage in the reader is stage 3. On the real book through this interface code: a passage counts in about 0.5 s, a section against the whole book in about 1.4 s.
 
@@ -129,7 +130,7 @@ A result should distinguish **reproducing the exact experiment generation** (str
 - the persistence format of an investigation, and what happens to explicitly started background jobs on exit;
 - the provider/adapter API, its versioning, and when (if ever) to publish separate distributions;
 - the tokenizer and scopes of the first milestone (default: the term study's tokenizer; scopes the corpus offers, plus plain-text files);
-- the encyclopedia's source format, editorial schema, provenance rules and initial coverage.
+- ~~the encyclopedia's source format and initial coverage~~ **decided 20 October 2026:** small bundled JSON table of contents; see §7. Proposal §9 is deferred.
 
 **Open alternative (raised by the maintainer, 18 October 2026): Textual as the outer host.** Instead of Neovim hosting ESSENCE, a single Textual application could host both BEING and ESSENCE as modules, with Neovim embedded inside it for reading. *For:* Textual's widgets suit panels (footnotes, notes, search, results) better than hand-built Lua popups, and one process simplifies shared state. *Against:* Textual has no built-in terminal, so Neovim would run either in an experimental third-party terminal widget or through a Neovim UI client (`nvim --embed`, redrawing its grid and forwarding every key); reading would pass through a second rendering layer (italics, Unicode widths, latency, Ctrl/Alt keys at risk), split/fullscreen would have to be rebuilt, and a stable reader would be migrated again. Porting the reader to Textual *without* Neovim is a further variant that would give up the present motions and exact selection. **Not adopted:** the decision above stands. Keep the reader's logic in Python (`ReaderActions`) and ESSENCE's state independent of any interface, so the host can change later by replacing presentation. **Proposed test before reconsidering:** a one-session spike running the real reader inside Textual via `nvim --embed`, comparing key handling, italics and latency with Alacritty; and the evidence of the reading trial (if Neovim reads well, the case weakens; if it reads badly, revisit the host rather than nest it).
 
@@ -143,7 +144,7 @@ A result should distinguish **reproducing the exact experiment generation** (str
 | 1. Interface shell | Textual mock (Encyclopedia / Methods / Experiment / Results); entry from and return to Neovim; split and fullscreen | Launches on demand, resizes without restart, restores the reader position, keyboard focus is robust |
 | 2. Minimal experiment | Word tokenizer and frequency table over a selectable target; source-linked counts; plain-text file input | Same output from CLI and TUI; works on a plain-text file without CORE |
 | 3. Comparison | Reference-corpus selector; normalized lexical comparison; navigation and export | Explicit denominators; no false comparability; stale generations refused |
-| 4. Encyclopedia skeleton | Source-linked entries and a navigable model genealogy | History, critique and task descriptions readable without model downloads |
+| 4. Encyclopedia (implemented, 20 October) | Bundled methods table of contents; short attributed Wikipedia excerpts and further links | Browsable offline, without CORE or model downloads |
 | 5. Model adapters | Capability-driven registry; optional runtimes; comparison experiments (including Experiment B below) | Model versions, input limits, policies and reproducibility documented and tested |
 
 **The first new experiment stays elementary:** a deterministic, documented word tokenizer, with token count, type count and a frequency table for the selected scope. Its purpose is to test the whole research loop, not to settle what a word is. The term study's existing tokenizer (`sol.essence.terms`) is the natural candidate: it takes runs of letters with combining marks and internal apostrophes, applies NFC and case folding, excludes digits and punctuation, and splits hyphenated compounds; the final choice is open ([§4](#4-interaction-model-and-inquiry-contract)). Model-specific subword tokenization and morphology come later as **distinct analyses**, never as aliases of this one.
@@ -524,37 +525,44 @@ The shipped term study normalizes Unicode token spellings, counts full-word matc
 
 With the optional **existing** Kitty handoff, one can open an ESSENCE Zsh pane from the compatibility reader workflow, execute an analysis, publish a return UUID, and accept the proposed navigation back in BEING. This validates reference passing, **not** a full model-output/parameter/visualization pipeline. Preserve its safety and permissions model while researching a terminal-independent equivalent.
 
-## 7. Model-history encyclopedia and task registry (proposed)
+<a id="7-model-history-encyclopedia-and-task-registry-proposed"></a>
 
-**Decision (maintainer, 18 October 2026):** the "synchronic/diachronic" interest concerns **the development of machine-learning methods themselves**, not historical change in the philosophical corpus. ESSENCE should eventually let a reader learn why a model was built, what inadequacy its authors identified, how later models responded and which trade-offs remain, and then run comparable tests. The encyclopedia and the laboratory are linked but not conflated. Nothing of this exists yet; the earlier model-history file mentioned in discussion has still not been supplied for review, so this section claims nothing about its contents.
+## 7. Methods encyclopedia
 
-Three separate kinds of knowledge object:
+**Decision (maintainer, 20 October 2026), implemented:** the encyclopedia stays a
+modest table of contents. The broader [encyclopedia proposal](coordination/proposals/ESSENCE_ENCYCLOPEDIA_PROPOSAL.md)
+remains historical design material; its §9 is deferred. No genealogy graph,
+editorial review states, catalog CLI, task registry or model execution is adopted.
 
-| Object | Minimum structure | What it is not |
-|---|---|---|
-| Historical entry | Publication year, origin paper, architecture, objective, claimed advance, limitations, evidence, relations to predecessors | Proof that newer methods are universally better |
-| Task/capability record | Tokenization, tagging, embedding, retrieval, classification, generation, evaluation; input/output contracts | A list of architectures or chronological ages |
-| Runnable adapter/checkpoint | Exact model or checkpoint, implementation package, license, version, expected device, limits, output shape | An encyclopedia claim or an interpretation |
+The small bundled file `sol/essence/encyclopedia.json` contains nine entries:
+word counts, word tokenization, relative frequencies and comparisons, sentence
+segmentation and length, lexical distribution and source context, prose
+projection, TF-IDF, word vectors, and Transformers. SOL's notes identify the
+existing operations (including term counts and segmentation error measurement)
+and distinguish reading topics without runnable adapters.
 
-**The genealogy is a sourced graph, not a triumphalist timeline.** A relation such as "addresses a weakness of", "extends", "changes the training objective of" or "trades accuracy for speed" carries a citation and a status. An encoder and a decoder model may suit different tasks rather than occupy one ladder. **The model history is not the model picker:** the encyclopedia describes lineages and evidence; the task/capability registry supplies runnable implementations. Compare only **commensurable measures**: outputs of, say, Naive Bayes classification and embedding similarity may be shown side by side but are not labelled comparable without an explicit shared evaluation task.
+Each entry has one short **verbatim Wikipedia excerpt**, its article title and
+URL, and one or two further links. Shared attribution to **Wikipedia
+contributors**, the **CC BY-SA 4.0** license and license URL, and the access date
+(**20 October 2026**) are stored alongside the entries and displayed for each
+one, with a link to the article's contributor history. Excerpts are unchanged;
+some are sentence fragments. The quotations retain their CC BY-SA 4.0 license
+separately from SOL's code. The SOL-specific notes are outside the quotation.
+No Wikipedia images or other media are bundled.
 
-Store entries as source-linked structured Markdown (or an equally plain format) that the interface renders; do not build them as hard-coded Textual screens. This keeps them reviewable, versioned and readable without SOL.
+Open **Encyclopedia (`1`)** in ESSENCE. Up/Down selects a method and shows its
+entry below; Enter focuses the scrollable detail, Page Down/Up or arrows scroll,
+and Escape returns to the list. Tab also moves focus. The layout stacks the
+list above details so it works beside the reader. `1`–`4` still switch screens;
+`q` or Ctrl-Q leaves. Selection survives screen switches during the session;
+only the existing screen/origin state is saved on exit.
 
-A good model inventory should distinguish:
-
-| Family | Appropriate role in SOL | Critical caution |
-|---|---|---|
-| Hand-coded lexical/statistical methods | Auditable baselines, concordance and length distributions | Counts are not semantic interpretation |
-| Classical NLP, POS/dependency parsers | Measurable syntactic hypotheses | Model errors and translation dependency |
-| Sparse vectors/TF-IDF | Transparent lexical similarity baseline | Shared vocabulary, not necessarily meaning |
-| Static word vectors | Word-distribution investigation | Polysemy and context compression |
-| Transformer encoder embeddings | Context-aware passage retrieval/classification | Pooling, model objective, input length, domain, language |
-| Decoder/LLM prompting | Hypotheses, summaries and exploratory analyses | Nondeterminism, hallucination, provenance, leakage |
-| Dimensionality reduction | Inspection of high-dimensional output | Graphical proximity is representation-dependent |
-
-This classification is a **provisional methods map**, not a statement that all are integrated in code or that model families follow a teleological historical progression.
-
-**Scaling constraints to keep from the start:** outputs retain edition, translator, source language, attribution and corpus generation; ordinary word tokens, model subword tokens, sentences and embeddings are distinct representations whose boundaries and algorithms are recorded; comparisons show denominators and uncertainty; large collections need batched, indexed access and caching by input/method digest, never a whole corpus loaded into widgets; external datasets and copyrighted corpora stay local or permissioned, and artifacts avoid embedding book text unless explicitly authorized.
+The catalog loads with standard-library package resources, including from an
+installed wheel outside the checkout. Browsing needs no corpus, model runtime,
+network or downloads. External reading links open only on explicit selection.
+This is reading material, not an experiment or a claim that the listed models
+are installed. Adding an entry means editing the bundled data and checking its
+excerpt, attribution, date, links and description of ESSENCE's actual support.
 
 ## 8. Developer acceptance and prohibitions
 

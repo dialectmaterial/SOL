@@ -8,6 +8,15 @@ SOL is now free software under the GNU General Public License, version 3 or
 later; see [LICENSE](LICENSE). The book you read with it is not covered and is
 never part of the repository.
 
+### A modest ESSENCE methods encyclopedia — 20 October 2026
+
+Encyclopedia (`1`) now browses nine bundled method entries: existing lexical,
+prose and sentence operations, plus TF-IDF, word vectors and Transformers as
+reading topics. Each has a short verbatim Wikipedia excerpt, contributor
+attribution, CC BY-SA 4.0 link, article URL, access date and further reading.
+The keyboard browser works offline without CORE or models. Graphs, review
+states and a catalog CLI remain deferred (proposal §9).
+
 ### The note editor opens beside the text — 19 October 2026
 
 `a` (and `e` in `c`) now opens the note editor beside the passage when there

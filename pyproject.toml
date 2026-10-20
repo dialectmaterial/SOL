@@ -48,3 +48,4 @@ namespaces = false
 
 [tool.setuptools.package-data]
 "sol.terminal" = ["*.lua"]
+"sol.essence" = ["encyclopedia.json"]
