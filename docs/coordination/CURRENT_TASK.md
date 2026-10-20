@@ -12,64 +12,56 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: Named landmarks in the reader
+## Claude Code: Real-terminal check of the new reader features
 
-**Status:** In review
-**Branch:** `claude/landmarks`
-**Requested:** 20 October 2026, by the maintainer (reader backlog, item 5)
+**Status:** In progress
+**Branch:** `claude/reader-smoke`
+**Requested:** 20 October 2026, by the maintainer via Claude (reader backlog)
 
 ### Goal
 
-Beside the three quick markers, the reader can name the current place, list
-the named places and open one, through the workspace's existing named
-bookmarks.
+Drive the installed reader on the real book in a real terminal (tmux, a
+temporary `-n` session) through `/` counts, `Ctrl-N`, `gp`, `M`/`L`, `S` and
+`keys.json`, and fix what fails.
 
 ### Scope
 
-[BEING §2–3](../BEING.md#2-what-is-implemented),
-[reader backlog](proposals/READER_GAPS_AFTER_ZATHURA.md): the marker panel in
-`sol/terminal/neovim_reader.py`, `sol/terminal/neovim_controls.lua` and
-`neovim_panels.lua` (a list panel), tests, BEING, CHANGELOG.
-
-### Constraints
-
-No workspace schema change; temporary sessions keep landmarks for the session
-only, like markers. No change to `sol/reader/actions.py` navigation (Codex's
-task).
+Whatever the check shows, in `sol/terminal/`; BEING §7 records what was
+exercised. No change to view preparation or `sol/reader/actions.py` (Codex).
 
 ### Acceptance
 
-Controller and headless Neovim tests; documentation check and full suite.
+A reported session; fixes with regression tests; documentation check and full
+suite.
 
-## Codex: Measure and cut reader navigation latency
+## Codex: Faster section and outline moves
 
-**Status:** In review
-**Branch:** `codex/navigation-latency`
+**Status:** Ready
+**Branch:** `codex/section-latency`
 **Requested:** 20 October 2026, by the maintainer via Claude (reader backlog, item 4)
 
 ### Goal
 
-Measured, smaller delays for the moves a reader makes most: `Ctrl-N`/`Ctrl-P`
-between occurrences in the passage already shown (now a full view reload,
-about 0.9 s), `j`/`k` across a section boundary, `b`/`n`, and the outline.
+`j`/`k` across a section boundary, `b`/`n` and outline jumps take clearly less
+than the measured ~1 s, measured with `scripts/reader_timings.py`.
 
 ### Scope
 
 [BEING §2](../BEING.md#2-what-is-implemented), [CORE §§5–7](../CORE.md#5-source-bound-positions-and-typography):
-`sol/reader/actions.py`, `sol/terminal/neovim_reader.py` view preparation,
-`sol/terminal/neovim_requests.lua`/`neovim_view.lua` if a move can stay in
-Neovim, `scripts/reader_timings.py`, tests, BEING, CHANGELOG.
+view preparation in `sol/terminal/neovim_reader.py` and `sol/terminal/neovim.py`
+payload building, `sol/reader/actions.py`, tests, BEING, CHANGELOG.
 
 ### Constraints
 
-Keep source verification before anything is saved and the refused-move
-guarantees. Record before/after medians on the real book in the handoff, without
-private text. No change to the marker panel or landmark UI (Claude's task).
+Do not relax or cache source verification: changing CORE's per-reference
+fingerprint policy is a **reserved** decision; propose it in the handoff
+instead. Keep the refused-move guarantees. No change to Lua key handling
+(Claude's task).
 
 ### Acceptance
 
-Timings before and after; regression tests for any fast path; documentation
-check and full suite.
+Before/after medians in the handoff; regression tests; documentation check and
+full suite.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
