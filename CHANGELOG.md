@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### The opening screen says SOL's own name — 20 October 2026
+
+The line *Science Organizes Logic* under the title is gone: the title is
+SOL's recursive name, SOL ORGANIZES LOGIC, and the line contradicted it.
+
 ### Clearer help and outline in the reader — 20 October 2026
 
 - `?` now groups the keys into Reading, Finding your way, Text, sources and
@@ -11,7 +16,7 @@
 
 ### An opening screen while SOL loads — 20 October 2026
 
-Starting the reader now shows SOL's title, *Science Organizes Logic*, while
+Starting the reader now shows SOL's title, SOL ORGANIZES LOGIC, while
 the book loads: beneath it Being (●) and Nothing (○) move into each other and
 vanish into Becoming (◉), and part again. It uses the reader's theme, gives
 way to any question SOL asks, and ignores keys pressed while loading.
