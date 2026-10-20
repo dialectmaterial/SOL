@@ -153,6 +153,38 @@ class _LocalState:
     search_whole_word: bool = False
 
 
+def selection_source(book, requested_id, target_id):
+    """Check reader projection and provenance without constructing a session."""
+    if not book.canonical_records:
+        raise ValueError("text selection requires canonical Book records")
+    from sol.core.references import resolve_reference
+    try:
+        reference = resolve_reference(book, requested_id)
+        record = reference.record
+        plain_text, markdown = record["plain_text"], record["markdown"]
+        digest = record["content_sha256"]
+        sources = record["sources"]
+        first, last = sources[0], sources[-1]
+        passage = book.find_passage(target_id)
+        valid = (
+            reference.target_id == target_id and record["id"] == target_id
+            and record["type"] in {"paragraph", "list_item", "quotation", "formula"}
+            and isinstance(plain_text, str) and isinstance(markdown, str)
+            and digest == sha256(markdown.encode("utf-8")).hexdigest()
+            and passage.identifier == target_id and passage.text == plain_text
+            and passage.kind == record["type"]
+            and display_path(passage.path) == record["reader_path"]
+            and (passage.pdf_page, passage.printed_page,
+                 passage.end_pdf_page, passage.end_printed_page)
+            == (first["pdf_page"], int(first["printed_page"]),
+                last["pdf_page"], int(last["printed_page"])))
+    except (KeyError, IndexError, TypeError, AttributeError) as error:
+        raise ValueError("The canonical selection source is corrupted; reopen SOL") from error
+    if not valid:
+        raise ValueError("The reader projection or canonical selection source disagrees; reopen SOL")
+    return plain_text, digest, sha256(plain_text.encode("utf-8")).hexdigest()
+
+
 class ReaderActions:
     """One source of reader state shared by command-driven and future interfaces.
 
@@ -293,35 +325,7 @@ class ReaderActions:
             raise
 
     def _selection_source(self, requested_id, target_id):
-        """Validate the explicit loaded generation, without reading source files."""
-        if not self.book.canonical_records:
-            raise ValueError("text selection requires canonical Book records")
-        from sol.core.references import resolve_reference
-        try:
-            reference = resolve_reference(self.book, requested_id)
-            record = reference.record
-            plain_text, markdown = record["plain_text"], record["markdown"]
-            digest = record["content_sha256"]
-            sources = record["sources"]
-            first, last = sources[0], sources[-1]
-            passage = self.book.find_passage(target_id)
-            valid = (
-                reference.target_id == target_id and record["id"] == target_id
-                and record["type"] in {"paragraph", "list_item", "quotation", "formula"}
-                and isinstance(plain_text, str) and isinstance(markdown, str)
-                and digest == sha256(markdown.encode("utf-8")).hexdigest()
-                and passage.identifier == target_id and passage.text == plain_text
-                and passage.kind == record["type"]
-                and display_path(passage.path) == record["reader_path"]
-                and (passage.pdf_page, passage.printed_page,
-                     passage.end_pdf_page, passage.end_printed_page)
-                == (first["pdf_page"], int(first["printed_page"]),
-                    last["pdf_page"], int(last["printed_page"])))
-        except (KeyError, IndexError, TypeError, AttributeError) as error:
-            raise ValueError("The canonical selection source is corrupted; reopen SOL") from error
-        if not valid:
-            raise ValueError("The reader projection or canonical selection source disagrees; reopen SOL")
-        return plain_text, digest, sha256(plain_text.encode("utf-8")).hexdigest()
+        return selection_source(self.book, requested_id, target_id)
 
     def _validate_selection(self, selection):
         current = self._current()

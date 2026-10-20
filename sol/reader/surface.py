@@ -5,7 +5,7 @@ share this validation; only ReaderActions may accept a position into a workspace
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from copy import deepcopy
 from hashlib import sha256
 import json
@@ -14,7 +14,7 @@ from sol.corpus.contract import CorpusSnapshot, verify_snapshot_current
 from sol.core.models import Book, Passage
 from sol.core.protocol import capture_reference, capture_references, check_reference, decode_reference, encode_reference
 from sol.core.references import resolve_record_reference, resolve_reference
-from sol.reader.actions import ReaderActions, TextSelection
+from sol.reader.actions import ReaderActions, TextSelection, selection_source
 
 
 @dataclass(frozen=True)
@@ -109,7 +109,14 @@ class CaptureExport:
         if not isinstance(book.corpus_snapshot, CorpusSnapshot):
             raise ValueError("surface export requires a verified corpus snapshot with explicit corpus identity")
         self.book = book
-        self.snapshot = deepcopy(book.corpus_snapshot)
+        # Snapshot payloads are JSON; a round trip detaches their containers
+        # without deepcopy's per-object dispatch across the entire book.
+        # CORE below still checks the original graph against verified bytes.
+        source = book.corpus_snapshot
+        self.snapshot = replace(
+            source, manifest=json.loads(json.dumps(source.manifest, allow_nan=False)),
+            records=json.loads(json.dumps(source.records, allow_nan=False)),
+            documents=dict(source.documents))
         self.records = {row["id"]: row for row in self.snapshot.records}
         self._cache = {}
         self._reader_ids = set()
@@ -233,9 +240,7 @@ def _agree_with_core(book, reference):
     # Reuse the reader's existing projection/provenance guard rather than
     # accepting independently changed page/path/kind data in a display sample.
     if record["plain_text"]:
-        reader = ReaderActions(book)
-        reader.open(reference.requested_id)
-        reader.select_span(0, len(record["plain_text"]))
+        selection_source(book, reference.requested_id, reference.target_id)
     return record
 
 

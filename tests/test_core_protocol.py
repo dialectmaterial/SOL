@@ -32,6 +32,22 @@ class CoreProtocolTests(unittest.TestCase):
         self.snapshot = core.load_snapshot(self.corpus)
         self.payload = core.capture_reference(self.snapshot, self.identifier)
 
+    def test_remember_reuses_only_equal_detached_verified_data(self):
+        from sol.core import protocol
+        from dataclasses import replace
+        snapshot = copy.deepcopy(self.snapshot)
+        first = protocol._remember(snapshot)
+        with patch.object(protocol, "_json_value", side_effect=AssertionError("validated again")):
+            self.assertIs(protocol._remember(copy.deepcopy(snapshot)), first)
+        snapshot.records[0]["plain_text"] = "Invented changed caller text."
+        self.assertNotEqual(first[5], snapshot.records)
+        changed = protocol._remember(snapshot)
+        self.assertIsNot(changed, first)
+        # Python equality alone must not let a JSON type change reuse trust.
+        manifest = copy.deepcopy(snapshot.manifest)
+        manifest["source"]["pdf_pages"] = float(manifest["source"]["pdf_pages"])
+        self.assertIsNot(protocol._remember(replace(snapshot, manifest=manifest)), changed)
+
     def test_batch_preserves_order_and_uses_one_verified_generation(self):
         identifiers = [self.identifier, self.snapshot.records[0]["id"], self.identifier]
         with patch.object(contract, "load_snapshot", wraps=contract.load_snapshot) as load:
