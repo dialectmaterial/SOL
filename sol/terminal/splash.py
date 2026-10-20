@@ -21,7 +21,7 @@ import time
 
 from sol.terminal.theme import _PALETTES
 
-# The maintainer's screensaver title (SOL / ORGANIZES / LOGIC), as three blocks.
+# The maintainer's screensaver title, SOL's recursive name: SOL / ORGANIZES / LOGIC.
 _BLOCKS = (
     ("███████╗ ██████╗ ██╗",
      "██╔════╝██╔═══██╗██║",
@@ -47,7 +47,6 @@ TITLE_WIDTH = max(len(line) for block in _BLOCKS for line in block)
 TITLE = tuple(line for number, block in enumerate(_BLOCKS)
               for line in ((("",) if number else ())
                            + tuple(" " * ((TITLE_WIDTH - max(map(len, block))) // 2) + row for row in block)))
-SUBTITLE = "Science Organizes Logic"
 MOMENTS = ("Being", "Nothing", "Becoming")
 TRACK = 41  # columns the two marks travel
 PERIOD = 2.6  # seconds from apart, through Becoming, to apart again
@@ -65,21 +64,20 @@ def frame(t, columns, rows, theme="mocha"):
     else:
         page, ink, accent, quiet = "", "", "\x1b[1m", "\x1b[2m"
     reset = "\x1b[0m" + page
-    compact = columns < TITLE_WIDTH + 4 or rows < len(TITLE) + 7
+    compact = columns < TITLE_WIDTH + 4 or rows < len(TITLE) + 5
     title = ("S O L",) if compact else TITLE
     width = 5 if compact else TITLE_WIDTH
-    top = max(0, (rows - len(title) - 6) // 2)
+    top = max(0, (rows - len(title) - 4) // 2)
     left = max(0, (columns - width) // 2)
     out = [page, "\x1b[2J"]
     for number, line in enumerate(title):
         out.append(f"\x1b[{top + number + 1};{left + 1}H{accent}{line}{reset}")
     below = top + len(title) + 1
-    out.append(_centred(below + 1, columns, f"{quiet}{SUBTITLE}{reset}", len(SUBTITLE)))
     line, moment = _movement(t)
-    out.append(_centred(below + 3, columns, f"{quiet}{line}{reset}".replace("●", f"{accent}●{quiet}")
+    out.append(_centred(below + 1, columns, f"{quiet}{line}{reset}".replace("●", f"{accent}●{quiet}")
                         .replace("○", f"{accent}○{quiet}").replace("◉", f"{accent}◉{quiet}"), TRACK))
     labels = "   ".join(f"{accent}{name}{reset}" if name in moment else f"{quiet}{name}{reset}" for name in MOMENTS)
-    out.append(_centred(below + 4, columns, labels, sum(map(len, MOMENTS)) + 6))
+    out.append(_centred(below + 2, columns, labels, sum(map(len, MOMENTS)) + 6))
     return "".join(out) + ink
 
 

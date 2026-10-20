@@ -23,7 +23,7 @@ class FrameTests(unittest.TestCase):
     def test_full_title_in_the_theme_colors_when_it_fits(self):
         text = splash.frame(0.3, 120, 40, "paper")
         self.assertIn(splash.TITLE[7], text)  # ORGANIZES
-        self.assertIn(splash.SUBTITLE, text)
+        self.assertNotIn("Science", text)
         self.assertIn("\x1b[48;2;243;240;230m", text)  # Paper's page
         self.assertIn("\x1b[38;2;85;48;138m", text)  # the Actual Spirit purple
 
