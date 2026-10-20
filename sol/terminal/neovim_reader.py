@@ -244,8 +244,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
 
     def search_panel(request, identifier):
         # Searching does not move the cursor, save a visit or erase a selection.
-        rows = actions.search(request["query"], path=(), limit=20)
-        return {"search": {"query": safe_label(request["query"]), "limit": 20, "rows": [
+        rows = actions.search(request["query"], path=(), limit=None)
+        return {"search": {"query": safe_label(request["query"]), "total": actions.search_position()[1], "rows": [
             {"number": i, "label": safe_label(f"{row.heading or row.node.title} | p. {row.printed_page}"),
              "snippet": safe_label(" ".join(row.text.split())[:150])}
             for i, row in enumerate(rows, 1)]}}
@@ -482,8 +482,10 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                 mode, start_tree, notice, search_marks = request["mode"], False, "", None
                 if operation in ("search_open", "search_next", "search_previous"):
                     projection = actions.search_highlights()
+                    position, total = actions.search_position()
                     notice = projection.reason or ""
                     search_marks = {"id": actions.snapshot().current.identifier,
+                                    "position": position, "total": total,
                                     "spans": [[start, end] for start, end in projection.spans]}
                 focused = request.get("focus", focused)
                 theme = request.get("theme", theme)

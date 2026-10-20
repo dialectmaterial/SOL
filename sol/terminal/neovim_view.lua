@@ -246,6 +246,10 @@ return function(reader, supplied)
     local left = where ~= "" and (page ~= "" and where .. " · " .. page or where) or page
     local right = { mode == "paragraph" and "One paragraph" or "Continuous" }
     if data.focus then right[#right + 1] = "focus" end
+    local marks = data.search_marks
+    if type(marks) == "table" and marks.position ~= nil and marks.id == record.id then
+      right[#right + 1] = marks.position .. " of " .. marks.total
+    end
     if data.progress ~= nil then
       local done = (data.progress.first + index - 1) / math.max(1, data.progress.total - 1)
       right[#right + 1] = string.format("%d%%", math.floor(100 * done + 0.5))
@@ -467,6 +471,8 @@ return function(reader, supplied)
     if type(marks) ~= "table" or type(marks.id) ~= "string" or type(marks.spans) ~= "table" then
       fail("invalid search marks")
     end
+    if marks.position ~= nil and (not integer(marks.position) or not integer(marks.total)
+      or marks.position < 1 or marks.position > marks.total) then fail("invalid search count") end
     local record = by_id[marks.id]
     for _, span in ipairs(marks.spans) do
       if not record or type(span) ~= "table" or not integer(span[1]) or not integer(span[2])

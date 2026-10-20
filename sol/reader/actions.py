@@ -130,6 +130,7 @@ class _ReadingContext:
     cursor_offset: int
     viewport_offset: int | None
     search_whole_word: bool = False
+    search_visit: tuple | None = None
 
 
 @dataclass(frozen=True)
@@ -151,6 +152,7 @@ class _LocalState:
     preferred_column: int | None
     preferred_layout: tuple | None
     search_whole_word: bool = False
+    search_visit: tuple | None = None
 
 
 def selection_source(book, requested_id, target_id):
@@ -206,6 +208,8 @@ class ReaderActions:
         self.search_query: str | None = None
         self.search_whole_word = False
         self._search_projection_cache = None
+        self._occurrences_cache = None
+        self._search_visit = None
         self._requested_id: str | None = None
         self._requested_target: str | None = None
         self._selection: TextSelection | None = None
@@ -227,7 +231,7 @@ class ReaderActions:
             self.current_reference_id() if current is not None else None,
             self._selection, self.search_query,
             tuple(passage.identifier for passage in self.results),
-            self.session.cursor_offset, self.session.viewport_offset, self.search_whole_word)
+            self.session.cursor_offset, self.session.viewport_offset, self.search_whole_word, self._search_visit)
 
     def _amend_context(self):
         context = self._context()
@@ -252,7 +256,7 @@ class ReaderActions:
                            self._selection, self.search_query, tuple(self.results),
                            self._trail, self._history_index, self.session.cursor_offset,
                            self.session.viewport_offset, self._preferred_column, self._preferred_layout,
-                           self.search_whole_word)
+                           self.search_whole_word, self._search_visit)
 
     def _rollback(self, state):
         self.cwd, self.previous_cwd = state.cwd, state.previous_cwd
@@ -261,6 +265,7 @@ class ReaderActions:
         self._selection, self.search_query = state.selection, state.search_query
         self.results = list(state.results)
         self.search_whole_word = state.search_whole_word
+        self._search_visit = state.search_visit
         self._trail, self._history_index = state.trail, state.history_index
         self.session.cursor_offset, self.session.viewport_offset = state.cursor_offset, state.viewport_offset
         self._preferred_column = state.preferred_column
@@ -308,6 +313,8 @@ class ReaderActions:
             if history_locations:
                 changed = changed or (origin.cursor_offset, origin.viewport_offset, origin.selection) != (
                     destination.cursor_offset, destination.viewport_offset, destination.selection)
+                changed = changed or (origin.search_visit is not None
+                                      and origin.search_visit != destination.search_visit)
             if origin.current_id != destination.current_id:
                 self._preferred_column = None
             if checkpoint and self.workspace_reader is not None:
@@ -507,18 +514,68 @@ class ReaderActions:
             return passage
         return self._transition(change)
 
+    def search_occurrences(self):
+        """Derive matches from immutable text values; never cache corpus trust."""
+        from sol.reader.search import search_projection
+        by_id = {p.identifier: p for p in self.book.passages}
+        try:
+            passages = [by_id[p.identifier] for p in self.results]
+        except KeyError as error:
+            raise ValueError("a search result is no longer in the book; search again") from error
+        key = (self.search_query, self.search_whole_word,
+               tuple((p.identifier, p.text, p.facsimile_labels) for p in passages))
+        if self._occurrences_cache is None or self._occurrences_cache[0] != key:
+            rows = []
+            if self.search_query is not None:
+                for number, passage in enumerate(passages, 1):
+                    projection = search_projection(passage.text, self.search_query,
+                        self.search_whole_word, passage.facsimile_labels)
+                    rows.extend((number, span) for span in projection.occurrences)
+            self._occurrences_cache = key, tuple(rows)
+        return self._occurrences_cache[1]
+
+    def search_position(self):
+        """One-based occurrence at the current cursor, or zero away from a match."""
+        current = self._current()
+        rows = self.search_occurrences()
+        if current is not None:
+            # Distinguish unprojectable occurrences that share fallback offset 0.
+            if self._search_visit is not None:
+                key, index, identifier, offset = self._search_visit
+                if (key == self._occurrences_cache[0] and identifier == current.identifier
+                        and offset == self.cursor_offset and index < len(rows)):
+                    return index + 1, len(rows)
+            for index, (number, span) in enumerate(rows):
+                if (self.results[number - 1].identifier == current.identifier and span is not None
+                        and span[0] == self.cursor_offset):
+                    return index + 1, len(rows)
+        return 0, len(rows)
+
     def search_next(self, reverse=False):
-        """Visit the next/previous passage in the latest literal search, wrapping."""
+        """Visit each literal occurrence in book order, wrapping both ways."""
         if type(reverse) is not bool:
             raise ValueError("reverse search direction must be a boolean")
-        if not self.results:
+        rows = self.search_occurrences()
+        if not rows:
             raise ValueError("no search results; search the book first")
-        current = self._current()
-        index = next((index for index, passage in enumerate(self.results)
-                      if current is not None and passage.identifier == current.identifier), None)
-        target = ((index + (-1 if reverse else 1)) % len(self.results) if index is not None
-                  else len(self.results) - 1 if reverse else 0)
-        return self.open_result(target + 1)
+        position, _ = self.search_position()
+        if position:
+            target = (position - 1 + (-1 if reverse else 1)) % len(rows)
+        else:
+            current = self._current()
+            order = {p.identifier: i for i, p in enumerate(self.book.passages)}
+            origin = (order[current.identifier], self.cursor_offset) if current is not None else None
+            candidates = []
+            for index, (number, span) in enumerate(rows):
+                location = (order[self.results[number - 1].identifier], span[0] if span else 0)
+                if origin is not None and (location < origin if reverse else location > origin):
+                    candidates.append(index)
+            if candidates:
+                target = candidates[-1] if reverse else candidates[0]
+            else:
+                target = len(rows) - 1 if reverse else 0
+        number, _ = rows[target]
+        return self.open_result(number, occurrence=target)
 
     def save_position(self):
         """Save a changed semantic position explicitly using existing CAS guards.
@@ -575,6 +632,7 @@ class ReaderActions:
                 self.workspace_reader.resumed_reference = reference
             self._selection, self.search_query, self.results = context.selection, context.search_query, results
             self.search_whole_word = context.search_whole_word
+            self._search_visit = context.search_visit
             self._history_index = index
             return passage
 
@@ -663,12 +721,17 @@ class ReaderActions:
             self._requested_id = self._requested_target = None
         return passage
 
-    def open_result(self, number: int):
+    def open_result(self, number: int, *, occurrence=None):
         if type(number) is not int or not 1 <= number <= len(self.results):
             raise ValueError("no such result in the latest search")
         identifier = self.results[number - 1].identifier
         if self.search_query is None:
             return self.open(identifier)
+        rows = self.search_occurrences()
+        if occurrence is None:
+            occurrence = next((i for i, (n, _) in enumerate(rows) if n == number), None)
+        if occurrence is None or not 0 <= occurrence < len(rows) or rows[occurrence][0] != number:
+            raise ValueError("this result no longer matches the query; search again")
         def change():
             passage = self._open_resolution(identifier)
             from sol.reader.search import search_projection
@@ -676,7 +739,9 @@ class ReaderActions:
                 whole_word=self.search_whole_word, facsimile_labels=passage.facsimile_labels)
             if not projection.spans and not projection.degraded:
                 raise ValueError("this result no longer matches the query; search again")
-            cursor = projection.spans[0][0] if projection.spans else 0
+            span = rows[occurrence][1]
+            cursor = span[0] if span is not None else 0
+            self._search_visit = (self._occurrences_cache[0], occurrence, identifier, cursor)
             if self.session.cursor_offset != cursor:
                 self.session.viewport_offset = None
             self.session.cursor_offset = cursor
@@ -709,7 +774,21 @@ class ReaderActions:
                whole_word=False, limit=20):
         if type(whole_word) is not bool:
             raise ValueError("whole-word search mode must be a boolean")
-        matches = self.book.search(query, self.cwd if path is None else path, whole_word, limit)
+        if limit is None:
+            import unicodedata
+            from sol.core.models import presentation_text
+            if not query.strip():
+                raise ValueError("search requires a nonempty query")
+            pattern = re.escape(unicodedata.normalize("NFC", query.strip()).casefold())
+            if whole_word:
+                pattern = rf"(?<!\w){pattern}(?!\w)"
+            expression = re.compile(pattern)
+            matches = [p for p in self.book.selection(self.cwd if path is None else path)
+                       if expression.search(unicodedata.normalize("NFC", presentation_text(
+                           p.text, p.facsimile_labels)).casefold())]
+        else:
+            matches = self.book.search(query, self.cwd if path is None else path, whole_word, limit)
+        self._search_visit = None
         self.results = list(matches)
         self.search_query = query
         self.search_whole_word = whole_word
