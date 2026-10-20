@@ -7,6 +7,7 @@ No editor buffer or byte column is ever saved as a reading position.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 import os
 import sys
 import unicodedata
@@ -225,6 +226,11 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                     "lines": [display_line(line) for line in record["body"].split("\n")]})
         return {"persistent": True, "notes": notes}
 
+    # Cache only immutable typography by its exact two input strings, bounded
+    # to this reader. Every payload still captures/checks/finishes its source
+    # export; neither references nor source trust are retained here.
+    typography = lru_cache(maxsize=256)(neovim.map_typography)
+
     def prepare():
         state = actions.snapshot()
         extent = reading_section(book, state.current.identifier)
@@ -236,7 +242,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                     "selection": None if state.selection is None else asdict(state.selection),
                     "cursor_offset": state.cursor_offset}
         payload = neovim.build_payload(sample, width, restored,
-                                      requested_ids=requested_ids, emphasis=emphasis, theme=theme)
+                                      requested_ids=requested_ids, emphasis=emphasis, theme=theme,
+                                      _typography=typography)
         navigation = {"previous": extent.first > 0, "next": extent.last + 1 < len(book.passages)}
         structure = structure_payload(book, state.current)
         structure["depth"] = tree_depth

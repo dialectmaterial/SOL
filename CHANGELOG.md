@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Cheaper section view preparation — 20 October 2026
+
+- Project styles and callouts together; reuse up to 256 immutable typography
+  results per reader, keyed by exact Markdown and plain-text values.
+- Scan ASCII source controls in bulk with the same Unicode refusal policy.
+  Reference verification, export freshness checks and staged saves are unchanged.
+
 ### Faster occurrence navigation — 20 October 2026
 
 - Ctrl-N / Ctrl-P within the shown passage updates the exact cursor and search

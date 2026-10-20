@@ -36,7 +36,7 @@ suite.
 
 ## Codex: Faster section and outline moves
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/section-latency`
 **Requested:** 20 October 2026, by the maintainer via Claude (reader backlog, item 4)
 
