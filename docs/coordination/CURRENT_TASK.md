@@ -12,65 +12,64 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: The printed page in a zoomable PDF viewer
+## Claude Code: Named landmarks in the reader
 
-**Status:** In review
-**Branch:** `claude/pdf-companion`
-**Requested:** 20 October 2026, by the maintainer (reader backlog, item 2)
-
-### Goal
-
-From the current passage, one key opens the verified PDF in a PDF viewer
-(Zathura when installed) at the passage's physical page, so the printed page
-can be zoomed and read in context; the crop popup of `s` stays.
-
-### Scope
-
-[BEING §5](../BEING.md#5-mathematical-notation-and-source-fidelity),
-[reader backlog](proposals/READER_GAPS_AFTER_ZATHURA.md):
-`sol/terminal/source.py`, the reader key and help in `sol/terminal/neovim_*.lua`
-only where the source action lives, tests, BEING §5, CHANGELOG.
-
-### Constraints
-
-Opens the private, fingerprint-checked PDF snapshot, never an unverified file.
-No new dependency; a viewer that is missing falls back to the crop. Does not
-touch search (Codex's task).
-
-### Acceptance
-
-Unit tests for the viewer command and fallback; a real session on the book.
-Documentation check and full suite pass.
-
-## Codex: Complete reader search
-
-**Status:** In review
-**Branch:** `codex/complete-search`
-**Requested:** 20 October 2026, by the maintainer (reader backlog, item 1)
+**Status:** In progress
+**Branch:** `claude/landmarks`
+**Requested:** 20 October 2026, by the maintainer (reader backlog, item 5)
 
 ### Goal
 
-`/` reaches every match in the book: occurrence-level next/previous, the total
-count and the current position shown (for example "12 of 87"), and no
-20-passage ceiling.
+Beside the three quick markers, the reader can name the current place, list
+the named places and open one, through the workspace's existing named
+bookmarks.
 
 ### Scope
 
-[BEING §2](../BEING.md#2-what-is-implemented),
-[reader backlog](proposals/READER_GAPS_AFTER_ZATHURA.md):
-`sol/terminal/neovim_reader.py` search request, `sol/reader/actions.py` search
-navigation, the Lua search display, tests, BEING, CHANGELOG.
+[BEING §2–3](../BEING.md#2-what-is-implemented),
+[reader backlog](proposals/READER_GAPS_AFTER_ZATHURA.md): the marker panel in
+`sol/terminal/neovim_reader.py`, `sol/terminal/neovim_controls.lua` and
+`neovim_panels.lua` (a list panel), tests, BEING, CHANGELOG.
 
 ### Constraints
 
-Preserve canonical text, offsets, UUIDs and the refused-move guarantees.
-Literal search semantics unchanged. No change to `sol/terminal/source.py`
-(Claude's task).
+No workspace schema change; temporary sessions keep landmarks for the session
+only, like markers. No change to `sol/reader/actions.py` navigation (Codex's
+task).
 
 ### Acceptance
 
-Tests for counts, occurrence stepping across passages and sections, and a
-common word with more than 20 passages; documentation check and full suite.
+Controller and headless Neovim tests; documentation check and full suite.
+
+## Codex: Measure and cut reader navigation latency
+
+**Status:** Ready
+**Branch:** `codex/navigation-latency`
+**Requested:** 20 October 2026, by the maintainer via Claude (reader backlog, item 4)
+
+### Goal
+
+Measured, smaller delays for the moves a reader makes most: `Ctrl-N`/`Ctrl-P`
+between occurrences in the passage already shown (now a full view reload,
+about 0.9 s), `j`/`k` across a section boundary, `b`/`n`, and the outline.
+
+### Scope
+
+[BEING §2](../BEING.md#2-what-is-implemented), [CORE §§5–7](../CORE.md#5-source-bound-positions-and-typography):
+`sol/reader/actions.py`, `sol/terminal/neovim_reader.py` view preparation,
+`sol/terminal/neovim_requests.lua`/`neovim_view.lua` if a move can stay in
+Neovim, `scripts/reader_timings.py`, tests, BEING, CHANGELOG.
+
+### Constraints
+
+Keep source verification before anything is saved and the refused-move
+guarantees. Record before/after medians on the real book in the handoff, without
+private text. No change to the marker panel or landmark UI (Claude's task).
+
+### Acceptance
+
+Timings before and after; regression tests for any fast path; documentation
+check and full suite.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
