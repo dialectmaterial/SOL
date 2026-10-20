@@ -9,6 +9,14 @@
 - `t` shows the outline as a centred panel with ▾/▸ for open and closed
   sections, ● on where you are, and each section's page on the right.
 
+### An opening screen while SOL loads — 20 October 2026
+
+Starting the reader now shows SOL's title, *Science Organizes Logic*, while
+the book loads: beneath it Being (●) and Nothing (○) move into each other and
+vanish into Becoming (◉), and part again. It uses the reader's theme, gives
+way to any question SOL asks, and ignores keys pressed while loading.
+`SOL_NO_SPLASH=1` turns it off.
+
 ### SOL's own themes and a reading window — 20 October 2026
 
 - **Paper** and **Night** join the themes: SOL's own, from actualspirit.com —
