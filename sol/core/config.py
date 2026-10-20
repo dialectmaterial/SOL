@@ -176,10 +176,15 @@ def save_corpus(directory: Path) -> tuple[Path, Path]:
     return corpus, _write_config(corpus=str(corpus))
 
 
-def configured_theme(choices) -> str | None:
-    """The reader preset saved by sol --set-theme; the reader supplies the names."""
+def configured_theme(choices, renamed=None) -> str | None:
+    """The reader preset saved by sol --set-theme; the reader supplies the names.
+
+    `renamed` maps names saved by earlier versions to their current preset.
+    """
     data = _read_config("sol --set-theme NAME")
     value = None if data is None else data.get("theme")
+    if isinstance(value, str):
+        value = (renamed or {}).get(value, value)
     if value is not None and value not in choices:
         raise ValueError(f"Invalid SOL configuration {config_path()}: theme must be one of "
                          f"{', '.join(choices)}.\nReset it with sol --set-theme NAME.")

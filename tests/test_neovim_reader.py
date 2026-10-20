@@ -15,6 +15,7 @@ from sol.core.paths import display_path, resolve_path
 from sol.reader import app
 from sol.reader.actions import ReaderActions
 from sol.terminal import neovim, neovim_reader
+from sol.terminal.theme import THEMES
 from sol.workspace.reader import WorkspaceReader
 from sol.workspace.store import Workspace, WorkspaceConflict
 
@@ -332,17 +333,17 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         self.extend(3)
         service = self.service()
         def native(payload, _, on_request):
-            self.assertEqual(payload["theme"]["active"], "paper")
+            self.assertEqual(payload["theme"]["active"], "latte")
             packet = self.reply(payload)["packet"]
-            shown = on_request({"op": "next", "mode": "continuous", "theme": "dark", "packet": packet})["payload"]
-            self.assertEqual(shown["theme"]["active"], "dark")
-            for invalid in ("sepia", None, ["dark"]):
+            shown = on_request({"op": "next", "mode": "continuous", "theme": "mocha", "packet": packet})["payload"]
+            self.assertEqual(shown["theme"]["active"], "mocha")
+            for invalid in ("sepia", None, ["mocha"]):
                 with self.subTest(theme=invalid), self.assertRaisesRegex(ValueError, "theme"):
                     on_request({"op": "next", "mode": "continuous", "theme": invalid, "packet": packet})
             return 0, {"action": "quit", "packet": shown["restore"]}
         with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
                 patch.object(neovim, "launch_payload", side_effect=native):
-            self.assertEqual(self.run_view(service, theme="paper"), 0)
+            self.assertEqual(self.run_view(service, theme="latte"), 0)
         self.assertNotIn("theme", json.dumps(service.store.export()))
         with self.assertRaisesRegex(ValueError, "theme"):
             self.run_view(theme="sepia")
@@ -709,7 +710,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             failing.append(True)
             with self.assertRaises(RuntimeError):
                 on_request({"op": "passage_next", "packet": payload["restore"], "mode": "paragraph",
-                            "focus": True, "theme": "dark"})
+                            "focus": True, "theme": "mocha"})
             failing.clear()
             # Leaving the editor for the next section rebuilds the view from the
             # reader's own state, which the refused move must not have changed.
@@ -806,6 +807,9 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             self.assertEqual(launch["env"]["XDG_DATA_HOME"], os.environ.get("XDG_DATA_HOME", ""))
             self.assertEqual(set(launch["env"]), set(neovim_reader.ESSENCE_ENVIRONMENT))
             path = Path(command[4])
+            # ESSENCE opens in the reader's theme.
+            self.assertEqual(command[5], "--theme")
+            self.assertIn(command[6], THEMES)
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             context = read_context(path)
             self.assertEqual(context["reference"], packet["reference"])
