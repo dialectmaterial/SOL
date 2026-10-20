@@ -44,7 +44,7 @@ Documentation check and full suite pass.
 
 ## Codex: Complete reader search
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `codex/complete-search`
 **Requested:** 20 October 2026, by the maintainer (reader backlog, item 1)
 
