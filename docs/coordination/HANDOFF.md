@@ -32,6 +32,32 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Runnable TF-IDF engine and CLI — 20 October 2026
+
+**Task:** maintainer request via Claude: dependency-free TF-IDF, engine and CLI only; no CURRENT_TASK entry.
+**Branch / PR:** `codex/tfidf` · see the pull request
+**Last implementation commit:** `845102a6a22acdaff7cbc0dc52541baa8d1d1158` (this report is committed after it)
+
+### Changed files
+- `sol/essence/tfidf.py`, `tfidf_cli.py`, `cli.py`, `__init__.py` — public provider API, `sol.tfidf` v1 strict artifacts, `sol analyze tfidf --json` and recomputable `check`; no new dependency.
+- `sol/essence/words.py` — share the bounded strict JSON decoder while preserving word-study validation; TF-IDF embeds the full word receipt and reuses its counts, tokenizer, digests and verifier.
+- `sol/essence/methods.json`, `encyclopedia.json`, `docs/ESSENCE.md`, `CHANGELOG.md` — exact tfidf-v1 formula, document unit, ordering, limits and engine/CLI availability.
+- `tests/test_tfidf.py`, `test_encyclopedia.py`, `test_packaging.py` — hand-computed multi-document weights, complete-vector normalization/aggregation, scopes, empty rows, Unicode, strict artifacts, stale bindings and headless file/CORE CLI coverage; mark TF-IDF runnable and verify its packaged API imports without optional dependencies.
+
+### Tests performed
+- Full suite: `/home/dima/Projects/code/sol/.venv/bin/python -m unittest discover -s tests` — 1,750 tests, OK (12 skipped, 4 expected failures).
+- 86 focused tests passed across TF-IDF (11), word frequencies/comparison, analysis CLI, methods and encyclopedia catalog.
+- `scripts/check_docs.py` and `git diff --check` — passed.
+- Installed entry-point equivalent (`from sol import cli`) over invented UTF-8 input — TF-IDF JSON and explicit-source `check` succeeded.
+
+### Outstanding issues
+- TUI execution and persistence remain for Claude. `analyze_tfidf(target: CoreProvider | FileProvider, *, top_n: int = 20) -> dict` is exported from `sol.essence`; `documents[].input_index` maps to `word_study.target.inputs`, with top terms per document and `overall`.
+- One file is one document, so IDF is 1 for every term. Overall is the mean of full L2-normalized document vectors, including empty rows; top_n truncation happens last. Formula and precision are versioned in the artifact and Methods.
+- No real-corpus or interactive terminal acceptance check was needed for this headless change.
+
+### Decisions requiring approval
+None.
+
 ## ESSENCE's Methods screen — 20 October 2026
 
 **Task:** maintainer's "go" (20 October 2026); data from Codex's #44; no CURRENT_TASK entry.
