@@ -31,6 +31,7 @@ extraction = []
 [project.scripts]
 sol = "sol:cli"
 sol-kitty = "sol.terminal.kitty:main"
+sol-window = "sol.terminal.window:main"
 sol-corpus = "sol.corpus.convert:main"
 sol-corpus-check = "sol.corpus.contract:main"
 
@@ -47,5 +48,5 @@ include = ["sol", "sol.*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-"sol.terminal" = ["*.lua"]
+"sol.terminal" = ["*.lua", "fonts/*.ttf", "fonts/OFL.txt"]
 "sol.essence" = ["encyclopedia.json", "methods.json"]
