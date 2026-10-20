@@ -30,6 +30,9 @@ def build_parser() -> argparse.ArgumentParser:
     words = commands.add_parser("words", help="count normalized words with explicit target/reference denominators")
     from sol.essence.word_cli import add_arguments
     add_arguments(words, words=True)
+    tfidf = commands.add_parser("tfidf", help="rank lexical terms per provider document and overall")
+    add_input_arguments(tfidf, words=True)
+    tfidf.add_argument("--top-n", type=int, default=20, metavar="N", help="terms per document and overall, 1–1000 (default: 20)")
     check = commands.add_parser("check", help="recompute and verify a saved experiment against the local corpus")
     check.add_argument("file", metavar="FILE|-", help="saved result JSON, or - for piped input")
     add_arguments(check)
@@ -54,7 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
     marking_import.add_argument("form", metavar="FORM_TXT|-", help="marked UTF-8 text form; only one input may be piped")
     marking_import.add_argument("--reviewer", required=True, metavar="NAME", help="declared human reviewer label")
     marking_import.add_argument("--output", type=Path, required=True, metavar="REVIEW_JSON", help="new private review file outside Git")
-    for command in (term, sentences, words, check, prose, sample, review, marking_export, marking_import):
+    for command in (term, sentences, words, tfidf, check, prose, sample, review, marking_export, marking_import):
         command.add_argument("--corpus", type=Path, metavar="DIRECTORY",
                              help="use this local canonical corpus instead of discovery")
         command.add_argument("--json", action="store_true", help="print machine-readable JSON instead of a human summary")
@@ -176,6 +179,9 @@ def main(arguments: list[str] | None = None) -> int:
     """Analyze or verify without opening BEING, a workspace, or a source PDF."""
     options = build_parser().parse_args(arguments)
     try:
+        if options.action == "tfidf":
+            from sol.essence.tfidf_cli import run
+            return run(options)
         if options.action == "words-export":
             from sol.essence.word_cli import run_export
             return run_export(options)
@@ -198,6 +204,10 @@ def main(arguments: list[str] | None = None) -> int:
                 header = json.loads(data)
             except (ValueError, UnicodeError, RecursionError):
                 header = None
+            if isinstance(header, dict) and header.get("protocol") == "sol.tfidf":
+                from sol.essence.tfidf import decode_tfidf_result
+                from sol.essence.tfidf_cli import run as run_tfidf
+                return run_tfidf(options, decode_tfidf_result(data))
             if isinstance(header, dict) and header.get("protocol") == "sol.word-frequencies":
                 return run(options, decode_word_result(data))
             if isinstance(header, dict) and header.get("protocol") == "sol.sentence-study":

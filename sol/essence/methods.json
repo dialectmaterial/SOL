@@ -73,6 +73,46 @@
       "encyclopedia": "frequency-comparison"
     },
     {
+      "id": "tfidf",
+      "title": "TF-IDF",
+      "summary": "Rank literal normalized terms per document and overall with the dependency-free tfidf-v1 method. Each CORE provider input passage is a document; a file is one document, even with newlines. Documents and vocabulary use the word study’s exact tokenizer, projection, scopes, exclusions and digests.",
+      "inputs": [
+        "A verified local CORE corpus, optionally scoped to a reader subtree, passage IDs or one passage span.",
+        "Or one explicit regular UTF-8 file, optionally scoped to a codepoint span."
+      ],
+      "settings": [
+        {
+          "name": "--provider / --input-file (alias --file)",
+          "meaning": "Choose CORE or a UTF-8 file; default file with --input-file, otherwise CORE."
+        },
+        {
+          "name": "--within / --passage / --span START END",
+          "meaning": "Reuse word-study scopes; tokens must be wholly contained in a half-open original-codepoint span. CORE spans require exactly one --passage."
+        },
+        {
+          "name": "--top-n N",
+          "meaning": "Return 1–1000 terms per document and overall (default 20). Normalize and aggregate the full vocabulary before truncating."
+        },
+        {
+          "name": "Formula (fixed, tfidf-v1)",
+          "meaning": "tf(t,d)=raw included count; idf(t)=ln((1+N)/(1+df(t)))+1, using natural logarithms and add-one smoothing of N and df plus an outer +1. Multiply tf by idf, then L2-normalize each document across all its terms. Empty vectors stay empty; zero-token documents count in N. No stemming or stop-word removal."
+        },
+        {
+          "name": "Overall / order (fixed)",
+          "meaning": "Overall weight is the mean of unrounded normalized document weights across all N documents; N=0 gives an empty result. Round final scores to 12 decimals, sort by decreasing rounded score then normalized word, and take top_n."
+        }
+      ],
+      "output": "sol.tfidf v1 JSON on stdout with --json; redirect to save. Includes documents[].input_index and top_terms, overall top terms, and a complete text-free sol.word-frequencies v1 word_study receipt. No automatic persistence or TUI execution yet.",
+      "limits": [
+        "CORE uses the word study’s eligible Hegel prose projection and facsimile masking; file text is verbatim. Each retained input row is one document; paragraphs in files are not split.",
+        "A single file has N=1 and idf=1 for every term, so its ranking reduces to normalized term counts. Weights describe these lexical inputs, not concepts, similarity or statistical significance.",
+        "Input files are limited to 64 MiB and complete JSON artifacts to 16 MiB. Provenance retains vocabulary, digests and first-occurrence offsets, without source text or file paths.",
+        "sol analyze check recomputes from explicit sources and saved scopes, refusing changed whole-file bytes or CORE generations even if selected token counts are unchanged."
+      ],
+      "cli": "sol analyze tfidf --input-file target.txt --top-n 20 --json > tfidf.sol-analysis.json",
+      "encyclopedia": "tf-idf"
+    },
+    {
       "id": "sentences",
       "title": "Sentence lengths",
       "summary": "Split text with deterministic punctuation rules and count word tokens in each sentence. Report mean, lower median, nearest-rank 10th and 90th percentiles, a length histogram, means by position within each input, and the twelve longest sentences.",

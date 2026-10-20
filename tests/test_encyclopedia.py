@@ -56,7 +56,7 @@ class CatalogTests(unittest.TestCase):
 
     def test_reading_topics_do_not_claim_runnable_adapters(self):
         for entry in load_catalog()['entries']:
-            if entry['id'] in {'tf-idf', 'word-vectors', 'transformers'}:
+            if entry['id'] in {'word-vectors', 'transformers'}:
                 self.assertIn('Reading topic;', entry['essence'])
                 self.assertIn('no ', entry['essence'])
             else:
