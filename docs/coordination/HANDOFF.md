@@ -32,6 +32,26 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Every occurrence of a word in ESSENCE — 20 October 2026
+
+**Task:** maintainer request in session (20 October 2026): list every occurrence of a word, not only the first per passage; no CURRENT_TASK entry.
+**Branch / PR:** `claude/every-occurrence` · see the pull request
+**Last implementation commit:** `db85b9f1beb50b1b6df6ce7531da31fc1f2c2a41` (this report is committed after it)
+
+### Changed files
+- `sol/essence/tui/words.py` — `sources()` yields one entry per occurrence, re-found at display time in the digest-verified text with `word_tokens` inside the input's span; falls back to the recorded first when the count doesn't match (masked tokens) or the text changed; `OCCURRENCE_LIMIT` 1,000.
+- `sol/essence/tui/app.py` — Occurrence column (*2 of 5*); the label says when fewer than all occurrences are listed.
+- `sol/essence/encyclopedia.json` — the concordance entry's ESSENCE note no longer says first occurrence only.
+- Tests, ESSENCE §4, CHANGELOG.
+
+### Tests performed
+- `scripts/check_docs.py` — OK; full unittest suite — OK (skipped=12, expected failures=4).
+- Real book, whole-book count: the 300 most frequent words list all their occurrences (no fallbacks); "the" (28,380) takes 0.6 s uncapped, 0.02 s with the cap.
+
+### Outstanding issues
+- The study artifact is unchanged: later occurrences are display-only, so exports still carry first offsets.
+- Not yet looked at by eye in a real terminal.
+
 
 ## Encyclopedia excerpt and packaging polish — 20 October 2026
 
