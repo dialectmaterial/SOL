@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Runnable TF-IDF engine and CLI — 20 October 2026
+
+`sol analyze tfidf` ranks terms per word-provider passage (or one whole UTF-8
+file) and overall, with `--top-n` and `--json`. The dependency-free `tfidf-v1`
+method declares raw-count TF, smoothed natural-log IDF and document L2
+normalization. `sol analyze check` recomputes saved results against explicit
+current sources. The public Python API is ready for later TUI integration;
+Methods and the TF-IDF encyclopedia entry document the shipped behavior.
+
 ### ESSENCE's Methods screen — 20 October 2026
 
 Methods (`2`) is no longer a placeholder: it lists each study ESSENCE and

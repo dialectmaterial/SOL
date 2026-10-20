@@ -121,7 +121,10 @@ for entry in catalog['entries']:
     assert entry['quote'] in entry_markdown(catalog, entry)
 from sol.essence.methods import load_methods, method_markdown
 methods = load_methods()
-assert len(methods['entries']) == 10
+assert len(methods['entries']) == 11
+assert any(method['id'] == 'tfidf' for method in methods['entries'])
+from sol.essence import analyze_tfidf
+assert callable(analyze_tfidf)
 for method in methods['entries']:
     assert method['summary'] in method_markdown(method)
 print(catalog['license'])

@@ -305,6 +305,11 @@ def check_word_result(target: CoreProvider | FileProvider, result: dict, *, refe
 
 def decode_word_result(data: bytes | str) -> dict:
     """Decode bounded, strict UTF-8 JSON without importing CORE."""
+    return _decode_result(data, _validate)
+
+
+def _decode_result(data, validate):
+    """Shared bounded transport for provider study artifacts."""
     try:
         raw = data.encode("utf-8") if isinstance(data, str) else data
         if not isinstance(raw, bytes):
@@ -332,7 +337,7 @@ def decode_word_result(data: bytes | str) -> dict:
         if isinstance(error, WordStudyError):
             raise
         raise WordStudyError("Invalid word-study JSON", code="invalid_json") from error
-    return _validate(result)
+    return validate(result)
 
 
 def encode_word_result(result: dict) -> str:

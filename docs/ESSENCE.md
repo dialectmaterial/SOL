@@ -21,6 +21,7 @@ ESSENCE is not currently a complete model environment. The inspected code contai
 - `sol.essence.prose.export_prose` and `sol analyze prose --json`: a **verified, Hegel-specific** prose-only analysis view over the current corpus.
 - `sol analyze term WORD`: a reproducible lexical-distribution experiment with reference-bound source matches; `sol analyze check FILE` checks its result against a current corpus generation.
 - `sol analyze sentences [--within PATH]`: the existing v1 corpus sentence-length study (run from the reader with `S` until 19 October, when the maintainer removed that key). `sol analyze sentences --file PATH [--span START END]` and the provider API add v2 studies over UTF-8 files or independently scoped CORE inputs; `sol analyze check FILE --input-file PATH` verifies file studies against an explicit local source.
+- `sol analyze tfidf`: dependency-free, versioned lexical TF-IDF over the existing word providers; engine and CLI only, with TUI integration pending. Top terms per document and overall retain word-study provenance and are recomputable with `check` (details below).
 - The optional Textual interface and the word engine's CORE/file counts, comparison measures and CSV/TSV export described in §4–§5. The interface also runs the sentence-length study through the provider API (19 October).
 - `sol.core` public snapshot/reference APIs, including source/edition/generation binding and batch captures; these are usable without opening BEING.
 - A narrow optional `sol-kitty` + Zsh handoff for a source passage, with an explicit proposed return to BEING. The handoff carries **references**, not an ML result database or unrestricted authority to save notes.
@@ -32,6 +33,9 @@ ESSENCE is not currently a complete model environment. The inspected code contai
 ### Existing commands
 
 ```sh
+sol analyze tfidf --input-file /absolute/path/to/text.txt --top-n 20 --json > tfidf.sol-analysis.json
+sol analyze check tfidf.sol-analysis.json --input-file /absolute/path/to/text.txt --json
+sol analyze tfidf --within /ESSENCE --corpus local-corpus
 sol analyze prose
 sol analyze prose --json > prose.sol-analysis.json
 sol analyze term ground
@@ -45,7 +49,47 @@ sol analyze check sentences.sol-analysis.json --input-file /absolute/path/to/tex
 sol reference capture RECORD_UUID --corpus local-corpus | sol reference check --corpus local-corpus
 ```
 
-The first `prose` command summarizes eligible records. The JSON export is for consumption by scripts. The lexical study measures exact normalized token occurrences and can break results down by the three doctrines, but a word occurrence does not prove concept identity. `check` verifies term, word-frequency and sentence studies by recomputation, not arbitrary generated model outputs or `prose` exports. File analysis through the Python API or `python -m sol.essence.cli` needs no CORE import or configured corpus; the installed `sol` entry point still loads BEING's command dispatcher.
+The first `prose` command summarizes eligible records. The JSON export is for consumption by scripts. The lexical study measures exact normalized token occurrences and can break results down by the three doctrines, but a word occurrence does not prove concept identity. `check` verifies term, word-frequency, TF-IDF and sentence studies by recomputation, not arbitrary generated model outputs or `prose` exports. File analysis through the Python API or `python -m sol.essence.cli` needs no CORE import or configured corpus; the installed `sol` entry point still loads BEING's command dispatcher.
+
+### TF-IDF engine contract (tfidf-v1)
+
+The maintainer requested this simple auditable transformation without a new dependency.
+`sol.essence.analyze_tfidf(target: CoreProvider | FileProvider, *, top_n: int = 20) -> dict`
+returns a `sol.tfidf` v1 artifact. `documents[]` contains `input_index` and
+`top_terms` (`word`, `score`); `overall` contains the highest mean-weight terms.
+The index maps to `word_study.target.inputs`, which retains CORE identities,
+source pages and digests, or a file digest and offsets. The embedded complete
+`sol.word-frequencies` v1 receipt declares tokenization and projection; artifacts
+contain vocabulary and first-occurrence locations, never passage text or file paths.
+
+A document is exactly one retained word-provider input row: one CORE passage,
+or one whole file (newlines do not create documents). Span selections keep only
+wholly contained tokens. N counts all retained rows, including zero-token rows;
+df(t) counts rows containing term t. The fixed formula is:
+
+- `tf(t,d) = c(t,d)`, the raw included token count, without sublinear scaling.
+- `idf(t) = ln((1+N)/(1+df(t))) + 1`, natural logarithm, add-one smoothing
+  on both document counts and an outer +1.
+- `w(t,d) = tf(t,d) * idf(t)`, then divide each document vector by its L2
+  norm over **all** terms. Empty vectors stay empty.
+- Overall weights are the mean of the unrounded normalized document weights
+  across all N rows, including empty rows; N=0 produces no terms.
+- Round final scores to 12 decimals, order by decreasing rounded score then
+  normalized word, and retain `top_n` (1–1000, default 20) independently for
+  each document and overall. Truncation happens after normalization and aggregation.
+
+No stemming or stop-word removal occurs. With a single file, N=df=1 and IDF=1:
+its ranking is normalized term counts. These weights do not establish conceptual
+similarity or significance. File input is verbatim; CORE retains the word study’s
+eligibility exclusions and facsimile masking. The shared 64 MiB input-file and
+16 MiB result limits apply, including the embedded receipt.
+`check_tfidf_result(target, result)` validates the declared method, recomputes
+weights and invokes word-study verification against caller-supplied current
+sources. It refuses changed whole-file bytes or corpus generations, including
+unselected material, and never follows artifact paths. `encode_tfidf_result`
+and `decode_tfidf_result` provide deterministic strict JSON transport. CLI `check`
+reuses the saved scope and requires explicit file input for a file artifact.
+The TUI can call this API later; this change adds no TUI controls or persistence.
 
 ## 3. Proper model inputs: projections, not destructive cleaning
 
