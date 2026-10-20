@@ -32,6 +32,49 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Reader navigation latency — 20 October 2026
+
+**Task:** [Codex: Measure and cut reader navigation latency](https://github.com/dialectmaterial/SOL/blob/43de133a2975c93b5b6ed048c6c7e31809c6d8db/docs/coordination/CURRENT_TASK.md#codex-measure-and-cut-reader-navigation-latency).
+**Branch / PR:** `codex/navigation-latency` · see the pull request; Claude reviews, author does not merge.
+**Last implementation commit:** `561bdfd6f573185528b33cf165d3bd0219483597` (this report is committed after it).
+
+### Changed files
+- `sol/terminal/neovim_reader.py` — compact checked position replies for same-passage occurrence steps, inside the existing staged-save boundary; full preparation avoids an active-reference check duplicated by payload validation.
+- `sol/terminal/neovim_requests.lua`, `neovim_view.lua` — dispatch compact replies; validate their packet and marks before moving the cursor, updating search styling/counts in the existing buffer.
+- `scripts/reader_timings.py` — version 2 probe adds occurrence steps, paragraph moves across section boundaries and an outline jump; follows actual restored cursor packets and accepts both reply forms.
+- Controller and headless Neovim tests; BEING §2, CHANGELOG and Codex's task status. Marker/landmark UI is untouched. The original worktree's Git metadata is read-only; implementation/publication uses `/tmp/sol-navigation-latency`, cloned from `origin/main`.
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — OK; external URLs were not network-checked. `git diff --check` — OK.
+- `.venv/bin/python -B -m unittest discover -s tests` — 1,791 tests, OK (12 skipped, 4 expected failures), after rebase onto `1510b23`; the pre-rebase run also passed (1,788 tests).
+- Focused controller and headless Neovim checks pass. New coverage includes both modes, Unicode codepoint cursors, selection clearing/history restoration, retired-reference fallback, preparation/storage failures and a source edit after position preparation but before saving; retry and history retain the accepted outgoing position. A headless action-channel reply preserves buffer/window identity, text and semantic styles, refreshes counts after Esc, and refuses malformed marks before moving.
+- Read-only real book: 4,629 records / 1,803 passages, identical generation before/after. Timings collected before rebasing the implementation unchanged onto `1510b23` (Claude’s landmarks); required checks rerun after rebase. Same version 2 harness against `origin/main` at `43de133` and the implementation, width 72, one discarded warmup and three measured runs per operation, warm process/OS cache. Real CORE verification and temporary SQLite workspaces; terminal boundary replaced, so IPC, Neovim painting and physical-key latency are excluded. No personal workspace or source PDF was opened. Command: `scripts/reader_timings.py --corpus LOCAL_CORPUS --repeats 3 --warmups 1 --json` using the repository venv. Private reports/profile remain outside Git at `/tmp/navigation-{before,after}-final.json` and `/tmp/navigation-profile`.
+
+| Controller operation | Before median (ms) | After median (ms) |
+| --- | ---: | ---: |
+| Ctrl-N, same passage | 899 | 437 |
+| Ctrl-P, same passage | 947 | 438 |
+| Section next (`j` boundary route) | 1,073 | 1,202 |
+| Section previous (`k` boundary route) | 1,041 | 999 |
+| `n` across section boundary | 1,081 | 1,016 |
+| `b` across section boundary | 1,015 | 1,025 |
+| Outline, second section | 1,088 | 1,036 |
+
+The occurrence steps improve by 51–54%. Other routes remain around a second,
+with mixed results; these small samples do not establish a general navigation
+speedup. A separate baseline profile attributed 11.7 s of its 30.8 s to source
+fingerprint verification and 12.9 s to view preparation (overlapping totals,
+not additive). The fast path removes full view construction/transfer, not the
+verification policy. Standalone ordinary payload and typography times remain
+about 460 ms and 5 ms; heavy typography remains about 125 ms.
+
+### Outstanding issues
+- Section and outline moves still prepare a complete checked destination; their latency needs further work. This change does not relax CORE's per-reference fingerprint checks or cache source trust.
+- No physical-keyboard terminal session or sustained human reading trial. Existing BEING §7 limits on an editor/transport failure after a successful save still apply.
+
+### Decisions requiring approval
+None reserved. Default: use compact replies only for occurrence steps within the same shown target and requested identity, with unchanged mode/focus/theme/notice; otherwise prepare the full view. Public CORE/reference contracts, corpus, workspace schemas and dependencies are unchanged.
+
 ## The printed page in a zoomable PDF viewer — 20 October 2026
 
 **Task:** [The printed page in a zoomable PDF viewer](https://github.com/dialectmaterial/SOL/blob/69189ea2620e4ce168ef4e88aa9da9f8c25a63f3/docs/coordination/CURRENT_TASK.md)
