@@ -33,6 +33,37 @@ Write "None." rather than deleting a heading.
 -->
 
 
+
+## Navigation refusal stage 1 recheck — 20 October 2026
+
+**Task:** [Codex: Preserve reading state when navigation is refused (stage 1)](https://github.com/dialectmaterial/SOL/blob/ad6a794b4b2727179ba796ad17a15fb1fbc3b836/docs/coordination/CURRENT_TASK.md#codex-preserve-reading-state-when-navigation-is-refused-stage-1), assigned by the maintainer via Claude.
+**Branch / PR:** `codex/navigation-refusal` · [PR #43](https://github.com/dialectmaterial/SOL/pull/43).
+**Last implementation commit:** `ad6a794b4b2727179ba796ad17a15fb1fbc3b836` (this report follows it).
+
+### Changed files
+
+- `tests/test_neovim_reader.py` — all 12 current navigation routes, including tree and reverse moves; destination CORE position-capture/storage failures; competing save and stale generation during preparation; exact history, retry and UUID/codepoint reopen.
+- `docs/BEING.md`, `CHANGELOG.md` — verified behavior and recovery limits; `CURRENT_TASK.md` records the assignment and status `In review`.
+- Application code is retained: current main already contains the stage 1 staging fix (`735bc3fd36b9d9730a8f89bb1d8ab64e22d5d071`). No reference/schema/dependency change.
+
+### Tests performed
+
+- Before edits, on freshly cloned main `c9b7db992eba94a993e5cbefd82a98597a74eacb`: `/tmp/sol-polish-venv/bin/python -B -m unittest discover -s tests -p test_neovim_reader.py -k refused_destination_view` — passed, including injected next-payload failure. The old bug no longer reproduces; no new fix is claimed. Removed `S`/`study_open` is skipped; `essence_source` remains covered.
+- Focused controller/action suites — 43 + 19 tests passed. A process-local mutation disabling `ReaderActions.staged()` produces 14 expected assertion failures across three tests, confirming sensitivity to the original failure and late save/generation races; no source file was altered for that probe.
+- `/tmp/sol-polish-venv/bin/python -B -m unittest discover -s tests` — 1,733 tests in 133 seconds, OK (12 skipped, 4 expected failures).
+- `/tmp/sol-polish-venv/bin/python -B scripts/check_docs.py` and branch diff whitespace check — passed. External URLs were not network-checked.
+- No manual Alacritty/Kitty session, private corpus or sustained reading trial. Work used a disposable `/tmp/sol-navigation-refusal` clone because the original checkout's Git metadata is read-only; synced sources and personal data were untouched.
+
+### Outstanding issues
+
+- Python/SQLite/Neovim are not one atomic transaction. After publication/display failure (including an oversized channel response), the reader exits; reopening resumes the accepted destination. An editor acknowledgement would require separate work.
+- A competing writer remains authoritative: the old screen stays visible, moves are refused, and reopening resumes the other writer's position. A stale generation requires resolving the mismatch before retrying; no automatic reconversion is introduced.
+
+### Decisions requiring approval
+
+None reserved. Retained default: the displayed outgoing cursor may be checkpointed even when the destination is refused. The destination checkpoint remains staged; no force-save or rollback of another session's committed work occurs. The maintainer decides task completion and the next assignment.
+
+
 ## Encyclopedia excerpt and packaging polish — 20 October 2026
 
 **Task:** maintainer request in session: mark mid-sentence encyclopedia excerpts and assert the wheel's GPL metadata/license payload; no CURRENT_TASK entry.
