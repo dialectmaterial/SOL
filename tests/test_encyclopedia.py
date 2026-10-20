@@ -1,4 +1,5 @@
 """The shipped reading list and its keyboard browser, using no real corpus."""
+from copy import deepcopy
 from datetime import date
 import unittest
 
@@ -33,6 +34,25 @@ class CatalogTests(unittest.TestCase):
                     self.assertIn(value, rendered)
                 for link in entry['further']:
                     self.assertIn(link['url'], rendered)
+
+    def test_mid_sentence_quotes_show_an_editorial_ellipsis_without_mutating_data(self):
+        catalog = load_catalog()
+        original = deepcopy(catalog)
+        fragments = {'sentences', 'concordance', 'prose', 'transformers'}
+        for entry in catalog['entries']:
+            with self.subTest(entry=entry['id']):
+                self.assertEqual(entry.get('quote_starts_mid_sentence', False),
+                                 entry['id'] in fragments)
+                leading = '… ' if entry['id'] in fragments else ''
+                self.assertIn(f"> {leading}{entry['quote']}\n", entry_markdown(catalog, entry))
+        self.assertEqual(catalog, original)
+
+    def test_omission_marker_uses_source_metadata_rather_than_capitalization(self):
+        catalog = load_catalog()
+        entry = dict(catalog['entries'][0], quote='SOL appears mid-sentence.',
+                     quote_starts_mid_sentence=True)
+        self.assertIn('> … SOL appears mid-sentence.\n', entry_markdown(catalog, entry))
+        self.assertEqual(entry['quote'], 'SOL appears mid-sentence.')
 
     def test_reading_topics_do_not_claim_runnable_adapters(self):
         for entry in load_catalog()['entries']:

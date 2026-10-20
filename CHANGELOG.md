@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Encyclopedia excerpts starting mid-sentence now display a leading … without changing the stored quote; packaging checks verify the wheel’s GPL-3.0-or-later declaration and LICENSE payload.
+
+### Catppuccin throughout — 20 October 2026
+
+The reader's themes are now Catppuccin: **Mocha** (dark, the new default) and
+**Latte** (light) replace Dark and Paper, and Terminal still uses your own
+terminal colors. `T` cycles them. ESSENCE opens in the reader's theme, using
+Textual's Catppuccin themes. If you saved `dark` or `paper` with
+`sol --set-theme`, it now opens as Mocha or Latte.
+
 ### SOL is licensed under the GPL — 20 October 2026
 
 SOL is now free software under the GNU General Public License, version 3 or

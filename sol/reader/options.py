@@ -11,8 +11,11 @@ from sol import __version__ as VERSION
 
 DEFAULT_READER_WIDTH = 72
 # Presentation presets; their highlight data lives in sol.terminal.theme.
-READER_THEMES = ("terminal", "dark", "paper")
-DEFAULT_READER_THEME = "terminal"
+# Catppuccin Mocha and Latte (catppuccin.com); Terminal inherits your own colors.
+READER_THEMES = ("mocha", "latte", "terminal")
+DEFAULT_READER_THEME = "mocha"
+# Names saved before Catppuccin replaced the Dark and Paper presets.
+LEGACY_READER_THEMES = {"dark": "mocha", "paper": "latte"}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -49,7 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     reader.add_argument("--emphasis", choices=("auto", "italic", "underline"),
                         help="semantic emphasis presentation; auto falls back to underline")
     reader.add_argument("--theme", choices=READER_THEMES,
-                        help="reading preset for this session (default: saved theme, else terminal); T cycles it")
+                        help="reading preset for this session (default: saved theme, else mocha); T cycles it")
     modes = parser.add_argument_group("Other actions (choose one)")
     mode = modes.add_mutually_exclusive_group()
     mode.add_argument("--structure", action="store_true", help="show the outline (prefer the indexed local corpus)")
@@ -69,7 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--set-source-pdf", type=Path, metavar="PATH",
                       help="verify and remember the corpus's original PDF for source previews (s in the reader)")
     mode.add_argument("--set-theme", choices=READER_THEMES, metavar="{" + ",".join(READER_THEMES) + "}",
-                      help="remember the reader's theme: terminal inherits your colors; dark or paper")
+                      help="remember the reader's theme: Catppuccin mocha (dark) or latte (light); terminal inherits your colors")
     mode.add_argument("--resume", action="store_true", help="resume the named workspace's saved passage")
     mode.add_argument("--workspace-export", action="store_true", help="export a workspace snapshot (JSON by default)")
     mode.add_argument("--workspace-check", action="store_true", help="report unresolved, retired and versioned workspace references")

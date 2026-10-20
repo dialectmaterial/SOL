@@ -29,7 +29,7 @@ ENTRY_POINTS = {
     "sol-corpus": "sol.corpus.convert:main",
     "sol-corpus-check": "sol.corpus.contract:main",
 }
-PUBLIC_FILES = {"pyproject.toml", "MANIFEST.in", "README.md", "CONTRIBUTING.md", "CHANGELOG.md",
+PUBLIC_FILES = {"pyproject.toml", "MANIFEST.in", "README.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE",
                 "docs/legacy/inventory.json"} | PACKAGE_FILES | PACKAGE_ASSETS
 for directory, suffixes in (("docs", {".md"}), ("tests", {".py"}),
                             ("experiments", {".py", ".lua", ".js", ".cjs"}), ("scripts", {".py"})):
@@ -136,6 +136,11 @@ print(catalog['license'])
         self.assertEqual(metadata["Name"], "sol-organizes-logic")
         self.assertEqual(metadata["Version"], "0.1.0")
         self.assertEqual(metadata["Requires-Python"], ">=3.10")
+        self.assertEqual(metadata["License-Expression"], "GPL-3.0-or-later")
+        self.assertEqual(metadata.get_all("License-File"), ["LICENSE"])
+        with zipfile.ZipFile(self.wheel) as archive:
+            self.assertEqual(archive.read(info + "/licenses/LICENSE"),
+                             (ROOT / "LICENSE").read_bytes())
         self.assertEqual(dict(entry_points["console_scripts"]), ENTRY_POINTS)
         requirements = metadata.get_all("Requires-Dist") or []
         self.assertEqual(set(metadata.get_all("Provides-Extra") or []), {"corpus", "shell", "extraction", "essence"})
