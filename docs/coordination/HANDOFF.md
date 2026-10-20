@@ -32,6 +32,39 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Verified reader startup speed — 20 October 2026
+
+**Task:** maintainer request via Claude in session; profile the real book and reduce startup without weakening verification. No CURRENT_TASK entry.
+**Branch / PR:** `codex/startup-speed` · [PR #47](https://github.com/dialectmaterial/SOL/pull/47).
+**Last implementation commit:** `0ada2bf84c97385d7f737f93aa3112f06b326765` (this report follows it).
+
+### Changed files
+- `sol/reader/actions.py`, `sol/reader/surface.py` — share the existing selection source/provenance guard directly instead of constructing/opening/selecting a throwaway navigation session per exported record. Export snapshots detach JSON containers through serialization instead of per-object deepcopy; CORE still checks the original graph, and finish still compares the full copied graph and reader projections.
+- `sol/core/protocol.py` — reuse an existing generation entry only after full canonical-JSON and structural equality; retain validation's detached JSON containers instead of throwing them away and creating another copy. No persistent indexes over mutable Book collections, no file-stat trust cache, no disk verification boundaries removed.
+- `tests/test_core_protocol.py`, `tests/test_reader_surface_export_guards.py` — cache reuse, detached ownership, JSON numeric type changes, and altered text/kind/path/all four page fields.
+- `CHANGELOG.md` — startup optimization and retained guards.
+
+### Tests performed
+- `/home/dima/Projects/code/sol/.venv/bin/python -B -m unittest discover -s tests` with temporary XDG directories and Neovim log — 1741 tests, OK (12 skipped, 4 expected failures).
+- Same Python, `-B scripts/check_docs.py` — OK; external URLs not network-checked. `git diff --check` — OK.
+- Before/after: same Python, `-B scripts/reader_timings.py --corpus /home/dima/Projects/code/sol/local-corpus --repeats 5 --warmups 1`, width 72. Baseline `9d40420`; after `0ada2bf`. The corpus was read-only; full text-free timing reports and cProfile data remain in `/tmp`, outside Git.
+
+| Median operation (ms) | Before | After |
+| --- | ---: | ---: |
+| Python startup to first payload | 1747.57 | 1213.50 |
+| Corpus book load | 892.67 | 454.48 |
+| Ordinary payload | 476.67 | 462.48 |
+| Footnote-heavy payload | 1123.65 | 868.18 |
+
+Startup improved 31%; book load 49%; heavy payload 23%. Startup ranges were 1690.89–1784.08 ms before and 1207.01–1468.62 ms after. A first three-run pass measured 1690.63 → 903.95 ms, illustrating host variation; the five-run figures above are the reported comparison. Stage timings overlap and must not be summed.
+
+### Outstanding issues
+- This is warm-process Python preparation (including fresh book load and temporary SQLite), excluding imports, corpus selection, Neovim process/IPC/painting and manual terminal reading. This host did not reproduce the maintainer's absolute ~4.7 s. Disk hashing and full in-memory checks remain measurable costs.
+- Shared checkout Git metadata is read-only in this session. The branch, commits and PR were prepared in `/tmp/sol-startup-speed`; the original checkout is unchanged. No corpus content, Lua files or `sol/essence/tui/` changes are included.
+
+### Decisions requiring approval
+None.
+
 ## ESSENCE's Methods screen — 20 October 2026
 
 **Task:** maintainer's "go" (20 October 2026); data from Codex's #44; no CURRENT_TASK entry.
