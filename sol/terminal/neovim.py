@@ -361,6 +361,9 @@ def launch_payload(payload, executable, *, on_request=None):
     with tempfile.TemporaryDirectory(prefix="sol-neovim-reader-") as temporary:
         root = Path(temporary)
         root.chmod(0o700)
+        # Neovim draws over the opening screen's last frame.
+        from sol.terminal import splash
+        splash.handoff()
         input_path, output_path = root / "input.json", root / "result.json"
         environment = _isolated_environment(root, input_path, output_path)
         _write_json(input_path, payload)

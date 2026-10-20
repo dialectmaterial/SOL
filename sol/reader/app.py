@@ -243,6 +243,9 @@ def main(argv: list[str] | None = None) -> int:
             from sol.terminal.neovim import validate_environment
             validate_environment(args.width or DEFAULT_READER_WIDTH)
             args.theme = args.theme or configured_theme(READER_THEMES, LEGACY_READER_THEMES) or DEFAULT_READER_THEME
+            # The opening screen covers loading; it steps aside for any prompt.
+            from sol.terminal import splash
+            splash.start(args.theme)
         if mode is ExecutionMode.SET_THEME:
             configuration = save_theme(args.set_theme, READER_THEMES)
             if args.json:
@@ -294,6 +297,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             if mode.interactive:
                 from sol.reader.onboarding import prepare_first_corpus
+                _close_splash()
                 book = prepare_first_corpus()
             else:
                 raise ValueError(f"No local corpus found. Run sol in a terminal to import the supported {PDF_FILENAME}, "
@@ -387,12 +391,15 @@ def main(argv: list[str] | None = None) -> int:
                 print(render_passage(passage, width, args.plain, color))
         return 0
     except ValueError as error:
+        _close_splash()
         print("sol: " + safe_output(error), file=sys.stderr)
         return 2
     except RuntimeError as error:
+        _close_splash()
         print("sol: " + safe_output(error), file=sys.stderr)
         return 1
     except EOFError:
+        _close_splash()
         print("\nsol: setup cancelled; no workspace or actor was created", file=sys.stderr)
         return 0
 
@@ -404,6 +411,7 @@ def cli(argv: list[str] | None = None) -> int:
         sys.stdout.flush()
         return status
     except KeyboardInterrupt:
+        _close_splash()
         print("\nsol: interrupted", file=sys.stderr)
         return 130
     except BrokenPipeError:
@@ -414,6 +422,15 @@ def cli(argv: list[str] | None = None) -> int:
         except (OSError, AttributeError, ValueError):
             pass
         return 0
+    finally:
+        _close_splash()
+
+
+def _close_splash():
+    """A refusal or error before Neovim starts must not leave the opening
+    screen up; once Neovim has drawn it is already gone and this does nothing."""
+    if "sol.terminal.splash" in sys.modules:
+        sys.modules["sol.terminal.splash"].stop()
 
 
 if __name__ == "__main__":
