@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Every occurrence of a word in ESSENCE — 20 October 2026
+
+A word's sources in ESSENCE now list every occurrence, not just the first in
+each passage, each with the words around it; Enter opens that very occurrence
+in the reader. Very common words list their first 1,000.
+
 - Encyclopedia excerpts starting mid-sentence now display a leading … without changing the stored quote; packaging checks verify the wheel’s GPL-3.0-or-later declaration and LICENSE payload.
 
 ### Catppuccin throughout — 20 October 2026
