@@ -4,6 +4,7 @@ recursive-include docs *.md
 include docs/legacy/inventory.json
 include pyproject.toml MANIFEST.in
 recursive-include sol *.py *.lua
+include sol/essence/encyclopedia.json
 recursive-include tests *.py
 recursive-include scripts *.py
 recursive-include experiments *.py *.lua *.js *.cjs

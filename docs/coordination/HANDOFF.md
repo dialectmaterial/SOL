@@ -32,6 +32,36 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## ESSENCE methods table of contents — 20 October 2026
+
+**Task:** maintainer's session decision: implement a modest methods table of contents; proposal §9 deferred.
+**Branch / PR:** `codex/encyclopedia-toc` · [PR #39](https://github.com/dialectmaterial/SOL/pull/39).
+**Last implementation commit:** `7b8e96ed818c03eda3d7f76cb9e0788da46b382b` (this report follows it).
+
+### Changed files
+
+- `sol/essence/encyclopedia.json`, `encyclopedia.py` — nine bundled entries, standard-library resource loading and rendering; one short verbatim Wikipedia excerpt per entry, contributor attribution, CC BY-SA 4.0 link, article URL/history, access date and one or two further links. SOL notes distinguish existing methods from reading topics.
+- `sol/essence/tui/app.py` — replace Encyclopedia's placeholder with a stacked keyboard list and scrollable details, preserving tab/quit/session behavior.
+- `pyproject.toml`, `MANIFEST.in`, `tests/test_packaging.py` — include the data in wheel/sdist; test installed offline loading outside the checkout with CORE, model and UI imports blocked.
+- `tests/test_encyclopedia.py` — entry coverage/attribution/link checks and keyboard browsing, scrolling, focus return and tab switches at 60×24 and 120×40.
+- `docs/ESSENCE.md`, `CHANGELOG.md` — record the narrower decision; retain the old §7 anchor for existing links. No graph, review states, catalog CLI or new dependency.
+
+### Tests performed
+
+- Verified the nine excerpts against the linked Wikipedia articles on 20 October 2026; further links point to existing SOL implementations or primary reference pages/papers.
+- Focused encyclopedia tests: 3 passed, including both terminal sizes. Documentation check and feature diff whitespace check passed.
+- One full-suite run: `/tmp/sol-encyclopedia-venv/bin/python -B -m unittest discover -s tests` with isolated XDG directories — **1,726 tests, OK (12 skipped, 4 existing expected failures)**, 127 seconds. Includes the installed-wheel/sdist checks. No second full-suite run.
+- PR #38 reviewed separately: [posted review](https://github.com/dialectmaterial/SOL/pull/38#issuecomment-6287730599), no blocking findings; GNU license checksum, real wheel metadata/license payload, docs and all 20 packaging tests checked in an isolated copy. Not merged.
+
+### Outstanding issues
+
+- No manual terminal/Neovim reading trial or private corpus was used. Check the new screen beside BEING and the external-link behavior in the maintainer's terminal.
+- The original worktree's Git metadata is read-only in this session; publication uses `/tmp/sol-encyclopedia-publish`, a temporary clone on the same branch with identical changed files. Workspace files remain in the original checkout.
+
+### Decisions requiring approval
+
+None. This implements the maintainer's decision; the broader proposal remains deferred.
+
 ## ESSENCE encyclopedia proposal — 19 October 2026
 
 **Task:** [Codex: Proposal for the ESSENCE encyclopedia (stage 4)](https://github.com/dialectmaterial/SOL/blob/379553bead8b408ae0fe8636b6528bf9ef3a2209/docs/coordination/CURRENT_TASK.md#codex-proposal-for-the-essence-encyclopedia-stage-4).

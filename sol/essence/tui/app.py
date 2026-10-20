@@ -14,20 +14,15 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual import work
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import (Button, DataTable, Footer, Input, Label, Markdown, RadioButton, RadioSet, Static,
+from textual.widgets import (Button, DataTable, Footer, Input, Label, Markdown, OptionList, RadioButton, RadioSet, Static,
                              TabbedContent, TabPane)
 
+from sol.essence.encyclopedia import entry_markdown, load_catalog
 from sol.essence.tui import sentences, words
 from sol.essence.tui.context import load_state, save_state
 
 SCREENS = {
-    "encyclopedia": ("Encyclopedia", """\
-## Encyclopedia
-
-*Not built yet (stage 4).* Historical entries on computational methods:
-why each was made, what its authors found inadequate before it, what
-trade-offs remain. Entries will be source-linked text, not screens.
-"""),
+    "encyclopedia": ("Encyclopedia", None),
     "methods": ("Methods", """\
 ## Methods
 
@@ -52,6 +47,9 @@ class EssenceApp(App):
     TITLE = "SOL ESSENCE"
     ENABLE_COMMAND_PALETTE = False
     CSS = """
+    #encyclopedia-list { height: 7; }
+    #encyclopedia-help { height: auto; padding: 0 1; }
+    #encyclopedia-detail { height: 1fr; }
     #origin { padding: 0 1; color: $text-muted; }
     #layout-hint { padding: 0 1; color: $text-muted; }
     Markdown { padding: 0 1; }
@@ -79,6 +77,7 @@ class EssenceApp(App):
 
     def __init__(self, context):
         super().__init__()
+        self.catalog = load_catalog()
         self.context = context
         self.state_file = context["state_file"]
         self.state = load_state(self.state_file) if self.state_file else {}
@@ -90,7 +89,9 @@ class EssenceApp(App):
             with TabbedContent(id="screens"):
                 for name, (label, text) in SCREENS.items():
                     with TabPane(label, id=name):
-                        if name == "experiment":
+                        if name == "encyclopedia":
+                            yield from self.compose_encyclopedia()
+                        elif name == "experiment":
                             yield from self.compose_experiment()
                         elif name == "results":
                             yield from self.compose_results()
@@ -99,6 +100,23 @@ class EssenceApp(App):
         yield Static("Alt-F fullscreen ⇄ beside the reader · Alt-R back to the reader · 1–4 screens",
                      id="layout-hint")
         yield Footer()
+
+    def compose_encyclopedia(self) -> ComposeResult:
+        yield Static("Methods · arrows browse · Enter reads · Escape returns to the list. "
+                     "Links open only when selected.", id="encyclopedia-help")
+        yield OptionList(*(item["title"] for item in self.catalog["entries"]), id="encyclopedia-list")
+        with VerticalScroll(id="encyclopedia-detail"):
+            yield Markdown(entry_markdown(self.catalog, self.catalog["entries"][0]), id="encyclopedia-entry")
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        if event.option_list.id == "encyclopedia-list":
+            self.query_one("#encyclopedia-entry", Markdown).update(
+                entry_markdown(self.catalog, self.catalog["entries"][event.option_index]))
+            self.query_one("#encyclopedia-detail", VerticalScroll).scroll_home(animate=False)
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_list.id == "encyclopedia-list":
+            self.query_one("#encyclopedia-detail").focus()
 
     def compose_experiment(self) -> ComposeResult:
         # Tab goes straight to the choices, not to the scrolling container.
@@ -321,14 +339,17 @@ class EssenceApp(App):
             f"Not exported: {outcome}" if isinstance(outcome, Exception) else f"Exported: {outcome}")
 
     def on_key(self, event) -> None:
+        if (event.key == "escape"
+                and self.query_one("#screens", TabbedContent).active == "encyclopedia"):
+            self.query_one("#encyclopedia-list").focus()
+            event.stop()
         if event.key == "escape" and self.focused is self.query_one("#sources", DataTable):
             self.query_one("#frequencies", DataTable).focus()
             event.stop()
 
     def on_mount(self) -> None:
         screen = self.state.get("screen")
-        if screen in SCREENS:
-            self.action_screen(screen)
+        self.action_screen(screen if screen in SCREENS else "encyclopedia")
 
     def action_screen(self, name: str) -> None:
         # Let go of focus first: a focused widget on the old screen would pull
@@ -336,7 +357,7 @@ class EssenceApp(App):
         self.set_focus(None)
         self.query_one("#screens", TabbedContent).active = name
         # Then start on the screen's first control.
-        first = {"experiment": "#study", "results": "#frequencies"}.get(name)
+        first = {"encyclopedia": "#encyclopedia-list", "experiment": "#study", "results": "#frequencies"}.get(name)
         if first:
             self.query_one(first).focus()
 

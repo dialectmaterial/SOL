@@ -1,0 +1,150 @@
+{
+  "attribution": "Wikipedia contributors",
+  "license": "CC BY-SA 4.0",
+  "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "accessed": "2026-10-20",
+  "entries": [
+    {
+      "id": "word-counts",
+      "title": "Word counts",
+      "article_title": "Word count",
+      "article_url": "https://en.wikipedia.org/wiki/Word_count",
+      "quote": "The word count is the number of words in a document or passage of text.",
+      "essence": "Runs in ESSENCE: word frequencies over a passage, section, book or UTF-8 file; exact normalized term counts by doctrine. Counts measure word occurrences, not concepts.",
+      "further": [
+        {
+          "title": "SOL word-frequency engine",
+          "url": "https://github.com/dialectmaterial/SOL/blob/2fe28c3/sol/essence/words.py"
+        },
+        {
+          "title": "Term frequency and weighting",
+          "url": "https://nlp.stanford.edu/IR-book/html/htmledition/term-frequency-and-weighting-1.html"
+        }
+      ]
+    },
+    {
+      "id": "tokenization",
+      "title": "Word tokenization",
+      "article_title": "Lexical analysis",
+      "article_url": "https://en.wikipedia.org/wiki/Lexical_analysis",
+      "quote": "Typically, lexical tokenization occurs at the word level.",
+      "essence": "Runs in ESSENCE: Unicode letters and marks with internal apostrophes, NFC and case folding. These word tokens differ from model subword tokens; SOL does not implement the Unicode default boundary algorithm.",
+      "further": [
+        {
+          "title": "SOL tokenizer",
+          "url": "https://github.com/dialectmaterial/SOL/blob/2fe28c3/sol/essence/tokenization.py"
+        },
+        {
+          "title": "Unicode text segmentation",
+          "url": "https://www.unicode.org/reports/tr29/"
+        }
+      ]
+    },
+    {
+      "id": "frequency-comparison",
+      "title": "Relative frequencies and comparisons",
+      "article_title": "Frequency (statistics)",
+      "article_url": "https://en.wikipedia.org/wiki/Frequency_(statistics)",
+      "quote": "The relative frequency is the ratio of absolute frequency to the sample size.",
+      "essence": "Runs in ESSENCE: rates per 10,000 tokens, target-minus-reference rate differences and log2 rate ratios, with no smoothing. Empty denominators and absent words have explicit undefined measures. These are descriptive comparisons.",
+      "further": [
+        {
+          "title": "SOL comparison formulas",
+          "url": "https://github.com/dialectmaterial/SOL/blob/2fe28c3/sol/essence/comparison.py"
+        }
+      ]
+    },
+    {
+      "id": "sentences",
+      "title": "Sentence segmentation and length",
+      "article_title": "Sentence boundary disambiguation",
+      "article_url": "https://en.wikipedia.org/wiki/Sentence_boundary_disambiguation",
+      "quote": "is the problem in natural language processing of deciding where sentences begin and end.",
+      "essence": "Runs in ESSENCE: punctuation-rules-v1 segmentation, sentence lengths in word tokens and longest sentences. Existing segmentation-sample/check tools measure boundaries against private human annotations; rule limitations remain.",
+      "further": [
+        {
+          "title": "SOL sentence study",
+          "url": "https://github.com/dialectmaterial/SOL/blob/2fe28c3/sol/essence/sentences.py"
+        },
+        {
+          "title": "A Maximum Entropy Approach to Identifying Sentence Boundaries",
+          "url": "https://aclanthology.org/A97-1004/"
+        }
+      ]
+    },
+    {
+      "id": "concordance",
+      "title": "Lexical distribution and source context",
+      "article_title": "Concordance (publishing)",
+      "article_url": "https://en.wikipedia.org/wiki/Concordance_(publishing)",
+      "quote": "listing every instance of each word with its immediate context.",
+      "essence": "Runs in ESSENCE: term distributions and reference-bound matches; word results list contributing passages with context around the first occurrence. This is a limited source view, not a complete concordance of every occurrence.",
+      "further": [
+        {
+          "title": "SOL term study",
+          "url": "https://github.com/dialectmaterial/SOL/blob/2fe28c3/sol/essence/terms.py"
+        },
+        {
+          "title": "SOL word source display",
+          "url": "https://github.com/dialectmaterial/SOL/blob/2fe28c3/sol/essence/tui/words.py"
+        }
+      ]
+    },
+    {
+      "id": "prose",
+      "title": "Prose projection",
+      "article_title": "Plain text",
+      "article_url": "https://en.wikipedia.org/wiki/Plain_text",
+      "quote": "plain text is a loose term for unformatted text or nontextual data represented as text",
+      "essence": "Runs in ESSENCE: prose export selects eligible attributed main text and removes structural headings and images from feature text, retaining source metadata separately. This SOL-specific projection is more selective than plain-text conversion.",
+      "further": [
+        {
+          "title": "SOL prose projection",
+          "url": "https://github.com/dialectmaterial/SOL/blob/2fe28c3/sol/essence/prose.py"
+        }
+      ]
+    },
+    {
+      "id": "tf-idf",
+      "title": "TF-IDF",
+      "article_title": "tf–idf",
+      "article_url": "https://en.wikipedia.org/wiki/Tf%E2%80%93idf",
+      "quote": "The tf–idf is the product of two statistics, term frequency and inverse document frequency.",
+      "essence": "Reading topic; no runnable TF-IDF adapter is bundled with ESSENCE.",
+      "further": [
+        {
+          "title": "Term frequency and weighting",
+          "url": "https://nlp.stanford.edu/IR-book/html/htmledition/term-frequency-and-weighting-1.html"
+        }
+      ]
+    },
+    {
+      "id": "word-vectors",
+      "title": "Word vectors",
+      "article_title": "Word embedding",
+      "article_url": "https://en.wikipedia.org/wiki/Word_embedding",
+      "quote": "In natural language processing, a word embedding is a representation of a word.",
+      "essence": "Reading topic; no word-vector model or adapter is bundled with ESSENCE.",
+      "further": [
+        {
+          "title": "GloVe: Global Vectors for Word Representation",
+          "url": "https://nlp.stanford.edu/projects/glove/"
+        }
+      ]
+    },
+    {
+      "id": "transformers",
+      "title": "Transformers",
+      "article_title": "Transformer (deep learning architecture)",
+      "article_url": "https://en.wikipedia.org/wiki/Transformer_(deep_learning_architecture)",
+      "quote": "the transformer is a family of artificial neural network architectures based on the multi-head attention mechanism",
+      "essence": "Reading topic; no Transformer model or adapter is bundled with ESSENCE.",
+      "further": [
+        {
+          "title": "Attention Is All You Need",
+          "url": "https://arxiv.org/abs/1706.03762"
+        }
+      ]
+    }
+  ]
+}
