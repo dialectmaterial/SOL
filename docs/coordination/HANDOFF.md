@@ -32,6 +32,33 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## ESSENCE study interface and TF-IDF — 20 October 2026
+
+**Task:** maintainer request via Claude in session: improve ESSENCE's screens and add the merged TF-IDF engine as a study; no CURRENT_TASK entry.
+**Branch / PR:** `codex/essence-ui` · [PR #51](https://github.com/dialectmaterial/SOL/pull/51).
+**Last implementation commit:** `7a6184f32c80ce09effca216192c825a5489c4e3` (this report follows it).
+
+### Changed files
+- `sol/essence/tui/app.py` — taller catalog lists/correct Encyclopedia help; borderless Experiment groups, conditional fields and neutral buttons; reference-free results, wrapping heading/page and context columns, boundary spaces kept with the bold word, resize reflow preserving export state.
+- `sol/essence/tui/tfidf.py` — lazy public engine adapter, passage-first top terms then overall means, checked CORE/file providers, owner-only artifacts and guarded passage-opening requests; no text persisted.
+- `sol/essence/tui/words.py` — singular input grammar and a clearer summary without a reference.
+- `sol/essence/methods.json`, `docs/ESSENCE.md`, `CHANGELOG.md` — document the shipped interface and TF-IDF study.
+- `tests/test_essence_tui.py` — conditional choices, columns, spaces/folding, source layout, resize/export state, TF-IDF persistence/check, stale corpus refusal, file behavior and keyboard passage navigation.
+
+### Tests performed
+- `/tmp/essence-ui-venv/bin/python -B -m unittest discover -s tests` — 1,760 tests, OK (33 skipped, 4 expected failures).
+- Focused ESSENCE/TF-IDF pytest run — 43 passed, 27 subtests; final spacing/resize/navigation regression run — 3 passed.
+- `scripts/check_docs.py`, `git diff --check` — OK.
+- Real local book p. 107 and its 17-passage section: words, comparison, sentence lengths and TF-IDF captured with `app.save_screenshot` across all 23 available Textual themes. Visually inspected full-size Paper/Night/Mocha/Latte screens and contact sheets across all themes. Also captured 70×30, 110×42 and 160×48 layouts; headings/pages remain visible and long term lists scroll. Local captures: `/tmp/essence-previews/`; harnesses: `/tmp/preview_essence.py`, `/tmp/all_essence_themes.py`. Screenshots contain book text and were kept out of Git.
+- Reader navigation checked through the emitted guarded source request in the Textual pilot; no changes under `sol/terminal/` or to the reader.
+
+### Outstanding issues
+- Interactive TF-IDF uses the engine's default top 20; configurable `--top-n` remains available through the CLI. A UTF-8 file remains one document, as declared by the engine.
+- No new live Neovim acceptance run; the existing sentence/source request protocol is reused and tested.
+
+### Decisions requiring approval
+None.
+
 ## SOL's own themes and a reading window — 20 October 2026
 
 **Task:** maintainer request (20 October 2026): a SOL theme like actualspirit.com, with its fonts; no CURRENT_TASK entry.
