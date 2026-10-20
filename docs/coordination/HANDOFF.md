@@ -32,6 +32,35 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+
+## Encyclopedia excerpt and packaging polish — 20 October 2026
+
+**Task:** maintainer request in session: mark mid-sentence encyclopedia excerpts and assert the wheel's GPL metadata/license payload; no CURRENT_TASK entry.
+**Branch / PR:** `codex/encyclopedia-polish` · see this branch's pull request.
+**Last implementation commit:** `1e3c424f64ce58fd630c699ec4fd6e25a8ed8fc9` (this report follows it).
+
+### Changed files
+
+- `sol/essence/encyclopedia.json`, `encyclopedia.py` — explicitly flag four mid-sentence excerpts and render a leading `… `; stored quote strings remain unchanged.
+- `tests/test_encyclopedia.py` — cover fragment/complete-sentence presentation, capitalized fragments and unchanged catalog data.
+- `tests/test_packaging.py` — stage LICENSE as public input; assert wheel License-Expression GPL-3.0-or-later, License-File LICENSE and the exact installed license bytes.
+- `CHANGELOG.md` — record both changes.
+
+### Tests performed
+
+- Focused unittest run: `test_encyclopedia` plus packaging tests `test_metadata_and_console_entry_points`, `test_sdist_contains_sources_and_docs_without_local_material`, and `test_installed_encyclopedia_loads_offline_without_optional_dependencies` — 8 passed, including Textual browsing at both terminal sizes and real wheel/sdist builds.
+- `scripts/check_docs.py` and `git diff --check` — passed.
+- PR #40 reviewed separately: [finding posted](https://github.com/dialectmaterial/SOL/pull/40#issuecomment-6290590653); left unmerged because list/object theme config values now cause an uncaught TypeError. Its 142 focused theme/reader/ESSENCE tests passed after installing test dependencies in a temporary environment.
+
+### Outstanding issues
+
+- No manual terminal reading trial or private corpus used.
+- Original workspace Git metadata is read-only; branch and publication use `/tmp/sol-encyclopedia-polish`, cloned from current main. PR #40 is not included.
+
+### Decisions requiring approval
+
+None.
+
 ## Catppuccin throughout — 20 October 2026
 
 **Task:** maintainer request in session (20 October 2026): make Catppuccin SOL's theme everywhere; no CURRENT_TASK entry.

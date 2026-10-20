@@ -60,6 +60,7 @@
       "article_title": "Sentence boundary disambiguation",
       "article_url": "https://en.wikipedia.org/wiki/Sentence_boundary_disambiguation",
       "quote": "is the problem in natural language processing of deciding where sentences begin and end.",
+      "quote_starts_mid_sentence": true,
       "essence": "Runs in ESSENCE: punctuation-rules-v1 segmentation, sentence lengths in word tokens and longest sentences. Existing segmentation-sample/check tools measure boundaries against private human annotations; rule limitations remain.",
       "further": [
         {
@@ -78,6 +79,7 @@
       "article_title": "Concordance (publishing)",
       "article_url": "https://en.wikipedia.org/wiki/Concordance_(publishing)",
       "quote": "listing every instance of each word with its immediate context.",
+      "quote_starts_mid_sentence": true,
       "essence": "Runs in ESSENCE: term distributions and reference-bound matches; word results list contributing passages with context around the first occurrence. This is a limited source view, not a complete concordance of every occurrence.",
       "further": [
         {
@@ -96,6 +98,7 @@
       "article_title": "Plain text",
       "article_url": "https://en.wikipedia.org/wiki/Plain_text",
       "quote": "plain text is a loose term for unformatted text or nontextual data represented as text",
+      "quote_starts_mid_sentence": true,
       "essence": "Runs in ESSENCE: prose export selects eligible attributed main text and removes structural headings and images from feature text, retaining source metadata separately. This SOL-specific projection is more selective than plain-text conversion.",
       "further": [
         {
@@ -138,6 +141,7 @@
       "article_title": "Transformer (deep learning architecture)",
       "article_url": "https://en.wikipedia.org/wiki/Transformer_(deep_learning_architecture)",
       "quote": "the transformer is a family of artificial neural network architectures based on the multi-head attention mechanism",
+      "quote_starts_mid_sentence": true,
       "essence": "Reading topic; no Transformer model or adapter is bundled with ESSENCE.",
       "further": [
         {

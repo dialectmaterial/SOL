@@ -10,10 +10,12 @@ def load_catalog():
 
 def entry_markdown(catalog, entry):
     """Keep the verbatim excerpt, attribution and SOL's own note distinct."""
+    # Editorial omission marker belongs to presentation, never the stored quote.
+    leading = '… ' if entry.get('quote_starts_mid_sentence', False) else ''
     history = entry['article_url'] + '?action=history'
     further = '\n'.join(f"- [{link['title']}]({link['url']})" for link in entry['further'])
     return (f"## {entry['title']}\n\n"
-            f"Wikipedia verbatim excerpt:\n\n> {entry['quote']}\n\n"
+            f"Wikipedia verbatim excerpt:\n\n> {leading}{entry['quote']}\n\n"
             f"— {catalog['attribution']}, *{entry['article_title']}* "
             f"([contributors and history]({history})). "
             f"[{catalog['license']}]({catalog['license_url']}); excerpt unchanged.\n\n"

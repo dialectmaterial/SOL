@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Encyclopedia excerpts starting mid-sentence now display a leading … without changing the stored quote; packaging checks verify the wheel’s GPL-3.0-or-later declaration and LICENSE payload.
+
 ### Catppuccin throughout — 20 October 2026
 
 The reader's themes are now Catppuccin: **Mocha** (dark, the new default) and
