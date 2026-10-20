@@ -24,7 +24,7 @@ from sol.core.config import (
 from sol.core.models import Book, Node, Passage, node_path, presentation_text
 from sol.core.paths import alias, child_by_name, display_path
 from sol.core.paths import resolve_path as resolve_book_path
-from sol.reader.options import (DEFAULT_READER_THEME, DEFAULT_READER_WIDTH, READER_THEMES,
+from sol.reader.options import (DEFAULT_READER_THEME, DEFAULT_READER_WIDTH, LEGACY_READER_THEMES, READER_THEMES,
                                 ExecutionMode, build_parser, validate_options,
                                 validate_workspace_management)
 from sol.reader.actions import ReaderActions, ReadingSession, context_passages
@@ -242,7 +242,7 @@ def main(argv: list[str] | None = None) -> int:
             # actor registration or opening/creating a personal workspace.
             from sol.terminal.neovim import validate_environment
             validate_environment(args.width or DEFAULT_READER_WIDTH)
-            args.theme = args.theme or configured_theme(READER_THEMES) or DEFAULT_READER_THEME
+            args.theme = args.theme or configured_theme(READER_THEMES, LEGACY_READER_THEMES) or DEFAULT_READER_THEME
         if mode is ExecutionMode.SET_THEME:
             configuration = save_theme(args.set_theme, READER_THEMES)
             if args.json:

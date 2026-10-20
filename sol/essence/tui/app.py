@@ -20,6 +20,9 @@ from textual.widgets import (Button, DataTable, Footer, Input, Label, Markdown, 
 from sol.essence.encyclopedia import entry_markdown, load_catalog
 from sol.essence.tui import sentences, words
 from sol.essence.tui.context import load_state, save_state
+from sol.reader.options import DEFAULT_READER_THEME
+
+TEXTUAL_THEMES = {"mocha": "catppuccin-mocha", "latte": "catppuccin-latte", "terminal": "ansi-dark"}
 
 SCREENS = {
     "encyclopedia": ("Encyclopedia", None),
@@ -75,8 +78,10 @@ class EssenceApp(App):
           for number, (name, (label, _)) in enumerate(SCREENS.items(), 1)),
     ]
 
-    def __init__(self, context):
+    def __init__(self, context, theme=DEFAULT_READER_THEME):
         super().__init__()
+        # Textual's own Catppuccin themes; Terminal uses the terminal's ANSI colors.
+        self.theme = TEXTUAL_THEMES[theme]
         self.catalog = load_catalog()
         self.context = context
         self.state_file = context["state_file"]

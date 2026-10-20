@@ -12,7 +12,7 @@ from fixtures_corpus import write_runtime_corpus
 from sol.core import config
 from sol.corpus import contract
 from sol.reader import app
-from sol.reader.options import READER_THEMES
+from sol.reader.options import LEGACY_READER_THEMES, READER_THEMES
 from sol.terminal import theme
 
 
@@ -25,15 +25,15 @@ class ThemePresetTests(unittest.TestCase):
         return next(row for row in payload["presets"] if row["name"] == name)["groups"]
 
     def test_every_preset_defines_exactly_the_owned_groups(self):
-        payload = theme.theme_payload("dark", TRUECOLOR)
+        payload = theme.theme_payload("mocha", TRUECOLOR)
         self.assertEqual([row["name"] for row in payload["presets"]], list(READER_THEMES))
-        self.assertEqual(payload["active"], "dark")
+        self.assertEqual(payload["active"], "mocha")
         for row in payload["presets"]:
             with self.subTest(preset=row["name"]):
                 self.assertEqual(set(row["groups"]), set(theme.GROUPS))
 
-    def test_dark_and_paper_meet_reading_contrast(self):
-        for name in ("dark", "paper"):
+    def test_catppuccin_presets_meet_reading_contrast(self):
+        for name in ("mocha", "latte"):
             groups = self.preset(name)
             page, panel = groups["Normal"]["bg"], groups["SOLPanel"]["bg"]
             with self.subTest(preset=name):
@@ -55,7 +55,7 @@ class ThemePresetTests(unittest.TestCase):
         self.assertEqual(self.preset("terminal", {**TRUECOLOR, "NO_COLOR": "1"})["SOLSourceWarning"], {"bold": True})
 
     def test_every_color_has_a_256_color_fallback(self):
-        for name in ("dark", "paper"):
+        for name in ("mocha", "latte"):
             for group, attributes in self.preset(name).items():
                 for channel in ("fg", "bg"):
                     if channel in attributes:
@@ -71,14 +71,18 @@ class ThemePresetTests(unittest.TestCase):
         self.assertEqual(theme.color_capability(TRUECOLOR), "truecolor")
         self.assertEqual(theme.color_capability({"TERM": "xterm-256color"}), "256")
         self.assertEqual(theme.color_capability({"TERM": "linux"}), "basic")
-        self.assertFalse(theme.theme_payload("paper", {"TERM": "xterm-256color"})["truecolor"])
-        basic = theme.theme_payload("paper", {"TERM": "linux"})
-        paper = next(row for row in basic["presets"] if row["name"] == "paper")
+        self.assertFalse(theme.theme_payload("latte", {"TERM": "xterm-256color"})["truecolor"])
+        basic = theme.theme_payload("latte", {"TERM": "linux"})
+        paper = next(row for row in basic["presets"] if row["name"] == "latte")
         self.assertEqual(paper["groups"], self.preset("terminal", {"TERM": "linux"}))
         self.assertIn("256-color", paper["notice"])
 
+    def test_catppuccin_colors_are_the_published_palette(self):
+        self.assertEqual(self.preset("mocha")["Normal"], theme._color("#cdd6f4", "#1e1e2e"))
+        self.assertEqual(self.preset("latte")["Normal"], theme._color("#4c4f69", "#eff1f5"))
+
     def test_unknown_theme_is_refused(self):
-        with self.assertRaisesRegex(ValueError, "terminal, dark, paper"):
+        with self.assertRaisesRegex(ValueError, "mocha, latte, terminal"):
             theme.theme_payload("sepia", TRUECOLOR)
 
 
@@ -97,9 +101,9 @@ class ThemeConfigurationTests(unittest.TestCase):
     def test_theme_is_absent_until_explicitly_saved(self):
         self.assertIsNone(config.configured_theme(READER_THEMES))
         self.assertFalse((self.root / "configuration").exists())
-        config.save_theme("paper", READER_THEMES)
-        self.assertEqual(config.configured_theme(READER_THEMES), "paper")
-        self.assertEqual(self.saved(), {"version": 1, "theme": "paper"})
+        config.save_theme("latte", READER_THEMES)
+        self.assertEqual(config.configured_theme(READER_THEMES), "latte")
+        self.assertEqual(self.saved(), {"version": 1, "theme": "latte"})
         # A theme-only file is not a broken corpus pointer.
         self.assertIsNone(config.configured_corpus())
 
@@ -107,12 +111,17 @@ class ThemeConfigurationTests(unittest.TestCase):
         corpus = self.root / "corpus"
         with patch("sol.core.corpus.load_corpus_book"):
             config.save_corpus(corpus)
-        config.save_theme("dark", READER_THEMES)
-        self.assertEqual(self.saved(), {"version": 1, "corpus": str(corpus.resolve()), "theme": "dark"})
+        config.save_theme("mocha", READER_THEMES)
+        self.assertEqual(self.saved(), {"version": 1, "corpus": str(corpus.resolve()), "theme": "mocha"})
         with patch("sol.core.corpus.load_corpus_book"):
             config.save_corpus(corpus)
-        self.assertEqual(self.saved()["theme"], "dark")
+        self.assertEqual(self.saved()["theme"], "mocha")
         self.assertEqual(config.configured_corpus(), corpus.resolve())
+
+    def test_dark_and_paper_saved_before_catppuccin_read_as_mocha_and_latte(self):
+        for saved, current in (("dark", "mocha"), ("paper", "latte")):
+            config.save_theme(saved, (saved,))
+            self.assertEqual(config.configured_theme(READER_THEMES, LEGACY_READER_THEMES), current)
 
     def test_invalid_saved_theme_explains_the_reset(self):
         path = config.config_path()
@@ -152,20 +161,20 @@ class ThemeCommandTests(unittest.TestCase):
 
     def test_set_theme_saves_without_loading_a_corpus(self):
         with patch.dict(os.environ, {"SOL_CORPUS": str(self.root / "absent")}):
-            status, output, error = self.call(["--set-theme", "paper", "--json"])
+            status, output, error = self.call(["--set-theme", "latte", "--json"])
         self.assertEqual(status, 0, error)
-        self.assertEqual(json.loads(output)["theme"], "paper")
-        self.assertEqual(config.configured_theme(READER_THEMES), "paper")
+        self.assertEqual(json.loads(output)["theme"], "latte")
+        self.assertEqual(config.configured_theme(READER_THEMES), "latte")
 
     def test_saved_theme_is_the_default_and_flag_overrides_it_for_one_session(self):
-        self.assertEqual(self.reader_theme(["-n"]), "terminal")
-        self.call(["--set-theme", "dark"])
-        self.assertEqual(self.reader_theme(["-n"]), "dark")
-        self.assertEqual(self.reader_theme(["-n", "--theme", "paper"]), "paper")
-        self.assertEqual(config.configured_theme(READER_THEMES), "dark")
+        self.assertEqual(self.reader_theme(["-n"]), "mocha")
+        self.call(["--set-theme", "latte"])
+        self.assertEqual(self.reader_theme(["-n"]), "latte")
+        self.assertEqual(self.reader_theme(["-n", "--theme", "terminal"]), "terminal")
+        self.assertEqual(config.configured_theme(READER_THEMES), "latte")
 
     def test_theme_is_reader_only(self):
-        status, _, error = self.call(["-r", "--theme", "dark"])
+        status, _, error = self.call(["-r", "--theme", "mocha"])
         self.assertNotEqual(status, 0)
         self.assertIn("--theme selects the interactive reader", error)
 
