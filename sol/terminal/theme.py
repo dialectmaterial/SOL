@@ -11,7 +11,10 @@ import re
 
 from sol.reader.options import DEFAULT_READER_THEME as DEFAULT_THEME, READER_THEMES as THEMES
 
-LABELS = {"mocha": "Catppuccin Mocha", "latte": "Catppuccin Latte", "terminal": "Terminal"}
+LABELS = {"mocha": "Catppuccin Mocha", "latte": "Catppuccin Latte", "paper": "SOL Paper", "night": "SOL Night",
+          "terminal": "Terminal"}
+# Whether a preset is a light or dark page; Neovim's 'background' follows it.
+BACKGROUNDS = {"mocha": "dark", "latte": "light", "paper": "light", "night": "dark"}
 
 # Highlight groups the reader owns. Lua refuses any other name or attribute.
 GROUPS = ("Normal", "SOLPanel", "SOLPanelBorder", "SOLSourceHeading", "SOLSourceWarning",
@@ -32,6 +35,16 @@ _PALETTES = {
               "warning": "#d20f39", "panel": "#eff1f5", "border": "#bcc0cc",
               "selection": "#ccd0da", "search": "#ead3b4", "search_text": "#4c4f69",
               "current": "#8839ef", "current_text": "#eff1f5"},
+    # SOL's own, from actualspirit.com: paper, ink and the Actual Spirit purple;
+    # Night is the site's dark band with its lilac accent.
+    "paper": {"page": "#f3f0e6", "text": "#17151c", "heading": "#55308a", "muted": "#66625a",
+              "warning": "#9b2c2c", "panel": "#ebe7d9", "border": "#d8d2bf",
+              "selection": "#ddd3ec", "search": "#ecdcb0", "search_text": "#17151c",
+              "current": "#55308a", "current_text": "#f3f0e6"},
+    "night": {"page": "#1b1820", "text": "#ece7da", "heading": "#c3a6ee", "muted": "#a29cae",
+              "warning": "#e8a87c", "panel": "#221e28", "border": "#3a3442",
+              "selection": "#3b3150", "search": "#4d4230", "search_text": "#ece7da",
+              "current": "#c3a6ee", "current_text": "#1b1820"},
 }
 _HEX = re.compile(r"#[0-9a-f]{6}")
 _CUBE = (0, 95, 135, 175, 215, 255)
@@ -139,12 +152,14 @@ def theme_payload(active=DEFAULT_THEME, environment=None):
     presets = []
     for name in THEMES:
         if name == "terminal":
-            presets.append({"name": name, "label": LABELS[name], "groups": _terminal_groups(colored), "notice": ""})
+            presets.append({"name": name, "label": LABELS[name], "groups": _terminal_groups(colored), "notice": "",
+                            "background": ""})
         elif capability == "basic":
             presets.append({"name": name, "label": LABELS[name], "groups": _terminal_groups(colored),
                             "notice": f"{LABELS[name]} needs a 256-color or truecolor terminal; "
-                                      "showing Terminal colors instead."})
+                                      "showing Terminal colors instead.", "background": ""})
         else:
             presets.append({"name": name, "label": LABELS[name],
-                            "groups": _palette_groups(_PALETTES[name]), "notice": ""})
+                            "groups": _palette_groups(_PALETTES[name]), "notice": "",
+                            "background": BACKGROUNDS[name]})
     return {"active": active, "truecolor": capability == "truecolor", "presets": presets}

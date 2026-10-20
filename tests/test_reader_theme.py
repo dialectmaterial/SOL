@@ -33,7 +33,7 @@ class ThemePresetTests(unittest.TestCase):
                 self.assertEqual(set(row["groups"]), set(theme.GROUPS))
 
     def test_catppuccin_presets_meet_reading_contrast(self):
-        for name in ("mocha", "latte"):
+        for name in ("mocha", "latte", "paper", "night"):
             groups = self.preset(name)
             page, panel = groups["Normal"]["bg"], groups["SOLPanel"]["bg"]
             with self.subTest(preset=name):
@@ -55,7 +55,7 @@ class ThemePresetTests(unittest.TestCase):
         self.assertEqual(self.preset("terminal", {**TRUECOLOR, "NO_COLOR": "1"})["SOLSourceWarning"], {"bold": True})
 
     def test_every_color_has_a_256_color_fallback(self):
-        for name in ("mocha", "latte"):
+        for name in ("mocha", "latte", "paper", "night"):
             for group, attributes in self.preset(name).items():
                 for channel in ("fg", "bg"):
                     if channel in attributes:
@@ -82,7 +82,7 @@ class ThemePresetTests(unittest.TestCase):
         self.assertEqual(self.preset("latte")["Normal"], theme._color("#4c4f69", "#eff1f5"))
 
     def test_unknown_theme_is_refused(self):
-        with self.assertRaisesRegex(ValueError, "mocha, latte, terminal"):
+        with self.assertRaisesRegex(ValueError, "mocha, latte, paper, night, terminal"):
             theme.theme_payload("sepia", TRUECOLOR)
 
 
@@ -118,8 +118,8 @@ class ThemeConfigurationTests(unittest.TestCase):
         self.assertEqual(self.saved()["theme"], "mocha")
         self.assertEqual(config.configured_corpus(), corpus.resolve())
 
-    def test_dark_and_paper_saved_before_catppuccin_read_as_mocha_and_latte(self):
-        for saved, current in (("dark", "mocha"), ("paper", "latte")):
+    def test_dark_saved_before_catppuccin_reads_as_mocha_and_paper_is_sols_own(self):
+        for saved, current in (("dark", "mocha"), ("paper", "paper")):
             config.save_theme(saved, (saved,))
             self.assertEqual(config.configured_theme(READER_THEMES, LEGACY_READER_THEMES), current)
 

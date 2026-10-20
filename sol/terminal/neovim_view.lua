@@ -61,7 +61,8 @@ return function(reader, supplied)
     if not exact_keys(theme, { "active", "truecolor", "presets" }) or type(theme.truecolor) ~= "boolean"
       or type(theme.presets) ~= "table" or #theme.presets < 1 then fail("invalid reader theme") end
     for _, preset in ipairs(theme.presets) do
-      if not exact_keys(preset, { "name", "label", "groups", "notice" }) or type(preset.name) ~= "string"
+      if not exact_keys(preset, { "name", "label", "groups", "notice", "background" }) or type(preset.name) ~= "string"
+        or not (preset.background == "" or preset.background == "light" or preset.background == "dark")
         or presets[preset.name] or type(preset.label) ~= "string" or type(preset.notice) ~= "string"
         or type(preset.groups) ~= "table" then fail("invalid reader theme preset") end
       boundaries(preset.label); boundaries(preset.notice)
@@ -250,8 +251,18 @@ return function(reader, supplied)
       right[#right + 1] = string.format("%d%%", math.floor(100 * done + 0.5))
     end
     right[#right + 1] = "? keys · :q quit"
+    right = table.concat(right, " · ")
+    -- Keep at least three spaces between the halves: when they do not fit, the
+    -- section path gives way from its start, so the page stays in view.
+    local room = vim.o.columns - 2 - vim.fn.strdisplaywidth(right) - 3
+    if vim.fn.strdisplaywidth(left) > room then
+      local chars = vim.fn.strchars(left)
+      local cut = 0
+      while cut < chars and vim.fn.strdisplaywidth("…" .. vim.fn.strcharpart(left, cut)) > room do cut = cut + 1 end
+      left = room > 1 and ("…" .. vim.fn.strcharpart(left, cut)) or ""
+    end
     local function escape(text) return (text:gsub("%%", "%%%%")) end
-    return " %<" .. escape(left) .. "%=" .. escape(table.concat(right, " · ")) .. " "
+    return " " .. escape(left) .. "%=   " .. escape(right) .. " "
   end
   _G.SOLStatus = function()
     local ok, text = pcall(statusline_text)
@@ -402,7 +413,7 @@ return function(reader, supplied)
   -- Semantic spans map once from source codepoints to UTF-8 extmark boundaries.
   -- Styling never enters canonical strings. Unknown/basic terminals underline em.
   local italic_capable = data.emphasis == "italic"
-  -- Terminal restores the host's own background setting; Mocha/Latte declare theirs.
+  -- Terminal restores the host's own background setting; colored presets declare theirs.
   if rawget(_G, 'SOLInitialBackground') == nil then _G.SOLInitialBackground = vim.o.background end
   local function apply_theme()
     if not data.theme then
@@ -411,7 +422,8 @@ return function(reader, supplied)
       return
     end
     local active = data.theme.active
-    local background = active == "latte" and "light" or active == "mocha" and "dark" or _G.SOLInitialBackground
+    local declared = presets[active].background
+    local background = declared ~= "" and declared or _G.SOLInitialBackground
     vim.o.termguicolors = active ~= "terminal" and data.theme.truecolor
     -- Changing 'background' resets Neovim's default groups, so it precedes ours.
     if vim.o.background ~= background then vim.o.background = background end

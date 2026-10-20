@@ -518,16 +518,21 @@ end
   assert(vim.wo[reader.window].winhighlight == 'NormalFloat:Normal')
   assert(vim.o.fillchars:find('lastline: ', 1, true) and vim.o.fillchars:find('eob: ', 1, true))
   local order = {}
-  for _ = 1, 3 do order[#order + 1] = reader.cycle_theme() end
+  for _ = 1, 5 do order[#order + 1] = reader.cycle_theme() end
   report.order = order
   -- The live cursor keeps its source position through every preset.
   local resting = reader.capture('n', nil, reader.source_point(data.records[1].id, 7))
   reader.restore(resting)
-  for _ = 1, 3 do
+  for _ = 1, 5 do
     vim.api.nvim_feedkeys('T', 'xt', false)
     assert(vim.deep_equal(SOLNvimReader.capture(), resting), 'theme switch moved the reading position')
   end
-  -- Terminal hands foreground, background and palette back to the host.
+  -- SOL's Paper declares a light page; Terminal hands foreground, background
+  -- and palette back to the host.
+  reader.cycle_theme()
+  assert(reader.theme() == 'paper' and vim.o.background == 'light' and normal().bg == tonumber('f3f0e6', 16))
+  reader.cycle_theme()
+  assert(reader.theme() == 'night' and vim.o.background == 'dark')
   reader.cycle_theme()
   assert(reader.theme() == 'terminal' and not vim.o.termguicolors and next(normal()) == nil)
   reader.cycle_theme()
@@ -541,7 +546,7 @@ end
   vim.wait(100, function() return vim.o.background == 'dark' end)
   assert(vim.o.background == 'dark' and normal().bg == tonumber('1e1e2e', 16))
 ''', theme="latte")
-        self.assertEqual(report["order"], ["terminal", "mocha", "latte"])
+        self.assertEqual(report["order"], ["paper", "night", "terminal", "mocha", "latte"])
 
     def test_source_preview_popup_requests_pages_and_returns_to_the_same_position(self):
         report = self.run_lua(r'''
@@ -753,7 +758,7 @@ end
   report.themes = {written()}
   reader.cycle_theme()
   report.themes[2] = written()
-  reader.cycle_theme(); reader.cycle_theme()
+  for _ = 1, 4 do reader.cycle_theme() end
   report.themes[3] = written()
   assert(vim.wait(5000, function()
     return table.concat(vim.api.nvim_buf_get_lines(essence.buffer, 0, -1, false), '\n'):find('ESSENCE STUB READY') ~= nil
@@ -918,6 +923,8 @@ end
   report.status = SOLStatus()
   vim.o.columns = 60
   report.narrow = SOLStatus()
+  vim.o.columns = 50
+  report.tiny = SOLStatus()
   local refused = 0
   for _, bad in ipairs({{first = -1, total = 3}, {first = 3, total = 3}, {first = 0}, 'half'}) do
     local broken = vim.deepcopy(payload); broken.progress = bad
@@ -926,9 +933,12 @@ end
   report.refused = refused
 ''', integrated=True)
         status = report["status"]
-        self.assertTrue(status.startswith(" %<Quality · p."), status)
+        self.assertTrue(status.startswith(" Quality · p."), status)
         self.assertIn(f"p. {self.sample.passages[1].printed_page}", status)
-        self.assertIn("%=Continuous · 50%% · ? keys · :q quit ", status)  # %% is a literal %
+        self.assertIn("%=   Continuous · 50%% · ? keys · :q quit ", status)  # %% is a literal %
+        # Too narrow for both halves: the path gives way from its start, never the gap.
+        self.assertTrue(report["tiny"].startswith(" …"), report["tiny"])
+        self.assertIn("%=   Continuous", report["tiny"])
         self.assertEqual(report["refused"], 4)
 
     def test_context_opens_beside_the_page_when_there_is_room(self):
@@ -1496,7 +1506,7 @@ while True:
   reader = SOLNvimReader
   assert(reader.mode == 'paragraph' and reader.theme() == 'latte')
   vim.api.nvim_feedkeys('T', 'xt', false)
-  assert(SOLNvimReader.theme() == 'terminal')
+  assert(SOLNvimReader.theme() == 'paper')
   local adapter = os.getenv('SOL_NVIM_ADAPTER')
   local refused = 0
   for _, change in ipairs({

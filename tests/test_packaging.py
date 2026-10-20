@@ -22,10 +22,12 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_FILES = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol").rglob("*.py")}
 PACKAGE_ASSETS = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol" / "terminal").glob("*.lua")}
-PACKAGE_ASSETS.update({"sol/essence/encyclopedia.json", "sol/essence/methods.json"})
+PACKAGE_ASSETS.update({"sol/essence/encyclopedia.json", "sol/essence/methods.json",
+                       "sol/terminal/fonts/LibertinusMono-Regular.ttf", "sol/terminal/fonts/OFL.txt"})
 ENTRY_POINTS = {
     "sol": "sol:cli",
     "sol-kitty": "sol.terminal.kitty:main",
+    "sol-window": "sol.terminal.window:main",
     "sol-corpus": "sol.corpus.convert:main",
     "sol-corpus-check": "sol.corpus.contract:main",
 }

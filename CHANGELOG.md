@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### SOL's own themes and a reading window — 20 October 2026
+
+- **Paper** and **Night** join the themes: SOL's own, from actualspirit.com —
+  cream paper, ink and the Actual Spirit purple, or the site's dark band with
+  lilac headings. `T` cycles Mocha, Latte, Paper, Night and Terminal; ESSENCE
+  follows.
+- **`sol-window`** opens the reader in a window of its own (foot, kitty or
+  Alacritty) in Libertinus Mono, a monospaced book face bundled with SOL, on
+  Paper. Your terminal keeps its own font.
+- **Fixed:** at narrow widths the status line's page ran into the reading mode
+  ("p. 7Continuous"); the section path now gives way instead.
+- A saved `paper` theme now opens SOL's Paper (it meant Catppuccin Latte since
+  this morning).
+
+### Faster verified reader startup — 20 October 2026
+
+Reader exports reuse the selection source/provenance guard directly instead of
+constructing navigation sessions for every record. Verified-generation caching
+reuses equal, detached JSON data, and export snapshots use a JSON copy instead
+of per-object deepcopy. Full memory comparisons, final export checks and disk
+fingerprint verification remain in place; no persistent Book index is added.
+
 ### Runnable TF-IDF engine and CLI — 20 October 2026
 
 `sol analyze tfidf` ranks terms per word-provider passage (or one whole UTF-8
