@@ -16,7 +16,8 @@ from unittest.mock import patch
 import zlib
 
 from sol.corpus.contract import load_snapshot, render_record
-from sol.terminal.source import SourceError, SourceService, open_viewer, render_page, render_region
+from sol.terminal import source as source_module
+from sol.terminal.source import SourceError, SourceService, open_pdf, open_viewer, render_page, render_region
 
 
 ROOT = "aaaaaaaa-0000-4000-8000-000000000001"
@@ -344,6 +345,59 @@ class SourceViewerTests(unittest.TestCase):
             with patch.dict(os.environ, {"DISPLAY": ":0"}), \
                     patch("sol.terminal.source.shutil.which", return_value=None):
                 self.assertIsNone(open_viewer(Path("/cache/crop.png")))
+        popen.assert_not_called()
+
+    def test_pdf_viewer_opens_the_verified_snapshot_at_the_physical_page(self):
+        request = self.service.capture(PASSAGE)
+        snapshot = request["source"]["verified_pdf"]
+        self.addCleanup(setattr, source_module, "_companion", None)
+        found = {"zathura": "/bin/zathura", "gdbus": "/bin/gdbus"}
+        with patch.dict(os.environ, {"WAYLAND_DISPLAY": "wayland-1"}), \
+                patch("sol.terminal.source.shutil.which", side_effect=found.get), \
+                patch("sol.terminal.source.subprocess.Popen") as popen:
+            self.assertEqual(open_pdf(request, 1), "zathura")
+            self.assertEqual(popen.call_args.args[0], ["/bin/zathura", "--page=3", snapshot])
+            self.assertTrue(popen.call_args.kwargs["start_new_session"])
+            # The window SOL opened is turned to the next page instead of duplicated.
+            popen.return_value.poll.return_value = None
+            popen.return_value.pid = 4242
+            with patch("sol.terminal.source.subprocess.run",
+                       return_value=SimpleNamespace(returncode=0, stdout=b"(true,)\n")) as run:
+                self.assertEqual(open_pdf(request, 0), "zathura")
+            self.assertEqual(popen.call_count, 1)
+            self.assertIn("org.pwmt.zathura.PID-4242", run.call_args.args[0])
+            self.assertEqual(run.call_args.args[0][-1], "0")
+            # Once that window is closed, a new one opens.
+            popen.return_value.poll.return_value = 0
+            open_pdf(request, 0)
+            self.assertEqual(popen.call_count, 2)
+            self.assertEqual(popen.call_args.args[0], ["/bin/zathura", "--page=1", snapshot])
+
+    def test_pdf_viewer_is_configurable_and_never_guessed_without_a_display(self):
+        request = self.service.capture(PASSAGE)
+        with patch("sol.terminal.source.sys.platform", "linux"), \
+                patch("sol.terminal.source.subprocess.Popen") as popen:
+            self.assertIsNone(open_pdf(request, 0))
+            with patch.dict(os.environ, {"DISPLAY": ":0"}), \
+                    patch("sol.terminal.source.shutil.which", return_value=None):
+                self.assertIsNone(open_pdf(request, 0))
+            popen.assert_not_called()
+            with patch.dict(os.environ, {"SOL_PDF_VIEWER": "invented-pdf -p {page} {file} --zoom"}), \
+                    patch("sol.terminal.source.shutil.which", return_value="/bin/invented-pdf"):
+                self.assertEqual(open_pdf(request, 1), "invented-pdf")
+            self.assertEqual(popen.call_args.args[0],
+                             ["/bin/invented-pdf", "-p", "3", request["source"]["verified_pdf"], "--zoom"])
+            with self.assertRaises(SourceError):
+                open_pdf(request, 2)
+
+    def test_pdf_viewer_refuses_a_changed_snapshot(self):
+        request = self.service.capture(PASSAGE)
+        snapshot = Path(request["source"]["verified_pdf"])
+        snapshot.chmod(0o600)
+        snapshot.write_bytes(b"%PDF-1.4 altered")
+        with patch.dict(os.environ, {"SOL_PDF_VIEWER": "invented-pdf"}), \
+                patch("sol.terminal.source.subprocess.Popen") as popen, self.assertRaises(SourceError):
+            open_pdf(request, 0)
         popen.assert_not_called()
 
 

@@ -91,7 +91,7 @@ return function(reader)
     end
     return capture()
   end
-  local show_search, show_source
+  local show_search, show_source, show_pdf
   show_search = function(result)
     local lines = {'Search: ' .. result.query, 'Whole book, literal and case-insensitive. Up to ' .. result.limit .. ' passages.', ''}
     local rows = {}
@@ -140,9 +140,12 @@ return function(reader)
       end
     end
     lines[#lines + 1] = ''
+    lines[#lines + 1] = 'S opens the whole page in a PDF viewer, to zoom and read it in context.'
     lines[#lines + 1] = (#result.pages > 1 and 'A page number shows that page. ' or '') .. 'Esc returns to reading.'
     show_lines(lines)
     local panel = api.nvim_get_current_buf()
+    local shown = result.shown
+    vim.keymap.set('n', 'S', function() request('source_pdf', {page = shown}) end, {buffer = panel, silent = true})
     for _, row in ipairs(result.pages) do
       if row.number <= 9 then
         local number = row.number
@@ -154,10 +157,26 @@ return function(reader)
   local function source()
     request('source_preview', {page = 1})
   end
+  -- The printed page itself, zoomable and in context, in a PDF viewer beside the
+  -- reader; the reading position never moves.
+  show_pdf = function(result)
+    if result.viewer ~= vim.NIL then
+      api.nvim_echo({{'Printed page ' .. result.printed_page .. ' (PDF page ' .. result.pdf_page ..
+        ') in ' .. result.viewer, 'None'}}, false, {})
+    else
+      show_lines({ 'No PDF viewer is available.', '',
+        'Install Zathura, or set SOL_PDF_VIEWER to a viewer command ({page} and {file}',
+        'are replaced). The verified PDF, at PDF page ' .. result.pdf_page .. ':', result.file, '',
+        'Esc returns to reading.' })
+    end
+  end
+  local function source_pdf()
+    request('source_pdf', {page = 1})
+  end
 
   panels.close_popup, panels.show_lines, panels.current_packet = close_popup, show_lines, current_packet
   panels.side_config = side_config
   panels.show_search, panels.show_source = show_search, show_source
-  panels.source = source
+  panels.source, panels.source_pdf, panels.show_pdf = source, source_pdf, show_pdf
   return panels
 end

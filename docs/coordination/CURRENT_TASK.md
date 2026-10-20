@@ -14,7 +14,7 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ## Claude Code: The printed page in a zoomable PDF viewer
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `claude/pdf-companion`
 **Requested:** 20 October 2026, by the maintainer (reader backlog, item 2)
 

@@ -103,6 +103,18 @@ def source_preview(request, page):
             "viewer": open_viewer(image)}
 
 
+def source_pdf(request, page):
+    """Open the verified PDF at one source page of a captured record, for zooming in context."""
+    from sol.terminal.source import open_pdf
+
+    if not 1 <= page <= len(request["sources"]):
+        raise ValueError(f"this passage has {len(request['sources'])} source page(s)")
+    row = request["sources"][page - 1]
+    return {"viewer": open_pdf(request, page - 1), "pdf_page": row["pdf_page"],
+            "printed_page": safe_label(row.get("printed_page") or "unnumbered"),
+            "file": safe_label(request["source"]["verified_pdf"])}
+
+
 def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_tree=False, tree_depth=2,
                theme=DEFAULT_THEME):
     """Resume, read continuously, and accept one verified semantic position.
@@ -220,6 +232,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                         "reader markers have slots 1, 2 and 3")],
         "node_open": [("node", lambda node: True, "")],
         "source_preview": [("page", lambda page: type(page) is int, "choose a source page by number")],
+        "source_pdf": [("page", lambda page: type(page) is int, "choose a source page by number")],
         "search": [("query", lambda query: isinstance(query, str) and 1 <= len(query.strip()) <= 256,
                     "search needs 1–256 characters")],
         "search_open": [("result", lambda result: type(result) is int and 1 <= result <= len(actions.results),
@@ -258,6 +271,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         if target not in source_requests:
             source_requests[target] = source_service.capture(target)
         try:
+            if request["op"] == "source_pdf":
+                return {"pdf": source_pdf(source_requests[target], request["page"])}
             return {"source": source_preview(source_requests[target], request["page"])}
         except SourceError:
             # A changed corpus or PDF snapshot needs a fresh capture next time.
@@ -373,8 +388,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                             "theme_file": str(theme_file),
                             "env": environment}}
 
-    panels = {"search": search_panel, "source_preview": source_panel, "marker_set": marker_panel,
-              "marker_clear": marker_panel, "note_add": note_panel,
+    panels = {"search": search_panel, "source_preview": source_panel, "source_pdf": source_panel,
+              "marker_set": marker_panel, "marker_clear": marker_panel, "note_add": note_panel,
               "note_edit": note_edit_panel, "note_history": note_history_panel, "footnote_open": footnote_panel, "essence_open": essence_panel}
 
     def handle(request):
