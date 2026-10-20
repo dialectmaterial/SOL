@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Encyclopedia excerpts starting mid-sentence now display a leading … without changing the stored quote; packaging checks verify the wheel’s GPL-3.0-or-later declaration and LICENSE payload.
+
 ### SOL is licensed under the GPL — 20 October 2026
 
 SOL is now free software under the GNU General Public License, version 3 or
