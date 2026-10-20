@@ -142,6 +142,27 @@ class EssenceAppTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(app.screen_stack), 1)
             await pilot.press("q")
 
+    async def test_follows_the_reader_theme_while_open(self):
+        from sol.essence.tui.app import EssenceApp
+
+        theme_file = Path(tempfile.mkdtemp(prefix="sol-essence-theme-")) / "context.theme"
+        theme_file.write_text("mocha", encoding="utf-8")
+        app = EssenceApp(context(), theme="mocha", theme_file=str(theme_file))
+        async with app.run_test() as pilot:
+            self.assertEqual(app.theme, "catppuccin-mocha")
+            theme_file.write_text("latte", encoding="utf-8")
+            await pilot.pause(0.8)
+            self.assertEqual(app.theme, "catppuccin-latte")
+            # Anything unknown, or a vanished file, leaves the theme as it is.
+            for content in ("sepia", None):
+                if content is None:
+                    theme_file.unlink()
+                else:
+                    theme_file.write_text(content, encoding="utf-8")
+                await pilot.pause(0.8)
+                self.assertEqual(app.theme, "catppuccin-latte")
+            await pilot.press("q")
+
 
 if __name__ == "__main__":
     unittest.main()

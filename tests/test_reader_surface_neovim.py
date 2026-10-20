@@ -725,7 +725,9 @@ end
     def test_essence_opens_beside_toggles_returns_and_closes_without_moving_the_reader(self):
         stub = self.root / "essence_stub.py"
         stub.write_text("import sys\nprint('ESSENCE STUB READY', flush=True)\nsys.stdin.readline()\n", encoding="utf-8")
-        paths = f"local PYTHON, STUB = {json.dumps(sys.executable)}, {json.dumps(str(stub))}\n"
+        theme_file = self.root / "essence.theme"
+        paths = (f"local PYTHON, STUB, THEME = {json.dumps(sys.executable)}, {json.dumps(str(stub))}, "
+                 f"{json.dumps(str(theme_file))}\n")
         report = self.run_lua(paths + r'''
   vim.o.columns, vim.o.lines = 140, 40
   local sent = {}
@@ -744,8 +746,15 @@ end
   vim.api.nvim_feedkeys('E', 'xt', false)
   report.request = sent[1].op
   report.request_target = sent[1].packet.reference.reference.target_id
-  _G.SOLReaderChannel.pending[sent[1].id]({essence = {command = {PYTHON, STUB}}})
+  _G.SOLReaderChannel.pending[sent[1].id]({essence = {command = {PYTHON, STUB}, theme_file = THEME}})
   local essence = assert(SOLEssence)
+  -- ESSENCE learns the reader's theme on opening and on every T.
+  local function written() local f = assert(io.open(THEME)); local v = f:read('*a'); f:close(); return v end
+  report.themes = {written()}
+  reader.cycle_theme()
+  report.themes[2] = written()
+  reader.cycle_theme(); reader.cycle_theme()
+  report.themes[3] = written()
   assert(vim.wait(5000, function()
     return table.concat(vim.api.nvim_buf_get_lines(essence.buffer, 0, -1, false), '\n'):find('ESSENCE STUB READY') ~= nil
   end, 10), 'ESSENCE did not start in its terminal')
@@ -791,8 +800,9 @@ end
   _G.SOLReaderChannel.pending[sent[#sent].id]({essence = {command = {'/nonexistent/sol-essence'}}})
   report.failure = {warning = warnings[#warnings], window = SOLEssence.window == nil,
                     focused_reader = vim.api.nvim_get_current_win() == SOLNvimReader.window}
-''', integrated=True)
+''', integrated=True, theme="mocha")
         self.assertEqual(report["request"], "essence_open")
+        self.assertEqual(report["themes"], ["mocha", "latte", "mocha"])
         self.assertEqual(report["request_target"], self.sample.passages[0].identifier)
         split = report["split"]
         self.assertEqual(split["layout"], "split")

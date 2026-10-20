@@ -942,6 +942,12 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             # ESSENCE opens in the reader's theme.
             self.assertEqual(command[5], "--theme")
             self.assertIn(command[6], THEMES)
+            # And follows T through an owner-only file the reader rewrites.
+            self.assertEqual(command[7:], ["--theme-file", launch["theme_file"]])
+            theme_file = Path(launch["theme_file"])
+            self.assertEqual(theme_file.parent, path.parent)
+            self.assertEqual(theme_file.read_text(encoding="utf-8"), command[6])
+            self.assertEqual(theme_file.stat().st_mode & 0o777, 0o600)
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             context = read_context(path)
             self.assertEqual(context["reference"], packet["reference"])

@@ -489,6 +489,8 @@ return function(reader, supplied)
     for index, name in ipairs(theme_order) do if name == data.theme.active then at = index end end
     data.theme.active = theme_order[at % #theme_order + 1]
     apply_theme()
+    local essence = rawget(_G, 'SOLEssence')
+    if essence and essence.set_theme then essence.set_theme(data.theme.active) end
     local preset = presets[data.theme.active]
     local message = preset.notice ~= '' and preset.notice or ('Theme: ' .. preset.label ..
       ' for this session. Keep it with: sol --set-theme ' .. preset.name)
