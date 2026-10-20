@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "Read and explore Hegel's Science of Logic in the terminal"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 keywords = ["hegel", "philosophy", "corpus", "terminal", "reader"]
 classifiers = [
     "Development Status :: 3 - Alpha",

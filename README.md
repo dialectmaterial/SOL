@@ -49,7 +49,7 @@ George di Giovanni PDF if no corpus exists, converts it locally once, then sets
 up an actor and workspace. An existing corpus can be selected with
 `sol --set-corpus /absolute/path/to/local-corpus`. The book is not bundled or
 downloaded. Use `b/n` for paragraphs, `p` for reading mode, `?` for keys, and
-`q` to save and leave; `sol guide` is a compact introduction.
+`:q` to save and leave; `sol guide` is a compact introduction.
 
 ## Documentation
 
@@ -66,3 +66,10 @@ This README is a gateway, not another design authority. See
 [CONTRIBUTING](CONTRIBUTING.md) for development checks,
 [CHANGELOG](CHANGELOG.md) for changes, and the [legacy archive](docs/legacy/README.md)
 for preserved earlier documentation.
+
+## License
+
+SOL is free software under the [GNU General Public License, version 3 or
+later](LICENSE) (`GPL-3.0-or-later`). The license covers SOL's code and
+documentation, not the book: the corpus is the reader's own and is never part
+of the repository.

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### SOL is licensed under the GPL — 20 October 2026
+
+SOL is now free software under the GNU General Public License, version 3 or
+later; see [LICENSE](LICENSE). The book you read with it is not covered and is
+never part of the repository.
+
 ### A modest ESSENCE methods encyclopedia — 20 October 2026
 
 Encyclopedia (`1`) now browses nine bundled method entries: existing lexical,
