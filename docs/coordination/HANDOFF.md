@@ -32,6 +32,37 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+
+## BEING describes the current reader — 21 October 2026
+
+**Task:** [Codex: BEING describes the current reader, not its history](https://github.com/dialectmaterial/SOL/blob/78c2389/docs/coordination/CURRENT_TASK.md#codex-being-describes-the-current-reader-not-its-history).
+**Branch / PR:** `codex/being-current` · [pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fbeing-current); Claude reviews; author does not merge.
+**Last implementation commit:** `5c98def611e0d95ac62f7552e7eb2ddcb17318e1` (this report is committed afterward).
+
+### Changed files
+- `docs/BEING.md` — §§2–7 consolidate current feature descriptions, controls and their evidence. Notes include draft lifetime; search includes hidden marks; refusal behavior includes checkpoint limits; source crops, PDF following, themes and ESSENCE retain their qualifications. Sentence lengths points to the already documented ESSENCE interface. The old §4 anchor remains explicit.
+- `docs/coordination/CURRENT_TASK.md` — only Codex's status, now `In review`; this handoff is the other coordination change. No behavior change, so no CHANGELOG entry. No README, guide, code or legacy edits.
+- Publication uses a clean clone at `/tmp/sol-being-current`, from `origin/main` at `78c2389`, because the supplied checkout's Git metadata is read-only.
+
+### Removed as obsolete
+- Dated delivery/stage labels, migration assurances, the old clipboard failure explanation and navigation-probe commit narration: implementation history belongs in CHANGELOG/Git. Their current behavior, test coverage and limits remain.
+- “Three presets” implementation text and “next bounded task” in §4's title: the existing table and §2 already describe five current presets. Every Decision paragraph, including the earlier three-preset decision, stays verbatim.
+- The old 20-passage search ceiling, passage-only search stepping and missing count: §2 already documents complete occurrence search and its projection caveats.
+- The blanket passage-local selection limit: the existing controls/copy description permits copying across paragraphs; note/ESSENCE and durable-span limits remain.
+- The retired reader sentence-study key/panel/actions, automatic loaded-section origin/save workflow, its old handoff example and popup listing: these controls no longer exist. The study's distribution, paragraph-position means, twelve longest sentences, private artifact path/checking and separate result/history returns remain described through its current interface. The stale plan to move the study into ESSENCE is replaced by a link to ESSENCE §4, which already documents it there. Decision/Decided statements are untouched.
+- Duplicate descriptions of notes, footnotes, search marks, math-record counts and refusal behavior: consolidated without dropping current facts. Refusal now uses the existing later qualification that the outgoing cursor may already be checkpointed.
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — OK, including after the final report; external URLs are not network-checked.
+- `.venv/bin/python -B -m unittest discover -s tests` — 1,807 tests, OK (12 skipped, 4 expected failures), Python 3.14.8; temporary XDG config/data/state/cache and Neovim log paths. Includes packaging/headless checks; no new manual terminal or private-corpus trial.
+- `git diff --check` — OK. Compared all five complete Decision paragraphs and the explicit Decided statements against `origin/main`: identical. Existing test evidence, unseen PDF-highlight placement, unreviewed mathematics and manual-acceptance limits remain qualified.
+
+### Outstanding issues
+- None introduced. Existing product/acceptance limits remain; this editorial task establishes no new usability or visual acceptance. Dated Decision wording and the adoption metadata outside §§2–7 are retained.
+
+### Decisions requiring approval
+None. Editorial defaults only; no reserved decision, public contract, schema or dependency change.
+
 ## Faster startup to readable text — 21 October 2026
 
 **Task:** [Codex: Faster startup to readable text](https://github.com/dialectmaterial/SOL/blob/e602ce668b6e840e838026c65c9c05586d900574/docs/coordination/CURRENT_TASK.md#codex-faster-startup-to-readable-text).

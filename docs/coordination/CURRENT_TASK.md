@@ -35,7 +35,7 @@ Tests for the guide text; documentation check and full suite.
 
 ## Codex: BEING describes the current reader, not its history
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/being-current`
 **Requested:** 21 October 2026, by the maintainer via Claude
 
