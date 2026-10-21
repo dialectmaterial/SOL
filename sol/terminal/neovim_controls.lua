@@ -46,21 +46,27 @@ return function(reader)
   local show_footnote = reader.footnotes.show
   local attribution_line = reader.footnotes.attribution_line
   local function context(...) return reader.context(...) end
+  -- A prompt's question and answer leave the command line once answered.
+  local function ask(prompt)
+    local answer = vim.fn.input(prompt)
+    api.nvim_echo({{'', 'None'}}, false, {})
+    return answer
+  end
   local function search()
     -- Standard command-line input works in any Neovim-capable terminal. A cancelled
     -- query never visits a result or modifies canonical text/selection.
-    local query = vim.fn.input('Search book: ')
+    local query = ask('Search book: ')
     if query:match('%S') then request('search', {query = query}) end
   end
   local function page()
     -- A printed page, as the edition numbers it and the status line shows it.
-    local answer = vim.fn.input('Printed page: ')
+    local answer = ask('Printed page: ')
     local number = tonumber(answer:match('^%s*[Pp]?%.?%s*(%d+)%s*$') or '')
     if number then request('page_open', {page = number})
     elseif answer:match('%S') then vim.notify('Type a printed page number, e.g. 240', vim.log.levels.WARN) end
   end
   local function landmark()
-    local name = vim.fn.input('Name this place: ')
+    local name = ask('Name this place: ')
     if name:match('%S') then request('landmark_set', {name = name}) end
   end
   local function marker(slot, operation)

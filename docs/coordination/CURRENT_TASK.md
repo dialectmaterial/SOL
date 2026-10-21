@@ -14,7 +14,7 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ## Claude Code: Visual audit of the reader, as options for the maintainer
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `claude/visual-audit`
 **Requested:** 21 October 2026, by the maintainer via Claude ([BEING §4](../BEING.md#4-theming-and-typography-next-bounded-task) "Not yet done")
 

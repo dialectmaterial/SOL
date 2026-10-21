@@ -500,9 +500,11 @@ end
   local tree = reader.tree()
   report.lines = vim.api.nvim_buf_get_lines(tree.buffer, 0, -1, false)
   report.width = vim.api.nvim_win_get_width(tree.window)
+  report.height = vim.api.nvim_win_get_height(tree.window)
 ''', integrated=True)
         lines, width = report["lines"], report["width"]
         self.assertLessEqual(width, 84)
+        self.assertEqual(report["height"], len(lines))  # no empty rows below the last entry
         self.assertTrue(any("▾" in line for line in lines))
         current = [line for line in lines if "●" in line]
         self.assertEqual(len(current), 1)
@@ -781,6 +783,22 @@ end
         self.assertEqual(report["follow_op"], "source_follow")
         self.assertTrue(report["not_blocking"])
         self.assertEqual(report["after_close"], 2)
+
+    def test_answered_prompts_leave_the_command_line_clear(self):
+        report = self.run_lua(r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  local echoed = {}
+  local echo = vim.api.nvim_echo
+  vim.api.nvim_echo = function(chunks, ...) echoed[#echoed + 1] = chunks[1][1]; return echo(chunks, ...) end
+  vim.fn.input = function() return '240' end
+  vim.api.nvim_feedkeys('gp', 'xt', false)
+  report.sent, report.echoed = #sent, echoed
+''', integrated=True)
+        self.assertEqual(report["sent"], 1)
+        self.assertEqual(report["echoed"], [""])  # the prompt line is cleared once answered
 
     def test_note_editor_saves_restores_selection_and_protects_drafts(self):
         report = self.run_lua(r'''

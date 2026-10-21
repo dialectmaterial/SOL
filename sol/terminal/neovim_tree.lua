@@ -28,10 +28,12 @@ function M.open(structure, callbacks)
     local columns = vim.o.columns - (essence and essence.reserved and essence.reserved() or 0)
     return math.max(1, math.min(WIDEST, columns - 4)), columns
   end
+  -- Rows the outline currently shows: the panel is no taller than its content.
+  local shown = 1
   local function config()
     local inner, columns = width()
     return {relative = 'editor', row = 1, col = math.max(1, math.floor((columns - inner) / 2) - 1), width = inner,
-      height = math.max(1, vim.o.lines - 4), style = 'minimal', border = 'rounded', zindex = 60,
+      height = math.max(1, math.min(vim.o.lines - 4, shown)), style = 'minimal', border = 'rounded', zindex = 60,
       title = ' Outline ', title_pos = 'center'}
   end
   local function draw()
@@ -64,6 +66,8 @@ function M.open(structure, callbacks)
     vim.bo[buffer].readonly, vim.bo[buffer].modifiable = false, true
     api.nvim_buf_set_lines(buffer, 0, -1, false, lines)
     vim.bo[buffer].modifiable, vim.bo[buffer].readonly = false, true
+    shown = #lines
+    if window and api.nvim_win_is_valid(window) then api.nvim_win_set_config(window, config()) end
     api.nvim_buf_clear_namespace(buffer, namespace, 0, -1)
     for _, mark in ipairs(marks) do
       api.nvim_buf_set_extmark(buffer, namespace, mark[1] - 1, mark[3] or 0,
