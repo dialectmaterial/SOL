@@ -5,6 +5,7 @@ from dataclasses import replace
 from hashlib import sha256
 import importlib.util
 import unittest
+from sol.reader.options import DEFAULT_READER_WIDTH
 from unittest.mock import patch
 
 from fixtures_async import UIEventLoop
@@ -96,13 +97,13 @@ class ReaderExperienceTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
 
     async def test_default_measure_and_primary_context_share_one_reading_column(self):
         async with self.view() as (view, pipe, actions, output):
-            self.assertEqual(view.reading_width, 72)
+            self.assertEqual(view.reading_width, DEFAULT_READER_WIDTH)
             for columns in (160, 100, 72, 40, 20):
                 output.columns = columns
                 view.application.invalidate()
-                await self.wait_for(lambda: view.body.window.render_info.window_width == min(72, columns)
+                await self.wait_for(lambda: view.body.window.render_info.window_width == min(DEFAULT_READER_WIDTH, columns)
                                     and abs(view.body.window.render_info._x_offset -
-                                            (columns - min(72, columns)) // 2) <= 1)
+                                            (columns - min(DEFAULT_READER_WIDTH, columns)) // 2) <= 1)
                 body = view.body.window.render_info
                 heading = view.heading_window.render_info
                 self.assertEqual(heading._x_offset, body._x_offset)

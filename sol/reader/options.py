@@ -9,7 +9,7 @@ from pathlib import Path
 
 from sol import __version__ as VERSION
 
-DEFAULT_READER_WIDTH = 72
+DEFAULT_READER_WIDTH = 66
 # Presentation presets; their highlight data lives in sol.terminal.theme.
 # Paper and Night are SOL's own, from actualspirit.com; Catppuccin Mocha and
 # Latte (catppuccin.com); Terminal inherits your own colors.
@@ -49,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     reader.add_argument("-n", "--none", action="store_true", help="read without saving; no workspace or actor")
     reader.add_argument("--workspace", metavar="NAME", help="open this workspace instead of the actor's last one")
     reader.add_argument("--actor", metavar="NAME", help="name attributed to your personal notes; remembers that actor's workspace")
-    reader.add_argument("--width", type=int, metavar="COLUMNS", help="maximum reading measure (20–240; reader default 72)")
+    reader.add_argument("--width", type=int, metavar="COLUMNS", help="maximum reading measure (20–240; reader default 66)")
     reader.add_argument("--emphasis", choices=("auto", "italic", "underline"),
                         help="semantic emphasis presentation; auto falls back to underline")
     reader.add_argument("--theme", choices=READER_THEMES,

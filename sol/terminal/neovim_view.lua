@@ -164,7 +164,8 @@ return function(reader, supplied)
 
   vim.o.modeline, vim.o.exrc = false, false
   vim.o.swapfile, vim.o.backup, vim.o.writebackup, vim.o.undofile = false, false, false, false
-  vim.o.laststatus, vim.o.showtabline, vim.o.cmdheight = 3, 0, 1
+  -- Focus mode leaves nothing but the text: no headings and no status line.
+  vim.o.laststatus, vim.o.showtabline, vim.o.cmdheight = data.focus and 0 or 3, 0, 1
   vim.o.showmode, vim.o.showcmd, vim.o.ruler, vim.o.hidden = false, false, false, true
   vim.o.mouse, vim.o.clipboard = "", ""
   -- In the reader the mouse scrolls and selects; a selection is copied when
