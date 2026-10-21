@@ -188,7 +188,7 @@ class FileSentenceTests(unittest.TestCase):
     def test_installed_dispatch_runs_a_file_study_with_no_configured_corpus(self):
         environment = {**os.environ, **{f"XDG_{name}_HOME": str(self.root / name.lower())
                                        for name in ("CONFIG", "DATA", "STATE", "CACHE")}}
-        completed = subprocess.run([sys.executable, "-B", "-m", "sol", "analyze", "sentences",
+        completed = subprocess.run([sys.executable, "-B", "-m", "sol", "essence", "sentences",
                                     "--file", str(self.path), "--json"], capture_output=True, text=True,
                                    env=environment, timeout=15)
         self.assertEqual(completed.returncode, 0, completed.stderr)

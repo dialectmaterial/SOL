@@ -154,7 +154,7 @@ def _in_scope(record, scope):
 
 
 def _selection(record, scope):
-    from sol.essence.terms import _reader_doctrine
+    from sol.essence.corpus_inputs import _reader_doctrine
 
     attribution = record["attribution"]
     if not _in_scope(record, scope):
@@ -205,7 +205,7 @@ def _measure(passages, rows):
 
 def _analyze(snapshot, scope, origin):
     from sol import core
-    from sol.essence.terms import _binding, _current, _facsimile_spans
+    from sol.essence.corpus_inputs import _binding, _current, _facsimile_spans
 
     binding = _binding(snapshot)
     if origin is not None:
@@ -255,7 +255,7 @@ def _validate(result):
         from sol.essence.sentence_inputs import validate_result
         return validate_result(result)
     from sol import core
-    from sol.essence.terms import _reader_doctrine
+    from sol.essence.corpus_inputs import _reader_doctrine
 
     result = _json_value(result)
     _keys(result, {"protocol", "version", "corpus", "generation", "method", "scope", "origin", "summary",
@@ -325,7 +325,7 @@ def analyze_sentences(snapshot, *, scope=None, origin=None):
             raise SentenceStudyError("Set the sentence scope on the provider", code="invalid_scope")
         from sol.essence.sentence_inputs import analyze_provider
         return analyze_provider(snapshot, origin=origin)
-    from sol.essence.terms import _fresh
+    from sol.essence.corpus_inputs import _fresh
 
     scope = _scope({"kind": "corpus"} if scope is None else _json_value(scope))
     return _analyze(_fresh(snapshot), scope, origin)
@@ -342,7 +342,7 @@ def check_sentence_result(snapshot, result):
         if snapshot.scope is not None and _json(snapshot.scope) != _json(result.get("scope")):
             raise SentenceStudyError("Provider scope differs from the saved study", status="mismatch", code="scope_mismatch")
         snapshot = snapshot.snapshot
-    from sol.essence.terms import _binding, _current, _fresh
+    from sol.essence.corpus_inputs import _binding, _current, _fresh
 
     result = _validate(result)
     fresh = _fresh(snapshot)

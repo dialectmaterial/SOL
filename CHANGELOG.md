@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### ESSENCE cleanup — 21 October 2026
+
+- Rename the analysis CLI to `sol essence`, with no `analyze` alias; update
+  help, study verification messages, Methods and current documentation.
+- Remove the one-word term experiment, segmentation-pilot commands and modules,
+  and checkout-only formula review sheet, with their dedicated tests. Keep the
+  shared word tokenizer and CORE freshness/selection guards for word and sentence
+  studies; their methods and saved artifact formats remain unchanged.
+
 ### Legacy documents folded in and removed — 21 October 2026
 
 The still-valid contracts from the pre-17-October documents now live in the
@@ -180,17 +189,17 @@ fingerprint verification remain in place; no persistent Book index is added.
 
 ### Runnable TF-IDF engine and CLI — 20 October 2026
 
-`sol analyze tfidf` ranks terms per word-provider passage (or one whole UTF-8
+`sol essence tfidf` ranks terms per word-provider passage (or one whole UTF-8
 file) and overall, with `--top-n` and `--json`. The dependency-free `tfidf-v1`
 method declares raw-count TF, smoothed natural-log IDF and document L2
-normalization. `sol analyze check` recomputes saved results against explicit
+normalization. `sol essence check` recomputes saved results against explicit
 current sources. The public Python API is ready for later TUI integration;
 Methods and the TF-IDF encyclopedia entry document the shipped behavior.
 
 ### ESSENCE's Methods screen — 20 October 2026
 
 Methods (`2`) is no longer a placeholder: it lists each study ESSENCE and
-`sol analyze` run, and shows what it takes, its settings, what it produces,
+`sol essence` run, and shows what it takes, its settings, what it produces,
 its limits and the command that runs it, with the matching encyclopedia entry.
 
 ### ESSENCE follows `T` — 20 October 2026
@@ -201,7 +210,7 @@ half a second, instead of only the next time it opens.
 ### ESSENCE method descriptions — 20 October 2026
 
 Bundled method descriptions now document word frequencies, comparison, sentence
-lengths and every other `sol analyze` operation, including inputs, settings,
+lengths and every other `sol essence` operation, including inputs, settings,
 artifacts, save locations, limits and CLI examples. The offline loader and
 Markdown renderer are ready for the Methods screen; this change adds no UI.
 
@@ -273,14 +282,14 @@ Alt-Left there returns. This replaces the reader's former `S`.
 - The status line shows where you are in the book (section titles and page),
   the reading mode, how far through the book you are, and how to find help
   and quit.
-- `S` (sentence lengths) is gone from the reader; `sol analyze sentences`
+- `S` (sentence lengths) is gone from the reader; `sol essence sentences`
   still runs the study.
 
 ### Sentence studies over UTF-8 files and CORE providers — 19 October 2026
 
-`sol analyze sentences --file PATH [--span START END]` measures ordinary text
+`sol essence sentences --file PATH [--span START END]` measures ordinary text
 without a configured corpus. The Python sentence API accepts the word engine's
-CORE/file providers and scopes; `sol analyze check FILE --input-file PATH`
+CORE/file providers and scopes; `sol essence check FILE --input-file PATH`
 verifies file results against the caller's explicit source. Provider studies
 use a v2 artifact with digests and original offsets, without input text or
 local file paths. Spans retain only complete sentences; cut sentences are
@@ -306,7 +315,7 @@ now go to `~/.local/share/sol/studies` like the reader's own studies.
 
 The UI-independent `compare_words` function reports a rate difference and
 log₂ rate ratio for target/reference word frequencies, with explicit
-denominators and undefined-value reasons. `sol analyze words-export` verifies
+denominators and undefined-value reasons. `sol essence words-export` verifies
 a saved study against its CORE/file inputs before emitting CSV or TSV with
 counts, rates, measures and provenance. There is no smoothing or significance
 claim; the existing `sol.word-frequencies` v1 artifact stays unchanged.
@@ -325,7 +334,7 @@ section, the whole book or a text file) and, optionally, what to compare it
 with, then press Count words. Results lists the words with counts and rates
 per 10,000 words for both sides, says how many words each side has, and warns
 when the two are not directly comparable. With a workspace, each count is
-saved and can be checked later with `sol analyze check`.
+saved and can be checked later with `sol essence check`.
 
 ### ESSENCE opens beside the reader — 18 October 2026
 
@@ -340,12 +349,12 @@ before and `E` says what to install.
 
 ### Count words through CORE or ordinary files — 18 October 2026
 
-`sol analyze words` and the UI-independent `analyze_words` function count a
+`sol essence words` and the UI-independent `analyze_words` function count a
 target and optional reference with the term study's shared, unchanged Unicode
 tokenizer. Results show tokens, types, absolute frequencies, explicit token
 denominators and rates, with source IDs/pages/offsets and unequal-scope warnings.
 Plain UTF-8 files work without CORE. The text-free `sol.word-frequencies` v1
-artifact is checked by recomputation with `sol analyze check`; changed corpus
+artifact is checked by recomputation with `sol essence check`; changed corpus
 generations or file bytes are refused. No interface or dependency is added.
 
 ### Split the Lua reader implementation — 18 October 2026
@@ -410,9 +419,9 @@ protected; existing exported forms, review fields and segmentation are unchanged
 
 ### Sentence marking in a text editor — 18 October 2026
 
-`sol analyze segmentation-export` makes a blind plain-text form from an
+`sol essence segmentation-export` makes a blind plain-text form from an
 unmarked sample. Add Enter between sentences or give an exclusion reason;
-`sol analyze segmentation-import` creates a new review for `segmentation-check`
+`sol essence segmentation-import` creates a new review for `segmentation-check`
 without editing JSON. Import preserves original spaces, Unicode and newlines,
 refuses text/header/sample changes and names the passage and mismatch location.
 Both output files are owner-only, outside Git and never overwrite a target.
@@ -432,8 +441,8 @@ narrow widths.
 
 ### Sentence-segmentation validation — 18 October 2026
 
-`sol analyze segmentation-sample` prepares a reproducible blind private form
-for marking sentences, and `sol analyze segmentation-check` reports exact
+`sol essence segmentation-sample` prepares a reproducible blind private form
+for marking sentences, and `sol essence segmentation-check` reports exact
 boundary misses, false splits, precision/recall and per-doctrine counts.
 Samples retain source/generation bindings, require complete marks or explicit
 exclusions, and are written owner-only outside Git without overwriting files.
@@ -457,8 +466,8 @@ history entry, so Alt-Left returns to where you were.
 `S` in the reader measures the sentences of the loaded section through a new
 ESSENCE study and lists the distribution, the means by place in the paragraph
 and the longest sentences. Enter reads one of them; Alt-Left returns to where
-you were. `sol analyze sentences [--within PATH]` runs the same study from a
-shell, and `sol analyze check` verifies a saved one by recomputation. The
+you were. `sol essence sentences [--within PATH]` runs the same study from a
+shell, and `sol essence check` verifies a saved one by recomputation. The
 segmentation rules are declared in the artifact and were tuned on the book's
 own citations, abbreviations and initials. Artifacts hold IDs, offsets and
 digests, never book text, and are saved only for workspace sessions.
