@@ -12,51 +12,58 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: Real-terminal check of the new reader features
+## Claude Code: The passage highlighted in Zathura, which follows the reader
 
-**Status:** In review
-**Branch:** `claude/reader-smoke`
-**Requested:** 20 October 2026, by the maintainer via Claude (reader backlog)
-
-### Goal
-
-Drive the installed reader on the real book in a real terminal (tmux, a
-temporary `-n` session) through `/` counts, `Ctrl-N`, `gp`, `M`/`L`, `S` and
-`keys.json`, and fix what fails.
-
-### Scope
-
-Whatever the check shows, in `sol/terminal/`; BEING §7 records what was
-exercised. No change to view preparation or `sol/reader/actions.py` (Codex).
-
-### Acceptance
-
-A reported session; fixes with regression tests; documentation check and full
-suite.
-
-## Codex: Faster section and outline moves
-
-**Status:** In review
-**Branch:** `codex/section-latency`
-**Requested:** 20 October 2026, by the maintainer via Claude (reader backlog, item 4)
+**Status:** In progress
+**Branch:** `claude/pdf-follow`
+**Requested:** 21 October 2026, by the maintainer via Claude (reader backlog, item 2)
 
 ### Goal
 
-`j`/`k` across a section boundary, `b`/`n` and outline jumps take clearly less
-than the measured ~1 s, measured with `scripts/reader_timings.py`.
+`S` highlights the passage's recorded region on the printed page (and its
+continuation on the next page), and while that Zathura window is open it turns
+to and highlights whichever passage the reader rests on.
 
 ### Scope
 
-[BEING §2](../BEING.md#2-what-is-implemented), [CORE §§5–7](../CORE.md#5-source-bound-positions-and-typography):
-view preparation in `sol/terminal/neovim_reader.py` and `sol/terminal/neovim.py`
-payload building, `sol/reader/actions.py`, tests, BEING, CHANGELOG.
+[BEING §5](../BEING.md#5-mathematical-notation-and-source-fidelity):
+`sol/terminal/source.py`, the source requests in `sol/terminal/neovim_reader.py`,
+`sol/terminal/neovim_panels.lua`/`neovim_controls.lua`/`neovim_requests.lua`,
+tests, BEING §5, CHANGELOG.
 
 ### Constraints
 
-Do not relax or cache source verification: changing CORE's per-reference
-fingerprint policy is a **reserved** decision; propose it in the handoff
-instead. Keep the refused-move guarantees. No change to Lua key handling
-(Claude's task).
+Only the verified snapshot and recorded boxes; following never moves the
+reader, never blocks a key and stops when Zathura closes. No change to startup
+or payload building (Codex).
+
+### Acceptance
+
+Unit and headless Neovim tests; a real Zathura check by D-Bus; documentation
+check and full suite.
+
+## Codex: Faster startup to readable text
+
+**Status:** Ready
+**Branch:** `codex/startup-time`
+**Requested:** 21 October 2026, by the maintainer via Claude (reader backlog, item 4)
+
+### Goal
+
+Measured, smaller time from `sol` to readable text (about 1.2 s to the first
+payload today), behind the opening screen.
+
+### Scope
+
+[BEING §2](../BEING.md#2-what-is-implemented): `sol/reader/app.py`,
+`sol/reader/launch.py`, corpus loading and imports on the startup path,
+`sol/terminal/neovim.py` payload building, `scripts/reader_timings.py`, tests,
+BEING, CHANGELOG.
+
+### Constraints
+
+Do not relax or cache source verification (reserved, see #64's proposal).
+No change to `sol/terminal/source.py` or the source requests (Claude).
 
 ### Acceptance
 
