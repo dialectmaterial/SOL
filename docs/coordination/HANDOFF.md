@@ -32,6 +32,57 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Faster section and outline view preparation — 20 October 2026
+
+**Task:** [Codex: Faster section and outline moves](https://github.com/dialectmaterial/SOL/blob/6eddeaa94c979adf73cf02d5783329b550d84b2f/docs/coordination/CURRENT_TASK.md#codex-faster-section-and-outline-moves).
+**Branch / PR:** `codex/section-latency` · [pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fsection-latency); Claude reviews, author does not merge.
+**Last implementation commit:** `7b412c771c97c5688ebb287ddcee56066dcaedea` (this report is committed afterward).
+
+### Changed files
+- `sol/terminal/neovim.py` — one typography projection for both styles and callouts; ASCII safety scanning in bulk with unchanged Unicode policy. All captures, reference checks and export finish checks remain.
+- `sol/terminal/neovim_reader.py` — reader-local LRU of at most 256 immutable typography results, keyed by exact Markdown and plain-text strings. Full payloads still rebuild their references, warnings, provenance, notes and personal state; no source trust is cached.
+- Controller/host regression tests; BEING §2, CHANGELOG and Codex's task status. No Lua/key handling, CORE, surface export, dependency or workspace changes. Git metadata in the original checkout is read-only; work/publication uses `/tmp/sol-section-latency`, cloned from `origin/main` at `6eddeaa`.
+
+### Tests performed
+- Documentation check and `git diff --check` — OK; external URLs were not network-checked.
+- Full suite — 1,799 tests, OK (12 skipped, 4 expected failures); isolated XDG paths, existing `/tmp/sol-complete-search/.venv/bin/python` (Python 3.14.8).
+- Focused controller (52) and host (34) tests — OK. New checks cover single projection, fresh/cached payload equivalence after Markdown-only and plain-text changes, detached style containers, source edits after a cache hit, and every Unicode control/format/surrogate/separator codepoint against the previous refusal policy. Existing staged-move, source-during-preparation and competing-save refusals remain covered by the full suite.
+- Read-only real book: 4,629 records / 1,803 passages, identical generation and dataset metadata before/after; no personal workspace or source PDF opened. Same version 2 `scripts/reader_timings.py --corpus LOCAL_CORPUS --repeats 3 --warmups 1 --json`, width 72, temporary SQLite workspaces, real CORE checks, replaced terminal boundary. One discarded warmup and three measured runs per operation, baseline then implementation sequentially without concurrent profiling/tests. Reports outside Git: `/tmp/section-{before,after}-final.json`.
+
+| Operation | Before median (ms) | After median (ms) |
+| --- | ---: | ---: |
+| Section next (`j` boundary route) | 1211 | 988 |
+| Section previous (`k` boundary route) | 981 | 910 |
+| `n` across section boundary | 1011 | 928 |
+| `b` across section boundary | 1012 | 917 |
+| Outline, second section | 1036 | 928 |
+| Standalone ordinary payload | 460 | 461 |
+| Standalone footnote-heavy payload | 977 | 705 |
+
+The paragraph-boundary and outline medians improve by 8–11%; heavy payload
+preparation by 28%. Section-next improves 18% in this comparison but remains
+borderline at 988 ms (after samples 1,015/988/985 ms). An earlier comparison
+was 1,016 → 1,005 ms there; three-run samples do not establish reliable
+subsecond latency on every route. Startup is 1,169 → 1,233 ms and ordinary
+payload time is effectively unchanged; no startup improvement is claimed.
+Controller measurements exclude Neovim IPC, painting and physical-key latency.
+
+A separate one-run cProfile comparison (`/tmp/section-profile` and
+`/tmp/section-after-profile`) attributes 9.55 → 6.41 s to the 11 controller
+view preparations and 2.91 → 0.60 s to typography (566 → 266 calls).
+Both profiles call `verify_snapshot_current` exactly 216 times; its cumulative
+cost is 9.07 → 8.10 s, still substantial. These are overlapping profiled totals,
+not additive components or keypress medians; the baseline profile overlapped an
+initial timing probe, so use the clean medians above for outcome claims.
+
+### Outstanding issues
+- The task's goal is only partly met: useful view-preparation savings, but section-next remains around a second and none of these samples establish consistently low physical-key latency. Full destination exports still detach the whole source graph and retain all existing verification work.
+- No real-terminal or sustained human reading trial; Claude's terminal task remains separate. Existing BEING §7 limits on editor/transport failure after a successful save still apply.
+
+### Decisions requiring approval
+- Default implemented: retain only immutable typography by exact input values, bounded to 256 entries per reader; never reuse references or verification results. No reserved change is required by this implementation.
+- **(reserved; proposal only)** Consider separately approving action-scoped fingerprint batching with a mandatory final verification before persistence/output and explicit semantics for edits during an action. This would change CORE's per-reference fingerprint policy and needs its own design/tests and maintainer approval. The current policy remains unchanged; this PR does not implement or depend on that proposal.
+
 ## Reader navigation latency — 20 October 2026
 
 **Task:** [Codex: Measure and cut reader navigation latency](https://github.com/dialectmaterial/SOL/blob/43de133a2975c93b5b6ed048c6c7e31809c6d8db/docs/coordination/CURRENT_TASK.md#codex-measure-and-cut-reader-navigation-latency).

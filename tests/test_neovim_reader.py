@@ -64,6 +64,32 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         with patch.object(neovim, "validate_environment", return_value="/invented/nvim"):
             return neovim_reader.run_reader(self.book, service, **kwargs)
 
+    def test_typography_reuse_keeps_payloads_detached_and_source_checks_live(self):
+        from sol.reader.typography import Typography, TypographySpan
+        calls = []
+        def project(markdown, text):
+            calls.append((markdown, text))
+            return Typography((TypographySpan(0, 1, ("emphasis",)),))
+
+        def native(payload, _, on_request):
+            request = {"op": "node_open", "node": "/",
+                       "packet": payload["restore"], "mode": "paragraph"}
+            before = len(calls)
+            payload["records"][0]["styles"][0]["styles"].append("strong")
+            refreshed = on_request(request)["payload"]
+            self.assertEqual(len(calls), before)
+            self.assertEqual(refreshed["records"][0]["styles"][0]["styles"], ["emphasis"])
+            source = self.corpus / "sample.md"
+            source.write_text(source.read_text() + "\nUnindexed edit.\n")
+            with self.assertRaises(ValueError):
+                on_request({**request, "packet": refreshed["restore"]})
+            return 0, None
+
+        with patch.object(neovim, "map_typography", side_effect=project), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(), 0)
+        self.assertEqual(len(calls), 1)
+
     def test_adjacent_records_share_one_view_without_changing_canonical_text(self):
         self.extend()
         before = self.files()

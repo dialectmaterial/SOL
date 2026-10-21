@@ -65,14 +65,19 @@ def validate_environment(width=72):
     return executable
 
 
+_UNSAFE_ASCII = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+_NON_ASCII = re.compile(r"[^\x00-\x7f]")
+
+
 def _safe_source(text):
     if not isinstance(text, str):
         raise ValueError("Neovim presentation requires exact source strings")
     # Neovim visibly escapes C1 characters with display=uhex. Keep their exact
     # bytes/codepoints in the buffer; do not replace a scalar with four source
     # characters. Unsafe controls/bidi are refused, never silently normalized.
-    if any((unicodedata.category(char) in {"Cc", "Cf", "Cs", "Zl", "Zp"}
-            and char not in {"\n", "\t"} and not 0x80 <= ord(char) <= 0x9f) for char in text):
+    if (_UNSAFE_ASCII.search(text) or any(
+            unicodedata.category(match[0]) in {"Cc", "Cf", "Cs", "Zl", "Zp"}
+            and not 0x80 <= ord(match[0]) <= 0x9f for match in _NON_ASCII.finditer(text))):
         raise ValueError("The reader refuses unsafe control/bidi source characters; canonical text was not altered. "
                          "Use sol -r --json to inspect the source and its review status.")
 
@@ -90,8 +95,8 @@ def _safe_metadata(value):
             _safe_metadata(item)
 
 
-def _styles(markdown, text):
-    typography = map_typography(markdown, text)
+def _styles(markdown, text, typography=None):
+    typography = map_typography(markdown, text) if typography is None else typography
     spans = [{"start": span.start, "end": span.end, "styles": list(span.styles)}
              for span in typography.spans]
     warning = ([typography.reason or "Semantic typography unavailable; plain text shown."]
@@ -171,13 +176,17 @@ def build_footnote_payload(sample: Sample, passage_id: str, trail: list[str]) ->
     return result
 
 
-def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None, emphasis="auto", theme=None):
+def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None,
+                  emphasis="auto", theme=None, _typography=None):
     """Prepare inert JSON; every selection offset remains a source codepoint.
 
     Only supplied document headings are projected. No experiment title or
     concatenated canonical record is introduced into the reading surface.
     A theme adds presentation presets only; research samples omit it.
+    _typography supplies a reader-local, exact-value presentation memo only;
+    all source capture, validation and export freshness checks still run.
     """
+    typography = map_typography if _typography is None else _typography
     _width(width)
     if sample.actions.workspace_reader is not None:
         raise ValueError("Neovim reader experiments do not accept a personal workspace")
@@ -199,7 +208,8 @@ def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None,
         _, checked = capture.capture(requested)
         record = checked.record
         _safe_source(payload["plain_text"])
-        styles, warnings = _styles(record["markdown"], payload["plain_text"])
+        projection = typography(record["markdown"], payload["plain_text"])
+        styles, warnings = _styles(record["markdown"], payload["plain_text"], projection)
         if passage.needs_source_review:
             warnings.insert(0, "Source transcription needs review.")
         if any(0x80 <= ord(char) <= 0x9f for char in payload["plain_text"]):
@@ -222,7 +232,8 @@ def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None,
             for part in parts:
                 offset = len(text) + 2 if text else 0
                 text = text + "\n\n" + part["plain_text"] if text else part["plain_text"]
-                spans, degraded = _styles(part["markdown"], part["plain_text"])
+                spans, degraded = _styles(part["markdown"], part["plain_text"],
+                                          typography(part["markdown"], part["plain_text"]))
                 note_styles += [{**span, "start": span["start"] + offset, "end": span["end"] + offset} for span in spans]
                 note_warnings += [warning for warning in degraded if warning not in note_warnings]
             _safe_source(text)
@@ -236,7 +247,7 @@ def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None,
                           "styles": note_styles, "warnings": note_warnings, "reference": reference})
         # Callouts outside this record's notes (or unplaced) are not invented.
         callouts = [{"offset": offset, "label": labels[note] or "?"}
-                    for offset, note in map_typography(record["markdown"], payload["plain_text"]).callouts
+                    for offset, note in projection.callouts
                     if note in labels]
         payload.update(heading=heading, styles=styles, warnings=warnings, context=context, notes=notes,
                        callouts=callouts)

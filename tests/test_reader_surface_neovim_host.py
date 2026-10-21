@@ -91,6 +91,45 @@ class NeovimHostTests(fixtures.CorpusFixture, unittest.TestCase):
         else:
             self.assertTrue(row["warnings"], "missing optional parser must degrade visibly")
 
+    def test_payload_parses_each_record_once_for_styles_and_callouts(self):
+        project = neovim.map_typography
+        sample = self.sample()
+        with patch.object(neovim, "map_typography", wraps=project) as mapped:
+            neovim.build_payload(sample)
+        self.assertEqual(mapped.call_count, len(sample.passages))
+
+    def test_typography_reuse_follows_exact_values_and_matches_fresh_payload(self):
+        from functools import lru_cache
+        project = lru_cache(maxsize=256)(neovim.map_typography)
+        for markdown, plain in (("A *thought*.", "A thought."),
+                                ("A **thought**.", "A thought."),
+                                ("A **claim**.", "A claim.")):
+            with self.subTest(markdown=markdown):
+                self.rewrite_body(plain, markdown=markdown)
+                sample = self.sample()
+                reused = neovim.build_payload(sample, _typography=project)
+                self.assertEqual(reused, neovim.build_payload(sample))
+                self.assertEqual(reused, neovim.build_payload(sample, _typography=project))
+        self.assertEqual(project.cache_info().misses, 3)
+        self.assertEqual(project.cache_info().hits, 3)
+
+    def test_source_safety_scan_preserves_unicode_policy(self):
+        import unicodedata
+        # Every codepoint in the categories the old scan refused, including
+        # supplementary format controls and surrogates; allowed text is exact.
+        for codepoint in range(0x110000):
+            char = chr(codepoint)
+            category = unicodedata.category(char)
+            if category not in {"Cc", "Cf", "Cs", "Zl", "Zp"}:
+                continue
+            text = "A" + char + "界"
+            if char in "\n\t" or 0x80 <= codepoint <= 0x9f:
+                neovim._safe_source(text)
+            else:
+                with self.assertRaises(ValueError, msg=f"U+{codepoint:04X}"):
+                    neovim._safe_source(text)
+        neovim._safe_source("λ 🙂 e\u0301 and 界")
+
     def test_unknown_terminal_falls_back_to_visible_underline(self):
         for term, expected in (("unknown-basic", "underline"), ("alacritty", "italic"),
                                ("xterm-kitty", "italic")):

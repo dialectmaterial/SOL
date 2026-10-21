@@ -93,7 +93,12 @@ the destination before the guarded save. A refused update preserves the shown
 view, accepted position and history, and can be retried. Cross-passage and
 section moves retain full destination preparation, which avoids one redundant
 active-reference check already performed by the payload validator. No source
-trust is cached across actions. `scripts/reader_timings.py` measures same-passage
+trust is cached across actions. Full views parse each passage once for styles
+and callouts. Each reader retains at most 256 immutable typography projections,
+keyed by exact Markdown and plain-text strings; a changed value is projected
+again, and every export still checks its source and current generation. Source
+safety scans keep the same Unicode control policy while scanning ASCII in bulk.
+`scripts/reader_timings.py` measures same-passage
 occurrences, section changes, paragraph moves across a section boundary and an
 outline jump against an explicit local corpus, using temporary workspaces and
 text-free reports. Its controller times exclude Neovim IPC and terminal painting;
