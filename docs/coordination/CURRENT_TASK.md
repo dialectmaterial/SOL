@@ -12,52 +12,67 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: ESSENCE interface, next improvements
+## Cleanup plan (maintainer, 21 October 2026)
 
-**Status:** Ready
-**Branch:** `claude/essence-ui-next`
-**Requested:** 21 October 2026, by the maintainer ("First, we need to improve Essence's UI")
+The maintainer approved removing what the project's history left behind:
 
-### Goal
+1. **Shell:** `--shell` stays but minimal: book browsing only (`ls`, `cd`,
+   `tree`, `read`, `cat`, `search`, `open`, `context`, `info`, `guide`, `help`,
+   `exit`) on plain `input()`/readline. Removed: Kitty (`sol-kitty`, panes,
+   comparison and ESSENCE panes), the private handoff transport and Zsh
+   launcher, workspace commands in the shell, `--ui`/`--editing-mode`, and the
+   `prompt-toolkit` dependency. **`sol compare` is removed.** Review and relate
+   commands go; data already stored in workspaces stays readable and exportable
+   (no schema change or migration).
+2. **Experiments:** `experiments/reader_surfaces/` and the Neovim research-export
+   mode (`neovim.run`, `:SOLExport`, the non-integrated Lua paths) are removed;
+   the reader keeps only its integrated mode.
+3. **Leftovers:** `--pdf` (`legacy_pdf.py`), hidden `--engine`, empty extras
+   (`corpus`, `shell`, `extraction`), unreachable modules.
+4. **Documents:** anything still useful in `docs/legacy/` moves into the four
+   authorities, CONTRIBUTING or README; then `docs/legacy/` is deleted (Git keeps
+   it). Finished proposals go; HANDOFF keeps only recent reports.
+5. **ESSENCE tools:** `sol analyze term` (its tokenizer moves to
+   `sol/essence/tokenization.py`), the segmentation-pilot commands and
+   `scripts/formula_review_sheet.py` are removed.
+6. **Names:** `sol analyze` becomes **`sol essence`**; `sol --reader` becomes
+   **`sol being`**; bare `sol` still opens the reader (`sol being`).
 
-Continue from the genealogy (#78) on the Encyclopedia and Methods screens, as
-the maintainer directs.
+Every step passes the documentation check and full suite; removal PRs are
+reviewed by the other agent before merging.
+
+## Claude Code: Fold the legacy documents in, then remove them (step 4)
+
+**Status:** In progress
+**Branch:** `claude/legacy-docs`
 
 ### Scope
 
-`sol/essence/tui/` Encyclopedia and Methods screens, `sol/essence/encyclopedia*`,
-tests, ESSENCE §7, CHANGELOG. Not the Results screen (Codex).
+`docs/legacy/`, `docs/coordination/` (old proposals, HANDOFF), the four
+authorities, README, CONTRIBUTING, CLAUDE.md, `scripts/check_docs.py` and its
+test. No code. Next: steps 1, 3 and 6's `sol being` (app, options, shell,
+`sol/terminal/` except the Lua reader, packaging).
 
-## Codex: ESSENCE Results in small windows
+## Codex: Remove the experiments and the research-export mode (step 2)
 
 **Status:** Ready
-**Branch:** `codex/essence-results-small`
-**Requested:** 21 October 2026, by the maintainer via Claude ("First, we need to improve Essence's UI")
-
-### Goal
-
-The Results screen works beside the reader at 80×24: a word's occurrences are
-visible without a taller window, and the word table's columns fit without
-sideways scrolling, for word frequencies (with and without a reference),
-sentence lengths and TF-IDF. The stage 5 proposal (#76) is deferred by the
-maintainer.
+**Branch:** `codex/remove-experiments`
 
 ### Scope
 
-[ESSENCE §4](../ESSENCE.md#4-interaction-model-and-inquiry-contract): the Results
-screen in `sol/essence/tui/app.py` and its helpers in `sol/essence/tui/`, tests,
-ESSENCE §4, CHANGELOG. Not the Encyclopedia or Methods screens (Claude).
-
-### Constraints
-
-Presentation only: engines, artifacts and exports unchanged. Keep keyboard flow
-(arrows, Enter to sources, Escape back) and every theme readable.
+`experiments/`, `neovim.run` and research export in `sol/terminal/neovim.py`,
+the non-integrated paths in `sol/terminal/neovim*.lua` (and `neovim.lua`),
+`sol/reader/surface.py` only as far as the experiments need, their tests
+(rewrite the headless Lua tests that run the non-integrated mode to the
+integrated one rather than dropping coverage of reader behaviour),
+`scripts/reader_timings.py` if it depends on them, CHANGELOG, BEING.
+Not `docs/legacy/` or `docs/coordination/proposals/` (Claude). Next: steps 5
+and 6's `sol essence` rename (`sol/essence/`, its tests and ESSENCE).
 
 ### Acceptance
 
-Textual pilot tests at 80×24 and 120×40; renders before and after in the
-handoff (Textual screenshots misplace spaces next to bold text: check text in
-a terminal); documentation check and full suite.
+No reader behaviour lost; documentation check and full suite; the handoff
+lists removed files and line counts.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
