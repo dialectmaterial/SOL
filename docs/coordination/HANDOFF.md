@@ -35,19 +35,19 @@ Write "None." rather than deleting a heading.
 ## Faster startup to readable text — 21 October 2026
 
 **Task:** [Codex: Faster startup to readable text](https://github.com/dialectmaterial/SOL/blob/e602ce668b6e840e838026c65c9c05586d900574/docs/coordination/CURRENT_TASK.md#codex-faster-startup-to-readable-text).
-**Branch / PR:** `codex/startup-time` · [pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fstartup-time); Claude reviews; do not merge as author.
-**Last implementation commit:** `12734c0f80e143e04013e5d6c1c819c20592e8bd` (this report is committed afterward).
+**Branch / PR:** `codex/startup-time` · [PR #67](https://github.com/dialectmaterial/SOL/pull/67); Claude reviews; do not merge as author.
+**Last implementation commit:** `275dcb24ab67cd78fff1e1a6496486844fce85a3` (integration of current main; startup implementation `12734c0`; this report is committed afterward).
 
 ### Changed files
 - `sol/corpus/contract.py` — hash the exact bytes already decoded as UTF-8; use string-based resolved-path containment and resolve the scan boundary once per scan. Each document still resolves its parents, refuses symlinks and is read/hashed anew; all before/after generation checks remain.
 - `sol/reader/app.py` — lazy compatibility wrappers defer the optional book shell.
 - `scripts/reader_timings.py` — `--startup-only` runs fresh application imports/dispatch through the first checked payload in a new process and temporary workspace per sample; existing version 2 measurements remain unchanged.
-- Regression tests, BEING §2, CHANGELOG and Codex's task status. No protocol, verification cache, dependency, schema or Claude source-request changes. Read-only Git metadata in the supplied checkout required a clean clone at `/tmp/sol-startup-time`, based on `origin/main` at `e602ce6`.
+- Regression tests, BEING §2, CHANGELOG and Codex's task status. No protocol, verification cache, dependency, schema or Claude source-request changes. Read-only Git metadata in the supplied checkout required a clean clone at `/tmp/sol-startup-time`, initially based on `origin/main` at `e602ce6`. PR #66 reached main after publication; merged `7dda0ae` into the published branch without rewriting it, preserving both changelog entries. Relative to current main, Claude’s files remain untouched.
 
 ### Tests performed
 - Focused corpus contract (41 tests) and timing probe (6 tests) — OK. Coverage includes repeated byte reads, CRLF fingerprint changes, invalid UTF-8, escaping parent links, undeclared canonical documents, fresh-process isolation and deferred shell imports.
 - `.venv/bin/python -B scripts/check_docs.py` and `git diff --check` — OK; external URLs were not network-checked.
-- `.venv/bin/python -B -m unittest discover -s tests` — 1,803 tests, OK (12 skipped, 4 expected failures), isolated XDG/Neovim paths. Packaging and headless Neovim checks are included.
+- `.venv/bin/python -B -m unittest discover -s tests` — final integrated branch: 1,807 tests, OK (12 skipped, 4 expected failures); pre-integration run: 1,803 tests, OK. Isolated XDG/Neovim paths; packaging and headless Neovim checks included.
 - Read-only real book: 4,629 records / 1,803 passages; identical index SHA-256 before/after. No private text, PDF, workspace or profile is committed. No source PDF or personal workspace opened. Python 3.14.8, width 72, warm OS cache, sequential runs without concurrent tests/profiling. All CORE verification remains real; terminal boundary replaced.
 
 | Measurement | Before median (ms) | After median (ms) |
@@ -75,7 +75,7 @@ The fresh-application improvement is modest (5%); warm controller startup is
 8% smaller. A separate one-run startup cProfile comparison attributes
 399 → 275 ms to canonical file scans and 213 → 114 ms to safe-path work;
 these are overlapping profiled totals, not additive stage medians.
-Both profiles retain 10 `verify_snapshot_current` calls, 12 canonical scans
+Measurements precede that integration; #66 adds source-follow request handling, not startup work. Both profiles retain 10 `verify_snapshot_current` calls, 12 canonical scans
 and 1,274 safe-path checks. The largest remaining fresh-load cost is whole-graph
 JSON validation/detachment in the existing CORE trust machinery, left unchanged.
 Profile overhead distorts totals (whole profiled dispatch was 2.19 → 2.36 s);
