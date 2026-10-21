@@ -1,7 +1,6 @@
 include README.md
 include CONTRIBUTING.md CHANGELOG.md
 recursive-include docs *.md
-include docs/legacy/inventory.json
 include pyproject.toml MANIFEST.in
 recursive-include sol *.py *.lua
 include sol/terminal/fonts/LibertinusMono-Regular.ttf sol/terminal/fonts/OFL.txt
