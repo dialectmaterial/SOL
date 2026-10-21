@@ -349,6 +349,46 @@ class CorpusContractTests(unittest.TestCase):
         with self.assertRaises(contract.CorpusError):
             contract.render_record(changed, "Prose.")
 
+    def test_verification_rereads_exact_utf8_bytes_on_every_call(self):
+        path = self.root / "sample.md"
+        path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+        contract.reindex(self.root)
+        snapshot = contract.load_snapshot(self.root)
+        original = path.read_bytes()
+        with patch.object(contract, "_read_bytes", wraps=contract._read_bytes) as reads:
+            contract.verify_snapshot_current(snapshot)
+            contract.verify_snapshot_current(snapshot)
+        self.assertEqual(sum(call.args[0] == path for call in reads.call_args_list), 2)
+        path.write_bytes(original.replace(b"\r\n", b"\n"))
+        with self.assertRaisesRegex(contract.CorpusError, "Markdown changed"):
+            contract.verify_snapshot_current(snapshot)
+        path.write_bytes(original + b"\xff")
+        with self.assertRaisesRegex(contract.CorpusError, "UTF-8"):
+            contract.verify_snapshot_current(snapshot)
+
+    def test_each_scan_resolves_parent_links_and_checks_undeclared_documents(self):
+        directory = self.root / "nested"
+        directory.mkdir()
+        (directory / "sample.md").write_bytes((self.root / "sample.md").read_bytes())
+        manifest = {**self.manifest, "documents": ["nested/sample.md"]}
+        (self.root / "sample.md").unlink()
+        contract._canonical_files(self.root, manifest)
+        # A sibling with the same prefix must still be outside the boundary.
+        with tempfile.TemporaryDirectory(prefix=self.root.name, dir=self.root.parent) as outside:
+            target = Path(outside)
+            (target / "sample.md").write_bytes((directory / "sample.md").read_bytes())
+            (directory / "sample.md").unlink()
+            directory.rmdir()
+            directory.symlink_to(target, target_is_directory=True)
+            with self.assertRaisesRegex(contract.CorpusError, "escapes"):
+                contract._canonical_files(self.root, manifest)
+            directory.unlink()
+        directory.mkdir()
+        (directory / "sample.md").write_text("valid UTF-8", encoding="utf-8")
+        (self.root / "unlisted.md").write_text("<!-- sol:unlisted -->", encoding="utf-8")
+        with self.assertRaisesRegex(contract.CorpusError, "missing from manifest"):
+            contract._canonical_files(self.root, manifest)
+
     def test_stale_markdown_index_refused(self) -> None:
         contract.reindex(self.root)
         path = self.root / "sample.md"

@@ -29,12 +29,23 @@ from sol.reader.options import (DEFAULT_READER_THEME, DEFAULT_READER_WIDTH, LEGA
                                 validate_workspace_management)
 from sol.reader.actions import ReaderActions, ReadingSession, context_passages
 from sol.reader.launch import interactive_input_available, shell_identity
-from sol.reader.shell import install_completion, run_shell
 from sol.terminal.text import display_text, safe_output
 from sol.reader.render import (HEGEL_ASCII, HEGEL_ASCII_SMALL, NEOFETCH_PLACEHOLDERS,
     sensible_width, page_range, source_line, fold_path, fold_body, render_passage,
     passage_data, render_context, render_search_results, location_data, render_info,
     render_listing, render_tree, render_guide, render_neofetch)
+
+
+def install_completion(*args, **kwargs):
+    """Compatibility entry point; the native reader does not use a book shell."""
+    from sol.reader.shell import install_completion as install
+    return install(*args, **kwargs)
+
+
+def run_shell(*args, **kwargs):
+    """Import the optional command loop only when selected."""
+    from sol.reader.shell import run_shell as run
+    return run(*args, **kwargs)
 
 
 def load_book(pdf: Path) -> Book:

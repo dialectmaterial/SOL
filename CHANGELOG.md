@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Cheaper verified reader startup — 21 October 2026
+
+- Hash canonical bytes directly after UTF-8 validation; reduce path allocation
+  and resolve the corpus boundary once per scan, retaining all document reads,
+  hashes, parent-link checks and final generation checks.
+- Defer optional book-shell imports; add an isolated fresh-process startup probe
+  alongside the existing warm-process reader measurements.
+- Source verification policy, CORE/reference contracts and caches are unchanged.
+
 ### Cheaper section view preparation — 20 October 2026
 
 - Project styles and callouts together; reuse up to 256 immutable typography

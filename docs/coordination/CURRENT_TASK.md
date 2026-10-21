@@ -44,7 +44,7 @@ check and full suite.
 
 ## Codex: Faster startup to readable text
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/startup-time`
 **Requested:** 21 October 2026, by the maintainer via Claude (reader backlog, item 4)
 

@@ -290,7 +290,7 @@ def parse_document(text: str, document: str = "") -> list[dict]:
     return records
 
 
-def _safe_file(root: Path, relative: str, suffix: str | None = None) -> Path:
+def _safe_file(root: Path, relative: str, suffix: str | None = None, *, _resolved_root=None) -> Path:
     if not isinstance(relative, str) or "\\" in relative:
         raise CorpusError("Document paths must be relative POSIX strings")
     parts = PurePosixPath(relative)
@@ -300,7 +300,12 @@ def _safe_file(root: Path, relative: str, suffix: str | None = None) -> Path:
         raise CorpusError(f"Document path must end in {suffix}: {relative!r}")
     path = root.joinpath(*parts.parts)
     try:
-        path.resolve().relative_to(root.resolve())
+        # Resolve every document including all its parent symlinks. Avoid
+        # allocating two more Path trees for the containment comparison.
+        resolved = os.path.realpath(path)
+        resolved_root = os.path.realpath(root) if _resolved_root is None else _resolved_root
+        if os.path.commonpath((resolved, resolved_root)) != resolved_root:
+            raise ValueError("outside corpus")
     except ValueError as exc:
         raise CorpusError(f"Corpus path escapes its directory: {relative!r}") from exc
     if path.is_symlink():
@@ -448,18 +453,25 @@ def validate_records(records: list[dict], manifest: dict) -> None:
 
 def _canonical_files(root: Path, manifest: dict) -> tuple[dict[str, str], dict[str, str]]:
     """Read declared documents and hashes without needing a Markdown dependency."""
+    # Resolve the scan's boundary once, never retain it across verifications.
+    # Each document still resolves all its parents and is checked for symlinks.
+    resolved_root = os.path.realpath(root)
     documents = set(manifest["documents"])
     # Removing a file from the manifest must not silently remove canonical content.
     for path in root.rglob("*.md"):
         relative = path.relative_to(root).as_posix()
-        if relative not in documents and re.search(r"^<!-- sol:", _read_utf8(_safe_file(root, relative, ".md")), re.M):
+        if relative not in documents and re.search(
+                r"^<!-- sol:", _read_utf8(_safe_file(root, relative, ".md", _resolved_root=resolved_root)), re.M):
             raise CorpusError(f"Canonical Markdown is missing from manifest: {relative}")
     fingerprints: dict[str, str] = {}
     contents: dict[str, str] = {}
     for document in manifest["documents"]:
-        path = _safe_file(root, document, ".md")
-        content = _read_utf8(path)
-        fingerprints[document] = _sha(content.encode("utf-8"))
+        path = _safe_file(root, document, ".md", _resolved_root=resolved_root)
+        # Hash the exact bytes we decoded; retain UTF-8 validation and newline
+        # fidelity without encoding every complete document again per check.
+        raw = _read_bytes(path)
+        content = _decode_utf8(raw, str(path))
+        fingerprints[document] = _sha(raw)
         contents[document] = content
     return contents, fingerprints
 

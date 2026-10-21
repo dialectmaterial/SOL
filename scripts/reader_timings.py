@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only, warm-process reader measurements; no optimisations or GUI launch.
+"""Read-only reader measurements, including optional fresh-process startup.
 
 Run from a checkout. Invented corpus by default; --corpus is always explicit.
 Reported operations overlap: independent stage times must not be added together.
@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import platform
 import statistics
+import subprocess
 import sys
 import tempfile
 import time
@@ -21,6 +22,44 @@ from unittest.mock import patch
 from uuid import UUID
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+
+def _startup_worker(directory, state, width):
+    """Fresh application imports and dispatch; replace only the terminal boundary."""
+    started = time.perf_counter()
+    from sol.reader import app
+    from sol.terminal import neovim, splash
+
+    class FirstPayload(BaseException):
+        pass
+
+    result = None
+
+    def frontend(payload, executable, *, on_request):
+        nonlocal result
+        result = {"app_first_payload_ms": (time.perf_counter() - started) * 1000,
+                  "records_shown": len(payload["records"])}
+        raise FirstPayload
+
+    with patch.object(neovim, "validate_environment", return_value="not-launched"), \
+            patch.object(neovim, "launch_payload", side_effect=frontend), \
+            patch.object(splash, "start"), patch.object(splash, "stop"):
+        try:
+            app.main(["--corpus", directory, "--actor", "SOL timing probe", "--workspace", "timing",
+                      "--workspace-dir", state, "--width", width])
+        except FirstPayload:
+            pass
+    if result is None:
+        raise ValueError("application did not prepare its first payload")
+    print(json.dumps(result))
+
+
+# Dispatch before importing benchmark/controller modules: imports belong to the
+# fresh application's measurement, rather than being warmed by the harness.
+if __name__ == "__main__" and sys.argv[1:2] == ["--_startup-worker"]:
+    _startup_worker(*sys.argv[2:])
+    raise SystemExit(0)
+
 
 from sol import core
 from sol.core.paths import display_path, resolve_path
@@ -214,13 +253,56 @@ def summary(values):
             "p25_ms": quartiles[0], "p75_ms": quartiles[2], "samples_ms": values}
 
 
-def benchmark(corpus=None, *, repeats=5, warmups=1, width=72):
+def startup_benchmark(corpus=None, *, repeats=5, warmups=1, width=72):
+    """Measure a new process and temporary persistent workspace on every run."""
+    _parameters(repeats, warmups, width)
+    values = {name: [] for name in ("app_first_payload", "fresh_process_wall")}
+    with tempfile.TemporaryDirectory(prefix="sol-startup-timings-") as temporary:
+        root = Path(temporary)
+        directory = Path(corpus).expanduser().resolve() if corpus is not None else synthetic_corpus(root / "corpus")
+        book = core.load_corpus_book(directory)
+        for number in range(warmups + repeats):
+            state = root / str(number)
+            state.mkdir()
+            environment = dict(os.environ)
+            environment.update({f"XDG_{kind}_HOME": str(state / kind.lower())
+                                for kind in ("CONFIG", "DATA", "CACHE", "STATE")})
+            environment["NVIM_LOG_FILE"] = str(state / "nvim.log")
+            started = time.perf_counter()
+            child = subprocess.run([sys.executable, "-B", str(Path(__file__).resolve()), "--_startup-worker",
+                                    str(directory), str(state), str(width)], env=environment,
+                                   capture_output=True, text=True, timeout=60, check=True)
+            elapsed = (time.perf_counter() - started) * 1000
+            row = json.loads(child.stdout)
+            if number >= warmups:
+                values["app_first_payload"].append(row["app_first_payload_ms"])
+                values["fresh_process_wall"].append(elapsed)
+        core.verify_snapshot_current(book.corpus_snapshot)
+        return {"measurement_version": 3, "clock": "time.perf_counter", "repeats": repeats,
+                "discarded_warmups": warmups, "width": width,
+                "host": {"python": platform.python_version(), "platform": platform.platform()},
+                "dataset": {"kind": "synthetic" if corpus is None else "explicit local corpus",
+                            "index_sha256": book.corpus_snapshot.index_sha256,
+                            "records": len(book.corpus_snapshot.records), "passages": len(book.passages)},
+                "limits": ["Fresh Python process per run, warm OS cache; new temporary SQLite workspace.",
+                           "Application time includes imports, explicit corpus/actor/workspace dispatch and first payload.",
+                           "Wall time also includes interpreter/harness setup and process cleanup.",
+                           "No Neovim process, version probe, splash, IPC, painting or human-latency measurement.",
+                           "No personal preferences or workspace; resumed-workspace startup is not measured."],
+                "operations": {name: summary(rows) for name, rows in values.items()}}
+
+
+def _parameters(repeats, warmups, width):
     if type(repeats) is not int or not 1 <= repeats <= 30:
         raise ValueError("repeats must be an integer from 1 to 30")
     if type(warmups) is not int or not 0 <= warmups <= 10:
         raise ValueError("warmups must be an integer from 0 to 10")
     if type(width) is not int or not 20 <= width <= 240:
         raise ValueError("width must be an integer from 20 to 240")
+
+
+def benchmark(corpus=None, *, repeats=5, warmups=1, width=72):
+    _parameters(repeats, warmups, width)
     values = {name: [] for name in OPERATIONS}
     with tempfile.TemporaryDirectory(prefix="sol-reader-timings-") as temporary:
         root = Path(temporary)
@@ -279,11 +361,13 @@ def main(arguments=None):
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--warmups", type=int, default=1)
     parser.add_argument("--width", type=int, default=72)
+    parser.add_argument("--startup-only", action="store_true", help="fresh-process application startup only")
     parser.add_argument("--json", action="store_true", help="text-free measurement report; keep real-book reports outside Git")
     options = parser.parse_args(arguments)
     try:
-        report = benchmark(options.corpus, repeats=options.repeats, warmups=options.warmups, width=options.width)
-    except (ValueError, OSError) as error:
+        run = startup_benchmark if options.startup_only else benchmark
+        report = run(options.corpus, repeats=options.repeats, warmups=options.warmups, width=options.width)
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
         print(f"reader_timings: {str(error)!r}", file=sys.stderr)
         return 2
     if options.json:
