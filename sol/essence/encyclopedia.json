@@ -150,5 +150,129 @@
         }
       ]
     }
-  ]
+  ],
+  "genealogy": {
+    "title": "Genealogy",
+    "note": "Where the methods come from. Each line descends from the one it hangs from; dates are those given by the linked Wikipedia articles.",
+    "accessed": "2026-10-21",
+    "nodes": [
+      {
+        "id": "concordance-1230",
+        "year": "1230",
+        "label": "Concordance",
+        "detail": "Hugh of Saint-Cher's Bible concordance",
+        "parent": null,
+        "entry": null,
+        "source": "https://en.wikipedia.org/wiki/Bible_concordance"
+      },
+      {
+        "id": "concordance",
+        "year": "",
+        "label": "Lexical distribution and source context",
+        "detail": "",
+        "parent": "concordance-1230",
+        "entry": "concordance",
+        "source": null
+      },
+      {
+        "id": "stylometry-1887",
+        "year": "1887",
+        "label": "Counting words for style",
+        "detail": "Mendenhall's authorship study",
+        "parent": null,
+        "entry": null,
+        "source": "https://en.wikipedia.org/wiki/Stylometry"
+      },
+      {
+        "id": "word-counts",
+        "year": "",
+        "label": "Word counts",
+        "detail": "",
+        "parent": "stylometry-1887",
+        "entry": "word-counts",
+        "source": null
+      },
+      {
+        "id": "frequency-comparison",
+        "year": "",
+        "label": "Relative frequencies and comparisons",
+        "detail": "",
+        "parent": "word-counts",
+        "entry": "frequency-comparison",
+        "source": null
+      },
+      {
+        "id": "sentences",
+        "year": "",
+        "label": "Sentence segmentation and length",
+        "detail": "",
+        "parent": "stylometry-1887",
+        "entry": "sentences",
+        "source": null
+      },
+      {
+        "id": "tf-idf",
+        "year": "1972",
+        "label": "TF-IDF",
+        "detail": "Spärck Jones's inverse document frequency",
+        "parent": "word-counts",
+        "entry": "tf-idf",
+        "source": "https://en.wikipedia.org/wiki/Tf%E2%80%93idf"
+      },
+      {
+        "id": "distributional-1954",
+        "year": "1954",
+        "label": "Distributional hypothesis",
+        "detail": "Harris: like contexts, like meanings",
+        "parent": null,
+        "entry": null,
+        "source": "https://en.wikipedia.org/wiki/Distributional_semantics"
+      },
+      {
+        "id": "word-vectors",
+        "year": "2013",
+        "label": "Word vectors",
+        "detail": "word2vec",
+        "parent": "distributional-1954",
+        "entry": "word-vectors",
+        "source": "https://en.wikipedia.org/wiki/Word2vec"
+      },
+      {
+        "id": "transformers",
+        "year": "2017",
+        "label": "Transformers",
+        "detail": "“Attention Is All You Need”",
+        "parent": "word-vectors",
+        "entry": "transformers",
+        "source": "https://en.wikipedia.org/wiki/Transformer_(deep_learning)"
+      },
+      {
+        "id": "inputs",
+        "year": "",
+        "label": "Every study's input",
+        "detail": "SOL's own preparation of the text",
+        "parent": null,
+        "entry": null,
+        "source": null
+      },
+      {
+        "id": "prose",
+        "year": "",
+        "label": "Prose projection",
+        "detail": "",
+        "parent": "inputs",
+        "entry": "prose",
+        "source": null
+      },
+      {
+        "id": "tokenization",
+        "year": "",
+        "label": "Word tokenization",
+        "detail": "",
+        "parent": "prose",
+        "entry": "tokenization",
+        "source": null
+      }
+    ]
+  }
 }

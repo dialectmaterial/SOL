@@ -584,6 +584,11 @@ modest table of contents. The broader [encyclopedia proposal](coordination/propo
 remains historical design material; its §9 is deferred. No genealogy graph,
 editorial review states, catalog CLI, task registry or model execution is adopted.
 
+**Decision (maintainer, 21 October 2026), implemented:** "a small genealogical
+map, as the 'first page' of the encyclopedia". This amends the decision above
+for the map only; editorial review states, a catalog CLI, a task registry and
+model execution remain unadopted, and the proposal's larger graph is not.
+
 The small bundled file `sol/essence/encyclopedia.json` contains nine entries:
 word counts, word tokenization, relative frequencies and comparisons, sentence
 segmentation and length, lexical distribution and source context, prose
@@ -599,6 +604,16 @@ one, with a link to the article's contributor history. Excerpts are unchanged;
 some are sentence fragments. The quotations retain their CC BY-SA 4.0 license
 separately from SOL's code. The SOL-specific notes are outside the quotation.
 No Wikipedia images or other media are bundled.
+
+**Genealogy** is the encyclopedia's first item and opens first: a map of where
+the methods come from, with a year column and lines of descent, drawn from the
+`genealogy` block of the same file (each node names its parent and the entry it
+opens). ● marks what ESSENCE runs, ○ a reading topic; ancestors without an entry
+(Hugh of Saint-Cher's concordance, 1230; Mendenhall's counting for authorship,
+1887; Harris's distributional hypothesis, 1954) are shown but cannot be chosen.
+Every year is one given by a linked Wikipedia article (accessed 21 October
+2026), listed below the map; a method without a sourced date has none. Enter on
+Genealogy moves into the map, and Enter on a method opens its entry.
 
 Open **Encyclopedia (`1`)** in ESSENCE. Up/Down selects a method and shows its
 entry below; Enter focuses the scrollable detail, Page Down/Up or arrows scroll,
