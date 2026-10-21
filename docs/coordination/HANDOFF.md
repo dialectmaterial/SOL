@@ -32,6 +32,33 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## ESSENCE Results in small windows — 21 October 2026
+
+**Task:** [Codex: ESSENCE Results in small windows](https://github.com/dialectmaterial/SOL/blob/a7827cf/docs/coordination/CURRENT_TASK.md#codex-essence-results-in-small-windows).
+**Branch / PR:** `codex/essence-results-small` · [pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fessence-results-small); Claude reviews; author does not merge.
+**Last implementation commit:** `93ce0007ae0f473b28480fe94458b155a73f5a43` (this report is committed afterward).
+
+### Changed files
+- `sol/essence/tui/app.py` — bound Results to its window; summaries use at most 20% of height; word and occurrence tables share the remaining space. Compact help/export controls keep occurrences visible at 80×24. Explicit column budgets include padding and scrollbar space; long words, undefined measures, sentences, locations and TF-IDF terms wrap. Resize rebuilds preserve word/occurrence selection, focus, messages and export disabled state; intermediate highlight events cannot reset the occurrence.
+- `tests/test_essence_tui.py` — real-engine pilots for words with/without reference, sentences and TF-IDF at 80×24 and 120×40; visible table bounds, no horizontal scroll, source opening, Escape, resize selection and unchanged study receipts. Long Unicode words and undefined measures exercise all five reader themes.
+- `docs/ESSENCE.md` §4, `CHANGELOG.md` — current presentation behavior; `CURRENT_TASK.md` — Codex is `In review`. No Encyclopedia/Methods changes, engine, artifact, export, dependency or public-contract changes.
+- Render evidence (before/after terminal-cell renders on the invented corpus at 80×24 and 120×40) was reviewed in PR #80 and not kept in the repository.
+- Publication checkout: `/tmp/sol-essence-results-small`, cloned from `origin/main` at `a7827cf`, because the supplied checkout's Git metadata is read-only.
+
+### Tests performed
+- Documentation check: `/home/dima/Projects/code/sol/.venv/bin/python -B scripts/check_docs.py` — OK; external URLs not network-checked. `git diff --check` — OK.
+- Full suite: `/home/dima/Projects/code/sol/.venv/bin/python -B -m unittest discover -s tests` — **1,816 tests, OK (12 skipped, 4 expected failures)**, 132.457 s. All ESSENCE tests pass in this run.
+- Focused `SmallResultsTests` — 2 tests, OK; covers repeated resizing and source navigation at both sizes and long-word/undefined-measure cases in Mocha, Latte, Paper, Night and Terminal.
+- Actual Textual terminal driver in tmux, 80×24 then 120×40 — selected occurrence remains visible with heading/page and context; exports fit. Checked the native text “An invented passage makes this installed research…” in all five reader themes, including spaces next to bold. Visually inspected Paper comparison and the four non-ANSI theme renders; Terminal's ANSI palette is absent from SVG screenshots, so its text was checked through the real terminal driver.
+
+### Outstanding issues
+- No private-book visual trial; renders and pilots use the public invented corpus. Long rows and summaries require vertical scrolling. Windows narrower than 80 columns are outside this task's acceptance.
+
+### Decisions requiring approval
+None reserved. Defaults: summary height cap 20%; word/occurrence tables share space; wrap rather than omit columns or shorten the engine's undefined-measure labels. Claude may revise these presentation defaults in review.
+
+
+
 
 
 ## Remove the experiments and the research-export mode — 21 October 2026

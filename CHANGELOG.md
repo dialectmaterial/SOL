@@ -7,6 +7,13 @@
 - Remove `experiments/reader_surfaces/` and the Neovim research-export entry (`neovim.run`, `:SOLExport`, standalone Lua mode). The reader keeps its integrated controls, checked selections and action results.
 - Run all retained headless Lua behavior checks in integrated mode; move the former HTML source-integrity checks to the installed payload builder. Retire tests of the removed experimental frontends.
 
+### ESSENCE Results fit beside the reader — 21 October 2026
+
+At 80×24, word occurrences stay visible below the frequency table, including
+with a reference. All comparison columns fit; long words and undefined measures
+wrap. Sentence and TF-IDF tables also fit without sideways scrolling. Resizing
+keeps focus, selected rows and export status. Summaries scroll independently.
+
 ### A genealogy opens the ESSENCE encyclopedia — 21 October 2026
 
 The encyclopedia's first page is a small map of where its methods come from,
