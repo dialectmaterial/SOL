@@ -203,8 +203,8 @@ The shipped sentence study (Experiment A, below) is not superseded; it remains t
 ### Stage 2 engine — word frequencies (implemented, 18 October)
 
 The headless engine is available independently of the interface shell. The
-tokenizer was moved unchanged to `sol.essence.tokenization.word_tokens`; the
-term study still uses that exact function and its v1 output is unchanged. It
+tokenizer lives unchanged in `sol.essence.tokenization.word_tokens` (the term
+study that first used it was removed on 21 October 2026). It
 yields normalized words and original, half-open Python codepoint offsets:
 letter runs with combining marks and internal straight/curly apostrophes,
 NFC then case folding then curly-to-straight apostrophes; punctuation and
@@ -465,7 +465,7 @@ evidence, not classification of a philosophical concept. The former one-word
 term experiment was removed in the maintainer's 21 October cleanup; the shared
 word tokenizer remains in `sol/essence/tokenization.py`.
 
-With the optional **existing** Kitty handoff, one can open an ESSENCE Zsh pane from the compatibility reader workflow, execute an analysis, publish a return UUID, and accept the proposed navigation back in BEING. This validates reference passing, **not** a full model-output/parameter/visualization pipeline. Preserve its safety and permissions model while researching a terminal-independent equivalent.
+The reader-to-ESSENCE round trip runs through `E` and the reader's guarded `essence_source` request ([BEING §6](BEING.md#6-being--essence-without-terminal-dogma)); the earlier Kitty/Zsh handoff was removed on 21 October 2026.
 
 <a id="7-model-history-encyclopedia-and-task-registry-proposed"></a>
 
