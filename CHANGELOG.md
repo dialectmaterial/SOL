@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### ESSENCE looks right in small windows and every theme — 21 October 2026
+
+- Results keep their tables in view in small windows; summaries name the section
+  ("Quality, from p. 84") instead of a corpus path.
+- Radio choices use the theme's accent; sentence-length bars too.
+- The longest sentences' beginnings end at a word with "…".
+- Export buttons and the layout hint are compact.
+
 ### The maintainer's visual audit choices — 21 October 2026
 
 - The reading line is 66 columns by default (was 72); `--width` still overrides it.

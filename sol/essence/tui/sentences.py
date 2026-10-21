@@ -29,6 +29,7 @@ class SentenceCount:
     target: object
     texts: dict = field(default_factory=dict, repr=False)
     labels: dict = field(default_factory=dict, repr=False)
+    book: object = field(default=None, repr=False)  # display only: names the section
 
 
 def engine():
@@ -64,7 +65,7 @@ def run(context, target_choice, *, target_file=None, loader=None):
             labels[item["id"]] = f"{passage.heading or passage.node.title} | p. {passage.printed_page}"
     if target_choice == "file":
         texts[None] = words.verified_file_text(target.path, study["input"]["binding"]["sha256"])
-    return SentenceCount(study, target, texts, labels)
+    return SentenceCount(study, target, texts, labels, book)
 
 
 def summary(count):
@@ -72,7 +73,7 @@ def summary(count):
     study = count.study
     totals = study["summary"]
     part = study["input"]
-    where = part["scope"].get("path") or part["scope"]["kind"]
+    where = words.scope_name(count.book, part)
     if not totals["sentences"]:
         lines = [f"No sentences to measure ({part['provider']}, {where})."]
     else:
@@ -106,6 +107,16 @@ def summary(count):
     return lines
 
 
+def _beginning(text, limit=60):
+    """The sentence's first words, cut at a word with an ellipsis rather than mid-word."""
+    words = " ".join(text.split())
+    if len(words) <= limit:
+        return words
+    head = words[:limit + 1]
+    cut = head.rsplit(" ", 1)[0] if " " in head else words[:limit]
+    return cut.rstrip(" ,;:") + "…"
+
+
 def rows(count, limit=ROW_LIMIT):
     """The longest sentences: words, how each begins, and where."""
     study, table = count.study, []
@@ -113,7 +124,7 @@ def rows(count, limit=ROW_LIMIT):
         input_index, start, end, tokens = study["sentences"][index]
         item = study["input"]["inputs"][input_index]
         text = count.texts.get(item.get("id"))
-        beginning = " ".join(text[start:end].split())[:60] if text is not None else ""
+        beginning = _beginning(text[start:end]) if text is not None else ""
         table.append((str(tokens), beginning, count.labels.get(item.get("id")) or _where(item)))
     return table
 

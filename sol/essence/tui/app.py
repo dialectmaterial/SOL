@@ -88,19 +88,23 @@ class EssenceApp(App):
     RadioSet { border: none; padding: 0; background: transparent; height: auto; }
     RadioButton { border: none; padding: 0 1; background: transparent; }
     RadioButton:focus { text-style: bold; }
+    /* The chosen option's dot in the theme's accent; the others stay visible on dark pages. */
+    RadioButton > .toggle--button { background: transparent; color: $text-muted; }
+    RadioButton.-on > .toggle--button { color: $accent; }
     Input { margin-top: 1; }
     #run-row { height: auto; padding-top: 1; }
     Button { min-width: 12; height: 3; margin-right: 1; border: none; }
     #cancel { background: transparent; }
     #status { padding-top: 1; color: $text-muted; }
     #summary { padding: 0 0 1 0; }
-    #summary-box { height: auto; max-height: 9; }
+    #summary-box { height: auto; max-height: 25%; }
     #frequencies { height: 1fr; min-height: 5; }
     DataTable { background: $background; }
     #sources-label, #overall-label { padding: 1 0 0 0; color: $text-muted; height: auto; }
-    #sources { height: 10; max-height: 40%; }
+    #sources { height: 1fr; min-height: 4; max-height: 40%; }
     #overall { height: 8; max-height: 30%; }
     #export-row { height: auto; padding-top: 1; }
+    #export-row Button { height: 1; }
     #result-status { color: $text-muted; height: auto; }
     """
     # The private terminal sequence that asks the reader to open a source; the
@@ -142,7 +146,7 @@ class EssenceApp(App):
                             yield from self.compose_results()
                         else:
                             yield Markdown(text)
-        yield Static("Alt-F fullscreen ⇄ beside the reader · Alt-R back to the reader · 1–4 screens",
+        yield Static("Alt-F fullscreen ⇄ beside · Alt-R back to the reader · 1–4 screens",
                      id="layout-hint")
         yield Footer()
 
@@ -307,8 +311,8 @@ class EssenceApp(App):
         self.set_word_widgets(True)
         table = self.query_one("#frequencies", DataTable)
         table.clear(columns=True)
-        table.add_columns("Word", "Target", "per 10,000",
-                          *(("Reference", "per 10,000") if count.reference is not None else ()),
+        table.add_columns("Word", "Target", "per 10k",
+                          *(("Reference", "per 10k") if count.reference is not None else ()),
                           *(("Difference", "Log₂ ratio") if count.comparison is not None else ()))
         shown, total = words.rows(count)
         table.add_rows(shown if count.reference is not None else [row[:3] for row in shown])
@@ -352,7 +356,10 @@ class EssenceApp(App):
             lines.append("The longest sentences are below; Enter opens one in the reader (Alt-Left there returns).")
         lines.append(f"Saved: {saved} (check with: sol analyze check FILE)" if saved else
                      "Not saved: this reader session has no workspace.")
-        self.query_one("#summary", Static).update("\n".join(lines))
+        # The length bars take the theme's accent rather than the full ink colour.
+        summary = Text("\n".join(lines))
+        summary.highlight_regex(r"█+", style=self.current_theme.accent or "bold")
+        self.query_one("#summary", Static).update(summary)
         self.query_one("#result-status", Static).update("")
         self.query_one("#status", Static).update(
             f"Measured {count.study['summary']['sentences']:,} sentences; see Results (4).")
