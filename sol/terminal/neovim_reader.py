@@ -289,6 +289,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                        "type a printed page number")],
         "source_preview": [("page", lambda page: type(page) is int, "choose a source page by number")],
         "source_pdf": [("page", lambda page: type(page) is int, "choose a source page by number")],
+        "source_follow": [],
         "search": [("query", lambda query: isinstance(query, str) and 1 <= len(query.strip()) <= 256,
                     "search needs 1–256 characters")],
         "search_open": [("result", lambda result: type(result) is int and 1 <= result <= len(actions.results),
@@ -328,6 +329,10 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         if target not in source_requests:
             source_requests[target] = source_service.capture(target)
         try:
+            if request["op"] == "source_follow":
+                # Turns only a Zathura window S opened; never opens one or moves the reader.
+                from sol.terminal.source import follow_pdf
+                return {"follow": {"active": follow_pdf(source_requests[target], 0)}}
             if request["op"] == "source_pdf":
                 opened = source_pdf(source_requests[target], request["page"])
                 if opened["viewer"] is not None:
@@ -467,6 +472,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                             "env": environment}}
 
     panels = {"search": search_panel, "source_preview": source_panel, "source_pdf": source_panel,
+              "source_follow": source_panel,
               "marker_set": marker_panel, "marker_clear": marker_panel, "landmark_list": landmark_panel,
               "landmark_set": landmark_panel, "landmark_clear": landmark_panel, "note_add": note_panel,
               "note_edit": note_edit_panel, "note_history": note_history_panel, "footnote_open": footnote_panel, "essence_open": essence_panel}

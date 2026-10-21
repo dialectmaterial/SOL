@@ -63,18 +63,24 @@ return function(reader)
     message.id, message.op, message.packet, message.mode = channel.serial, operation, packet or current_packet(), mode
     message.focus = data.focus == true
     if data.theme then message.theme = data.theme.active end
-    if operation ~= 'marker_set' and operation ~= 'marker_clear' then
+    -- Following the reader in Zathura is background work: it never holds back a key.
+    if operation ~= 'marker_set' and operation ~= 'marker_clear' and operation ~= 'source_follow' then
       channel.navigation_pending = message.id
     end
     channel.pending[message.id] = function(result, problem)
       if channel.navigation_pending == message.id then channel.navigation_pending = nil end
-      if not result then vim.notify(tostring(problem), vim.log.levels.ERROR); return end
+      if not result then
+        if operation == 'source_follow' then reader.panels.stop_follow()
+        else vim.notify(tostring(problem), vim.log.levels.ERROR) end
+        return
+      end
       local ok, error = pcall(function()
         if result.position then reader.view.update_position(result.position)
         elseif result.payload then reload(result.payload)
         elseif result.search then reader.panels.show_search(result.search)
         elseif result.source then reader.panels.show_source(result.source)
         elseif result.pdf then reader.panels.show_pdf(result.pdf)
+        elseif result.follow then reader.panels.update_follow(result.follow)
         elseif result.landmarks then reader.panels.show_landmarks(result.landmarks)
         elseif result.note_history then reader.notes.show_history(result.note_history)
         elseif result.essence then reader.essence.open(result.essence)

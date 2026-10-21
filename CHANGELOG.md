@@ -11,6 +11,11 @@
   alongside the existing warm-process reader measurements.
 - Source verification policy, CORE/reference contracts and caches are unchanged.
 
+### Zathura highlights the passage and follows your reading — 21 October 2026
+
+`S` now highlights the passage on the printed page, and the Zathura window it
+opened follows the paragraph you are reading until you close it.
+
 ### Cheaper section view preparation — 20 October 2026
 
 - Project styles and callouts together; reuse up to 256 immutable typography

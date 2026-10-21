@@ -14,7 +14,7 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ## Claude Code: The passage highlighted in Zathura, which follows the reader
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `claude/pdf-follow`
 **Requested:** 21 October 2026, by the maintainer via Claude (reader backlog, item 2)
 

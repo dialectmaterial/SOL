@@ -198,9 +198,37 @@ return function(reader)
   end
   -- The printed page itself, zoomable and in context, in a PDF viewer beside the
   -- reader; without a viewer Python sends the crop instead. The position never moves.
+  -- After S opens Zathura, it follows the passage the reader rests on, until it
+  -- is closed. Moves are debounced and never wait for, or move, the reader.
+  -- Kept beside the request channel, so it survives section reloads.
+  local follow = rawget(_G, 'SOLReaderFollow') or {active = false, last = nil, timer = nil}
+  _G.SOLReaderFollow = follow
+  local function resting_passage()
+    local ok, packet = pcall(current_packet)
+    return ok and packet and packet.reference.reference.target_id or nil
+  end
   show_pdf = function(result)
     api.nvim_echo({{'Printed page ' .. result.printed_page .. ' (PDF page ' .. result.pdf_page ..
-      ') in ' .. result.viewer, 'None'}}, false, {})
+      ') in ' .. result.viewer .. (result.viewer == 'zathura' and '; it follows your reading' or ''), 'None'}},
+      false, {})
+    follow.active, follow.last = result.viewer == 'zathura', resting_passage()
+  end
+  function panels.stop_follow() follow.active = false end
+  function panels.update_follow(result) follow.active = follow.active and result.active == true end
+  function panels.follow_tick()
+    if not follow.active then return end
+    if follow.timer then follow.timer:stop() end
+    follow.timer = vim.defer_fn(function()
+      follow.timer = nil
+      local channel = rawget(_G, 'SOLReaderChannel')
+      if not follow.active or panels.window or api.nvim_get_current_win() ~= window
+        or (channel and channel.navigation_pending) then return end
+      local passage = resting_passage()
+      if passage and passage ~= follow.last then
+        follow.last = passage
+        request('source_follow')
+      end
+    end, 400)
   end
   local function source_pdf()
     request('source_pdf', {page = 1})
