@@ -33,6 +33,49 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## Stage 5 design proposal — 21 October 2026
+
+**Task:** [Codex: Stage 5 design proposal](https://github.com/dialectmaterial/SOL/blob/59624ea76140827c57516381e3a451ff63220d1a/docs/coordination/CURRENT_TASK.md#codex-stage-5-design-proposal-model-adapters-and-experiment-b).
+**Branch / PR:** `codex/stage5-proposal` · [pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fstage5-proposal); Claude reviews; author does not merge.
+**Last implementation commit:** `cfe87fb9209c3836fd3cc489a9318c0d937195ed` (this report is committed afterward).
+
+### Changed files
+- `docs/coordination/proposals/ESSENCE_STAGE5_PROPOSAL.md` — proposed capability/adapter interfaces, optional runtimes, exact prose input, embedding/Projector artifacts, reproducibility and layered verification, privacy and source-return boundaries, staged acceptance and smallest first task. Ten reserved decisions, each with options and a recommendation.
+- `docs/coordination/CURRENT_TASK.md` — Codex status `In review`; this HANDOFF entry is the other procedural edit. No code, dependencies, authority Decisions, public contracts or existing formats changed.
+- Publication uses `/tmp/sol-stage5-proposal`, cloned from `origin/main` at `59624ea`, because the supplied checkout's Git metadata is read-only.
+
+### Tests performed
+- `/home/dima/Projects/code/sol/.venv/bin/python -B scripts/check_docs.py` — OK; local Markdown links/anchors, four-authority layout and legacy integrity. External URLs are not checked by this script.
+- `/home/dima/Projects/code/sol/.venv/bin/python -B -m unittest discover -s tests` — 1,809 tests in 128.136 s, OK (12 skipped, 4 expected failures). Public/invented fixtures; log at `/tmp/sol-stage5-tests.log`.
+- `git diff --check` — OK. Reviewed upstream publisher/API/Projector documentation cited in the proposal; no model, runtime or viewer was installed or evaluated, and no private corpus or artifacts were used.
+
+### Outstanding issues
+- This is a design proposal, not completed stage 5. Exact checkpoint revision, dependency locks/platform support, model suitability/resource measurements, local viewer privacy and real-book/manual acceptance remain unverified gates for later tasks. UltraBERT's exact identity and embedding recipe remain unresolved.
+- Maintainer decisions below are needed before dependent implementation. No merge by the author.
+
+### Decisions requiring approval
+
+Every R1–R10 item is **(reserved)**. Options and recommendations are reproduced
+below; none is assumed adopted. No authority Decision statement is changed.
+
+| ID | Reserved decision and options | Recommendation |
+| --- | --- | --- |
+| R1 | Provider/adapter/capability API and versioning: private versioned boundary; public plugin API/entry points; separate distributions | Private v1 boundary and bundled metadata-only registry; publish nothing separately yet |
+| R2 | Runtime packaging/dependency set: reader extra; isolated research environment/subprocess; external service | Isolated CPU environment with exact tested lock/platform record; no reader dependency or Python-range change |
+| R3 | Input and scope contract: reuse word projection; exact prose-export passages; sentences/chunks; whole-file/spans/collections | Exact prose export for complete CORE passages, separate verbatim whole-file policy; no new canonical schema or projection-offset return |
+| R4 | Checkpoint/license/extraction adoption: exact sentence baseline; verified UltraBERT; other purpose-built model | Evaluate all-MiniLM-L6-v2 first; approve immutable revision/file inventory and recipe before use; UltraBERT unresolved |
+| R5 | Length/granularity/numeric policy: reject; truncate; chunk/aggregate; CPU/GPU/quantized outputs | Reject overflow, no chunks, explicit float32 L2-normalized CPU output and no automatic fallback |
+| R6 | New artifact contract and limits: manifest plus TSVs; monolithic JSON; binary matrix/archive | `sol.embedding-study` v1 manifest and fixed TSV pair with strict escaping/hashes, proposed caps and separately bound optional derivatives |
+| R7 | Verification/reproducibility contract: integrity only; source check; exact replay; numerical replay/relaxed freshness | Report all levels separately, retain strict generation binding, exact-byte comparison plus declared `1e-5` numeric tolerance; never claim cross-device identity |
+| R8 | Publication, deletion and job lifetime: overwrite/resume; immutable runs; detached jobs; cancel on exit | Owner-only atomic no-overwrite runs, cancel owned worker on exit, clean only owned incomplete staging; defer durable investigation/workspace changes |
+| R9 | Viewer/dependencies/privacy: hosted local-file loading; pinned local Projector; TensorBoard/checkpoints; export only | Audit pinned local Projector first, export only until proven; separately approve build/runtime dependencies, no hosted transfer default |
+| R10 | Comparison/projection dependency and evidence contract: exact cosine via scikit-learn; approximate index; viewer-only plots; UMAP | Later scikit-learn exact original-space neighbors and recorded PCA/t-SNE; defer approximate search/UMAP; projection never substitutes for original-space evidence |
+
+Defaults: headless orchestration before UI, a modest bundled registry, unchanged
+existing contracts and guarded passage-start source return. No new permissions,
+background-job persistence or model-generated workspace assertions.
+
+
 ## A faster full test suite — 21 October 2026
 
 **Task:** [Codex: A faster full test suite](https://github.com/dialectmaterial/SOL/blob/aba326e38eeacdb29ac41e6ce1e78d3670d4e053/docs/coordination/CURRENT_TASK.md#codex-a-faster-full-test-suite).
