@@ -33,6 +33,69 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## A faster full test suite — 21 October 2026
+
+**Task:** [Codex: A faster full test suite](https://github.com/dialectmaterial/SOL/blob/aba326e38eeacdb29ac41e6ce1e78d3670d4e053/docs/coordination/CURRENT_TASK.md#codex-a-faster-full-test-suite).
+**Branch / PR:** `codex/test-speed` · [pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Ftest-speed); Claude reviews; author does not merge.
+**Last implementation commit:** `6a57ccb8e0820b10e805e9beccfdc6a1b01bb847` (this report is committed afterward).
+
+### Changed files
+- `tests/fixtures_async.py` — cooperative setup for UI tests: retain `IsolatedAsyncioTestCase` and its per-test loop, cancellation and cleanup; use normal application loop mode unless `PYTHONASYNCIODEBUG` is set. Avoid expensive asyncio creation-stack tracing during ordinary behavior checks.
+- Eight UI test modules (encyclopedia, ESSENCE, reader cursor/experience/reflow/spacing/surface/view) — mix in that setup; ESSENCE's existing async setup calls its parent. Every test method, assertion, decorator, input sequence, wait and worker check is unchanged.
+- `CONTRIBUTING.md`, `CHANGELOG.md` — explain normal versus opt-in debug diagnostics. Codex's task status is `In review`. No product, dependency, CI, authority, public contract or schema change.
+- Publication uses `/tmp/sol-test-speed`, cloned from `origin/main` at `aba326e`, because the supplied checkout's Git metadata is read-only.
+
+### Tests performed
+- Documentation check (`python -B scripts/check_docs.py`) — OK; external URLs were not network-checked. `git diff --check` — OK.
+- Full discovery before and after — **1,807 tests, OK (12 skipped, 4 expected failures)** in both runs; no added skips or changed expected failures. Includes packaging, real headless Neovim and native TTY checks. The ordinary command stays `python -B -m unittest discover -s tests`.
+- Full discovery with `PYTHONASYNCIODEBUG=1` — 1,807 tests, OK (12 skipped, 4 expected failures), 99.287 s reported / 100.727 s wall time; restores the original diagnostic mode.
+- Focused ESSENCE checks — 32 tests, OK, 28.893 s (baseline module total 39.343 s). AST comparison of all 1,807 test methods, including their assertions and decorators, against `origin/main` — identical.
+
+| Full discovery timing | Before (s) | After (s) |
+| --- | ---: | ---: |
+| Wall clock, including discovery and runner | 101.255 | 81.277 |
+| unittest's reported run time | 100.883 | 80.905 |
+
+**19.7% less wall time (20.0 s saved)** on this machine. The task's approximate
+150 s was not reproduced: the measured baseline here was 101.3 s. Same Python
+3.14.8 interpreter (`/home/dima/Projects/code/sol/.venv/bin/python`), dependency
+installation, public fixtures, temporary XDG/Neovim paths and sequential runs,
+without another suite/profile running concurrently. A temporary `TextTestResult`
+subclass timestamps `startTest`/`stopTest`, preserving discovery and runner
+behavior; the wall timer also includes discovery and class setup/cleanup. Test
+rows include each test's setup/cleanup, not shared class setup. These are local
+samples, not a cross-host speed guarantee. Packaging and subprocess timings also
+vary; the unchanged native TTY and Zathura tests are useful controls.
+
+Slowest baseline tests, with the same tests after the change:
+
+| Test | Before (s) | After (s) |
+| --- | ---: | ---: |
+| `test_encyclopedia.EncyclopediaBrowserTests.test_browse_read_scroll_and_return_at_terminal_sizes` | 7.18 | 5.37 |
+| `test_essence_tui.EssenceAppTests.test_methods_screen_browses_every_method` | 4.40 | 2.77 |
+| `test_reader_terminal_portability.ReaderTerminalPortabilityTests.test_default_reader_in_xterm_vt100_and_screen_ttys` | 4.39 | 4.32 |
+| `test_essence_tui.ComparisonScreenTests.test_export_writes_only_in_workspace_sessions` | 4.33 | 2.94 |
+| `test_essence_tui.CountOrderTests.test_an_older_count_never_replaces_a_newer_one` | 3.55 | 3.03 |
+| `test_reader_surface_neovim.ReaderSurfaceNeovimTests.test_zathura_follows_the_resting_passage_after_s_until_it_closes` | 3.53 | 3.53 |
+| `test_essence_tui.ComparisonScreenTests.test_measures_sources_and_opening_one_in_the_reader` | 3.40 | 2.59 |
+| `test_essence_tui.EssenceAppTests.test_follows_the_reader_theme_while_open` | 2.98 | 2.90 |
+
+The remaining slowest tests are encyclopedia browsing (5.37 s), native TTYs
+(4.32 s), Zathura following (3.53 s), count ordering (3.03 s), exports (2.94 s)
+and theme polling (2.90 s). Real launches and all polling/synchronization waits
+remain. A separate cProfile of encyclopedia browsing identified repeated
+asyncio stack extraction and line-cache work; profiling distorted total wall
+time, so those timings are excluded from the comparison. Raw timing logs/JSON
+and the temporary profiler remain outside Git at `/tmp/sol-speed-*`,
+`/tmp/time-sol-suite.py` and `/tmp/sol-ui-before.prof`; no private corpus was used.
+
+### Outstanding issues
+- Normal mode omits asyncio's debug-only diagnostics (creation stacks, slow-callback logging and thread checks); `PYTHONASYNCIODEBUG=1` restores them. Test behavior, exception propagation, resource warnings and loop cleanup remain. No manual reading/visual acceptance is claimed.
+
+### Decisions requiring approval
+None reserved. Default: run UI behavior checks in the application's normal loop mode, with debug diagnostics available explicitly. Existing tests and assertions remain intact; the reviewer can overrule this runner default.
+
+
 ## BEING describes the current reader — 21 October 2026
 
 **Task:** [Codex: BEING describes the current reader, not its history](https://github.com/dialectmaterial/SOL/blob/78c2389/docs/coordination/CURRENT_TASK.md#codex-being-describes-the-current-reader-not-its-history).
