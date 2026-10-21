@@ -4,8 +4,8 @@ This file tells Claude Code how to work in this repository. It is operational
 guidance, not a design authority. What SOL should be is governed only by the four
 documents in `docs/`: [Architecture](docs/ARCHITECTURE.md), [BEING](docs/BEING.md),
 [ESSENCE](docs/ESSENCE.md) and [CORE](docs/CORE.md). Development procedure is in
-[CONTRIBUTING](CONTRIBUTING.md). `docs/legacy/` is historical evidence: read it,
-never edit it.
+[CONTRIBUTING](CONTRIBUTING.md). Earlier documents are in Git history, not in the
+tree.
 
 ## Roles
 

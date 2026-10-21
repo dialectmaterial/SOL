@@ -3,7 +3,7 @@
 The four human-facing design authorities are [Architecture](docs/ARCHITECTURE.md),
 [BEING](docs/BEING.md), [ESSENCE](docs/ESSENCE.md), and [CORE](docs/CORE.md).
 This contributor guide covers operational development procedures, not a separate
-architecture. Earlier instructions are preserved in the [legacy archive](docs/legacy/README.md).
+architecture. Earlier instructions are in Git history.
 
 Use Python 3.10 or newer. From a checkout, prepare an isolated environment:
 

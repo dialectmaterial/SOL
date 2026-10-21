@@ -30,8 +30,8 @@ ENTRY_POINTS = {
     "sol-corpus": "sol.corpus.convert:main",
     "sol-corpus-check": "sol.corpus.contract:main",
 }
-PUBLIC_FILES = {"pyproject.toml", "MANIFEST.in", "README.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE",
-                "docs/legacy/inventory.json"} | PACKAGE_FILES | PACKAGE_ASSETS
+PUBLIC_FILES = {"pyproject.toml", "MANIFEST.in", "README.md", "CONTRIBUTING.md", "CHANGELOG.md",
+                "LICENSE"} | PACKAGE_FILES | PACKAGE_ASSETS
 for directory, suffixes in (("docs", {".md"}), ("tests", {".py"}),
                             ("scripts", {".py"})):
     PUBLIC_FILES.update(path.relative_to(ROOT).as_posix()
@@ -122,7 +122,7 @@ for entry in catalog['entries']:
     assert entry['quote'] in entry_markdown(catalog, entry)
 from sol.essence.methods import load_methods, method_markdown
 methods = load_methods()
-assert len(methods['entries']) == 11
+assert {entry['id'] for entry in methods['entries']} == {'words', 'word-comparison', 'tfidf', 'sentences', 'prose', 'check'}
 assert any(method['id'] == 'tfidf' for method in methods['entries'])
 from sol.essence import analyze_tfidf
 assert callable(analyze_tfidf)
@@ -487,7 +487,7 @@ assert 'markdown_it' not in sys.modules
                 self.assertIn("usage:", result.stdout)
 
     def test_installed_experiment_runs_without_reader_workspace_or_optional_libraries(self):
-        installed = Path(self.temporary.name) / "term-study-wheel"
+        installed = Path(self.temporary.name) / "sentence-study-wheel"
         with zipfile.ZipFile(self.wheel) as archive:
             archive.extractall(installed)
         corpus = Path(self.temporary.name) / "installed-experiment-corpus"
@@ -508,22 +508,22 @@ def guard(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
 from sol.essence.cli import main
-from sol.essence.terms import check_term_result
+from sol.essence.sentences import check_sentence_result
 from sol.core import load_snapshot
 output = io.StringIO()
 with contextlib.redirect_stdout(output):
-    assert main(['term', 'invented', '--corpus', sys.argv[2], '--json']) == 0
+    assert main(['sentences', '--corpus', sys.argv[2], '--json']) == 0
 result = json.loads(output.getvalue())
-assert result['totals']['occurrences'] == 1
-assert check_term_result(load_snapshot(sys.argv[2]), result) == result
+assert result['summary']['sentences'] == 1
+assert check_sentence_result(load_snapshot(sys.argv[2]), result) == result
 assert not any(name == prefix or name.startswith(prefix + '.')
                for name in sys.modules for prefix in forbidden)
-print(json.dumps({'query': result['query'], 'occurrences': result['totals']['occurrences']}))
+print(json.dumps({'sentences': result['summary']['sentences']}))
 """
         completed = subprocess.run([sys.executable, "-I", "-B", "-c", program, str(installed), str(corpus)],
                                    cwd=self.temporary.name, capture_output=True, text=True)
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
-        self.assertEqual(json.loads(completed.stdout), {"query": "invented", "occurrences": 1})
+        self.assertEqual(json.loads(completed.stdout), {"sentences": 1})
         self.assertEqual(before, {path.name: path.read_bytes() for path in corpus.iterdir()})
 
     def test_core_only_wheel_proves_interface_dependency_boundary(self):

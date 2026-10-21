@@ -182,6 +182,8 @@ sol --workspace logic-study --workspace-export > logic-study.sol-workspace.json
 
 Workspace report exports retain references, questions, notes/revisions, reading state, attribution, source provenance and unresolved IDs; adding `--include-passages` includes the *current* canonical Markdown of referenced records, **not** historic text snapshots. Exports can include copyrighted and private material: keep out of Git. Workspace backup/upgrade operations produce validated separate SQLite copies and reject overwriting targets.
 
+**Storage rules.** Each workspace is one SQLite file in `$XDG_DATA_HOME/sol/workspaces` (default `~/.local/share/sol/workspaces`; `--workspace-dir` selects another), outside the canonical book and never synchronized to Git or a service; foreign keys are enforced on every connection. Schema 2 added annotation history and editing; schema 3, which new workspaces use, adds checkpoint-bound reading positions. Recognized schema 1 and 2 files open in their own format, and unrecognized or incompatible files are refused, with no migration on ordinary open. `--workspace-backup FILE.sqlite3` takes SQLite's online backup, validates it and publishes it without overwriting anything (the parent directory must exist; files are mode `0600`); `--workspace-upgrade FILE.sqlite3` migrates only a separately named, validated copy, leaving the original and any open session untouched, and an upgraded legacy note keeps the body available at upgrade as its baseline, not a reconstructed history. JSON and Markdown exports go to standard output only, add no reading activity, and keep schema-2/3 `annotation_history` without fabricating it for schema 1; use the `.sol-workspace.json`/`.md` suffixes, which Git and release archives ignore. Personal and canonical Markdown in a report is shown literally in fenced blocks (links and images are inert text), metadata in code spans, unsafe controls as visible escapes. Review testimony binds only the inspected Markdown digest and the manifest's declared PDF fingerprint, not attribution, page labels, rectangles or image bytes; testimony on a retired reference is conservatively stale, and exports and `--workspace-check` disclose this binding rather than repair it. **Listing and removing workspaces:** `sol --workspace-list` and `sol --workspace-delete NAME` need no reader, actor or corpus (`--workspace-dir` and `--json` apply). Close the workspace everywhere first. Deletion acts at once, without a second confirmation: it removes the workspace from normal use, clears launch preferences that point to it, and keeps the unchanged database in a private subdirectory of `workspaces/.trash/`, printing the recovery path (`recovery_path` in JSON); actor profiles and the corpus are untouched, and missing, open, linked, unrecognized or unsafe databases are refused rather than forced. Listing does not show archived workspaces. To restore, close SOL and move the database from its recovery path back to the workspace directory, only if the original filename is free; there is no automatic restore or permanent archive deletion. Actor labels live separately in `$XDG_DATA_HOME/sol/profiles.sqlite3` (mode `0600`); they are attribution, not authentication. Authored writes, checkpoints and resumes refuse a changed corpus generation (manifest, index and Markdown, not PDF bytes) rather than reloading it: reindex explicitly, then reopen.
+
 <a id="4-theming-and-typography-next-bounded-task"></a>
 
 ## 4. Theming and typography
@@ -226,53 +228,9 @@ The corpus contract supports separate `formula` records and prose passages with 
 
 **Zoomable printed page ([reader backlog](coordination/proposals/READER_GAPS_AFTER_ZATHURA.md) item 2):** `S` in the reader, or in the `s` popup, opens the private, fingerprint-checked PDF snapshot at the passage's physical page in a PDF viewer: Zathura when installed, otherwise Sioyek, Okular, Evince or MuPDF, or the command in `SOL_PDF_VIEWER` (`{page}` and `{file}` are replaced). The page can then be zoomed and read with its surroundings, which a fixed-resolution crop cannot offer. A Zathura window SOL opened is turned to each new page over D-Bus (`gdbus`) instead of opening another, so it works as a companion beside the reader; once it is closed, `S` opens a new one. Without a graphical display or PDF viewer, `S` shows the crop popup instead and says why. The reading position, selection and workspace never change. Tested with mocked viewers and in Zathura 2026.10.4 by D-Bus; not yet used in a reading session. In Zathura, `S` also highlights the passage's recorded region on the page, and on the next page when the passage continues there (Zathura's D-Bus `HighlightRects`, with the converter's boxes in PDF points from the top-left corner). Until that window is closed, it follows the reader: about 0.4 s after the cursor comes to rest in another passage, the window turns to it and highlights it. Following checks the snapshot again, never opens a window, never moves the reader, and waits while a move is loading; it stops quietly when Zathura is closed or a request fails. Tested with mocked D-Bus and headless Neovim, and by D-Bus against Zathura 2026.10.4 on the book (calls accepted); the highlight's placement has not yet been seen on screen. Returning from the PDF to the text is not implemented.
 
-### Private formula review sheet
-
-Checkout-only `scripts/formula_review_sheet.py` prepares a private offline HTML
-sheet beside its source-bound `sheet.json` and initially empty `verdicts.jsonl`.
-It selects all canonical records with `contains_math: true` and
-`transcription_status: needs_visual_review`, including note paragraphs, in
-canonical order. This includes more than the 30 retyped records; repeat
-`--record FULL_UUID` to select an explicit eligible subset. Each item shows its
-ID, attribution, exact typed text and canonical Markdown, plus every recorded
-source page, with PDF/printed labels. The script calls the existing
-`SourceService.capture` and `render_region`: recorded regions are cropped, and
-entries lacking a bounding box are explicitly labelled whole pages. Missing or
-changed PDF/corpus data refuse generation; no guessed formula is supplied.
-
-```sh
-.venv/bin/python -B scripts/formula_review_sheet.py create \
-  --corpus /absolute/path/to/local-corpus --output /private/path/formula-review
-# Add --pdf /absolute/path/to/original.pdf if normal source discovery needs it.
-# Open /private/path/formula-review/review.html, then record each human verdict:
-.venv/bin/python -B scripts/formula_review_sheet.py review \
-  --sheet /private/path/formula-review --reviewer "Your name"
-.venv/bin/python -B scripts/formula_review_sheet.py record \
-  --sheet /private/path/formula-review --record 1 --reviewer "Your name" \
-  --verdict needs-correction --note "The exponent differs from the print."
-.venv/bin/python -B scripts/formula_review_sheet.py check \
-  --sheet /private/path/formula-review --corpus /absolute/path/to/local-corpus
-```
-
-The output's parent must already exist outside every Git checkout and the
-canonical corpus; an existing sheet is never replaced. Directories are private
-(700), files 600, and the temporary verified PDF/cache is removed. The sheet
-does not load remote resources. `review` offers confirmed, needs correction,
-skip and quit, and resumes pending items. Needs correction requires a note;
-`record` can revisit an item by number or full ID. Every verdict is appended,
-retaining earlier testimony, reviewer and UTC time, bound to the sheet's hash
-and record text/metadata digests. The last verdict on an item supplies progress
-counts; it is not approval to apply it. HTML/crop changes or malformed history
-refuse further recording. `check --corpus` additionally refuses a different
-canonical generation. Historical verdicts may still be recorded against the
-unchanged sheet, without asserting that it matches a later corpus.
-
-**This is a review aid only.** All verdicts start absent. Confirmed means the
-named human recorded that verdict; it never sets canonical status to
-`reviewed`, certifies a formula, or rewrites text. Applying testimony or changing
-`transcription_status` in canonical Markdown remains a separate human-approved
-step, followed by reindexing and checking. The private artifact format belongs
-to this checkout script, not the CORE reference protocol or workspace schema.
+The checkout-only formula review-sheet tool was removed in the maintainer's
+21 October cleanup. Printed-source crops and page viewing remain available;
+canonical transcription status still requires human review.
 
 Acceptance: demonstrate one reviewed simple formula, one complex or unreviewed Newton-related formula, a mixed prose/math passage, a missing source image, a corrected formula, and a stale reference; compare actual rendering against original PDF evidence.
 
@@ -284,7 +242,7 @@ The next development target is a **terminal-independent handoff interface**, usi
 
 A narrow, demonstrable first scenario: read a chapter → select scope → initiate an ESSENCE sentence-length analysis → inspect measurements and supporting passage IDs → choose a result → return to its source in BEING → recover the original reading context. **Returning to the result's passage** and **returning to the previous reader position** are different operations; support or explicitly distinguish both rather than assuming one action solves both.
 
-**Sentence study:** `sol analyze sentences` runs ESSENCE's sentence study, also available as **Sentence lengths** in ESSENCE ([interface and scopes](ESSENCE.md#4-interaction-model-and-inquiry-contract)). It shows the distribution, means by place in the paragraph and the twelve longest sentences. Workspace sessions save artifacts owner-only as `~/.local/share/sol/studies/sentences-*.sol-analysis.json`, never overwriting; temporary `-n` sessions save nothing. `sol analyze check` checks the artifact. Enter on a corpus sentence in ESSENCE opens its first character through guarded navigation; Alt-Left returns to the earlier reader position. There is no sentence-study reader key, panel or reader action. The reader's `S` opens the printed PDF page (§5).
+**Sentence study:** `sol essence sentences` runs ESSENCE's sentence study, also available as **Sentence lengths** in ESSENCE ([interface and scopes](ESSENCE.md#4-interaction-model-and-inquiry-contract)). It shows the distribution, means by place in the paragraph and the twelve longest sentences. Workspace sessions save artifacts owner-only as `~/.local/share/sol/studies/sentences-*.sol-analysis.json`, never overwriting; temporary `-n` sessions save nothing. `sol essence check` checks the artifact. Enter on a corpus sentence in ESSENCE opens its first character through guarded navigation; Alt-Left returns to the earlier reader position. There is no sentence-study reader key, panel or reader action. The reader's `S` opens the printed PDF page (§5).
 
 **Decision (maintainer, 18 October 2026): ESSENCE opens beside or over the reader, on demand.** ESSENCE will become a separate Textual application in a Neovim terminal buffer, beside the reader or fullscreen, started only when requested ([ESSENCE §4](ESSENCE.md#4-interaction-model-and-inquiry-contract)). Requirements on the reader side, **proposed** and to be marked implemented only when tested on real terminals:
 
@@ -320,4 +278,4 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 
 A change may be called done only when (1) core corpus/ref/workspace tests pass; (2) recorded UUID+codepoint location survives theme switches, resizing, section transitions, and restart; (3) warnings and notes remain correctly attributed; (4) regular Alacritty and optional Kitty degrade gracefully; (5) reading in a chosen substantial *Science of Logic* chapter demonstrates fewer interruptions; (6) math preview and ESSENCE returns demonstrably preserve the right context; and (7) code and these documents agree on what is actually implemented.
 
-**Source lineage:** consolidated from GitHub's reader view, Neovim implementation, reader actions, workspace plan/export, usage manual, handoff documentation, renderer experiments and dated discussions. Detailed historical experiments remain in `docs/legacy/` after migration.
+**Source lineage:** consolidated from GitHub's reader view, Neovim implementation, reader actions, workspace plan/export, usage manual, handoff documentation, renderer experiments and dated discussions. Earlier documents are in Git history.

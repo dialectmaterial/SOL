@@ -7,7 +7,7 @@ and reports in [HANDOFF](HANDOFF.md). This file is coordination, not design
 authority: a task must agree with [Architecture](../ARCHITECTURE.md),
 [BEING](../BEING.md), [ESSENCE](../ESSENCE.md) and [CORE](../CORE.md), and cites
 them rather than restating them. Backlog: the
-[Codex reader and workspace proposal](proposals/CODEX_READER_WORKSPACE_PLAN.md).
+[reader backlog](proposals/READER_GAPS_AFTER_ZATHURA.md).
 
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
@@ -43,7 +43,7 @@ reviewed by the other agent before merging.
 
 ## Claude Code: Fold the legacy documents in, then remove them (step 4)
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `claude/legacy-docs`
 
 ### Scope
@@ -53,26 +53,25 @@ authorities, README, CONTRIBUTING, CLAUDE.md, `scripts/check_docs.py` and its
 test. No code. Next: steps 1, 3 and 6's `sol being` (app, options, shell,
 `sol/terminal/` except the Lua reader, packaging).
 
-## Codex: Remove the experiments and the research-export mode (step 2)
+## Codex: ESSENCE cleanup (steps 5 and 6)
 
 **Status:** In review
-**Branch:** `codex/remove-experiments`
+**Branch:** `codex/essence-cleanup`
+**Requested:** 21 October 2026, by the maintainer
 
 ### Scope
 
-`experiments/`, `neovim.run` and research export in `sol/terminal/neovim.py`,
-the non-integrated paths in `sol/terminal/neovim*.lua` (and `neovim.lua`),
-`sol/reader/surface.py` only as far as the experiments need, their tests
-(rewrite the headless Lua tests that run the non-integrated mode to the
-integrated one rather than dropping coverage of reader behaviour),
-`scripts/reader_timings.py` if it depends on them, CHANGELOG, BEING.
-Not `docs/legacy/` or `docs/coordination/proposals/` (Claude). Next: steps 5
-and 6's `sol essence` rename (`sol/essence/`, its tests and ESSENCE).
+Remove the term experiment, segmentation-pilot tools and formula review sheet,
+with their tests. Preserve the shared tokenizer and corpus guards. Rename the
+`sol analyze` namespace to `sol essence` without an alias in ESSENCE code,
+messages, current docs and tests. In `sol/reader/app.py`, change only that
+subcommand's dispatch condition. Claude owns shell, terminal (except ESSENCE
+TUI), reader options and packaging cleanup. See ESSENCE §§2, 5–6.
 
 ### Acceptance
 
-No reader behaviour lost; documentation check and full suite; the handoff
-lists removed files and line counts.
+Documentation check and full suite; handoff with removed files and line counts;
+pull request for Claude's review, no author merge.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.

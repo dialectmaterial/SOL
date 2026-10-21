@@ -214,7 +214,7 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
-    if arguments and arguments[0] == "analyze":
+    if arguments and arguments[0] == "essence":
         from sol.essence.cli import main as analyze_main
         return analyze_main(arguments[1:])
     if arguments and arguments[0] == "reference":

@@ -1,28 +1,19 @@
-"""Analysis inputs, experiments and private review over a selected local corpus."""
+"""Analysis inputs and experiments over a selected local corpus."""
 
 from __future__ import annotations
 
 import argparse
 import json
 from pathlib import Path
-import shutil
 import sys
-import textwrap
 import unicodedata
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Build help without importing analysis or opening any local data."""
     parser = argparse.ArgumentParser(
-        prog="sol analyze", description="Run and verify transparent, read-only corpus experiments.")
+        prog="sol essence", description="Run and verify transparent, read-only corpus experiments.")
     commands = parser.add_subparsers(dest="action", required=True)
-    term = commands.add_parser("term", help="measure exact lexical occurrences, not conceptual similarity")
-    term.add_argument("word", metavar="WORD", help="one lexical token to count (Unicode-aware, case-insensitive)")
-    term.add_argument("--reference", metavar="FILE|-", help="optional CORE reference anchor; it does not restrict the scope")
-    term.add_argument("--doctrine", choices=("being", "essence", "concept"),
-                      help="explicitly restrict the experiment to one doctrine")
-    term.add_argument("--limit", type=int, default=10, metavar="N",
-                      help="maximum representative passages (default: 10)")
     sentences = commands.add_parser("sentences", help="measure sentence lengths in the English translation")
     from sol.essence.word_cli import add_input_arguments
     add_input_arguments(sentences, words=True, unit="sentences")
@@ -43,21 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     word_export.set_defaults(json=False)
     add_arguments(word_export)
     prose = commands.add_parser("prose", help="prepare prose-only analysis input, retaining headings as metadata")
-    sample = commands.add_parser("segmentation-sample", help="prepare a blind private sample for human sentence marking")
-    sample.add_argument("--per-doctrine", type=int, required=True, metavar="N", help="explicit number of whole passages from each doctrine")
-    sample.add_argument("--seed", type=int, required=True, help="explicit reproducible sampling seed")
-    sample.add_argument("--output", type=Path, required=True, metavar="FILE", help="new private JSON file outside every Git checkout")
-    review = commands.add_parser("segmentation-check", help="measure false splits and misses against human-marked sentences")
-    review.add_argument("file", metavar="FILE|-", help="completed private review JSON, or - for piped input")
-    marking_export = commands.add_parser("segmentation-export", help="export a blind sample for marking in a text editor")
-    marking_export.add_argument("file", metavar="SAMPLE_JSON|-", help="original unmarked segmentation-sample JSON")
-    marking_export.add_argument("--output", type=Path, required=True, metavar="FORM_TXT", help="new private text file outside Git")
-    marking_import = commands.add_parser("segmentation-import", help="turn added sentence breaks into a new private review JSON")
-    marking_import.add_argument("file", metavar="SAMPLE_JSON|-", help="the same original unmarked sample used for export")
-    marking_import.add_argument("form", metavar="FORM_TXT|-", help="marked UTF-8 text form; only one input may be piped")
-    marking_import.add_argument("--reviewer", required=True, metavar="NAME", help="declared human reviewer label")
-    marking_import.add_argument("--output", type=Path, required=True, metavar="REVIEW_JSON", help="new private review file outside Git")
-    for command in (term, sentences, words, tfidf, check, prose, sample, review, marking_export, marking_import):
+    for command in (sentences, words, tfidf, check, prose):
         command.add_argument("--corpus", type=Path, metavar="DIRECTORY",
                              help="use this local canonical corpus instead of discovery")
         command.add_argument("--json", action="store_true", help="print machine-readable JSON instead of a human summary")
@@ -80,61 +57,12 @@ def _json(value: dict) -> str:
     return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
-def verification_receipt(result: dict) -> dict:
-    """A verification receipt is deliberately not another experiment envelope."""
-    return {"status": "current", "query": result["query"],
-            "corpus_id": result["corpus"]["id"], "generation": result["generation"],
-            "totals": result["totals"], "matched_ids": [match["id"] for match in result["matches"]]}
-
-
 def _location(sources: list[dict]) -> str:
     def page(source):
         label = source["printed_page"]
         return f"printed {_safe(label) if label is not None else '?'} / PDF {source['pdf_page']}"
     first = page(sources[0])
     return first if len(sources) == 1 else first + " to " + page(sources[-1])
-
-
-def render_result(result: dict) -> str:
-    """Present validated data minimally; every source-derived string is escaped."""
-    totals = result["totals"]
-    scope = result["doctrine"] or "BEING, ESSENCE, CONCEPT"
-    lines = [f"Term: {_safe(result['query'])}",
-             "Exact lexical occurrences; not conceptual similarity.",
-             f"Scope: {_safe(scope)}", "",
-             f"{totals['occurrences']} occurrences in {totals['matching_passages']} matching passages; "
-             f"{totals['token_count']} tokens across {totals['passage_count']} included passages.",
-             "Occurrences per 10,000 tokens:"]
-    for group in result["groups"]:
-        rate = group["rate_per_10000_tokens"]
-        formatted_rate = f"{rate:.3f} / 10,000" if rate is not None else "n/a (no included tokens)"
-        lines.append(f"  {_safe(group['doctrine']):7}  {group['occurrences']:>5} occurrences  "
-                     + formatted_rate)
-    excluded = result["exclusions"]
-    review = excluded["by_reason"]["review"]
-    lines.append(f"Excluded: {excluded['excluded_records']} records, including "
-                 f"{review} pending/unreviewed transcriptions.")
-    if excluded["masked_facsimile_captions"]:
-        lines.append(f"Ignored facsimile image labels: {excluded['masked_facsimile_captions']} "
-                     f"({excluded['masked_facsimile_tokens']} non-prose tokens).")
-    if result["origin"] is not None:
-        lines.append(f"Anchor: {_safe(result['origin']['reference']['requested_id'])} "
-                     "(context only; does not restrict scope).")
-    matches = result["matches"]
-    width = max(40, min(88, shutil.get_terminal_size(fallback=(80, 24)).columns))
-    lines += ["", f"Representative passages: {len(matches)} of {totals['matching_passages']}."]
-    for match in matches:
-        first = match["first_match"]
-        start, end = first["start"] - first["context_start"], first["end"] - first["context_start"]
-        context = first["context"]
-        marked = context[:start] + "[" + context[start:end] + "]" + context[end:]
-        folded = textwrap.fill(_safe(marked), width=width, initial_indent="  ", subsequent_indent="  ",
-                               break_on_hyphens=False)
-        lines += ["", f"{_safe(match['reader_path'])}  ({_location(match['sources'])})",
-                  f"{_safe(match['id'])}  {match['occurrences']} occurrence(s)", folded]
-    if result["matches_truncated"]:
-        lines += ["", "More matching passages exist; increase --limit to include more representatives."]
-    return "\n".join(lines)
 
 
 def render_sentences(result: dict) -> str:
@@ -192,7 +120,6 @@ def main(arguments: list[str] | None = None) -> int:
                                                or options.passage is not None or options.span is not None):
             from sol.essence.sentence_cli import run
             return run(options)
-        raw = None
         if options.action == "check":
             from sol.essence.word_cli import read_artifact, run
             from sol.essence.words import decode_word_result
@@ -214,80 +141,20 @@ def main(arguments: list[str] | None = None) -> int:
                 from sol.essence.sentences import decode_sentence_result
                 from sol.essence.sentence_cli import run as run_sentences
                 return run_sentences(options, decode_sentence_result(data))
+            raise ValueError("Unsupported ESSENCE artifact protocol")
         from sol.core import MAX_REFERENCE_BYTES, decode_reference, discover_corpus, load_snapshot
         from sol.core.wire import read_json_input
-        from sol.essence.terms import (
-            MAX_RESULT_BYTES, analyze_term, check_term_result,
-            decode_term_result, encode_term_result,
-        )
-
         from sol.essence import sentences as sentence_study
 
-        origin = result = None
-        # Reject unsafe input before inspecting corpus/configuration data.
-        if options.action in {"segmentation-check", "segmentation-export", "segmentation-import"}:
-            from sol.essence.segmentation_check import MAX_REVIEW_BYTES, decode_sample
-            if options.action == "segmentation-import" and options.file == options.form == "-":
-                raise ValueError("only one of the sample and marking form may use stdin")
-            result = decode_sample(read_json_input(options.file, MAX_REVIEW_BYTES))
-            if options.action == "segmentation-import":
-                from sol.essence.segmentation_marking import decode_marking_form
-                form = decode_marking_form(read_json_input(options.form, MAX_REVIEW_BYTES))
-        elif options.action == "check":
-            data = raw.encode("utf-8") if isinstance(raw, str) else raw
-            decode = (sentence_study.decode_sentence_result if b'"sol.sentence-study"' in data
-                      else decode_term_result)
-            result = decode(data)
-        elif options.action in ("term", "sentences") and options.reference is not None:
+        origin = None
+        # Reject unsafe references before discovery.
+        if options.action == "sentences" and options.reference is not None:
             origin = decode_reference(read_json_input(options.reference, MAX_REFERENCE_BYTES))
         directory = discover_corpus(options.corpus)
         if directory is None:
             raise ValueError("No canonical corpus configured; use --corpus DIRECTORY or sol --set-corpus DIRECTORY")
         snapshot = load_snapshot(directory)
-        if options.action == "segmentation-sample":
-            from sol.essence.segmentation_check import prepare_sample, write_sample
-            sample = prepare_sample(snapshot, per_doctrine=options.per_doctrine, seed=options.seed)
-            path = write_sample(sample, options.output)
-            receipt = {"sample": str(path), "passages": len(sample["passages"]), "status": "unmarked"}
-            print(_json(receipt) if options.json else
-                  f"Created private blind sample: {_safe(path)}\n"
-                  f"{receipt['passages']} passages; human marking is required before scoring.")
-        elif options.action == "segmentation-export":
-            from sol.essence.segmentation_marking import export_marking_form, write_marking_form
-            form = export_marking_form(snapshot, result)
-            path = write_marking_form(form, options.output)
-            receipt = {"form": str(path), "passages": len(result["passages"]), "status": "unmarked"}
-            print(_json(receipt) if options.json else
-                  f"Created private blind marking form: {_safe(path)}\n"
-                  "Open it in a text editor. Add sentence breaks; keep every original space and character.")
-        elif options.action == "segmentation-import":
-            from sol.essence.segmentation_check import write_sample
-            from sol.essence.segmentation_marking import import_marking_form
-            review = import_marking_form(snapshot, result, form, reviewer=options.reviewer)
-            path = write_sample(review, options.output)
-            receipt = {"review": str(path), "passages": len(review["passages"]),
-                       "excluded": sum(row["exclude_reason"] is not None for row in review["passages"]), "status": "marked"}
-            print(_json(receipt) if options.json else
-                  f"Created private marked review: {_safe(path)}\n"
-                  "Score it with sol analyze segmentation-check; import does not certify the marks.")
-        elif options.action == "segmentation-check":
-            from sol.essence.segmentation_check import compare_sample
-            report = compare_sample(snapshot, result)
-            if options.json:
-                print(_json(report))
-            else:
-                counts = report["summary"]
-                def rate(value):
-                    return "undefined (no boundaries)" if value is None else f"{100 * value:.2f}%"
-                print(f"Sentence segmentation against marks by {_safe(report['reviewer'])}\n"
-                      f"{counts['passages']} scored passages; {len(report['excluded_passages'])} explicitly excluded.\n"
-                      f"{counts['gold_boundaries']} gold internal boundaries; "
-                      f"{counts['false_splits']} false splits, {counts['misses']} misses.\n"
-                      f"Precision {rate(counts['precision'])}; recall {rate(counts['recall'])}; "
-                      f"F1 {rate(counts['f1'])}.\n"
-                      "Final passage ends are excluded. This scores declared marks, not proof of human review.\n"
-                      "Use --json for per-doctrine counts and exact error offsets.")
-        elif options.action == "prose":
+        if options.action == "prose":
             from sol.essence.prose import export_prose
             result = export_prose(snapshot)
             print(_json(result) if options.json else (
@@ -295,25 +162,11 @@ def main(arguments: list[str] | None = None) -> int:
                 f"{result['exclusions']['excluded_records']} records excluded.\n"
                 "Vector input: passages[].text (headings and image labels excluded).\n"
                 "Canonical ancestry, headings and source references remain in metadata.\n"
-                "Use sol analyze prose --json to export the complete input."))
+                "Use sol essence prose --json to export the complete input."))
         elif options.action == "sentences":
             scope = {"kind": "within", "path": options.within} if options.within else None
             result = sentence_study.analyze_sentences(snapshot, scope=scope, origin=origin)
             print(sentence_study.encode_sentence_result(result) if options.json else render_sentences(result))
-        elif options.action == "term":
-            result = analyze_term(snapshot, options.word, origin=origin,
-                                  doctrine=options.doctrine.upper() if options.doctrine else None,
-                                  limit=options.limit)
-            print(encode_term_result(result) if options.json else render_result(result))
-        elif result["protocol"] == "sol.sentence-study":
-            result = sentence_study.check_sentence_result(snapshot, result)
-            print(_json({"status": "current", "protocol": result["protocol"], "corpus_id": result["corpus"]["id"],
-                         "generation": result["generation"], "summary": result["summary"]}) if options.json
-                  else "Verified against the current corpus generation.\n\n" + render_sentences(result))
-        else:
-            result = check_term_result(snapshot, result)
-            print(_json(verification_receipt(result)) if options.json
-                  else "Verified against the current corpus generation.\n\n" + render_result(result))
         return 0
     except (ValueError, OSError) as error:
         message = _safe(error)

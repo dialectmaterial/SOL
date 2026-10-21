@@ -37,7 +37,7 @@ class MethodsTests(unittest.TestCase):
         documented = set()
         for entry in load_methods()['entries']:
             command = shlex.split(entry['cli'])
-            self.assertEqual(command[:2], ['sol', 'analyze'])
+            self.assertEqual(command[:2], ['sol', 'essence'])
             arguments = command[2:command.index('>')] if '>' in command else command[2:]
             with self.subTest(method=entry['id']):
                 options = parser.parse_args(arguments)

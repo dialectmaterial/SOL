@@ -61,7 +61,7 @@
       "article_url": "https://en.wikipedia.org/wiki/Sentence_boundary_disambiguation",
       "quote": "is the problem in natural language processing of deciding where sentences begin and end.",
       "quote_starts_mid_sentence": true,
-      "essence": "Runs in ESSENCE: punctuation-rules-v1 segmentation, sentence lengths in word tokens and longest sentences. Existing segmentation-sample/check tools measure boundaries against private human annotations; rule limitations remain.",
+      "essence": "Runs in ESSENCE: punctuation-rules-v1 segmentation, sentence lengths in word tokens and longest sentences. Human boundary validation remains open; the segmentation-pilot tools were removed in the 21 October cleanup.",
       "further": [
         {
           "title": "SOL sentence study",
@@ -80,11 +80,11 @@
       "article_url": "https://en.wikipedia.org/wiki/Concordance_(publishing)",
       "quote": "listing every instance of each word with its immediate context.",
       "quote_starts_mid_sentence": true,
-      "essence": "Runs in ESSENCE: term distributions and reference-bound matches; word results list every occurrence with the words around it, up to 1,000 per word. Occurrences past each passage's first are found again at display time and not saved in the study.",
+      "essence": "Runs in ESSENCE: word results list every occurrence with the words around it, up to 1,000 per word. Occurrences past each passage’s first are found again at display time and not saved in the study. Exact lexical evidence does not identify philosophical concepts.",
       "further": [
         {
-          "title": "SOL term study",
-          "url": "https://github.com/dialectmaterial/SOL/blob/2fe28c3/sol/essence/terms.py"
+          "title": "SOL word frequencies",
+          "url": "https://github.com/dialectmaterial/SOL/blob/main/sol/essence/words.py"
         },
         {
           "title": "SOL word source display",
@@ -113,7 +113,7 @@
       "article_title": "tf–idf",
       "article_url": "https://en.wikipedia.org/wiki/Tf%E2%80%93idf",
       "quote": "The tf–idf is the product of two statistics, term frequency and inverse document frequency.",
-      "essence": "Runs in ESSENCE: engine and CLI, sol analyze tfidf (TUI integration pending). The versioned tfidf-v1 method uses raw-count TF, smoothed natural-log IDF ln((1+N)/(1+df))+1 and document L2 normalization. Documents are word-provider passages, or one whole file; overall weights average all normalized document vectors. See Methods for scopes, limits and verification.",
+      "essence": "Runs in ESSENCE: engine and CLI, sol essence tfidf (TUI integration pending). The versioned tfidf-v1 method uses raw-count TF, smoothed natural-log IDF ln((1+N)/(1+df))+1 and document L2 normalization. Documents are word-provider passages, or one whole file; overall weights average all normalized document vectors. See Methods for scopes, limits and verification.",
       "further": [
         {
           "title": "Term frequency and weighting",

@@ -86,8 +86,7 @@ These four documents distinguish implemented behavior from decisions and proposa
 
 This README is a gateway, not another design authority. See
 [CONTRIBUTING](CONTRIBUTING.md) for development checks,
-[CHANGELOG](CHANGELOG.md) for changes, and the [legacy archive](docs/legacy/README.md)
-for preserved earlier documentation.
+and [CHANGELOG](CHANGELOG.md) for changes; earlier documents are in Git history.
 
 ## License
 
