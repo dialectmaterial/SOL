@@ -1,12 +1,13 @@
 # SOL BEING — Reading, Presentation, and Scholarly Workspace
 
-**Status:** current implementation + explicitly marked decisions; 18 October 2026.  
-**Repository baseline:** `main` at `1d200e4fcbff1ca69f48b5dc96c55765f215f303`.  
-**Companions:** [Architecture](ARCHITECTURE.md) · [CORE](CORE.md) · [ESSENCE](ESSENCE.md).
-
-**Implementation reviewed through:** `577166b` (17 October 2026). The baseline above is the original adoption snapshot; the implemented theme, source-preview, note, footnote, search-mark and sentence-study features below were added afterward.
+**Status:** current implementation and explicitly marked decisions; framed by the leading [SPECULATIVE](SPECULATIVE.md) document on 21 October 2026.  
+**Companions:** [SPECULATIVE](SPECULATIVE.md) (leading) · [Architecture](ARCHITECTURE.md) · [CORE](CORE.md) · [ESSENCE](ESSENCE.md).  
+**Original adoption:** 17 October 2026 at `main` `1d200e4`; features since then are recorded below with their dates.
 
 ## 1. Purpose and non-negotiable experience
+
+**BEING as a logical division ([SPECULATIVE §4](SPECULATIVE.md#4-initial-repository-hierarchy)).** BEING is the reading environment and the immediate encounter with texts, including the Neovim reader. Its first-level divisions are **Quality, Quantity and Measure**. Which of today's reader, terminal and workspace modules belongs under which, if any, is to be argued from the text in the restructuring, never from word associations, and recorded in the [placement register](ARCHITECTURE.md#9-placement-register); nothing below presupposes a placement. SPECULATIVE's own example ([§6](SPECULATIVE.md#6-limits-of-the-logical-hierarchy)) notes that even the word tokenizer, used by ESSENCE today, might belong under a BEING determination once justified.
+
 
 BEING is the place to **read Hegel's *Science of Logic***, locate source evidence, think, mark, question, annotate, compare, and depart for/return from computation. It is not an ebook format, a terminal emulator, or merely a virtual filesystem. Its primary use case is a comfortable sustained reading session. A working structure tree, extensive keybindings and correct UUID handling are only foundations; an unpleasant reading surface is an unresolved product defect even when automated tests pass.
 

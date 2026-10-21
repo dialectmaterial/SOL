@@ -1,8 +1,8 @@
 # Working on SOL with Claude Code
 
 This file tells Claude Code how to work in this repository. It is operational
-guidance, not a design authority. What SOL should be is governed only by the four
-documents in `docs/`: [Architecture](docs/ARCHITECTURE.md), [BEING](docs/BEING.md),
+guidance, not a design authority. What SOL should be is governed only by the five
+documents in `docs/`, led by [SPECULATIVE](docs/SPECULATIVE.md): [Architecture](docs/ARCHITECTURE.md), [BEING](docs/BEING.md),
 [ESSENCE](docs/ESSENCE.md) and [CORE](docs/CORE.md). Development procedure is in
 [CONTRIBUTING](CONTRIBUTING.md). Earlier documents are in Git history, not in the
 tree.
@@ -24,7 +24,7 @@ tree.
 1. Check `gh pr list`. If the other agent has an open pull request you have not
    reviewed since its last push, review it first (see *Reviewing and merging*).
 2. Read [`docs/coordination/CURRENT_TASK.md`](docs/coordination/CURRENT_TASK.md).
-   Work only on the task assigned to you; if it is unclear or conflicts with the four authorities,
+   Work only on the task assigned to you; if it is unclear or conflicts with the five governing documents,
    ask instead of guessing.
 3. Read the latest entry in [`docs/coordination/HANDOFF.md`](docs/coordination/HANDOFF.md)
    and the authority sections the task names.

@@ -75,10 +75,11 @@ and `sol essence` runs the studies from the command line. Reader keys can be mov
 
 ## Documentation
 
-These four documents distinguish implemented behavior from decisions and proposals:
+Five documents govern SOL. [SPECULATIVE](docs/SPECULATIVE.md) leads: SOL as a computational investigation of philosophy and a philosophical investigation of computation, organized by the *Science of Logic*. The others describe the system in its terms and distinguish implemented behavior from decisions and proposals:
 
 | Document | Scope |
 | --- | --- |
+| [SPECULATIVE](docs/SPECULATIVE.md) | Leading: aim, speculative method, logical divisions, agent reading protocol |
 | [Architecture](docs/ARCHITECTURE.md) | Purpose, responsibilities and development direction |
 | [BEING](docs/BEING.md) | Reader, presentation and scholarly workspace |
 | [ESSENCE](docs/ESSENCE.md) | Implemented analyses and proposed research workflows |

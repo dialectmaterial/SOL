@@ -1,6 +1,6 @@
 # Working on SOL
 
-The four human-facing design authorities are [Architecture](docs/ARCHITECTURE.md),
+The five governing documents are [SPECULATIVE](docs/SPECULATIVE.md) (leading), [Architecture](docs/ARCHITECTURE.md),
 [BEING](docs/BEING.md), [ESSENCE](docs/ESSENCE.md), and [CORE](docs/CORE.md).
 This contributor guide covers operational development procedures, not a separate
 architecture. Earlier instructions are in Git history.
