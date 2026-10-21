@@ -12,6 +12,7 @@ from dataclasses import replace
 from hashlib import sha256
 import importlib.util
 import unittest
+from sol.reader.options import DEFAULT_READER_WIDTH
 
 from fixtures_async import UIEventLoop
 
@@ -115,8 +116,8 @@ class ReaderSpacingTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(heading._y_offset, gaps[0])
                     self.assertEqual(body._y_offset, gaps[0] + 2 + gaps[1])
                     self.assertEqual(heading._x_offset, body._x_offset)
-                    self.assertEqual(body.window_width, 72)
-                    self.assertLessEqual(abs(body._x_offset - (output.columns - 72) // 2), 1)
+                    self.assertEqual(body.window_width, DEFAULT_READER_WIDTH)
+                    self.assertLessEqual(abs(body._x_offset - (output.columns - DEFAULT_READER_WIDTH) // 2), 1)
                     self.assert_body_and_cursor_visible(view, output)
                     for index, gap in enumerate(gaps):
                         dimension = view._gap_height(index)
@@ -138,7 +139,7 @@ class ReaderSpacingTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(context._x_offset, body._x_offset)
                     self.assertGreaterEqual(body._y_offset,
                                             context._y_offset + context.window_height)
-                    self.assertEqual(body.window_width, 72)
+                    self.assertEqual(body.window_width, DEFAULT_READER_WIDTH)
                     self.assert_body_and_cursor_visible(view, output)
                     view._context_visible = False
                     view._focus_mode = True

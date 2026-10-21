@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from sol.reader.options import DEFAULT_READER_WIDTH
 from unittest.mock import patch
 
 from sol.corpus import contract
@@ -216,7 +217,7 @@ class ReaderViewCLITests(unittest.TestCase):
                 patch.object(app, "shell_identity", side_effect=AssertionError("No actor setup")):
             status, _, error = self.call(["--dynamic-structure", "--depth", "3"])
         self.assertEqual(status, 0, error)
-        self.assertEqual(reader.call_args.kwargs, {"width": 72, "start_tree": True, "tree_depth": 3, "theme": "mocha"})
+        self.assertEqual(reader.call_args.kwargs, {"width": DEFAULT_READER_WIDTH, "start_tree": True, "tree_depth": 3, "theme": "mocha"})
         self.assertFalse((self.root / "data").exists())
 
     def test_dynamic_structure_refuses_workspace_pdf_and_noninteractive_output(self):

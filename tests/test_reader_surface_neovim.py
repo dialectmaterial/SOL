@@ -800,6 +800,16 @@ end
         self.assertEqual(report["sent"], 1)
         self.assertEqual(report["echoed"], [""])  # the prompt line is cleared once answered
 
+    def test_focus_mode_hides_the_status_line_and_brings_it_back(self):
+        report = self.run_lua(r'''
+  report.before = vim.o.laststatus
+  vim.api.nvim_feedkeys('f', 'xt', false)
+  report.focused = vim.o.laststatus
+  vim.api.nvim_feedkeys('f', 'xt', false)
+  report.after = vim.o.laststatus
+''', integrated=True)
+        self.assertEqual((report["before"], report["focused"], report["after"]), (3, 0, 3))
+
     def test_note_editor_saves_restores_selection_and_protects_drafts(self):
         report = self.run_lua(r'''
   local sent = {}

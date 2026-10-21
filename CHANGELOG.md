@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### The maintainer's visual audit choices — 21 October 2026
+
+- The reading line is 66 columns by default (was 72); `--width` still overrides it.
+- Focus mode (`f`) hides the status line as well as headings, leaving only the text.
+- The full status line and plain bold headings stay as they were.
+
 ### Less test-runner overhead in UI checks — 21 October 2026
 
 - Run UI behavior checks on isolated asyncio loops in the normal application
