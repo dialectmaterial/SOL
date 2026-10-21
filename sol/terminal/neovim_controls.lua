@@ -318,7 +318,7 @@ return function(reader)
           { "c", "beside the text: pages, footnotes, your notes, markers" },
           { "c, Enter", "read a footnote; Backspace back, Esc to the passage" },
           { "s", "the printed page of this passage (formulas)" },
-          { "S", "the whole printed page in a PDF viewer, to zoom" },
+          { "S", "the printed page in Zathura, highlighted; it follows you" },
           { "a", "write a note on this passage (workspace)" },
           { "c, e / r", "edit your note / its earlier versions" } } },
         { "ESSENCE", {
@@ -549,6 +549,11 @@ return function(reader)
     vim.notify('keys.json names keys SOL does not use: ' .. table.concat(missing, ' '), vim.log.levels.WARN)
   end
   local group = api.nvim_create_augroup('SOLReaderView', {clear = true})
+  if integrated then
+    api.nvim_create_autocmd('CursorMoved', { group = group, buffer = buffer, callback = function()
+      reader.panels.follow_tick()
+    end })
+  end
   api.nvim_create_autocmd("VimResized", { group = group, callback = function()
     if tree_view then tree_view.resize() else close_popup() end
     if api.nvim_win_is_valid(window) then api.nvim_win_set_config(window, window_config()) end
