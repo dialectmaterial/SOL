@@ -11,6 +11,14 @@
   shared word tokenizer and CORE freshness/selection guards for word and sentence
   studies; their methods and saved artifact formats remain unchanged.
 
+### Legacy documents folded in and removed — 21 October 2026
+
+The still-valid contracts from the pre-17-October documents now live in the
+current ones: the corpus contract and reference protocol in CORE §§9–10, the
+prose-input policy in ESSENCE §3, workspace storage and export rules in BEING
+§3. `docs/legacy/`, two finished proposals and old handoff reports were then
+removed from the tree; Git history keeps them.
+
 ### Remove reader surface experiments — 21 October 2026
 
 - Remove `experiments/reader_surfaces/` and the Neovim research-export entry (`neovim.run`, `:SOLExport`, standalone Lua mode). The reader keeps its integrated controls, checked selections and action results.
@@ -527,7 +535,7 @@ schemas are unchanged.
 Adopt four human-facing design documents: [Architecture](docs/ARCHITECTURE.md),
 [BEING](docs/BEING.md), [ESSENCE](docs/ESSENCE.md), and [CORE](docs/CORE.md).
 The root README is a short setup/navigation gateway. Earlier guides, contracts,
-research and root documents remain in the [legacy archive](docs/legacy/README.md),
+research and root documents remain in the legacy archive (removed from the tree on 21 October 2026; in Git history),
 with an integrity inventory and navigable historical links. This migration changes
 documentation and its checks, not application behavior or data contracts.
 
@@ -544,6 +552,6 @@ schemas are preserved.
 
 ## Earlier development history
 
-The [previous changelog](docs/legacy/root/CHANGELOG.md) is preserved byte-for-byte.
+The previous changelog is in Git history.
 It includes superseded optional-reader and horizontal-tree descriptions, which
 are historical changes rather than current feature claims.

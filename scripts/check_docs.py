@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check local Markdown links/anchors, four-document layout and archive integrity.
+"""Check local Markdown links/anchors and the four-document layout.
 
 No network, Git history, private corpus or terminal is required. External URLs
 are not probed; GitHub main/HEAD links to this repository are resolved locally.
@@ -8,9 +8,7 @@ Fenced examples are parsed as code, never rewritten or checked as links.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import html
-import json
 from pathlib import Path
 import re
 from urllib.parse import unquote, urlsplit
@@ -50,43 +48,9 @@ def markdown_details(text):
     return anchors, destinations
 
 
-def archive_errors(root):
-    errors = []
-    try:
-        inventory = json.loads((root / "docs/legacy/inventory.json").read_text(encoding="utf-8"))
-        if inventory["version"] != 1 or not isinstance(inventory["entries"], list):
-            return ["Unsupported archive inventory"]
-        originals, archived = set(), set()
-        for entry in inventory["entries"]:
-            original, target = entry["original"], entry["archived"]
-            expected = ("docs/legacy/" + original[5:] if original.startswith("docs/")
-                        else "docs/legacy/root/" + original)
-            if (target != expected or ".." in Path(target).parts or Path(target).is_absolute()
-                    or original in originals or target in archived):
-                errors.append(f"Invalid/duplicate archive mapping: {original} -> {target}")
-                continue
-            originals.add(original)
-            archived.add(target)
-            snapshot = (root / target).read_bytes()
-            rewrites = entry.get("link_rewrites", [])
-            if original in ROOT_DOCUMENTS and rewrites:
-                errors.append(f"Root snapshot must be byte-exact: {target}")
-            for rewrite in rewrites:
-                before = ("](" + rewrite["from"] + ")").encode()
-                after = ("](" + rewrite["to"] + ")").encode()
-                if after not in snapshot:
-                    errors.append(f"Declared link rewrite is absent: {target}: {rewrite['to']}")
-                snapshot = snapshot.replace(after, before)
-            if hashlib.sha256(snapshot).hexdigest() != entry["sha256"]:
-                errors.append(f"Archive differs from original beyond declared link repairs: {target}")
-    except (OSError, ValueError, KeyError, TypeError) as error:
-        errors.append(f"Cannot verify archive inventory: {error}")
-    return errors
-
-
 def check(root):
     root = Path(root).resolve()
-    errors = archive_errors(root)
+    errors = []
     leading = {path.name for path in (root / "docs").glob("*.md")}
     if leading != AUTHORITIES:
         errors.append(f"Expected only four leading design documents, got {sorted(leading)}")
@@ -133,7 +97,7 @@ def main(argv=None):
         for error in errors:
             print(error)
         return 1
-    print("Documentation OK: four authorities, local links/anchors and lossless legacy inventory.")
+    print("Documentation OK: four authorities and local links/anchors.")
     print("External URLs were not network-checked.")
     return 0
 

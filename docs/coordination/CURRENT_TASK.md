@@ -7,7 +7,7 @@ and reports in [HANDOFF](HANDOFF.md). This file is coordination, not design
 authority: a task must agree with [Architecture](../ARCHITECTURE.md),
 [BEING](../BEING.md), [ESSENCE](../ESSENCE.md) and [CORE](../CORE.md), and cites
 them rather than restating them. Backlog: the
-[Codex reader and workspace proposal](proposals/CODEX_READER_WORKSPACE_PLAN.md).
+[reader backlog](proposals/READER_GAPS_AFTER_ZATHURA.md).
 
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
@@ -43,7 +43,7 @@ reviewed by the other agent before merging.
 
 ## Claude Code: Fold the legacy documents in, then remove them (step 4)
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `claude/legacy-docs`
 
 ### Scope
