@@ -36,7 +36,7 @@ full suite.
 
 ## Codex: Stage 5 design proposal (model adapters and Experiment B)
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/stage5-proposal`
 **Requested:** 21 October 2026, by the maintainer via Claude ([ESSENCE §5](../ESSENCE.md#5-prioritized-experiments), stage 5)
 
