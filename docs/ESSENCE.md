@@ -196,7 +196,7 @@ A result should distinguish **reproducing the exact experiment generation** (str
 
 | Stage | Deliverable | Exit criterion |
 |---|---|---|
-| 0. Documentation | These decisions reconciled in the four authorities | Docs check passes; no application code changed; open decisions listed |
+| 0. Documentation | These decisions reconciled in the governing documents | Docs check passes; no application code changed; open decisions listed |
 | 1. Interface shell | Textual mock (Encyclopedia / Methods / Experiment / Results); entry from and return to Neovim; split and fullscreen | Launches on demand, resizes without restart, restores the reader position, keyboard focus is robust |
 | 2. Minimal experiment | Word tokenizer and frequency table over a selectable target; source-linked counts; plain-text file input | Same output from CLI and TUI; works on a plain-text file without CORE |
 | 3. Comparison | Reference-corpus selector; normalized lexical comparison; navigation and export | Explicit denominators; no false comparability; stale generations refused |

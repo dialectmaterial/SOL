@@ -2,8 +2,8 @@
 
 Claude Code adds one report per completed task, newest first, so a reviewer can
 judge the work from GitHub alone: the report says what to look at, the pull
-request shows the diff. Reports describe; they do not change what the four
-authorities ([Architecture](../ARCHITECTURE.md), [BEING](../BEING.md),
+request shows the diff. Reports describe; they do not change what the five
+governing documents ([SPECULATIVE](../SPECULATIVE.md), [Architecture](../ARCHITECTURE.md), [BEING](../BEING.md),
 [ESSENCE](../ESSENCE.md), [CORE](../CORE.md)) say. Keep each report short; the
 commit messages and diff carry the detail. Trim reports older than the last few
 merged tasks; Git history keeps them.
