@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### The guide and README describe today's reader — 21 October 2026
+
+`sol guide` and the README now name complete search, `gp`, `s`/`S` with
+Zathura, landmarks, notes, ESSENCE, themes, `sol-window` and `keys.json`; the
+guide no longer says search stops at 20 passages or that `Ctrl-Q` quits.
+
 ### Cheaper verified reader startup — 21 October 2026
 
 - Hash canonical bytes directly after UTF-8 validation; reduce path allocation

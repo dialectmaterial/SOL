@@ -14,7 +14,7 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ## Claude Code: The guide and README describe today's reader
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `claude/guide-current`
 **Requested:** 21 October 2026, by the maintainer via Claude
 
