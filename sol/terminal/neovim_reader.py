@@ -250,7 +250,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         if start_tree:
             structure["root"] = "/"
         progress = {"first": extent.first, "total": len(book.passages)}
-        payload.update(integrated=True, navigation=navigation, progress=progress, notice=notice or "", mode=mode, focus=focused,
+        payload.update(navigation=navigation, progress=progress, notice=notice or "", mode=mode, focus=focused,
                        markers=markers(), structure=structure, tree_only=start_tree,
                        personal=personal_notes(sample), search_marks=search_marks)
         neovim._safe_metadata({"notice": payload["notice"], "markers": payload["markers"], "structure": structure,

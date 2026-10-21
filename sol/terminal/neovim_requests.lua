@@ -56,7 +56,7 @@ return function(reader)
     _G.SOLReaderChannel = channel
   end
   local function request(operation, fields, callback, packet)
-    if not channel then fail('this action needs the installed SOL reader, not a research export') end
+    if not channel then fail('this action needs the SOL reader action channel') end
     if channel.navigation_pending then return end
     local message = vim.deepcopy(fields or {})
     channel.serial = channel.serial + 1

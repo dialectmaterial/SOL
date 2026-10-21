@@ -105,15 +105,15 @@ def _styles(markdown, text, typography=None):
 
 
 def _check_sample_packet(sample, packet, records=None):
-    """Validate locally, then fence a research packet to this bounded sample."""
+    """Validate locally, then fence a reader packet to this bounded sample."""
     selected = validate_packet(sample.book, packet)
     target = packet["reference"]["reference"]["target_id"]
     if target not in {passage.identifier for passage in sample.passages}:
-        raise ValueError("research packet targets a passage outside this Neovim sample")
+        raise ValueError("reader packet targets a passage outside this Neovim sample")
     if records is not None:
         record = next(record for record in records if record["id"] == target)
         if packet["reference"] != record["reference"]:
-            raise ValueError("research packet must use this sample's exact checked reference")
+            raise ValueError("reader packet must use this sample's exact checked reference")
     return selected
 
 
@@ -180,20 +180,20 @@ def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None,
                   emphasis="auto", theme=None, _typography=None):
     """Prepare inert JSON; every selection offset remains a source codepoint.
 
-    Only supplied document headings are projected. No experiment title or
+    Only supplied document headings are projected. No synthetic title or
     concatenated canonical record is introduced into the reading surface.
-    A theme adds presentation presets only; research samples omit it.
+    A theme adds presentation presets only; isolated payload probes may omit it.
     _typography supplies a reader-local, exact-value presentation memo only;
     all source capture, validation and export freshness checks still run.
     """
     typography = map_typography if _typography is None else _typography
     _width(width)
     if sample.actions.workspace_reader is not None:
-        raise ValueError("Neovim reader experiments do not accept a personal workspace")
+        raise ValueError("Detached Neovim views do not accept a personal workspace")
     if not 1 <= len(sample.passages) <= 64:
-        raise ValueError("Neovim reader proof needs between 1 and 64 canonical passages")
+        raise ValueError("Neovim reading section needs between 1 and 64 canonical passages")
     if len({passage.identifier for passage in sample.passages}) != len(sample.passages):
-        raise ValueError("Neovim reader proof needs distinct canonical passages")
+        raise ValueError("Neovim reading section needs distinct canonical passages")
     if restore is not None:
         _check_sample_packet(sample, restore)
     requested_ids = requested_ids or {}
@@ -253,7 +253,7 @@ def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None,
                        callouts=callouts)
         records.append(payload)
     if restore is not None:
-        # Match the browser proof's strict, disposable packet policy; aliases
+        # Preserve the section's exact checked reference; aliases
         # are not silently rewritten into a new requested identity.
         _check_sample_packet(sample, restore, records)
     capture.finish()
@@ -268,13 +268,13 @@ def _unique_fields(pairs):
     result = {}
     for key, value in pairs:
         if key in result:
-            raise ValueError("duplicate research packet JSON field")
+            raise ValueError("duplicate reader packet JSON field")
         result[key] = value
     return result
 
 
 def _reject_constant(value):
-    raise ValueError(f"non-finite research packet JSON value: {value}")
+    raise ValueError(f"non-finite reader packet JSON value: {value}")
 
 
 def _read_packet(path):
@@ -285,27 +285,14 @@ def _read_packet(path):
     with os.fdopen(descriptor, "rb") as stream:
         metadata = os.fstat(stream.fileno())
         if not stat.S_ISREG(metadata.st_mode):
-            raise ValueError("research packet must be a regular file")
+            raise ValueError("reader packet must be a regular file")
         if metadata.st_size > MAX_PACKET_BYTES:
-            raise ValueError("research packet exceeds 1 MiB")
+            raise ValueError("reader packet exceeds 1 MiB")
         data = stream.read(MAX_PACKET_BYTES + 1)
     if len(data) > MAX_PACKET_BYTES:
-        raise ValueError("research packet exceeds 1 MiB")
+        raise ValueError("reader packet exceeds 1 MiB")
     return json.loads(data.decode("utf-8"), object_pairs_hook=_unique_fields,
                       parse_constant=_reject_constant)
-
-
-def _check_destination(sample, output):
-    output = Path(output)
-    if output.exists() or output.is_symlink():
-        raise FileExistsError(f"refusing to overwrite an existing research packet: {output}")
-    corpus = sample.book.corpus_directory
-    if corpus is not None and (corpus.resolve() == output.resolve()
-                               or corpus.resolve() in output.resolve().parents):
-        raise ValueError("choose a packet output outside the read-only canonical corpus directory")
-    if not output.parent.is_dir():
-        raise ValueError("research packet output parent directory must already exist")
-    return output
 
 
 def _write_json(path, value):
@@ -426,25 +413,3 @@ def launch_payload(payload, executable, *, on_request=None):
         if code:
             return (code if code > 0 else 128 - code), None
         return 0, _read_packet(output_path) if output_path.exists() else None
-
-
-def run(sample: Sample, width=72, export=None, restore=None):
-    """Research entry: validate returned identity before optional private export."""
-    executable = validate_environment(width)
-    destination = None if export is None else _check_destination(sample, export)
-    restored = None if restore is None else _read_packet(restore)
-    payload = build_payload(sample, width=width, restore=restored)
-    status, packet = launch_payload(payload, executable)
-    if status:
-        return status
-    if packet is None:
-        if destination is not None:
-            raise ValueError("Neovim exited without a captured packet; use q on source text to export")
-        return 0
-    _check_sample_packet(sample, packet, payload["records"])
-    if destination is not None:
-        # The editor may have remained open while the filesystem changed.
-        _check_destination(sample, destination)
-        _write_json(destination, packet)
-        print(f"Created private checked research packet: {destination.resolve()}")
-    return 0

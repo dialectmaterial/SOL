@@ -6,7 +6,6 @@ return function(reader)
   local codepoint_to_byte = reader.text.codepoint_to_byte
   local check_personal = reader.text.check_personal
   local data = reader.view.data
-  local integrated = reader.view.integrated
   local mode = reader.view.mode
   local focused_id = reader.view.focused_id
   local records = reader.view.records
@@ -296,78 +295,61 @@ return function(reader)
   -- The reader's key remappings, from keys.json through Python (see neovim.user_keys).
   local remap = vim.json.decode(vim.env.SOL_NVIM_KEYS or '{}', {luanil = {object = true, array = true}}) or {}
   local function help()
-    if integrated then
-      -- Sections of key / description; a wrapped description continues under
-      -- its own column, and the section names carry the heading colour.
-      local KEY = 17
-      local sections = {
-        { "Reading", {
-          { "j/k  Ctrl-d/u", "lines / half a window" },
-          { "h/l  w", "character / word motions" },
-          { "b / n", "previous / next paragraph" },
-          { "gg / G", "start / end of the loaded section" },
-          { "p", "continuous or one-paragraph reading" },
-          { "f", "quiet focus mode" },
-          { "T", "theme: Mocha, Latte, Paper, Night, Terminal (this session)" } } },
-        { "Finding your way", {
-          { "t", "book outline: h/l fold, Enter read" },
-          { "gp", "go to a printed page, e.g. gp 240 Enter" },
-          { "/", "search the whole book" },
-          { "Ctrl-P / Ctrl-N", "previous / next search occurrence" },
-          { "Esc", "hide the search marks" },
-          { "Alt-Left/Right", "back / forward through your reading" },
-          { "m1 m2 m3", "set a paragraph marker; '1 '2 '3 jump, dm1… clear" },
-          { "M / L", "name this place / list named places (Enter reads)" } } },
-        { "Text, sources and notes", {
-          { "v  then y", "select; copy to the clipboard, across paragraphs too" },
-          { "mouse", "scroll; drag to select and copy" },
-          { "c", "beside the text: pages, footnotes, your notes, markers" },
-          { "c, Enter", "read a footnote; Backspace back, Esc to the passage" },
-          { "s", "the printed page of this passage (formulas)" },
-          { "S", "the printed page in Zathura, highlighted; it follows you" },
-          { "a", "write a note on this passage (workspace)" },
-          { "c, e / r", "edit your note / its earlier versions" } } },
-        { "ESSENCE", {
-          { "E", "open beside the reader; inside, Alt-F fullscreen, Alt-R back" } } },
-        { "Leaving", {
-          { ":q  :qa", "save your exact place and quit" },
-          { ":qa!", "quit without saving" } } },
-      }
-      local yours = {}
-      for from, to in pairs(remap) do yours[#yours + 1] = { to, "does what " .. from .. " does above" } end
-      table.sort(yours, function(left, right) return left[1] < right[1] end)
-      if #yours > 0 then sections[#sections + 1] = { "Your keys (keys.json)", yours } end
-      local lines, marks = { "SOL reader · " .. (mode == "paragraph" and "one paragraph" or "continuous") }, { { 1, "SOLSourceHeading" } }
-      for _, section in ipairs(sections) do
-        lines[#lines + 1] = ""
-        lines[#lines + 1] = section[1]
-        marks[#marks + 1] = { #lines, "SOLSourceHeading" }
-        for _, row in ipairs(section[2]) do
-          lines[#lines + 1] = row[1] .. string.rep(" ", math.max(1, KEY - vim.fn.strdisplaywidth(row[1]))) .. row[2]
-        end
+    -- Sections of key / description; a wrapped description continues under
+    -- its own column, and the section names carry the heading colour.
+    local KEY = 17
+    local sections = {
+      { "Reading", {
+        { "j/k  Ctrl-d/u", "lines / half a window" },
+        { "h/l  w", "character / word motions" },
+        { "b / n", "previous / next paragraph" },
+        { "gg / G", "start / end of the loaded section" },
+        { "p", "continuous or one-paragraph reading" },
+        { "f", "quiet focus mode" },
+        { "T", "theme: Mocha, Latte, Paper, Night, Terminal (this session)" } } },
+      { "Finding your way", {
+        { "t", "book outline: h/l fold, Enter read" },
+        { "gp", "go to a printed page, e.g. gp 240 Enter" },
+        { "/", "search the whole book" },
+        { "Ctrl-P / Ctrl-N", "previous / next search occurrence" },
+        { "Esc", "hide the search marks" },
+        { "Alt-Left/Right", "back / forward through your reading" },
+        { "m1 m2 m3", "set a paragraph marker; '1 '2 '3 jump, dm1… clear" },
+        { "M / L", "name this place / list named places (Enter reads)" } } },
+      { "Text, sources and notes", {
+        { "v  then y", "select; copy to the clipboard, across paragraphs too" },
+        { "mouse", "scroll; drag to select and copy" },
+        { "c", "beside the text: pages, footnotes, your notes, markers" },
+        { "c, Enter", "read a footnote; Backspace back, Esc to the passage" },
+        { "s", "the printed page of this passage (formulas)" },
+        { "S", "the printed page in Zathura, highlighted; it follows you" },
+        { "a", "write a note on this passage (workspace)" },
+        { "c, e / r", "edit your note / its earlier versions" } } },
+      { "ESSENCE", {
+        { "E", "open beside the reader; inside, Alt-F fullscreen, Alt-R back" } } },
+      { "Leaving", {
+        { ":q  :qa", "save your exact place and quit" },
+        { ":qa!", "quit without saving" } } },
+    }
+    local yours = {}
+    for from, to in pairs(remap) do yours[#yours + 1] = { to, "does what " .. from .. " does above" } end
+    table.sort(yours, function(left, right) return left[1] < right[1] end)
+    if #yours > 0 then sections[#sections + 1] = { "Your keys (keys.json)", yours } end
+    local lines, marks = { "SOL reader · " .. (mode == "paragraph" and "one paragraph" or "continuous") }, { { 1, "SOLSourceHeading" } }
+    for _, section in ipairs(sections) do
+      lines[#lines + 1] = ""
+      lines[#lines + 1] = section[1]
+      marks[#marks + 1] = { #lines, "SOLSourceHeading" }
+      for _, row in ipairs(section[2]) do
+        lines[#lines + 1] = row[1] .. string.rep(" ", math.max(1, KEY - vim.fn.strdisplaywidth(row[1]))) .. row[2]
       end
-      for _, note in ipairs({ "", "In one-paragraph reading j/k stay in the paragraph; b/n move on.",
-          "Selections are not saved; the book's text cannot be edited.", "Esc closes this help." }) do
-        lines[#lines + 1] = note
-        if note ~= "" then marks[#marks + 1] = { #lines, "NonText" } end
-      end
-      show_lines(lines, nil, marks, KEY)
-      return
     end
-    show_lines({ "Reader experiment — not a workspace editor", "",
-      "j/k           visual wrapped rows; h/l retain Neovim character motions",
-      "Ctrl-d/u      Neovim half-window scroll; gg/G the bounded sample",
-      "[p / ]p       previous / next source passage",
-      "/, n, N       native Neovim search and matches",
-      "v             characterwise visual selection inside one passage",
-      "c             edition/page context and attributed source notes",
-      "q / Ctrl-q    export exact position/selection, then return",
-      ":SOLExport    export without quitting (output must not already exist)",
-      ":qa!          quit without exporting; no workspace is modified", "",
-      "Linewise/blockwise/cross-passage selections cannot be exported.",
-      "A selection exports Unicode codepoint boundaries, never display cells.",
-      "Rendering is read-only, not a security sandbox. Personal config is not loaded.",
-      "Esc closes this help." })
+    for _, note in ipairs({ "", "In one-paragraph reading j/k stay in the paragraph; b/n move on.",
+        "Selections are not saved; the book's text cannot be edited.", "Esc closes this help." }) do
+      lines[#lines + 1] = note
+      if note ~= "" then marks[#marks + 1] = { #lines, "NonText" } end
+    end
+    show_lines(lines, nil, marks, KEY)
   end
   local function guarded(fn)
     return function()
@@ -378,7 +360,7 @@ return function(reader)
   end
   local function reading_request(action)
     if action ~= "quit" then
-      if not integrated or not data.navigation[action] then return end
+      if not data.navigation[action] then return end
       if vim.fn.mode(1) ~= "n" then fail("clear selection before changing reading sections") end
       if channel then request(action); return end
     end
@@ -392,7 +374,7 @@ return function(reader)
     -- on a heading or separator explicitly lands on the closest actual source row.
     -- Visual endpoints remain strict and are never silently adjusted.
     local cursor = native_cursor()
-    if integrated and vim.fn.mode(1) == "n" and not source_rows[cursor.row] then
+    if vim.fn.mode(1) == "n" and not source_rows[cursor.row] then
       local nearest, distance
       for row, item in pairs(source_rows) do
         local delta = math.abs(row - cursor.row)
@@ -419,110 +401,101 @@ return function(reader)
         payload.mode, payload.tree_only = mode, false
         reload(payload)
       else set_exact_cursor(source_point(selected.id, 0)); vim.cmd('normal! zt') end
-    elseif integrated then request(delta > 0 and 'passage_next' or 'passage_previous') end
+    else request(delta > 0 and 'passage_next' or 'passage_previous') end
   end
-  if integrated then
-    -- Quitting is a command, not a stray key: q and Ctrl-q only say how.
-    for _, key in ipairs({ "q", "<C-q>" }) do
-      vim.keymap.set({ "n", "x" }, key, function()
-        api.nvim_echo({{"Type :q to save your place and quit (:qa! quits without saving)", "None"}}, false, {})
-      end, { buffer = buffer, silent = true })
-    end
-    -- :q, :qa and their spellings save the exact position first; :qa! (any
-    -- command with !) is left to Neovim and quits without saving.
-    local quits = {}
-    for _, name in ipairs({ "q", "qu", "qui", "quit", "qa", "qal", "qall", "quita", "quital", "quitall",
-                            "wq", "wqa", "wqal", "wqall", "x", "xa", "xal", "xall", "xi", "xit", "exi", "exit" }) do
-      quits[name] = true
-    end
-    vim.keymap.set("c", "<CR>", function()
-      -- From a selection, ":" starts with its range; the selection is kept.
-      local line = vim.fn.getcmdline()
-      local selected = line:match("^%s*'<,'>") ~= nil
-      if vim.fn.getcmdtype() == ":" and quits[vim.trim(line:gsub("^%s*'<,'>", ""), nil)] then
-        vim.schedule(guarded(function()
-          if selected then vim.cmd("normal! gv") end
-          reading_request("quit")
-        end))
-        return "<C-c>"
-      end
-      return "<CR>"
-    end, { buffer = buffer, expr = true })
-  else
-    for _, key in ipairs({ "q", "<C-q>" }) do
-      vim.keymap.set({ "n", "x" }, key, guarded(function() reading_request("quit") end), { buffer = buffer, silent = true })
-    end
+  -- Quitting is a command, not a stray key: q and Ctrl-q only say how.
+  for _, key in ipairs({ "q", "<C-q>" }) do
+    vim.keymap.set({ "n", "x" }, key, function()
+      api.nvim_echo({{"Type :q to save your place and quit (:qa! quits without saving)", "None"}}, false, {})
+    end, { buffer = buffer, silent = true })
   end
+  -- :q, :qa and their spellings save the exact position first; :qa! (any
+  -- command with !) is left to Neovim and quits without saving.
+  local quits = {}
+  for _, name in ipairs({ "q", "qu", "qui", "quit", "qa", "qal", "qall", "quita", "quital", "quitall",
+                          "wq", "wqa", "wqal", "wqall", "x", "xa", "xal", "xall", "xi", "xit", "exi", "exit" }) do
+    quits[name] = true
+  end
+  vim.keymap.set("c", "<CR>", function()
+    -- From a selection, ":" starts with its range; the selection is kept.
+    local line = vim.fn.getcmdline()
+    local selected = line:match("^%s*'<,'>") ~= nil
+    if vim.fn.getcmdtype() == ":" and quits[vim.trim(line:gsub("^%s*'<,'>", ""), nil)] then
+      vim.schedule(guarded(function()
+        if selected then vim.cmd("normal! gv") end
+        reading_request("quit")
+      end))
+      return "<C-c>"
+    end
+    return "<CR>"
+  end, { buffer = buffer, expr = true })
   vim.keymap.set({ "n", "x" }, "j", "gj", { buffer = buffer, silent = true })
   vim.keymap.set({ "n", "x" }, "k", "gk", { buffer = buffer, silent = true })
-  if integrated then
-    for key, motion in pairs({ j = "gj", k = "gk" }) do
-      vim.keymap.set("n", key, guarded(function()
-        local before = api.nvim_win_get_cursor(window)
-        vim.cmd("normal! " .. motion)
-        local after = api.nvim_win_get_cursor(window)
-        if mode == 'paragraph' then
-          if not source_rows[after[1]] then
-            local record = by_id[focused_id]
-            set_exact_cursor(source_point(record.id, key == 'j' and record._length or 0))
-          end
-        else
-          local edge = key == "j" and after[1] >= positions[records[#records].id].last_row
-            or key == "k" and after[1] <= positions[records[1].id].first_row
-          if edge and vim.deep_equal(before, after) then reading_request(key == "j" and "next" or "previous") end
+  for key, motion in pairs({ j = "gj", k = "gk" }) do
+    vim.keymap.set("n", key, guarded(function()
+      local before = api.nvim_win_get_cursor(window)
+      vim.cmd("normal! " .. motion)
+      local after = api.nvim_win_get_cursor(window)
+      if mode == 'paragraph' then
+        if not source_rows[after[1]] then
+          local record = by_id[focused_id]
+          set_exact_cursor(source_point(record.id, key == 'j' and record._length or 0))
         end
-      end), { buffer = buffer, silent = true })
-    end
-    vim.keymap.set("n", "[c", guarded(function() reading_request("previous") end), { buffer = buffer, silent = true })
-    vim.keymap.set("n", "]c", guarded(function() reading_request("next") end), { buffer = buffer, silent = true })
-    vim.keymap.set({'n', 'x'}, 'p', guarded(toggle_mode), {buffer = buffer, silent = true})
-    vim.keymap.set({'n', 'x'}, 'y', guarded(yank), {buffer = buffer, silent = true})
-    for _, release in ipairs({'<LeftRelease>', '<2-LeftRelease>', '<3-LeftRelease>'}) do
-      vim.keymap.set('x', release, guarded(yank), {buffer = buffer, silent = true})
-    end
-    vim.keymap.set('n', 't', guarded(tree), {buffer = buffer, silent = true})
-    vim.keymap.set('n', 'f', guarded(toggle_focus), {buffer = buffer, silent = true})
-    vim.keymap.set('n', 'b', guarded(function() passage(-1) end), {buffer = buffer, silent = true})
-    vim.keymap.set('n', 'n', guarded(function() passage(1) end), {buffer = buffer, silent = true})
-    vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
-    vim.keymap.set('n', 'gp', guarded(page), {buffer = buffer, silent = true})
-    vim.keymap.set('n', 'M', guarded(landmark), {buffer = buffer, silent = true})
-    vim.keymap.set('n', 'L', guarded(function() request('landmark_list') end), {buffer = buffer, silent = true})
-    vim.keymap.set({'n', 'x'}, 'E', guarded(function()
-      -- Capture the exact position and selection; ESSENCE returns to it with
-      -- Alt-R and on closing. Visual mode stays until ESSENCE actually opens
-      -- (its window change ends it), so a refused launch keeps the selection.
-      local packet = current_packet()
-      local essence = rawget(_G, 'SOLEssence')
-      essence.origin = packet
-      if essence.window and api.nvim_win_is_valid(essence.window) then essence.focus()
-      else request('essence_open', nil, nil, packet) end
-    end), {buffer = buffer, silent = true})
-    -- Views rebuilt from this one (p, f, b/n) copy data, so forget the marks there too.
-    vim.keymap.set('n', '<Esc>', function()
-      api.nvim_buf_clear_namespace(buffer, search_namespace, 0, -1)
-      data.search_marks = vim.NIL
-    end, {buffer = buffer, silent = true})
-    vim.keymap.set('n', 's', guarded(source), {buffer = buffer, silent = true})
-    vim.keymap.set('n', 'S', guarded(source_pdf), {buffer = buffer, silent = true})
-    vim.keymap.set({'n', 'x'}, 'a', guarded(note), {buffer = buffer, silent = true})
-    vim.keymap.set('n', '<C-n>', guarded(function() request('search_next') end), {buffer = buffer, silent = true})
-    vim.keymap.set('n', '<C-p>', guarded(function() request('search_previous') end), {buffer = buffer, silent = true})
-    vim.keymap.set('n', '<M-Left>', guarded(function() request('history_back') end), {buffer = buffer, silent = true})
-    vim.keymap.set('n', '<M-Right>', guarded(function() request('history_forward') end), {buffer = buffer, silent = true})
-    for slot = 1, 3 do
-      local number = slot
-      vim.keymap.set('n', 'm' .. number, guarded(function() marker(number) end), {buffer = buffer, silent = true})
-      vim.keymap.set('n', "'" .. number, guarded(function() marker(number, 'marker_open') end), {buffer = buffer, silent = true})
-      vim.keymap.set('n', 'dm' .. number, guarded(function() marker(number, 'marker_clear') end), {buffer = buffer, silent = true})
-    end
+      else
+        local edge = key == "j" and after[1] >= positions[records[#records].id].last_row
+          or key == "k" and after[1] <= positions[records[1].id].first_row
+        if edge and vim.deep_equal(before, after) then reading_request(key == "j" and "next" or "previous") end
+      end
+    end), { buffer = buffer, silent = true })
+  end
+  vim.keymap.set("n", "[c", guarded(function() reading_request("previous") end), { buffer = buffer, silent = true })
+  vim.keymap.set("n", "]c", guarded(function() reading_request("next") end), { buffer = buffer, silent = true })
+  vim.keymap.set({'n', 'x'}, 'p', guarded(toggle_mode), {buffer = buffer, silent = true})
+  vim.keymap.set({'n', 'x'}, 'y', guarded(yank), {buffer = buffer, silent = true})
+  for _, release in ipairs({'<LeftRelease>', '<2-LeftRelease>', '<3-LeftRelease>'}) do
+    vim.keymap.set('x', release, guarded(yank), {buffer = buffer, silent = true})
+  end
+  vim.keymap.set('n', 't', guarded(tree), {buffer = buffer, silent = true})
+  vim.keymap.set('n', 'f', guarded(toggle_focus), {buffer = buffer, silent = true})
+  vim.keymap.set('n', 'b', guarded(function() passage(-1) end), {buffer = buffer, silent = true})
+  vim.keymap.set('n', 'n', guarded(function() passage(1) end), {buffer = buffer, silent = true})
+  vim.keymap.set('n', '/', guarded(search), {buffer = buffer, silent = true})
+  vim.keymap.set('n', 'gp', guarded(page), {buffer = buffer, silent = true})
+  vim.keymap.set('n', 'M', guarded(landmark), {buffer = buffer, silent = true})
+  vim.keymap.set('n', 'L', guarded(function() request('landmark_list') end), {buffer = buffer, silent = true})
+  vim.keymap.set({'n', 'x'}, 'E', guarded(function()
+    -- Capture the exact position and selection; ESSENCE returns to it with
+    -- Alt-R and on closing. Visual mode stays until ESSENCE actually opens
+    -- (its window change ends it), so a refused launch keeps the selection.
+    local packet = current_packet()
+    local essence = rawget(_G, 'SOLEssence')
+    essence.origin = packet
+    if essence.window and api.nvim_win_is_valid(essence.window) then essence.focus()
+    else request('essence_open', nil, nil, packet) end
+  end), {buffer = buffer, silent = true})
+  -- Views rebuilt from this one (p, f, b/n) copy data, so forget the marks there too.
+  vim.keymap.set('n', '<Esc>', function()
+    api.nvim_buf_clear_namespace(buffer, search_namespace, 0, -1)
+    data.search_marks = vim.NIL
+  end, {buffer = buffer, silent = true})
+  vim.keymap.set('n', 's', guarded(source), {buffer = buffer, silent = true})
+  vim.keymap.set('n', 'S', guarded(source_pdf), {buffer = buffer, silent = true})
+  vim.keymap.set({'n', 'x'}, 'a', guarded(note), {buffer = buffer, silent = true})
+  vim.keymap.set('n', '<C-n>', guarded(function() request('search_next') end), {buffer = buffer, silent = true})
+  vim.keymap.set('n', '<C-p>', guarded(function() request('search_previous') end), {buffer = buffer, silent = true})
+  vim.keymap.set('n', '<M-Left>', guarded(function() request('history_back') end), {buffer = buffer, silent = true})
+  vim.keymap.set('n', '<M-Right>', guarded(function() request('history_forward') end), {buffer = buffer, silent = true})
+  for slot = 1, 3 do
+    local number = slot
+    vim.keymap.set('n', 'm' .. number, guarded(function() marker(number) end), {buffer = buffer, silent = true})
+    vim.keymap.set('n', "'" .. number, guarded(function() marker(number, 'marker_open') end), {buffer = buffer, silent = true})
+    vim.keymap.set('n', 'dm' .. number, guarded(function() marker(number, 'marker_clear') end), {buffer = buffer, silent = true})
   end
   vim.keymap.set("n", "[p", guarded(function() passage(-1) end), { buffer = buffer, silent = true })
   vim.keymap.set("n", "]p", guarded(function() passage(1) end), { buffer = buffer, silent = true })
   vim.keymap.set({"n", "x"}, "c", guarded(context), { buffer = buffer, silent = true })
   vim.keymap.set("n", "?", help, { buffer = buffer, silent = true })
   if data.theme then vim.keymap.set("n", "T", guarded(cycle_theme), { buffer = buffer, silent = true }) end
-  if not integrated then api.nvim_create_user_command("SOLExport", guarded(function() export() end), {}) end
   -- The reader's own keys.json: each SOL key moves to the reader's chosen key.
   -- All moves are collected before any is made, so two keys can swap.
   local moves, missing = {}, {}
@@ -555,11 +528,9 @@ return function(reader)
     vim.notify('keys.json names keys SOL does not use: ' .. table.concat(missing, ' '), vim.log.levels.WARN)
   end
   local group = api.nvim_create_augroup('SOLReaderView', {clear = true})
-  if integrated then
-    api.nvim_create_autocmd('CursorMoved', { group = group, buffer = buffer, callback = function()
-      reader.panels.follow_tick()
-    end })
-  end
+  api.nvim_create_autocmd('CursorMoved', { group = group, buffer = buffer, callback = function()
+    reader.panels.follow_tick()
+  end })
   api.nvim_create_autocmd("VimResized", { group = group, callback = function()
     if tree_view then tree_view.resize() else close_popup() end
     if api.nvim_win_is_valid(window) then api.nvim_win_set_config(window, window_config()) end

@@ -60,6 +60,79 @@ None reserved. Defaults: summary height cap 20%; word/occurrence tables share sp
 
 
 
+
+## Remove the experiments and the research-export mode — 21 October 2026
+
+**Task:** [Codex: Remove the experiments and the research-export mode (step 2)](https://github.com/dialectmaterial/SOL/blob/d137627ba67d77a3c73571c2e0b037b493f54ac9/docs/coordination/CURRENT_TASK.md#codex-remove-the-experiments-and-the-research-export-mode-step-2).
+**Branch / PR:** `codex/remove-experiments` · [pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fremove-experiments); Claude reviews; author does not merge.
+**Last implementation commit:** `0a89491e6596df7aea4881250fb16b01e24758c3` (this report is committed afterward).
+
+### Changed files
+- `sol/terminal/neovim.py` — remove `run` and the research destination/export wrapper; retain isolated native hosting, bounded strict packet reads, checked view preparation and selection restoration.
+- `sol/terminal/neovim_{view,controls,requests}.lua`, `neovim_reader.py` — remove the mode discriminator, standalone help/status/quit/export branches and `:SOLExport`; use integrated navigation, controls and action envelopes throughout. The internal result writer remains for integrated quit/section returns.
+- `sol/reader/surface.py` — describe its retained checked projections and selection packets as reader internals. Source verification, generation checks, selection fields and detached-view guards remain.
+- `tests/test_reader_surface_neovim.py` — retain **all 53** headless behavior tests, now with integrated navigation on every launch. The selection export/restore check now quits through the integrated path and validates the packet inside its action envelope. Assert `:SOLExport` is absent. Unicode boundaries, wrapping, exact selections, forced-mutation refusals, resizing and fresh-editor restoration remain covered alongside the existing controls/panels tests.
+- `tests/test_reader_surface_export_guards.py` — retain all **20** checks, replacing HTML rendering with the installed payload builder: retirement chains, defensive copies, corpus/reference/generation bindings, late source/graph mutations and imported packet checks.
+- Neovim host, opt-in Alacritty and packaging tests — use installed modules, integrated payloads and action envelopes. Retain host isolation/private-file/preflight/strict-read checks; retire only the research file-export wrapper cases. Source archives explicitly exclude experiments and run the retained source guards; installed-wheel headless Lua loading remains checked.
+- `tests/test_reader_cursor.py` — remove its baseline-only toolkit geometry class; retain all 26 semantic/source-layout tests. `test_reader_view_cli.py` drops a patch of the removed frontend; its routing checks remain.
+- `MANIFEST.in`, `docs/BEING.md`, `CHANGELOG.md`, `CURRENT_TASK.md` — stop shipping experiments, describe the remaining reader, record removal, mark Codex's task `In review`.
+- `scripts/reader_timings.py` already uses installed modules and needs no change. `neovim.lua` remains the unchanged package-local entry.
+- Work performed in `/tmp/sol-remove-experiments`, a clean clone from `origin/main` at `d137627`, because the supplied checkout's Git metadata is read-only. Main had not advanced at publication preparation.
+
+### Removed files and line counts
+
+Counts are against `origin/main` at `d137627`. **31 complete files / 6,308 lines** removed: 12 experiment files / 1,995 lines and 19 experiment-only test files / 4,313 lines. The implementation commit changes 50 files overall: **282 added, 6,798 deleted, net −6,516 lines**; the additional deletions include standalone Lua branches, the research host wrapper and baseline/export-only test cases in retained files. The report itself is excluded from these totals.
+
+| Removed file | Lines |
+| --- | ---: |
+| `experiments/__init__.py` | 1 |
+| `experiments/reader_surfaces/__init__.py` | 1 |
+| `experiments/reader_surfaces/__main__.py` | 102 |
+| `experiments/reader_surfaces/baseline.py` | 715 |
+| `experiments/reader_surfaces/browser.js` | 178 |
+| `experiments/reader_surfaces/browser_acceptance.cjs` | 113 |
+| `experiments/reader_surfaces/common.py` | 5 |
+| `experiments/reader_surfaces/html.py` | 160 |
+| `experiments/reader_surfaces/neovim.py` | 5 |
+| `experiments/reader_surfaces/reading_layout.py` | 147 |
+| `experiments/reader_surfaces/trials.py` | 159 |
+| `experiments/reader_surfaces/tui.py` | 409 |
+| `tests/test_reader_alacritty_integration.py` | 248 |
+| `tests/test_reader_experience.py` | 540 |
+| `tests/test_reader_hosts.py` | 106 |
+| `tests/test_reader_lexer_cache.py` | 90 |
+| `tests/test_reader_reflow.py` | 313 |
+| `tests/test_reader_spacing.py` | 244 |
+| `tests/test_reader_surface_alacritty.py` | 195 |
+| `tests/test_reader_surface_baseline.py` | 152 |
+| `tests/test_reader_surface_browser.py` | 60 |
+| `tests/test_reader_surface_cli.py` | 98 |
+| `tests/test_reader_surface_html.py` | 306 |
+| `tests/test_reader_surface_neovim_cli.py` | 77 |
+| `tests/test_reader_surface_trial_cli.py` | 172 |
+| `tests/test_reader_surface_trial_html.py` | 134 |
+| `tests/test_reader_surface_trials.py` | 332 |
+| `tests/test_reader_surface_tui.py` | 491 |
+| `tests/test_reader_view.py` | 376 |
+| `tests/test_reader_view_integration.py` | 168 |
+| `tests/test_reading_layout.py` | 211 |
+
+### Tests performed
+- `/home/dima/Projects/code/sol/.venv/bin/python -B scripts/check_docs.py` — OK; local links/anchors and legacy inventory checked, external URLs not network-checked.
+- Same interpreter, `-B -m unittest discover -s tests` — **1,608 tests, OK (8 skipped, 4 expected failures)**, 98.477 s. Includes native TTY, headless Neovim, controller and packaging checks. No added skip or expected-failure markers.
+- Focused Neovim surface/host/Alacritty discovery — 81 tests, OK (1 explicit GUI skip); source guards — 20 tests, OK; packaging — 21 tests, OK. The full suite includes the final versions.
+- Cursor and dependent flow-action modules — 26 and 15 tests, OK. The initial full run found a dangling decorator after the retired toolkit class; fixed before the successful full run.
+- `scripts/reader_timings.py --repeats 1 --warmups 0 --json` — OK on its invented temporary corpus; no removed-module dependency. No performance improvement is claimed.
+- `git diff --check` — OK. All retained Python modules parse. Compared headless test method names against the base: 53 before/after, with the export check renamed to integrated quit/restore.
+
+### Outstanding issues
+- No manual terminal/readability acceptance or private-corpus run is claimed. Opt-in GUI checks remain opt-in.
+- Claude's separate document cleanup owns CONTRIBUTING and historical documents: CONTRIBUTING's optional-experiments/archive paragraph still describes the retired tools and should be reconciled there. `docs/legacy/` and `docs/coordination/proposals/` are untouched as assigned.
+
+### Decisions requiring approval
+None reserved. The removals implement the maintainer's approved step 2; no authority Decision statement, dependency set, public CORE/reference/corpus contract or workspace schema changes. Default: retain the internal integrated result writer and detached source-checking helpers needed by the installed reader and its tests.
+
+
 ## A faster full test suite — 21 October 2026
 
 **Task:** [Codex: A faster full test suite](https://github.com/dialectmaterial/SOL/blob/aba326e38eeacdb29ac41e6ce1e78d3670d4e053/docs/coordination/CURRENT_TASK.md#codex-a-faster-full-test-suite).

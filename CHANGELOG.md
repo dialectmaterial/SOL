@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Remove reader surface experiments — 21 October 2026
+
+- Remove `experiments/reader_surfaces/` and the Neovim research-export entry (`neovim.run`, `:SOLExport`, standalone Lua mode). The reader keeps its integrated controls, checked selections and action results.
+- Run all retained headless Lua behavior checks in integrated mode; move the former HTML source-integrity checks to the installed payload builder. Retire tests of the removed experimental frontends.
+
 ### ESSENCE Results fit beside the reader — 21 October 2026
 
 At 80×24, word occurrences stay visible below the frequency table, including

@@ -22,7 +22,7 @@ import unittest
 
 from sol.core.corpus import load_corpus_book
 from sol.corpus import contract
-from experiments.reader_surfaces.common import sample_from_book, validate_packet
+from sol.reader.surface import sample_from_book, validate_packet
 from fixtures_corpus import write_runtime_corpus
 
 
@@ -99,7 +99,7 @@ class ReaderSurfaceNeovimTests(unittest.TestCase):
             env=neovim_environment(Path(temporary.name)), capture_output=True, text=True, timeout=10)
         version = re.match(r"NVIM v(\d+)\.(\d+)", result.stdout)
         if result.returncode or version is None or tuple(map(int, version.groups())) < (0, 11):
-            raise unittest.SkipTest("Neovim 0.11 or newer is required for this experiment")
+            raise unittest.SkipTest("Neovim 0.11 or newer is required for these reader checks")
 
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="sol-neovim-proof-")
@@ -111,15 +111,14 @@ class ReaderSurfaceNeovimTests(unittest.TestCase):
         self.input, self.output = self.root / "input.json", self.root / "selection.json"
         self.result = self.root / "report.json"
 
-    def run_lua(self, scenario, *, restore=None, automatic_quit=True, integrated=False, theme=None):
-        from experiments.reader_surfaces.neovim import build_payload
+    def run_lua(self, scenario, *, restore=None, automatic_quit=True, theme=None):
+        from sol.terminal.neovim import build_payload
         from sol.terminal.theme import theme_payload
 
         self.payload = build_payload(self.sample, width=72, restore=restore)
         if theme is not None:
             self.payload["theme"] = theme_payload(theme, {"COLORTERM": "truecolor"})
-        if integrated:
-            self.payload.update(integrated=True, navigation={"next": True, "previous": True}, notice="")
+        self.payload.update(navigation={"next": True, "previous": True}, notice="")
         self.input.write_text(json.dumps(self.payload, ensure_ascii=False), encoding="utf-8")
         environment = {**self.environment,
             "SOL_NVIM_INPUT": str(self.input), "SOL_NVIM_OUTPUT": str(self.output),
@@ -164,6 +163,7 @@ end
 
     def test_buffer_preserves_exact_multirecord_source_and_native_soft_wrapping(self):
         report = self.run_lua(r'''
+  assert(vim.fn.exists(':SOLExport') == 0)
   assert(vim.bo[reader.buffer].buftype == 'nofile')
   assert(not vim.bo[reader.buffer].modifiable)
   assert(vim.wo[reader.window].wrap and vim.wo[reader.window].linebreak)
@@ -318,7 +318,7 @@ end
         self.assertEqual(validate_packet(self.sample.book, report["packet"]).text,
             self.sample.passages[0].text[5:32])
 
-    def test_exported_packet_validates_in_python_and_restores_in_fresh_editor(self):
+    def test_quit_packet_validates_in_python_and_restores_in_fresh_editor(self):
         text = self.sample.passages[0].text
         start, end = text.index("thought"), text.index("ground") + len("ground")
         report = self.run_lua(r'''
@@ -326,10 +326,11 @@ end
   local packet = reader.capture('v', reader.source_point(id, ''' + str(end - 1) + r'''),
       reader.source_point(id, ''' + str(start) + r'''))
   reader.restore(packet)
-  reader.export()
   report.packet = reader.capture()
+  write_report()
+  reader.quit()
 ''')
-        packet = json.loads(self.output.read_text())
+        packet = json.loads(self.output.read_text())["packet"]
         self.assertEqual(packet, report["packet"])
         self.assertEqual(validate_packet(self.sample.book, packet).text, text[start:end])
         self.output.unlink()
@@ -341,7 +342,7 @@ end
   local cp = reader.source_point(data.records[2].id, 11)
   vim.api.nvim_win_set_cursor(reader.window, {cp.row, cp.byte})
   vim.api.nvim_feedkeys(':q\r', 'xt', false)
-''', integrated=True)
+''')
         result = json.loads(self.output.read_text())
         self.assertEqual(set(result), {"action", "packet"})
         self.assertEqual(result["action"], "quit")
@@ -349,20 +350,20 @@ end
         self.assertIsNone(validate_packet(self.sample.book, result["packet"]))
 
     def test_installed_next_section_uses_native_mapped_key(self):
-        self.run_lua("  vim.api.nvim_feedkeys(']c', 'xt', false)\n", integrated=True)
+        self.run_lua("  vim.api.nvim_feedkeys(']c', 'xt', false)\n")
         result = json.loads(self.output.read_text())
         self.assertEqual(result["action"], "next")
         self.assertIsNone(validate_packet(self.sample.book, result["packet"]))
 
     def test_installed_bottom_j_continues_instead_of_stalling_on_separator(self):
-        self.run_lua("  vim.api.nvim_feedkeys('Gj', 'xt', false)\n", integrated=True)
+        self.run_lua("  vim.api.nvim_feedkeys('Gj', 'xt', false)\n")
         result = json.loads(self.output.read_text())
         self.assertEqual(result["action"], "next")
         self.assertEqual(result["packet"]["reference"]["reference"]["target_id"], self.sample.passages[-1].identifier)
         self.assertEqual(result["packet"]["cursor_offset"], len(self.sample.passages[-1].text))
 
     def test_installed_top_k_can_return_to_previous_reading_section(self):
-        self.run_lua("  vim.api.nvim_feedkeys('ggk', 'xt', false)\n", integrated=True)
+        self.run_lua("  vim.api.nvim_feedkeys('ggk', 'xt', false)\n")
         result = json.loads(self.output.read_text())
         self.assertEqual(result["action"], "previous")
         self.assertEqual(result["packet"]["cursor_offset"], 0)
@@ -376,7 +377,7 @@ end
   vim.api.nvim_exec_autocmds('VimResized', {})
   assert(vim.deep_equal(reader.capture(), packet))
   vim.api.nvim_feedkeys(':q\r', 'xt', false)
-''', integrated=True)
+''')
         result = json.loads(self.output.read_text())
         selected = validate_packet(self.sample.book, result["packet"])
         self.assertEqual(selected.text, self.sample.passages[0].text[5:32])
@@ -420,7 +421,7 @@ end
   reader = SOLNvimReader
   assert(reader.mode == 'continuous' and vim.tbl_count(reader.positions) == 3)
   report.packet = reader.capture()
-''', integrated=True)
+''')
         self.assertEqual(report["packet"]["reference"]["reference"]["target_id"], self.sample.passages[1].identifier)
 
     def test_yank_calls_clipboard_provider_with_exact_semantic_text(self):
@@ -438,7 +439,7 @@ end
   reader.restore(packet)
   reader.yank()
   report.clipboard = clipboard()
-''', integrated=True)
+''')
         self.assertEqual(report["clipboard"], "thought")
 
     def test_outline_keeps_selection_across_resize_and_returns_without_navigation(self):
@@ -466,7 +467,7 @@ end
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'xt', false)
   assert(vim.deep_equal(reader.capture(), before))
   report.restored = true
-''', integrated=True)
+''')
         self.assertTrue(report["restored"])
 
     def test_help_groups_keys_and_wraps_under_their_descriptions(self):
@@ -477,7 +478,7 @@ end
   report.lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
   report.breakindent = vim.wo[panel].breakindent
   report.shift = vim.wo[panel].breakindentopt
-''', integrated=True)
+''')
         lines = report["lines"]
         for section in ("Reading", "Finding your way", "Text, sources and notes", "ESSENCE", "Leaving"):
             self.assertIn(section, lines)
@@ -501,7 +502,7 @@ end
   report.lines = vim.api.nvim_buf_get_lines(tree.buffer, 0, -1, false)
   report.width = vim.api.nvim_win_get_width(tree.window)
   report.height = vim.api.nvim_win_get_height(tree.window)
-''', integrated=True)
+''')
         lines, width = report["lines"], report["width"]
         self.assertLessEqual(width, 84)
         self.assertEqual(report["height"], len(lines))  # no empty rows below the last entry
@@ -520,7 +521,7 @@ end
   refuse(function() reader.yank() end)
   assert(vim.fn.getreg('"') == data.records[1].plain_text)
   report.register = true
-''', integrated=True)
+''')
         self.assertTrue(report["register"])
 
     def test_simple_paragraph_keys_and_focus_retain_semantic_positions(self):
@@ -548,7 +549,7 @@ end
   assert(reader.capture().reference.reference.target_id == second)
   assert(reader.capture().cursor_offset == 0)
   report.simple_keys = true
-''', integrated=True)
+''')
         self.assertTrue(report["simple_keys"])
 
     def test_theme_presets_style_only_presentation_and_cycle_in_order(self):
@@ -618,7 +619,7 @@ end
   vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
   assert(vim.api.nvim_get_current_win() == reader.window)
   assert(vim.deep_equal(SOLNvimReader.capture(), resting), 'source preview moved the reading position')
-''', integrated=True)
+''')
         opened, fallback = "\n".join(report["opened"]), "\n".join(report["fallback"])
         self.assertIn("Recorded region of PDF page 7 (printed page 5), 1 of 2", opened)
         self.assertIn("Transcription: needs visual review", opened)
@@ -646,7 +647,7 @@ end
   end
   report.sent = sent
   report.warned = warned
-''', integrated=True)
+''')
         self.assertEqual([(row["op"], row["page"]) for row in report["sent"]], [("page_open", 240)])
         self.assertEqual(report["warned"], ["Type a printed page number, e.g. 240"])
 
@@ -674,7 +675,7 @@ end
   report.missing = vim.api.nvim_buf_get_lines(0, 0, -1, false)
   vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
   assert(vim.deep_equal(SOLNvimReader.capture(), resting), 'the PDF key moved the reading position')
-''', integrated=True)
+''')
         self.assertIn("Printed page 5 (PDF page 7) in zathura", report["echo"])
         missing = "\n".join(report["missing"])
         self.assertIn("No PDF viewer is available (install Zathura", missing)
@@ -708,7 +709,7 @@ end
   vim.api.nvim_feedkeys(vim.keycode('<CR>'), 'xt', false)
   assert(sent[4].op == 'landmark_open' and sent[4].name == 'Being and nothing')
   report.count = #sent
-''', integrated=True)
+''')
         panel = "\n".join(report["panel"])
         self.assertIn("Landmarks", panel)
         self.assertIn("Quality | p. 81 | Being, pure being", panel)
@@ -737,7 +738,7 @@ end
   _G.SOLReaderChannel.navigation_pending = nil
   vim.api.nvim_feedkeys('?', 'xt', false)
   report.help = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-''', integrated=True)
+''')
         self.assertTrue(report["P"])
         self.assertEqual((report["gp_sent"], report["gp_error"]), (0, ""))  # moved away: does nothing
         self.assertEqual(report["first"], "landmark_list")  # L and M swapped
@@ -776,7 +777,7 @@ end
   _G.SOLReaderChannel.pending[sent[2].id]({follow = {active = false}})  -- Zathura was closed
   rest_on(second)
   report.after_close = #sent
-''', integrated=True)
+''')
         self.assertEqual(report["before_s"], 0)  # nothing follows until S opened Zathura
         self.assertEqual(report["same_passage"], 1)  # resting on the same passage sends nothing
         self.assertEqual(report["during_move"], 1)
@@ -796,7 +797,7 @@ end
   vim.fn.input = function() return '240' end
   vim.api.nvim_feedkeys('gp', 'xt', false)
   report.sent, report.echoed = #sent, echoed
-''', integrated=True)
+''')
         self.assertEqual(report["sent"], 1)
         self.assertEqual(report["echoed"], [""])  # the prompt line is cleared once answered
 
@@ -807,7 +808,7 @@ end
   report.focused = vim.o.laststatus
   vim.api.nvim_feedkeys('f', 'xt', false)
   report.after = vim.o.laststatus
-''', integrated=True)
+''')
         self.assertEqual((report["before"], report["focused"], report["after"]), (3, 0, 3))
 
     def test_note_editor_saves_restores_selection_and_protects_drafts(self):
@@ -862,7 +863,7 @@ end
   -- A temporary session explains instead of opening an editor.
   SOLNvimReader.update_personal({persistent = false, notes = vim.empty_dict()})
   report.temporary = select(2, pcall(SOLNvimReader.note))
-''', integrated=True)
+''')
         text = self.sample.passages[0].text
         self.assertEqual(report["quote"], text[5:13])
         self.assertTrue(report["title"].startswith(" Note on: "))
@@ -934,7 +935,7 @@ end
                  {revision = 1, kind = 'created', editor = 'Invented reader', recorded_at = '2026-10-17T12:00:00Z',
                   lines = {'My first', 'thought'}}}}})
   report.history = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-''', integrated=True)
+''')
         context = "\n".join(report["context"])
         self.assertIn("Your notes   2 · a add · e edit · r versions", context)
         self.assertIn("  Invented reader · 17 Oct 2026, 12:00 · revision 1\n"
@@ -1030,7 +1031,7 @@ end
   _G.SOLReaderChannel.pending[sent[#sent].id]({essence = {command = {'/nonexistent/sol-essence'}}})
   report.failure = {warning = warnings[#warnings], window = SOLEssence.window == nil,
                     focused_reader = vim.api.nvim_get_current_win() == SOLNvimReader.window}
-''', integrated=True, theme="mocha")
+''', theme="mocha")
         self.assertEqual(report["request"], "essence_open")
         self.assertEqual(report["themes"], ["mocha", "latte", "mocha"])
         self.assertEqual(report["request_target"], self.sample.passages[0].identifier)
@@ -1098,7 +1099,7 @@ end
   reader.yank()
   report.fallback = messages[#messages]
   report.register = vim.fn.getreg('"')
-''', integrated=True)
+''')
         self.assertEqual(report["across"], texts[0][5:] + "\n\n" + texts[1][:10])
         self.assertEqual(report["mode_after"], "n")
         self.assertEqual(report["snapped"], texts[1][:5])
@@ -1122,7 +1123,7 @@ end
   report.pdf_key = normal['S'] == true
   vim.fn.writefile({vim.json.encode(report)}, os.getenv('SOL_NVIM_TEST_REPORT'))
   vim.api.nvim_feedkeys(':qa!\\r', 'xt', false)
-''', integrated=True, automatic_quit=False)
+''', automatic_quit=False)
         self.assertEqual(report["hint"], ["Type :q to save your place and quit (:qa! quits without saving)"] * 2)
         self.assertTrue(report["alive"])
         self.assertTrue(report["pdf_key"])  # S is the printed page now, not the old sentence study
@@ -1156,7 +1157,7 @@ end
     if not pcall(assert(loadfile(os.getenv('SOL_NVIM_ADAPTER'))), broken) then refused = refused + 1 end
   end
   report.refused = refused
-''', integrated=True)
+''')
         status = report["status"]
         self.assertTrue(status.startswith(" Quality · p."), status)
         self.assertIn(f"p. {self.sample.passages[1].printed_page}", status)
@@ -1194,7 +1195,7 @@ end
   vim.api.nvim_exec_autocmds('VimResized', {})
   vim.api.nvim_feedkeys('c', 'xt', false)
   report.narrow = {page = geometry(reader.window), panel = geometry(popup())}
-''', integrated=True)
+''')
         wide = report["wide"]
         self.assertLess(wide["page"]["col"], wide["centred"]["col"])
         self.assertGreaterEqual(wide["panel"]["col"], wide["page"]["col"] + wide["page"]["width"] + 1)
@@ -1247,7 +1248,7 @@ end
                    focused = vim.api.nvim_get_current_win() == reader.window}
   reader.note()
   report.forced.draft = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-""", integrated=True)
+""")
         wide, narrow = report["160"], report["100"]
         self.assertLess(wide["page"]["col"], wide["centred"]["col"])
         self.assertGreaterEqual(wide["editor"]["col"], wide["page"]["col"] + wide["page"]["width"] + 1)
@@ -1275,7 +1276,7 @@ end
     for _, line in ipairs(mark[4].virt_lines or {}) do quoted[#quoted + 1] = line[1][1] end
   end
   report.quoted = quoted
-""", integrated=True)
+""")
         self.assertEqual(report["quoted"][0], " ".join(text[:30].split()))
         self.assertIn("s", report["quoted"][0])
 
@@ -1288,7 +1289,7 @@ end
   assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
   SOLNvimReader.context()
   report.lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
-''', integrated=True)
+''')
         # 12:00 UTC on 17 October is 14:00 in Amsterdam (summer time).
         self.assertIn("  Invented reader · 17 Oct 2026, 14:00 · revision 1", report["lines"])
 
@@ -1366,7 +1367,7 @@ while True:
   local job = essence.job
   essence.save_before_exit()
   report.exited = vim.fn.jobwait({job}, 0)[1] ~= -1
-''', integrated=True)
+''')
         self.assertEqual(report["before"], "full")
         self.assertEqual(report["while_terminal"], 1)  # only E's request: nothing sent from terminal mode
         self.assertEqual(report["requests"], [{"op": "essence_source", "source": request["source"]}])
@@ -1428,7 +1429,7 @@ while True:
   _G.SOLReaderChannel.pending[sent[#sent].id](nil, 'ESSENCE needs Textual')
   report.refused = {mode = vim.fn.mode(), exact = vim.deep_equal(SOLNvimReader.capture(), selected),
                     warning = warnings[#warnings], window = SOLEssence.window == nil}
-''', integrated=True)
+''')
         for direction, cursor in (("forward", end), ("reverse", start)):
             with self.subTest(direction=direction):
                 case = report["cases"][direction]
@@ -1569,7 +1570,7 @@ while True:
       end
     end
   end
-''', integrated=True)
+''')
         self.assertEqual(report["checks"], 8)
         self.assertEqual(report["marks"], 24)
 
@@ -1616,7 +1617,7 @@ while True:
   vim.api.nvim_win_set_cursor(reader.window, point(id, 20))
   assert(reader.capture().cursor_offset == 20)
   report.ok = true
-''', integrated=True)
+''')
         self.assertTrue(report["ok"])
 
     def test_occurrence_reply_moves_exact_cursor_without_rebuilding_view(self):
@@ -1653,7 +1654,7 @@ while True:
     assert(vim.deep_equal(styles, vim.api.nvim_buf_get_extmarks(buffer, reader.namespace, 0, -1, {details = true})))
   end
   report.ok = true
-''', integrated=True)
+''')
         self.assertTrue(report["ok"])
 
     def test_search_marks_highlight_matches_until_escape(self):
@@ -1676,7 +1677,7 @@ while True:
   local broken = vim.deepcopy(data)
   broken.search_marks = {id = data.records[1].id, spans = {{2, 1}}}
   report.refused = not pcall(loadfile(os.getenv('SOL_NVIM_ADAPTER')), broken)
-''', integrated=True)
+''')
         self.assertIn("12 of 87", report["status"])
         self.assertEqual((report["before"], report["after"]), (1, 0))
         self.assertTrue(report["refused"])
@@ -1700,7 +1701,7 @@ while True:
       break
     end
   end
-''', integrated=True)
+''')
         self.assertEqual((report["op"], report["number"]), ("search_open", 25))
 
     def test_dismissed_search_marks_stay_hidden_until_a_new_result(self):
@@ -1738,7 +1739,7 @@ while True:
   -- A deliberate new result arrives as a new payload and shows its marks.
   assert(loadfile(adapter))(vim.deepcopy(payload))
   report.counts.new_result = count()
-''', integrated=True, theme="terminal")
+''', theme="terminal")
         self.assertEqual(report["counts"], {"shown": 1, "escape": 0, "paragraph": 0, "paragraph_back": 0,
                                             "continuous": 0, "focus": 0, "resize": 0, "theme": 0, "new_result": 1})
 
@@ -1779,7 +1780,7 @@ while True:
       end
     end
   end
-''', integrated=True)
+''')
         self.assertEqual(len(report["yanks"]), 8)
         for width, mode, first, last, copied in report["yanks"]:
             with self.subTest(width=width, mode=mode):
@@ -1809,7 +1810,7 @@ while True:
     if not accepted then refused = refused + 1 end
   end
   report.refused = refused
-''', theme="mocha", integrated=True)
+''', theme="mocha")
         self.assertEqual(report["refused"], 6)
 
 
