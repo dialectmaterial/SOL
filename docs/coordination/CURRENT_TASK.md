@@ -53,25 +53,29 @@ authorities, README, CONTRIBUTING, CLAUDE.md, `scripts/check_docs.py` and its
 test. No code. Next: steps 1, 3 and 6's `sol being` (app, options, shell,
 `sol/terminal/` except the Lua reader, packaging).
 
-## Codex: ESSENCE cleanup (steps 5 and 6)
+## Codex: Restructuring stage A — ESSENCE and CORE inventory
 
 **Status:** In review
-**Branch:** `codex/essence-cleanup`
-**Requested:** 21 October 2026, by the maintainer
+**Branch:** `codex/inventory-essence-core`
+**Requested:** 21 October 2026, directly by the maintainer
 
 ### Scope
 
-Remove the term experiment, segmentation-pilot tools and formula review sheet,
-with their tests. Preserve the shared tokenizer and corpus guards. Rename the
-`sol analyze` namespace to `sol essence` without an alias in ESSENCE code,
-messages, current docs and tests. In `sol/reader/app.py`, change only that
-subcommand's dispatch condition. Claude owns shell, terminal (except ESSENCE
-TUI), reader options and packaging cleanup. See ESSENCE §§2, 5–6.
+Inventory every module in `sol/essence/`, `sol/corpus/`, `sol/core/` and
+`scripts/` from `origin/main`, following the maintainer's SPECULATIVE §§4 and 7
+(read from PR #86's `origin/claude/speculative-docs` while pending).
+Record actual responsibilities, mechanical imports/reverse imports, entry
+routes, protecting tests, present boundaries, cohesive groups and Stage C
+reading questions in `restructuring/INVENTORY_ESSENCE_CORE.md`.
+
+### Constraints
+
+No product code changes or placements under logical subdivisions. Do not touch
+Claude's parallel `INVENTORY_BEING.md`. Preserve contracts and behavior.
 
 ### Acceptance
 
-Documentation check and full suite; handoff with removed files and line counts;
-pull request for Claude's review, no author merge.
+Documentation check, HANDOFF report and PR for Claude's review; no author merge.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
