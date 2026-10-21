@@ -12,54 +12,53 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: The guide and README describe today's reader
+## Claude Code: Visual audit of the reader, as options for the maintainer
 
-**Status:** In review
-**Branch:** `claude/guide-current`
-**Requested:** 21 October 2026, by the maintainer via Claude
+**Status:** In progress
+**Branch:** `claude/visual-audit`
+**Requested:** 21 October 2026, by the maintainer via Claude ([BEING §4](../BEING.md#4-theming-and-typography-next-bounded-task) "Not yet done")
 
 ### Goal
 
-`sol guide` and the README name the reader's keys and features as they are
-now (complete search, `gp`, `s`/`S` with Zathura, `M`/`L`, notes, ESSENCE,
-themes, `keys.json`, `sol-window`) and nothing that has changed.
+Rendered before/after comparisons of spacing, heading density, status-line
+weight and popup intrusion on the real book, in each theme, as concrete options
+the maintainer chooses from. Nothing changes the look until chosen.
 
 ### Scope
 
-`sol/reader/render.py` (the guide), `README.md`, their tests, CHANGELOG. No
-change to BEING (Codex).
+Audit tooling under `scripts/` if needed; no change to the reader's look in
+this task.
 
 ### Acceptance
 
-Tests for the guide text; documentation check and full suite.
+An options page for the maintainer; BEING §4 records that the audit was done.
 
-## Codex: BEING describes the current reader, not its history
+## Codex: A faster full test suite
 
-**Status:** In review
-**Branch:** `codex/being-current`
+**Status:** Ready
+**Branch:** `codex/test-speed`
 **Requested:** 21 October 2026, by the maintainer via Claude
 
 ### Goal
 
-BEING §§2–7 read as the current state of the reader: dated "Implemented (17
-October)" paragraphs become one present-tense description per feature, with
-history left to CHANGELOG and Git. Every fact, limit and test claim survives.
+`python -B -m unittest discover -s tests` takes clearly less than its current
+~150 s on this machine, with the same tests and assertions.
 
 ### Scope
 
-`docs/BEING.md` only (plus CHANGELOG if needed). No code.
+`tests/` (fixtures, shared setup, slow helpers), `CONTRIBUTING.md` if the
+commands change, CHANGELOG. No product code unless a test-only seam is needed.
 
 ### Constraints
 
-**Decision** statements stay word for word (changing them is reserved). No
-claim may be strengthened: what is untested or unseen stays so. Keep links
-and anchors the documentation check verifies. No change to README or the
-guide (Claude).
+No test deleted, skipped or weakened; the same test count (1,807 now, plus
+any added). No new dependency (no pytest-xdist). CI configuration unchanged
+unless it gets faster too.
 
 ### Acceptance
 
-Documentation check and full suite; the handoff lists anything removed as
-obsolete and why.
+Before/after wall-clock times in the handoff; the slowest tests listed;
+documentation check and full suite.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
