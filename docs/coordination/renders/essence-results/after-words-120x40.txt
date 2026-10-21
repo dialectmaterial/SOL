@@ -1,0 +1,40 @@
+  From the reader: Invented section | p. 7 · record bbbbbbbb
+ Encyclopedia  Methods  Experiment  Results
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╸━━━━━━━╺━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ Word frequencies
+ Target: 13 tokens, 13 distinct words, 1 input (core, corpus)
+ Not saved: this reader session has no workspace.
+  Word                                                                                              Target  per 10k
+  an                                                                                                1       769.23
+  any                                                                                               1       769.23
+  extracting                                                                                        1       769.23
+  installed                                                                                         1       769.23
+  invented                                                                                          1       769.23
+  makes                                                                                             1       769.23
+  passage                                                                                           1       769.23
+  pdf                                                                                               1       769.23
+  reader                                                                                            1       769.23
+  research                                                                                          1       769.23
+  this                                                                                              1       769.23
+  useful                                                                                            1       769.23
+  without                                                                                           1       769.23
+ Occurrences · Enter opens in reader · Escape returns to words
+  Side       Occurrence  Where                        In context
+  target     1 here      Synthetic section            An invented passage makes this installed…
+                         p. 7
+
+
+
+
+
+
+
+
+
+
+
+
+
+  Alt-F fullscreen ⇄ beside · Alt-R back to the reader · 1–4 screens
+ q Leave ESSENCE

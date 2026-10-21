@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### ESSENCE Results fit beside the reader — 21 October 2026
+
+At 80×24, word occurrences stay visible below the frequency table, including
+with a reference. All comparison columns fit; long words and undefined measures
+wrap. Sentence and TF-IDF tables also fit without sideways scrolling. Resizing
+keeps focus, selected rows and export status. Summaries scroll independently.
+
 ### A genealogy opens the ESSENCE encyclopedia — 21 October 2026
 
 The encyclopedia's first page is a small map of where its methods come from,

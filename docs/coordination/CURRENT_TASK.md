@@ -30,7 +30,7 @@ tests, ESSENCE §7, CHANGELOG. Not the Results screen (Codex).
 
 ## Codex: ESSENCE Results in small windows
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/essence-results-small`
 **Requested:** 21 October 2026, by the maintainer via Claude ("First, we need to improve Essence's UI")
 

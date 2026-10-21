@@ -1,0 +1,40 @@
+  From the reader: Invented section | p. 7 · record bbbbbbbb
+ Encyclopedia  Methods  Experiment  Results
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╸━━━━━━━╺━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ Target: 13 tokens, 13 distinct words, 1 input (core, Synthetic section, from p. 7)
+ Reference: 13 tokens, 13 distinct words, 1 input (core, corpus)
+ Difference: target rate minus reference rate, per 10,000 tokens. Log₂ ratio: log₂ of target rate over reference
+ rate. No smoothing: a word absent on one side has no ratio.
+ Note: Lexical rates describe these inputs; they do not establish conceptual similarity or statistical significance. ▄▄
+ Note: These are descriptive lexical effect sizes, not significance tests, confidence estimates or evidence of
+  Word                                                 Target  per 10k   Reference  per 10k   Difference  Log₂ ratio
+  an                                                   1       769.23    1          769.23    +0.00       +0.00
+  any                                                  1       769.23    1          769.23    +0.00       +0.00
+  extracting                                           1       769.23    1          769.23    +0.00       +0.00
+  installed                                            1       769.23    1          769.23    +0.00       +0.00
+  invented                                             1       769.23    1          769.23    +0.00       +0.00
+  makes                                                1       769.23    1          769.23    +0.00       +0.00
+  passage                                              1       769.23    1          769.23    +0.00       +0.00
+  pdf                                                  1       769.23    1          769.23    +0.00       +0.00
+  reader                                               1       769.23    1          769.23    +0.00       +0.00
+  research                                             1       769.23    1          769.23    +0.00       +0.00
+  this                                                 1       769.23    1          769.23    +0.00       +0.00
+  useful                                               1       769.23    1          769.23    +0.00       +0.00      ▇▇
+ Occurrences · Enter opens in reader · Escape returns to words
+  Side       Occurrence  Where                        In context
+  target     1 here      Synthetic section            An invented passage makes this installed…
+                         p. 7
+  reference  1 here      Synthetic section            An invented passage makes this installed…
+                         p. 7
+
+
+
+
+
+
+
+  Export CSV   Export TSV
+
+  Alt-F fullscreen ⇄ beside · Alt-R back to the reader · 1–4 screens
+ q Leave ESSENCE

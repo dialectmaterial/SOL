@@ -37,8 +37,7 @@ SOL_THEMES = (
           panel="#2a2531", dark=True),
 )
 
-SOURCES_HELP = ("Sources · Enter on a word focuses its occurrences; Enter here opens the reader. "
-                "Escape returns to words · Alt-Left in the reader returns.")
+SOURCES_HELP = "Occurrences · Enter opens in reader · Escape returns to words"
 
 # Screens that browse a bundled catalog, with their one-line help.
 BROWSERS = {
@@ -98,14 +97,15 @@ class EssenceApp(App):
     Button { min-width: 12; height: 3; margin-right: 1; border: none; }
     #cancel { background: transparent; }
     #status { padding-top: 1; color: $text-muted; }
-    #summary { padding: 0 0 1 0; }
-    #summary-box { height: auto; max-height: 25%; }
-    #frequencies { height: 1fr; min-height: 5; }
+    #results { height: 1fr; }
+    #summary { padding: 0; }
+    #summary-box { height: auto; max-height: 20%; }
+    #frequencies { height: 1fr; min-height: 3; }
     DataTable { background: $background; }
-    #sources-label, #overall-label { padding: 1 0 0 0; color: $text-muted; height: auto; }
-    #sources { height: 1fr; min-height: 4; max-height: 40%; }
-    #overall { height: 8; max-height: 30%; }
-    #export-row { height: auto; padding-top: 1; }
+    #sources-label, #overall-label { color: $text-muted; height: auto; max-height: 2; }
+    #sources { height: 1fr; min-height: 4; }
+    #overall { height: 1fr; min-height: 3; max-height: 30%; }
+    #export-row { height: 1; }
     #export-row Button { height: 1; }
     #result-status { color: $text-muted; height: auto; }
     """
@@ -354,11 +354,19 @@ class EssenceApp(App):
         self.set_word_widgets(True)
         table = self.query_one("#frequencies", DataTable)
         table.clear(columns=True)
-        table.add_columns("Word", "Target", "per 10k",
-                          *(("Reference", "per 10k") if count.reference is not None else ()),
-                          *(("Difference", "Log₂ ratio") if count.comparison is not None else ()))
+        columns = [("Target", 6), ("per 10k", 8)]
+        if count.reference is not None:
+            columns += [("Reference", 9), ("per 10k", 8)]
+        if count.comparison is not None:
+            columns += [("Difference", 10), ("Log₂ ratio", 10)]
+        budget = self.result_width(len(columns) + 1)
+        table.add_column("Word", width=max(1, budget - sum(width for _, width in columns)))
+        for label, width in columns:
+            table.add_column(label, width=width)
         shown, total = words.rows(count)
-        table.add_rows(shown if count.reference is not None else [row[:3] for row in shown])
+        for row in shown:
+            cells = row if count.reference is not None else row[:3]
+            table.add_row(*cells, height=None)
         lines = words.summary(count)
         if len(shown) < total:
             lines.append(f"Showing the {len(shown):,} most frequent of {total:,} words.")
@@ -377,6 +385,14 @@ class EssenceApp(App):
         # Words first: arrows choose a word, Enter goes to its sources.
         table.focus()
 
+    def result_width(self, columns):
+        """Cell budget: pane padding, scrollbar, then DataTable cell padding.
+
+        Use the viewport, never content widths, so a resize cannot make long
+        words, paths or undefined measures force sideways scrolling.
+        """
+        return max(columns, self.size.width - 4 - 2 * columns)
+
     def set_word_widgets(self, shown) -> None:
         self.query_one("#overall").display = False
         self.query_one("#overall-label").display = False
@@ -389,8 +405,8 @@ class EssenceApp(App):
         table = self.query_one("#frequencies", DataTable)
         table.clear(columns=True)
         table.add_column("Words", width=7)
-        table.add_column("Beginning", width=max(15, self.size.width - 47))
-        table.add_column("Where", width=30)
+        table.add_column("Beginning", width=self.result_width(3) - 7 - 24)
+        table.add_column("Where", width=24)
         for row in sentences.rows(count):
             table.add_row(row[0], Text(row[1], overflow="fold"),
                           Text(row[2].replace(" | p. ", "\np. "), overflow="fold"), height=None)
@@ -416,14 +432,17 @@ class EssenceApp(App):
         self.set_word_widgets(False)
         table = self.query_one("#frequencies", DataTable)
         table.clear(columns=True)
-        table.add_column("Passage · Enter to open", width=min(34, max(20, self.size.width // 3)))
-        table.add_column("Top terms · weight", width=max(24, self.size.width - 43))
+        passage_width = min(34, max(20, self.result_width(2) // 3))
+        table.add_column("Passage · Enter to open", width=passage_width)
+        table.add_column("Top terms · weight", width=self.result_width(2) - passage_width)
         for label, terms in tfidf.rows(count):
             table.add_row(Text(label, overflow="fold"), Text(terms, overflow="fold"), height=None)
         overall = self.query_one("#overall", DataTable)
         overall.clear(columns=True)
-        overall.add_columns("Term", "Mean weight")
-        overall.add_rows((row["word"], f"{row['score']:.4f}") for row in count.study["overall"])
+        overall.add_column("Term", width=self.result_width(2) - 12)
+        overall.add_column("Mean weight", width=12)
+        for row in count.study["overall"]:
+            overall.add_row(Text(row["word"], overflow="fold"), f"{row['score']:.4f}", height=None)
         overall.display = self.query_one("#overall-label").display = True
         lines = tfidf.summary(count)
         lines.append(f"Saved: {saved}" if saved else "Not saved: this reader session has no workspace.")
@@ -441,8 +460,9 @@ class EssenceApp(App):
         table.clear(columns=True)
         table.add_column("Side", width=9)
         table.add_column("Occurrence", width=10)
-        table.add_column("Where", width=min(34, max(20, self.size.width // 3)))
-        table.add_column("In context", width=max(20, self.size.width - 65))
+        where_width = min(30, self.result_width(4) // 4)
+        table.add_column("Where", width=where_width)
+        table.add_column("In context", width=self.result_width(4) - 19 - where_width)
         self.shown_sources = () if index is None else tuple(words.sources(self.last_count, index))
         for item in self.shown_sources:
             label = item["label"].replace(" | p. ", "\np. ")
@@ -526,19 +546,24 @@ class EssenceApp(App):
 
     def reflow_result(self) -> None:
         table = self.query_one("#frequencies", DataTable)
-        if isinstance(self.last_count, words.Count):
-            sources = self.query_one("#sources", DataTable)
-            row = sources.cursor_row
-            self.show_sources(table.cursor_row if table.row_count else None)
-            sources.move_cursor(row=row)
-            return
         screen = self.query_one("#screens", TabbedContent).active
         focused = self.focused
         row = table.cursor_row
+        sources = self.query_one("#sources", DataTable)
+        source_row = sources.cursor_row
+        export_disabled = [button.disabled for button in self.query("#export-row Button")]
         messages = [(widget, widget.content) for widget in
                     (self.query_one("#status", Static), self.query_one("#result-status", Static))]
-        self.show_result(self.last_count, self.last_saved)
-        table.move_cursor(row=row)
+        # Rebuilding posts highlight events for row zero. Suppress those
+        # intermediate events so they cannot reset the restored occurrence.
+        with self.prevent(DataTable.RowHighlighted):
+            self.show_result(self.last_count, self.last_saved)
+            table.move_cursor(row=row)
+            if isinstance(self.last_count, words.Count):
+                self.show_sources(row if table.row_count else None)
+                sources.move_cursor(row=source_row)
+        for button, disabled in zip(self.query("#export-row Button"), export_disabled):
+            button.disabled = disabled
         for widget, content in messages:
             widget.update(content)
         self.query_one("#screens", TabbedContent).active = screen

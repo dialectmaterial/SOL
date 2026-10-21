@@ -1,0 +1,40 @@
+  From the reader: Invented section | p. 7 · record bbbbbbbb
+ Encyclopedia  Methods  Experiment  Results
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╸━━━━━━━╺━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ TF-IDF · 1 passage · 13 tokens · top 20 terms each
+ Passages in reading order, then overall mean weights. Enter opens a passage in the reader.
+ Raw-count TF · smoothed IDF · L2 per passage · no stop-word removal.
+ Not saved: this reader session has no workspace.
+
+  Passage · Enter to open             Top terms · weight
+  Synthetic section                   an 0.2774 · any 0.2774 · extracting 0.2774 · installed 0.2774 · invented
+  p. 7                                0.2774 · makes 0.2774 · passage 0.2774 · pdf 0.2774 · reader 0.2774 ·
+                                      research 0.2774 · this 0.2774 · useful 0.2774 · without 0.2774
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ Overall · mean passage weights
+  Term        Mean weight
+  an          0.2774
+  any         0.2774
+  extracting  0.2774
+  installed   0.2774                                                                                                 ▃▃
+  invented    0.2774
+  makes       0.2774
+  passage     0.2774
+
+  Alt-F fullscreen ⇄ beside · Alt-R back to the reader · 1–4 screens
+ q Leave ESSENCE

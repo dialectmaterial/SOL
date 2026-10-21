@@ -1,0 +1,40 @@
+  From the reader: Invented section | p. 7 · record bbbbbbbb
+ Encyclopedia  Methods  Experiment  Results
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╸━━━━━━━╺━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ 1 sentence, 13 words, 1 input (core, corpus)
+ Words per sentence: mean 13.0, median 13, middle 80% 13–13, longest 13
+
+     1–10 words      0                                                                                               ▃▃
+    11–20 words      1  ████████████████████████
+    21–30 words      0
+    31–40 words      0
+    41–50 words      0
+  Words    Beginning                                                                  Where
+  13       An invented passage makes this installed research reader…                  Synthetic section
+                                                                                      p. 7
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  Alt-F fullscreen ⇄ beside · Alt-R back to the reader · 1–4 screens
+ q Leave ESSENCE
