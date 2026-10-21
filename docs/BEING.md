@@ -14,7 +14,7 @@ BEING is the place to **read Hegel's *Science of Logic***, locate source evidenc
 
 ## 2. What is implemented
 
-`sol` invokes a **single native Neovim 0.11+ reader** with a private SOL configuration. Personal Neovim/LazyVim settings are neither loaded nor changed. The fullscreen prompt_toolkit research baseline is outside the installed distribution and remains under `experiments/reader_surfaces/baseline.py` for controlled research. `sol --engine neovim` remains compatible syntax, not a distinct engine.
+`sol` invokes a **single native Neovim 0.11+ reader** with a private SOL configuration. Personal Neovim/LazyVim settings are neither loaded nor changed. The reader uses only its integrated mode; checkout surface experiments and the separate research-export mode have been removed. `sol --engine neovim` remains compatible syntax, not a distinct engine.
 
 Python/CORE owns source verification, IDs, lineage, actions and workspace persistence. Neovim owns disposable buffers, layout, input, motions and visual styling. A view contains **at most 64 canonical paragraphs**, divided into bounded reading sections; the reading position is a UUID plus source-codepoint offset, *never* a Neovim buffer address or screen row. Reloading a section in the same native Neovim process preserves the semantic contract. The reader can display adjacent passages continuously or one passage at a time. The book is **not** one unbounded editor buffer.
 
@@ -226,7 +226,7 @@ Do not confuse installing a Neovim color scheme with designing a reading surface
 
 The earlier `prompt_toolkit` surface was subjectively easier to read despite less functionality. Compare the historical baseline and current Neovim on **the same chapter**. Document why: use a friction log with (a) interruption point, (b) recovery effort, (c) spacing/typography issue, (d) a source or math issue, (e) one corrective change. Then implement small changes inside Neovim with regression tests. Resist another framework migration based on screenshots alone.
 
-Checkout-only proofs include continuous terminal and offline self-contained HTML surfaces (under `experiments/reader_surfaces/`); these are **research comparisons, not installed alternative readers**. They demonstrate that source-bound selection can survive layout changes but do not establish long-term human comfort. A browser HTML proof is not a finished BEING GUI. If terminal-native reading proves intrinsically inadequate, use the existing CORE/reader-action separation to evaluate a typeset projection later.
+Earlier continuous-terminal and offline HTML proofs are retained in Git history. Headless tests of the integrated reader cover exact source-bound selections across layout changes; they do not establish long-term human comfort. If terminal-native reading proves intrinsically inadequate, use the existing CORE/reader-action separation to evaluate a typeset projection later.
 
 ## 5. Mathematical notation and source fidelity
 

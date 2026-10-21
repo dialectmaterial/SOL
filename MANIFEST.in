@@ -8,7 +8,6 @@ include sol/essence/encyclopedia.json
 include sol/essence/methods.json
 recursive-include tests *.py
 recursive-include scripts *.py
-recursive-include experiments *.py *.lua *.js *.cjs
 exclude AGENTS.md
 prune sources
 prune local-corpus

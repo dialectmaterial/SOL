@@ -1,8 +1,8 @@
-"""Fresh offline exports remain exact while avoiding duplicate CORE checks.
+"""Reader payloads remain exact while avoiding duplicate CORE checks.
 
 All corpus content here is invented and disposable. Imported references still
 use the full public CORE check; the faster path is only for locally captured
-references during one bounded, read-only experiment export.
+references during one bounded, read-only reader view.
 """
 from __future__ import annotations
 
@@ -14,7 +14,8 @@ from unittest.mock import patch
 
 from sol import core
 
-from experiments.reader_surfaces import common, html
+from sol.reader import surface as common
+from sol.terminal import neovim
 import fixtures_corpus as fixtures
 
 
@@ -73,20 +74,18 @@ class ReaderSurfaceExportGuardTests(fixtures.CorpusFixture, unittest.TestCase):
         sample = common.sample_from_book(self.book, count=2)
         with patch.object(common, "capture_references", wraps=core.capture_references) as capture, \
                 patch.object(common, "check_reference", side_effect=AssertionError("fresh export checked twice")):
-            rendered = html.render_html(sample)
+            rendered = neovim.build_payload(sample)
         capture.assert_called_once()
         requested = capture.call_args.args[1]
         self.assertCountEqual(requested, [self.identifier, SECOND_PASSAGE, note_id])
         self.assertEqual(requested.count(note_id), 1)
-        self.assertIn(second["plain_text"], rendered)
+        self.assertIn(second["plain_text"], [row["plain_text"] for row in rendered["records"]])
 
     def test_every_serialized_reference_passes_unchanged_independent_core_check(self):
         self.add_note()
         sample = common.sample_from_book(self.book, count=1)
         before = self.files()
-        document = fixtures._Document(html.render_html(sample))
-        embedded = next(text for tag, attrs, text in document.blocks if attrs.get("id") == "sol-data")
-        rows = json.loads(embedded)["records"]
+        rows = neovim.build_payload(sample)["records"]
         self.assertEqual(len(rows), 1)
         for payload in rows:
             reference = core.check_reference(self.book.corpus_snapshot, payload["reference"])
@@ -174,19 +173,19 @@ class ReaderSurfaceExportGuardTests(fixtures.CorpusFixture, unittest.TestCase):
         text = "An invented false replacement with a freshly computed local digest."
         source.update(markdown=text, plain_text=text, content_sha256=hashlib.sha256(text.encode()).hexdigest())
         with self.assertRaises(ValueError):
-            html.render_html(sample)
+            neovim.build_payload(sample)
 
     def test_loaded_snapshot_manifest_corruption_is_refused(self):
         sample = common.sample_from_book(self.book, count=1)
         self.book.corpus_snapshot.manifest["edition"]["translator"] = "An invented wrong translator"
         with self.assertRaises(ValueError):
-            html.render_html(sample)
+            neovim.build_payload(sample)
 
     def test_loaded_snapshot_document_fingerprints_cannot_be_overridden(self):
         sample = common.sample_from_book(self.book, count=1)
         self.book.corpus_snapshot.documents["sample.md"] = "0" * 64
         with self.assertRaises(ValueError):
-            html.render_html(sample)
+            neovim.build_payload(sample)
 
     def test_finish_detects_snapshot_mutation_after_its_successful_capture(self):
         capture = common.CaptureExport(self.book)
@@ -200,7 +199,7 @@ class ReaderSurfaceExportGuardTests(fixtures.CorpusFixture, unittest.TestCase):
         sample = common.sample_from_book(self.book, count=1)
         self.rewrite_body(self.body + " An invented correction made another valid generation.")
         with self.assertRaises(ValueError):
-            html.render_html(sample)
+            neovim.build_payload(sample)
 
     def test_captured_record_binding_must_agree_before_rendering(self):
         changes = (
@@ -218,7 +217,7 @@ class ReaderSurfaceExportGuardTests(fixtures.CorpusFixture, unittest.TestCase):
                     payloads[0]["reference"][field] = value
                     return payloads
                 with patch.object(common, "capture_references", side_effect=changed), self.assertRaises(ValueError):
-                    html.render_html(common.sample_from_book(self.book, count=1))
+                    neovim.build_payload(common.sample_from_book(self.book, count=1))
 
     def test_captured_corpus_and_generation_bindings_cannot_be_mixed(self):
         for group, field, value in (("corpus", "id", RETIRED_A),
@@ -232,40 +231,34 @@ class ReaderSurfaceExportGuardTests(fixtures.CorpusFixture, unittest.TestCase):
                     payloads[0][group][field] = value
                     return payloads
                 with patch.object(common, "capture_references", side_effect=changed), self.assertRaises(ValueError):
-                    html.render_html(common.sample_from_book(self.book, count=1))
+                    neovim.build_payload(common.sample_from_book(self.book, count=1))
 
-    def test_source_edit_during_last_typography_projection_leaves_no_artifact(self):
+    def test_source_edit_during_last_typography_projection_is_refused(self):
         sample = common.sample_from_book(self.book, count=1)
-        output = self.root / "refused.html"
-        project = html.map_typography
+        project = neovim.map_typography
         def changed(markdown, text):
             result = project(markdown, text)
             source = self.corpus / "sample.md"
             source.write_text(source.read_text(encoding="utf-8") + "\nUnindexed invented edit.\n", encoding="utf-8")
             return result
-        with patch.object(html, "map_typography", side_effect=changed), self.assertRaises(ValueError):
-            html.write_html(sample, output)
-        self.assertFalse(output.exists())
-        self.assertFalse(output.is_symlink())
+        with patch.object(neovim, "map_typography", side_effect=changed), self.assertRaises(ValueError):
+            neovim.build_payload(sample)
 
-    def test_detached_main_record_change_during_render_is_refused_without_artifact(self):
+    def test_detached_main_record_change_during_render_is_refused(self):
         sample = common.sample_from_book(self.book, count=1)
-        output = self.root / "refused.html"
-        project = html.map_typography
+        project = neovim.map_typography
         def changed(markdown, text):
             result = project(markdown, text)
             self.book.canonical_records = copy.deepcopy(self.book.canonical_records)
             self.book.canonical_records[self.identifier]["plain_text"] = "A false late replacement."
             return result
-        with patch.object(html, "map_typography", side_effect=changed), self.assertRaises(ValueError):
-            html.write_html(sample, output)
-        self.assertFalse(output.exists())
+        with patch.object(neovim, "map_typography", side_effect=changed), self.assertRaises(ValueError):
+            neovim.build_payload(sample)
 
-    def test_detached_note_change_during_its_projection_is_refused_without_artifact(self):
+    def test_detached_note_change_during_its_projection_is_refused(self):
         note_id = self.add_note()
         sample = common.sample_from_book(self.book, count=1)
-        output = self.root / "refused.html"
-        project = html.map_typography
+        project = neovim.map_typography
         note_text = self.book.canonical_records[note_id]["plain_text"]
         def changed(markdown, text):
             result = project(markdown, text)
@@ -273,9 +266,8 @@ class ReaderSurfaceExportGuardTests(fixtures.CorpusFixture, unittest.TestCase):
                 self.book.canonical_records = copy.deepcopy(self.book.canonical_records)
                 self.book.canonical_records[note_id]["attribution"]["author"] = "A false late note author"
             return result
-        with patch.object(html, "map_typography", side_effect=changed), self.assertRaises(ValueError):
-            html.write_html(sample, output)
-        self.assertFalse(output.exists())
+        with patch.object(neovim, "map_typography", side_effect=changed), self.assertRaises(ValueError):
+            neovim.build_payload(sample)
 
     def test_imported_packet_validation_still_uses_full_core_check(self):
         selected = common.selection_packet(self.book, self.identifier, 3, 14)
