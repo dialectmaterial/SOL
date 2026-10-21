@@ -76,14 +76,18 @@ class GuideTests(unittest.TestCase):
 
     def test_reader_navigation_search_selection_and_return_are_described(self):
         text = sol.render_guide(synthetic_book())
-        for key in ("j / k", "h / l", "Ctrl-D / Ctrl-U", "b / n", "gg / G",
-                    "v, then motion", "c / f / ?", "Ctrl-Q", "/ground, Enter",
-                    "Ctrl-P / Ctrl-N", "Alt-Left/Right"):
+        for key in ("j/k", "h/l", "Ctrl-D / Ctrl-U", "b / n", "gg / G",
+                    "v, then y", "c / ?", ":q", "/ground, Enter",
+                    "Ctrl-N / Ctrl-P", "Alt-Left/Right", "gp 240", "M / L", "sol-window", "keys.json"):
             self.assertIn(key, text)
         self.assertIn("not printed page", text)
-        self.assertIn("within this passage; Escape clears it", text)
+        self.assertIn("select text and copy it (Escape clears)", text)
+        self.assertIn("every matching passage is listed", text)
+        self.assertNotIn("up to 20 passages", text)
+        self.assertNotIn("Ctrl-Q", text)  # the reader quits with :q
         self.assertIn("beginning / end of the loaded reading section", text)
-        self.assertIn("save your position and quit", text)
+        self.assertIn("save your exact position and quit", text)
+        self.assertIn("passage highlighted", text)
         self.assertNotIn("q quits", text)
 
     def test_search_privacy_and_terminal_boundaries_are_clear(self):

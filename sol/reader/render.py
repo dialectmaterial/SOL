@@ -249,27 +249,29 @@ it asks to create one. Choose explicitly: sol --actor NAME --workspace NAME.
 An actor is the name on your personal notes, not the book's author.
 
 IN THE READER
-  j / k           read down / up through wrapped lines
-  h / l           move by source character
-  Ctrl-D / Ctrl-U move half a visible page down / up
+  j/k  h/l  w     lines / source characters / words
+  Ctrl-D / Ctrl-U half a visible page down / up
   b / n           previous / next passage, not printed page
-  p               switch continuous / one-paragraph reading
+  p / f / T       one-paragraph reading / quiet focus / colour theme
   gg / G          beginning / end of the loaded reading section
-  v, then motion  select text within this passage; Escape clears it
-  c / f / ?       context / quiet focus mode / keyboard help
-  m1 / m2 / m3    place one of three paragraph markers
-  '1 / '2 / '3    return to a marker (also visible under c)
-  y               copy the selection, otherwise this paragraph
-  t               outline: j/k move, h/l branches, Enter read, Esc return
-  q / Ctrl-Q      save your position and quit
+  t               outline: j/k move, h/l branches, Enter read
+  v, then y       select text and copy it (Escape clears); y alone copies
+  c / ?           pages, footnotes, your notes and markers / every key
+  :q / :qa!       save your exact position and quit / quit without saving
 
 FIND AND RETURN
-  /ground, Enter  search; choose a result with j/k, then Enter
-  Ctrl-P / Ctrl-N previous / next matching passage
+  /ground, Enter  search the whole book; every matching passage is listed
+  Ctrl-N / Ctrl-P next / previous occurrence, counted as "4 of 770"
+  gp 240, Enter   go to a printed page
   Alt-Left/Right  back / forward through your reading trail
-Search is literal, case-insensitive, not conceptual; up to 20 passages.
-In paragraph mode j/k stay in that paragraph; b/n explicitly change paragraphs.
-Escape closes panels. gg/G apply to the loaded section, not the whole book.
+  m1 / M / L      a quick marker ('1 returns) / name this place / list places
+Search is literal, case-insensitive, not conceptual. Escape closes panels.
+
+PRINTED PAGE, NOTES AND ESSENCE
+  s / S           the printed crop / the page in Zathura, passage highlighted
+  a               a note on this passage (Ctrl-S saves, Ctrl-C discards)
+  E               ESSENCE studies beside the reader (Alt-R returns)
+  sol-window      its own window in a book face; keys.json moves your keys
 
 YOUR LOCAL WORKSPACE
   sol --workspace-list         list saved workspaces
@@ -277,7 +279,6 @@ YOUR LOCAL WORKSPACE
 Position and notes stay local. Canonical text is read-only.
 
 MORE WHEN YOU NEED IT
-  sol --dynamic-structure  open the same outline directly
   sol guide --depth 2  reveal more of the book's structure
   sol --help          see options and one-shot reading commands
   sol --shell         open the optional command interface

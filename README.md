@@ -48,9 +48,28 @@ required. First interactive launch asks for the exact supported Cambridge /
 George di Giovanni PDF if no corpus exists, converts it locally once, then sets
 up an actor and workspace. An existing corpus can be selected with
 `sol --set-corpus /absolute/path/to/local-corpus`. The book is not bundled or
-downloaded. Use `b/n` for paragraphs, `p` for reading mode, `?` for keys, and
-`:q` to save and leave; `sol guide` is a compact introduction. `sol-window`
-opens the reader in a window of its own, in a book face (Libertinus Mono) on SOL's Paper theme.
+downloaded.
+
+## Reading
+
+`sol` resumes where you left off; `sol-window` opens the reader in a window of
+its own, in a book face (Libertinus Mono) on SOL's Paper theme. Inside, `?`
+shows every key and `sol guide` prints a compact introduction. The essentials:
+
+| Keys | What they do |
+| --- | --- |
+| `j`/`k`, `b`/`n`, `p` | Read by line, by paragraph; one-paragraph mode |
+| `t`, `gp 240` | The outline; go to a printed page |
+| `/`, `Ctrl-N`/`Ctrl-P` | Search the whole book; step through every occurrence ("4 of 770") |
+| `s`, `S` | The printed source as a crop; the whole page in Zathura, passage highlighted, following your reading |
+| `a`, `c` | Write a note on the passage; see pages, footnotes, notes and markers beside the text |
+| `m1`–`m3`, `M`/`L` | Quick markers; named places |
+| `E` | ESSENCE beside the reader: word counts and every occurrence, TF-IDF, sentence lengths |
+| `T` | Mocha, Latte, Paper, Night or your terminal's colours |
+| `:q` | Save your exact position and leave |
+
+Reader keys can be moved in `~/.config/sol/keys.json`, for example
+`{"version": 1, "keys": {"n": "J"}}`.
 
 ## Documentation
 
