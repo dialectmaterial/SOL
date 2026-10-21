@@ -389,31 +389,3 @@ class WorkspaceReader:
         self.require_author()
         ref = self.current_reference(session, identifier)
         return self.store.add_annotation(ref.requested_id, body, ref.record["content_sha256"])
-
-    def save_comparison(self, name, identifiers, question):
-        self.require_author()
-        if not isinstance(question, str) or not question.strip():
-            raise ValueError("comparison requires a nonempty question")
-        refs = [resolve_reference(self.book, value) for value in identifiers]
-        return self.store.save_comparison(name, [ref.requested_id for ref in refs], question)
-
-    def record_review(self, outcome, issue, session, identifier=None):
-        self.require_author()
-        if not isinstance(issue, str) or not issue.strip():
-            raise ValueError("review testimony requires a nonempty issue or inspection description")
-        ref = self.current_reference(session, identifier)
-        return self.store.add_review(ref.requested_id, outcome, issue, ref.record["content_sha256"],
-                                     self.book.corpus_manifest["source"]["sha256"])
-
-    def add_relation(self, source, kind, target, reason):
-        self.require_author()
-        if not isinstance(reason, str) or not reason.strip():
-            raise ValueError("a reader-asserted relation requires a nonempty reason")
-        source_ref = resolve_reference(self.book, source)
-        target_ref = resolve_reference(self.book, target)
-        return self.store.add_relation(source_ref.requested_id, target_ref.requested_id, kind, reason)
-
-    def execute(self, verb, arguments, session):
-        """Compatibility entry point; command syntax belongs to its adapter."""
-        from sol.workspace.commands import execute
-        return execute(self, verb, arguments, session)

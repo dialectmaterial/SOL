@@ -1,13 +1,14 @@
-"""SOL operations invoked from a real shell; no shell grammar is implemented."""
+"""sol read: print a complete canonical file from a real shell."""
 from __future__ import annotations
 
 import argparse
 from copy import deepcopy
 import json
-import shlex
 from pathlib import Path
+import posixpath
 import sys
-import tempfile
+
+from sol.core.paths import resolve_path
 
 
 def _path_argument(book, value):
@@ -19,9 +20,57 @@ def _path_argument(book, value):
     return str(candidate) if candidate.is_absolute() else value
 
 
+def resolve_file_path(book, value, cwd=()):
+    """Select complete ordered canonical text, without reading arbitrary files.
+
+    .txt paths belong to SOL's virtual tree; .md paths are relative to the
+    configured corpus or absolute filenames within it. Both resolve to IDs from
+    the loaded index. Physical Markdown is never parsed a second time here.
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("Choose a SOL text path or a canonical Markdown file")
+    records = book.canonical_records
+    if value.lower().endswith(".md"):
+        documents = book.corpus_manifest.get("documents", [])
+        candidate = Path(value).expanduser()
+        directory = getattr(book, "corpus_directory", None)
+        if candidate.is_absolute():
+            if directory is None:
+                raise ValueError("No canonical corpus directory is configured")
+            try:
+                document = candidate.resolve().relative_to(Path(directory).resolve()).as_posix()
+            except ValueError as error:
+                raise ValueError("Choose a Markdown file inside the configured SOL corpus") from error
+        else:
+            document = posixpath.normpath(value)
+            if directory is not None and document.startswith(Path(directory).name + "/"):
+                document = document[len(Path(directory).name) + 1:]
+        if document not in documents:
+            raise ValueError(f"Not a canonical Markdown file: {value}. Use a path from the SOL corpus.")
+        selected = [r for r in records.values() if r.get("document") == document
+                    and r.get("type") != "retired_record"]
+        display = str(Path(directory) / document) if directory is not None else document
+        title = next((r.get("title") for r in selected if r.get("type") == "section" and r.get("title")),
+                     Path(document).stem.replace("-", " "))
+        kind = "markdown_file"
+    else:
+        node, scope = resolve_path(value, cwd, book.root)
+        passage_ids = {p.identifier for p in book.selection(scope)}
+        prefix = "/" + "/".join(scope)
+        selected = [r for r in records.values() if r["id"] in passage_ids
+                    or (r.get("type") == "section" and isinstance(r.get("reader_path"), str)
+                        and (r["reader_path"] == prefix or r["reader_path"].startswith(prefix.rstrip("/") + "/")))]
+        display, title, kind = prefix, node.title, "reader_path"
+    selected.sort(key=lambda r: r["order"])
+    if not selected:
+        raise ValueError(f"No canonical text in {value}")
+    return {"path": display, "display_path": document if kind == "markdown_file" else display,
+            "title": title, "kind": kind,
+            "target_ids": [r["id"] for r in selected]}
+
+
 def _records(book, value):
-    from sol.workspace.comparison import resolve_comparison_path
-    selection = resolve_comparison_path(book, _path_argument(book, value), ())
+    selection = resolve_file_path(book, _path_argument(book, value))
     records = [deepcopy(book.canonical_records[identifier]) for identifier in selection["target_ids"]]
     return selection, records
 
@@ -57,11 +106,6 @@ def main(arguments):
         outputs.add_argument("--plain", action="store_true", help="unwrapped text only")
         outputs.add_argument("--markdown", action="store_true", help="original record Markdown")
         outputs.add_argument("--json", action="store_true", help="canonical records with IDs, attribution and sources")
-    elif action == "compare":
-        parser.description = "Compare two complete files, then return to your shell with q."
-        parser.add_argument("paths", nargs=2, metavar="FILE")
-        parser.add_argument("--question", default="", help="optional inquiry to keep alongside the text")
-        parser.add_argument("--json", action="store_true", help="print a comparison snapshot instead of opening the viewer")
     else:
         raise ValueError("Unsupported native SOL action")
     options = parser.parse_args(arguments[1:])
@@ -87,25 +131,6 @@ def main(arguments):
                     text = safe_output(text)
                 print(text)
             return 0
-        from sol.workspace.comparison import capture_paths
-        from sol.core.paths import resolve_path
-        paths = [_path_argument(book, value) for value in options.paths]
-        snapshot = capture_paths(book, paths, resolve_path=resolve_path, question=options.question)
-        snapshot["terminal_mode"] = "foreground"
-        snapshot["reopen_command"] = "sol compare " + " ".join(shlex.quote(s["path"]) for s in snapshot["selections"])
-        if options.question:
-            snapshot["reopen_command"] += " --question " + shlex.quote(options.question)
-        if options.json:
-            print(json.dumps(snapshot, ensure_ascii=False, indent=2))
-            return 0
-        if not sys.stdin.isatty() or not sys.stdout.isatty():
-            raise ValueError("sol compare needs an interactive terminal; use --json for pipes or redirection")
-        from sol.terminal.comparison import viewer_main
-        with tempfile.TemporaryDirectory(prefix="sol-shell-comparison-") as temporary:
-            mailbox = Path(temporary) / "selection.json"
-            mailbox.write_text(json.dumps({"sequence": 1, "request": snapshot}), encoding="utf-8")
-            mailbox.chmod(0o600)
-            return viewer_main(mailbox)
     except ValueError as error:
         print(f"sol: {error}", file=sys.stderr)
         return 2

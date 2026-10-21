@@ -18,19 +18,14 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: Text Processing",
 ]
-dependencies = ["prompt-toolkit>=3.0.52,<4", "markdown-it-py>=3,<4", "opendataloader-pdf==2.5.13"]
+dependencies = ["markdown-it-py>=3,<4", "opendataloader-pdf==2.5.13"]
 
 [project.optional-dependencies]
 # ESSENCE's Textual interface; the reader runs without it.
 essence = ["textual>=8,<9"]
-corpus = []
-shell = []
-# Older installation commands remain valid; every feature is included normally.
-extraction = []
 
 [project.scripts]
 sol = "sol:cli"
-sol-kitty = "sol.terminal.kitty:main"
 sol-window = "sol.terminal.window:main"
 sol-corpus = "sol.corpus.convert:main"
 sol-corpus-check = "sol.corpus.contract:main"

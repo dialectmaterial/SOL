@@ -21,14 +21,14 @@ LEGACY_READER_THEMES = {"dark": "mocha"}
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="sol", usage="%(prog)s [OPTIONS]\n       %(prog)s guide [--depth N]\n       %(prog)s {read,compare,reference,analyze} --help",
+        prog="sol", usage="%(prog)s [being] [OPTIONS]\n       %(prog)s guide [--depth N]\n       %(prog)s {read,reference,essence} --help",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="SOL Organizes Logic\n\n"
                     "Read Hegel's Science of Logic directly in your terminal.\n"
                     "sol opens the reader at the last actor's saved workspace and position.\n"
                     "First use imports your supported PDF, then sets up your reading workspace.",
         epilog="Start here:\n"
-               "  sol                         resume reading\n"
+               "  sol                         resume reading (the same as sol being)\n"
                "  sol -n                      read without a workspace or actor\n"
                "  sol --dynamic-structure     explore the book tree interactively\n"
                "  sol --actor NAME            use that actor's last workspace\n"
@@ -36,16 +36,14 @@ def build_parser() -> argparse.ArgumentParser:
                "  sol guide                   reader keys, examples, and book structure\n"
                "  sol -r                      print one random passage and leave\n\n"
                "Reader keys: j/k lines, b/n paragraphs, p reading mode, / search,\n"
-               "m1-3 markers, y copy, t tree, c context, f focus, ? help, q save and quit.\n"
+               "m1-3 markers, y copy, t tree, c context, f focus, ? help, :q save and quit.\n"
                "Runs in ordinary capable terminals; no particular emulator is required.\n"
-               "Use --shell for the compatibility book command interface.\n"
-               "Native read, compare, reference, and analyze commands have their own --help.")
-    parser.add_argument("command", nargs="?", choices=("guide",), help="reader guide and a small source-derived book tree")
+               "--shell opens a minimal command interface for browsing the book.\n"
+               "sol read, sol reference and sol essence have their own --help.")
+    parser.add_argument("command", nargs="?", choices=("being", "guide"),
+                        help="being: the reader (also bare sol); guide: reader guide and a small book tree")
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
-    reader = parser.add_argument_group("Reader (the default)")
-    reader.add_argument("--reader", action="store_true", help="open the full-screen reader (also what bare sol does)")
-    # Accept the previous explicit spelling without advertising a second reader.
-    reader.add_argument("--engine", choices=("neovim", "builtin"), help=argparse.SUPPRESS)
+    reader = parser.add_argument_group("Reader: sol being (the default)")
     reader.add_argument("-n", "--none", action="store_true", help="read without saving; no workspace or actor")
     reader.add_argument("--workspace", metavar="NAME", help="open this workspace instead of the actor's last one")
     reader.add_argument("--actor", metavar="NAME", help="name attributed to your personal notes; remembers that actor's workspace")
@@ -60,7 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--dynamic-structure", action="store_true",
                       help="open the reader's book outline directly (temporary session)")
     mode.add_argument("--guide", action="store_true", help="reader keys, examples, and book structure; same as sol guide")
-    mode.add_argument("--shell", action="store_true", help="open the optional book command interface instead of the reader")
+    mode.add_argument("--shell", action="store_true", help="browse the book in a minimal command interface; saves nothing")
     mode.add_argument("-r", "--random", action="store_true", help="print a random passage and leave")
     mode.add_argument("--read", metavar="PATH", help="read a random paragraph within a virtual path")
     mode.add_argument("--first", metavar="PATH", help="read the first paragraph within a virtual path")
@@ -89,16 +87,9 @@ def build_parser() -> argparse.ArgumentParser:
     storage.add_argument("--include-passages", action="store_true",
                         help="include current referenced canonical Markdown in a Markdown workspace export")
     storage.add_argument("--resume-revision", type=int, metavar="N", help="with --resume, restore a historical checkpoint as a new visit")
-    prompt = parser.add_argument_group("Optional book command interface (--shell)")
-    prompt.add_argument("--ui", choices=("auto", "basic", "prompt"), help="command input: enhanced prompt or basic input (default auto)")
-    prompt.add_argument("--editing-mode", choices=("emacs", "vi"), help="editing keys for the command prompt")
-    source = parser.add_argument_group("Corpus selection").add_mutually_exclusive_group()
-    source.add_argument("--corpus", type=Path, metavar="DIRECTORY",
-                        help="canonical corpus for this run (otherwise discover a local or saved corpus)")
-    source.add_argument("--pdf", type=Path, metavar="PATH",
-                        help="explicit legacy PDF reading (slow; not used for ordinary reading)")
-    prompt.add_argument("--source-pdf", type=Path, metavar="PATH",
-                        help="local evidence PDF for source viewing in the canonical shell")
+    parser.add_argument_group("Corpus selection").add_argument(
+        "--corpus", type=Path, metavar="DIRECTORY",
+        help="canonical corpus for this run (otherwise discover a local or saved corpus)")
     printing = parser.add_argument_group("One-shot output and outline options")
     printing.add_argument("--within", metavar="PATH", help="restrict --search to this subtree")
     printing.add_argument("--word", action="store_true", help="whole-word --search rather than substring")
@@ -141,6 +132,11 @@ class ExecutionMode(str, Enum):
     def interactive(self) -> bool:
         return self in (ExecutionMode.READER, ExecutionMode.SHELL)
 
+    @property
+    def personal(self) -> bool:
+        """Only the reader keeps a workspace and an actor; the shell saves nothing."""
+        return self is ExecutionMode.READER
+
 
 def _selected_actions(args):
     return [mode for mode in ExecutionMode
@@ -151,19 +147,17 @@ def _selected_actions(args):
 
 def select_execution_mode(args: argparse.Namespace) -> ExecutionMode:
     actions = _selected_actions(args)
-    if args.reader and (args.shell or actions):
-        raise ValueError("--reader cannot be combined with --shell or another action")
+    if args.command == "being" and (args.shell or actions):
+        raise ValueError("sol being opens the reader; it cannot be combined with --shell or another action")
     if actions:
         return actions[0]
     return ExecutionMode.SHELL if args.shell else ExecutionMode.READER
 
 
 def validate_options(args: argparse.Namespace) -> ExecutionMode:
-    if args.engine == "builtin":
-        raise ValueError("SOL now has one reader. Omit --engine; run python3 scripts/install.py if Neovim is missing.")
     management = bool(getattr(args, "workspace_list", False) or
                       getattr(args, "workspace_delete", None) is not None)
-    if args.command:
+    if args.command == "guide":
         if _selected_actions(args) or args.shell or args.none:
             raise ValueError("guide cannot be combined with another action")
         args.guide = True
@@ -174,35 +168,22 @@ def validate_options(args: argparse.Namespace) -> ExecutionMode:
         raise ValueError("-n/--none is a temporary interactive session; omit one-shot/guide actions")
     mode = select_execution_mode(args)
     args.reader = mode is ExecutionMode.READER
-    if args.engine is not None and not args.reader and mode is not ExecutionMode.DYNAMIC_STRUCTURE:
-        raise ValueError("--engine selects the interactive reader, not a shell or one-shot action")
     if mode is ExecutionMode.DYNAMIC_STRUCTURE:
-        if (args.pdf is not None or args.workspace is not None or args.actor is not None
-                or args.plain or args.json):
-            raise ValueError("--dynamic-structure uses a temporary Neovim tree over the canonical corpus; omit PDF/workspace/output options")
+        if args.workspace is not None or args.actor is not None or args.plain or args.json:
+            raise ValueError("--dynamic-structure uses a temporary Neovim tree; omit workspace/output options")
         if args.depth is not None and not 1 <= args.depth <= 6:
             raise ValueError("dynamic tree depth must be between 1 and 6")
     if args.reader:
-        if args.pdf is not None:
-            raise ValueError("--reader requires the indexed canonical corpus, not --pdf. "
-                             "Use sol -r --pdf PATH for a legacy random passage.")
         if args.plain or args.json:
-            raise ValueError("--reader is interactive; omit --plain and --json")
-        if args.ui is not None or args.editing_mode is not None or args.source_pdf is not None:
-            raise ValueError("--reader uses its own keyboard view; omit --ui, --editing-mode and --source-pdf")
+            raise ValueError("the reader is interactive; omit --plain and --json")
     elif args.emphasis is not None:
-        raise ValueError("--emphasis requires --reader")
+        raise ValueError("--emphasis belongs to the reader (sol being)")
     if args.theme is not None and not args.reader and mode is not ExecutionMode.DYNAMIC_STRUCTURE:
         raise ValueError("--theme selects the interactive reader's presentation; use --set-theme to save one")
-    if args.shell and not args.none and args.pdf is not None:
-        raise ValueError("the persistent shell requires an indexed Markdown corpus, not --pdf. "
-                         "Use sol -r --pdf PATH for a legacy random passage.")
+    if args.shell and (args.workspace is not None or args.actor is not None or args.workspace_dir is not None):
+        raise ValueError("the shell browses the book and saves nothing; omit workspace and actor options")
     if args.none and (args.workspace is not None or args.actor is not None or args.workspace_dir is not None):
         raise ValueError("-n/--none does not use a workspace or actor; omit workspace options")
-    if not args.shell and (args.ui is not None or args.editing_mode is not None):
-        raise ValueError("--ui and --editing-mode are available only in the shell")
-    if args.source_pdf is not None and (not args.shell or args.pdf is not None):
-        raise ValueError("--source-pdf is for source viewing in the canonical shell; omit --pdf and one-shot actions")
     if args.word and args.search is None:
         raise ValueError("--word requires --search")
     if args.search is None and not args.review_queue and (args.within is not None or args.limit is not None):
@@ -223,28 +204,23 @@ def validate_options(args: argparse.Namespace) -> ExecutionMode:
             raise ValueError("--depth must be between 0 and 32")
     if args.json and (args.shell or args.guide):
         raise ValueError("--json is not a shell/guide mode; use sol -r --json for a random passage")
-    if args.set_corpus is not None and (args.corpus is not None or args.pdf is not None):
-        raise ValueError("--set-corpus cannot be combined with --corpus or --pdf")
-    if args.set_source_pdf is not None and args.pdf is not None:
-        raise ValueError("--set-source-pdf belongs to the canonical corpus; omit --pdf")
-    if args.workspace is None and not mode.interactive and (args.workspace_dir is not None or args.actor is not None or args.resume
+    if args.set_corpus is not None and args.corpus is not None:
+        raise ValueError("--set-corpus cannot be combined with --corpus")
+    if args.workspace is None and not mode.personal and (args.workspace_dir is not None or args.actor is not None or args.resume
                                    or args.workspace_export or args.workspace_check or args.workspace_backup is not None
                                    or args.workspace_upgrade is not None):
         raise ValueError("workspace options require --workspace NAME")
     if args.resume_revision is not None and (not args.resume or args.resume_revision < 1):
         raise ValueError("--resume-revision requires --resume and a positive checkpoint revision")
-    if args.review_queue and args.pdf is not None:
-        raise ValueError("--review-queue requires the canonical corpus, not --pdf")
     if args.workspace is not None:
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", args.workspace):
             raise ValueError("workspace name must contain 1–64 letters, numbers, underscores or hyphens")
         if args.actor is not None and not args.actor.strip():
             raise ValueError("--actor requires a nonempty name")
-        if (args.pdf is not None or args.set_corpus is not None or args.set_source_pdf is not None
-                or args.guide or args.structure):
-            raise ValueError("--workspace requires the indexed corpus and cannot accompany --pdf, --set-corpus, or an outline action")
+        if args.set_corpus is not None or args.set_source_pdf is not None or args.guide or args.structure:
+            raise ValueError("--workspace cannot accompany --set-corpus or an outline action")
         if args.search is not None or args.info is not None or args.cat is not None:
-            raise ValueError("--workspace is available for reading, --shell, --resume, and --workspace-export")
+            raise ValueError("--workspace is available for reading, --resume and the workspace commands")
         if args.context is not None:
             raise ValueError("workspace reading does not yet save a context view; use --passage ID --context N without --workspace")
     if args.workspace_export and args.plain:

@@ -52,7 +52,7 @@ downloaded.
 
 ## Reading
 
-`sol` resumes where you left off; `sol-window` opens the reader in a window of
+`sol` (the same as `sol being`) resumes where you left off; `sol-window` opens the reader in a window of
 its own, in a book face (Libertinus Mono) on SOL's Paper theme. Inside, `?`
 shows every key and `sol guide` prints a compact introduction. The essentials:
 
@@ -68,7 +68,9 @@ shows every key and `sol guide` prints a compact introduction. The essentials:
 | `T` | Mocha, Latte, Paper, Night or your terminal's colours |
 | `:q` | Save your exact position and leave |
 
-Reader keys can be moved in `~/.config/sol/keys.json`, for example
+`sol --shell` browses the book in a minimal command line that saves nothing;
+`sol read FILE` prints a file, `sol reference` captures and checks references,
+and `sol essence` runs the studies from the command line. Reader keys can be moved in `~/.config/sol/keys.json`, for example
 `{"version": 1, "keys": {"n": "J"}}`.
 
 ## Documentation

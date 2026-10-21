@@ -828,7 +828,7 @@ class ReaderActions:
 
     def _reference_snapshot(self):
         if self.book.corpus_snapshot is None:
-            raise ValueError("ESSENCE handoffs require the verified canonical corpus, not legacy PDF reading")
+            raise ValueError("This needs the verified canonical corpus")
         return self.book.corpus_snapshot
 
     def capture_active_reference(self):
@@ -855,11 +855,6 @@ class ReaderActions:
                 != (first["pdf_page"], int(first["printed_page"]), last["pdf_page"], int(last["printed_page"]))):
             raise ValueError("The reader projection disagrees with canonical data; reopen SOL")
         return reference
-
-    def accept_return_reference(self, packet):
-        """Explicit navigation uses the same guarded checkpoint path as ordinary open."""
-        reference = self.check_return_reference(packet)
-        return self.open(reference.requested_id)
 
     def accept_return_position(self, packet, cursor_offset, selection=None, *, history_locations=False):
         """Accept one frontend location as a single guarded workspace visit.

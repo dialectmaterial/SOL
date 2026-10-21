@@ -31,7 +31,7 @@ source-archive checks include every Lua asset, with a headless reading check fro
 
 The reader presently uses a centered maximum width of **66 terminal columns** (configurable with `--width`; the maintainer chose 66 over 72 and 80 in the visual audit), native word-aware wrap, semantic emphasis/strong/code spans, headings, a source-context display and review warnings. It is a character-cell presentation, not proportional typesetting. It runs in capable terminal hosts including Alacritty and Kitty; terminal capability heuristics can choose italic or underline fallback. Five presentation presets (Catppuccin Mocha, the default, and Latte; SOL's own Paper and Night; Terminal) are implemented, and `sol-window` opens the reader in its own window in a book face; see section 4.
 
-The current implementation also includes literal book search, source-positioned results, a dynamic outline/tree, selection and copy, markers, focus/paragraph modes, a session navigation trail, saved reading position, annotated workspaces, comparisons, notes and source-review operations. The most mature workspace operations are additionally exposed via `sol --shell`; not every operation has an equally convenient Neovim keybinding. Avoid claiming full GUI/TUI parity.
+The current implementation also includes literal book search, source-positioned results, a dynamic outline/tree, selection and copy, markers, focus/paragraph modes, a session navigation trail, saved reading position, annotated workspaces with notes, markers and named places, and printed-source views. Avoid claiming full GUI parity.
 
 **Startup measurement:** the opening screen still covers a fully
 verified corpus load and checked first view. The loader hashes the same raw
@@ -62,7 +62,7 @@ replaced at the terminal boundary. Real-book medians and limits are in the
 | `y` | Copy the selection (exact source text, paragraphs joined by a blank line) or the current paragraph to the system clipboard |
 | Mouse | Wheel scrolls; dragging selects, and the selection is copied when the button is released |
 | `m1`–`m3`; `'1`–`'3`; `dm1`–`dm3` | Set, open, clear one of three paragraph markers |
-| `M`; `L` | Name the current place; list named places (Enter reads one, `D` forgets it). They are the workspace's named bookmarks, shell bookmarks included; a temporary session keeps them until it ends |
+| `M`; `L` | Name the current place; list named places (Enter reads one, `D` forgets it). They are the workspace's named bookmarks, including any made by earlier versions; a temporary session keeps them until it ends |
 | `t` | Dynamic structure tree (Vim-style navigation) |
 | `c` | Beside the text when there is room: pages, footnotes, your notes, markers and the record; Enter on a footnote reads it, `e` edits your note and `r` shows its versions |
 | `a` | Write a personal note on this passage, saved in the workspace (`Ctrl-S` or `:w` saves, `Ctrl-C` discards) |
@@ -73,6 +73,7 @@ replaced at the terminal boundary. Real-book medians and limits are in the
 | `f` | Quiet focus mode: hides headings and the status line, keeps important warnings |
 | `T` | Cycle Mocha / Latte / Paper / Night / Terminal for this session |
 | `?` | Help |
+| `sol --shell` | A minimal command interface for browsing the book (`ls`, `cd`, `tree`, `read`, `cat`, `search`, `open`, `context`, `info`, `guide`); it uses no workspace and saves nothing |
 | `:q`, `:qa` | Save the exact position and quit (`q` and `Ctrl-q` only say so) |
 | `:qa!` | Quit without saving the current position |
 
@@ -135,7 +136,7 @@ Controller tests inject failures in destination view preparation, position captu
 
 **Panels and status line:** the `c` panel opens beside the page when the reader's columns leave at least 34 spare (the page moves left; the panel takes at most 64 columns and the page's height), and over the page when they do not; footnotes, search results, help and the note editor (`a`, `e`) open the same way; the editor then takes the page's full height. The panel names the passage, its place in the book and its pages, then Footnotes, Your notes (dates in local time), Markers and About this text as separate headed sections. The status line shows the cursor's place in the book (a breadcrumb of section titles and the page), the reading mode, focus, how far through the book the cursor is, and `? keys · :q quit`. Clipboard, quitting and panel placement are tested in headless Neovim and through a real session in tmux on the book (copy read back with `wl-paste`, `:q` exit 0, panel placement); not yet checked by hand in Alacritty or Kitty.
 
-**Personal notes:** `a` writes a note on the whole passage through the same workspace service as the shell's `note add` (actor, content digest, revision history). A selection appears above the editor as context but is not stored: no workspace schema records spans. `Ctrl-S` or `:w` saves; `Ctrl-C` discards. Temporary `-n` sessions refuse personal notes. In `c`, each workspace note shows its author, date and revision, and says when its passage has changed since it was written or when it was written on a retired record ID. `e` opens the note under the cursor (or the only one) in the same editor as `a`; `r` lists its versions, newest first. A save goes through the workspace's edit service: only the note's author can edit it, a newer revision saved from another session refuses the save, and so does a corpus that changed since the reader opened. The note keeps its ID, target and original source digest, so an edit never rebinds it to newer text; a save that changes nothing adds no revision. A refused save keeps the draft for the next `e`. Notes cannot be deleted, hidden or retracted; that needs a retention decision. Tested in headless Neovim and through the controller; not yet used by hand.
+**Personal notes:** `a` writes a note on the whole passage through the workspace service (actor, content digest, revision history). A selection appears above the editor as context but is not stored: no workspace schema records spans. `Ctrl-S` or `:w` saves; `Ctrl-C` discards. Temporary `-n` sessions refuse personal notes. In `c`, each workspace note shows its author, date and revision, and says when its passage has changed since it was written or when it was written on a retired record ID. `e` opens the note under the cursor (or the only one) in the same editor as `a`; `r` lists its versions, newest first. A save goes through the workspace's edit service: only the note's author can edit it, a newer revision saved from another session refuses the save, and so does a corpus that changed since the reader opened. The note keeps its ID, target and original source digest, so an edit never rebinds it to newer text; a save that changes nothing adds no revision. A refused save keeps the draft for the next `e`. Notes cannot be deleted, hidden or retracted; that needs a retention decision. Tested in headless Neovim and through the controller; not yet used by hand.
 
 Unsaved note drafts are process-local recovery state. Closing the note editor (including `:q!`) or a failed save keeps the draft available under `a` during that SOL session; quitting/restarting SOL does not durably save an unpublished draft. Save through `Ctrl-S` or `:w` before leaving SOL. Clipboard, viewer and Ctrl-S behavior still need the manual terminal checks described below.
 
@@ -167,22 +168,7 @@ First-run setup accepts the **specific audited Cambridge/di Giovanni PDF only**,
 
 A workspace is bound to the corpus identity and source fingerprint. New workspaces use **schema 3**; older supported versions can be opened without silent migration. Upgrades produce separate copies. Concurrent/stale revisions are refused rather than overwritten. Reading history in a session and durable checkpoint visits are separate. Existing notes and comparisons may refer to *live* records, not frozen historical quotations; after edits, disclose that distinction. A durable selected-span note with exact source-version binding is still **future work**.
 
-Examples of available compatibility-shell operations (not necessarily Neovim shortcuts):
-
-```text
-bookmark add beginning
-note draft
-note list
-note history NOTE_ID
-note edit NOTE_ID
-compare save examination UUID_A UUID_B --question "What is the relation?"
-compare show examination
-relate add UUID_A compares-with UUID_B --reason "A provisional observation"
-review show
-review queue --limit 10
-workspace history --limit 10
-workspace check
-```
+Personal work is written from the reader: notes (`a`; edits and versions in `c`), quick markers (`m1`–`m3`) and named places (`M`/`L`). Comparison groups, review testimony and relations stored by earlier versions stay in the database and in exports; the shell commands that created them were removed on 21 October 2026, and `--review-queue` still lists canonical pending transcriptions.
 
 Unverified/flagged source material stays visible to the reader with warnings but does not become verified because it has been displayed. Notes from the translator or edition stay separate from Hegel's prose and personal annotations.
 
@@ -222,7 +208,7 @@ Do not confuse installing a Neovim color scheme with designing a reading surface
 
 ### Design experiment before expanding features
 
-The earlier `prompt_toolkit` surface was subjectively easier to read despite less functionality. Compare the historical baseline and current Neovim on **the same chapter**. Document why: use a friction log with (a) interruption point, (b) recovery effort, (c) spacing/typography issue, (d) a source or math issue, (e) one corrective change. Then implement small changes inside Neovim with regression tests. Resist another framework migration based on screenshots alone.
+The earlier `prompt_toolkit` surface (removed; in Git history) was subjectively easier to read despite less functionality. Document why: use a friction log with (a) interruption point, (b) recovery effort, (c) spacing/typography issue, (d) a source or math issue, (e) one corrective change. Then implement small changes inside Neovim with regression tests. Resist another framework migration based on screenshots alone.
 
 Earlier continuous-terminal and offline HTML proofs are retained in Git history. Headless tests of the integrated reader cover exact source-bound selections across layout changes; they do not establish long-term human comfort. If terminal-native reading proves intrinsically inadequate, use the existing CORE/reader-action separation to evaluate a typeset projection later.
 
@@ -292,7 +278,7 @@ Acceptance: demonstrate one reviewed simple formula, one complex or unreviewed N
 
 ## 6. BEING ↔ ESSENCE without terminal dogma
 
-CORE v1 envelopes can capture and check source identity. With `sol-kitty`, an optional private, one-exchange handoff launches an ordinary Zsh ESSENCE pane; BEING checks a proposed return and explicitly accepts it. This is not a general active-investigation workflow and is currently host-specific. It is not a reason to construct an ESSENCE terminal emulator.
+CORE v1 envelopes capture and check source identity. ESSENCE opens beside the reader with `E` and returns exactly (below). The earlier Kitty/Zsh handoff (`sol-kitty`, `sol reference return`) was removed on 21 October 2026.
 
 The next development target is a **terminal-independent handoff interface**, using existing CORE references and guarded reader actions. Starting from the current chapter/passage, preserve an investigation origin and a way to return to the exact passage while retaining previous navigation state. Any new result must be a separately versioned, attributable **computation artifact**; do not auto-insert model interpretations into the authored workspace.
 
@@ -324,11 +310,9 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 - Visual selection is transient. Copy can span paragraphs; notes and ESSENCE accept one passage, and no durable cross-paragraph span annotation is available.
 - Printed-source preview is implemented and was used in a real terminal (17 October); the reader judged the separate viewer helpful but awkward. `S` opens the whole page in a zoomable PDF viewer, not yet tried in a reading session. Native 2-D mathematical typesetting remains unimplemented; retyped linear mathematics awaits human review.
 - The outline/search/marker UI is functional but readability, styling, and mode transitions require actual use testing.
-- Some scholarly actions are still most accessible through the optional compatibility shell: comparisons, reviews and relations. Writing, editing and viewing notes and their versions is in the reader; a note containing invisible control characters is edited through the shell.
+- Comparisons, review testimony and relations can no longer be created (their shell commands were removed on 21 October 2026); records already stored stay readable and exportable. A note containing invisible control characters cannot be edited in the reader.
 - Footnote marks are inline display text and can push a wrapped line one cell further. Book-note panels have explicit depth, size and link bounds; they do not save a separate note-reading position or offer personal annotations on note paragraphs.
 - Notes cannot yet anchor to a selected span; that needs a new workspace schema version.
-- Comparison presentation is not yet a mature integrated side-by-side desk; authoring/version-binding details matter.
-- The current Kitty exchange is host-bound; the terminal-independent research workflow remains proposed.
 - A view that Neovim fails to display after Python accepted it (a crash, or a response over the 16 MiB channel budget) leaves the destination saved; the reader then exits, and reopening resumes there.
 - Human reading acceptance is **not** established by headless tests, mock terminal checks, or a 24-passage HTML rendering benchmark.
 

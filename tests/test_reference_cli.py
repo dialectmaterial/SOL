@@ -338,7 +338,7 @@ class ReferenceCLITests(unittest.TestCase):
                             file.symlink_to(previous)
                 return original_fstat(descriptor)
 
-            with self.subTest(mutation=mutation), patch("sol.terminal.reference.os.fstat", side_effect=raced_fstat), \
+            with self.subTest(mutation=mutation), patch("sol.core.wire.os.fstat", side_effect=raced_fstat), \
                     patch("sol.core.discover_corpus", side_effect=AssertionError("Unstable input must fail first")):
                 status, output, error = self.call(["check", str(file)])
                 self.assertNotEqual(status, 0)

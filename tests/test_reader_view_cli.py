@@ -36,10 +36,9 @@ class ReaderViewCLITests(unittest.TestCase):
         return status, output.getvalue(), error.getvalue()
 
     def test_reader_is_default_and_explicit_shell_keeps_command_interface(self):
-        for arguments, selected, temporary in (([], True, False), (["--reader"], True, False),
+        for arguments, selected, temporary in (([], True, False), (["being"], True, False),
                                                (["-n"], True, True), (["--shell"], False, False),
-                                               (["--shell", "-n"], False, True),
-                                               (["--reader", "-n"], True, True)):
+                                               (["being", "-n"], True, True)):
             args = build_parser().parse_args(arguments)
             mode = app.validate_options(args)
             self.assertEqual(args.shell, not selected)
@@ -55,8 +54,7 @@ class ReaderViewCLITests(unittest.TestCase):
             status, output, _ = self.call(["--set-source-pdf", "~/book.pdf", "--json"])
             self.assertEqual(json.loads(output), {"source_pdf": "/invented/book.pdf"})
         self.assertEqual(remember.call_args.args, (Path("~/book.pdf"),))
-        for arguments in (["--set-source-pdf", "a.pdf", "--pdf", "b.pdf"],
-                          ["--set-source-pdf", "a.pdf", "--workspace", "study"]):
+        for arguments in (["--set-source-pdf", "a.pdf", "--workspace", "study"],):
             with self.subTest(arguments=arguments):
                 status, _, error = self.call(arguments)
                 self.assertNotEqual(status, 0)
@@ -73,17 +71,14 @@ class ReaderViewCLITests(unittest.TestCase):
         self.assertFalse((self.root / "config" / "sol" / "sources.json").exists())
 
     def test_unsupported_prototype_options_are_refused_before_loading_or_onboarding(self):
-        for arguments in (["--reader", "--shell"], ["--reader", "-r"], ["--reader", "--search", "ground"],
-                          ["--reader", "--json"], ["--reader", "--plain"], ["--reader", "--pdf", "absent.pdf"],
-                          ["--reader", "--ui", "basic"], ["--reader", "--editing-mode", "vi"],
-                          ["--reader", "--source-pdf", "absent.pdf"],
-                          ["--reader", "guide"], ["--reader", "--set-corpus", "absent"]):
+        for arguments in (["being", "--shell"], ["being", "-r"], ["being", "--search", "ground"],
+                          ["being", "--json"], ["being", "--plain"], ["being", "--set-corpus", "absent"]):
             with self.subTest(arguments=arguments), \
                     patch.object(app, "discover_corpus", side_effect=AssertionError("No corpus I/O")), \
                     patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")):
                 status, _, error = self.call(arguments)
                 self.assertNotEqual(status, 0)
-                self.assertIn("--reader", error)
+                self.assertIn("reader", error)
         self.assertFalse((self.root / "config").exists())
         self.assertFalse((self.root / "data").exists())
 
@@ -134,13 +129,13 @@ class ReaderViewCLITests(unittest.TestCase):
     def test_width_and_emphasis_are_forwarded_to_the_reader(self):
         with patch("sol.terminal.neovim.validate_environment"), \
                 patch.object(app, "run_reader", return_value=0) as view:
-            status, _, error = self.call(["--reader", "-n", "--width", "64", "--emphasis", "underline"])
+            status, _, error = self.call(["being", "-n", "--width", "64", "--emphasis", "underline"])
         self.assertEqual(status, 0, error)
         self.assertEqual(view.call_args.kwargs, {"width": 64, "emphasis": "underline", "theme": "mocha"})
 
     def test_emphasis_is_reader_only_and_width_validation_precedes_data_access(self):
-        for arguments in (["-r", "--emphasis", "italic"], ["--reader", "--width", "19"],
-                          ["--reader", "--width", "241"]):
+        for arguments in (["-r", "--emphasis", "italic"], ["being", "--width", "19"],
+                          ["being", "--width", "241"]):
             with self.subTest(arguments=arguments), \
                     patch.object(app, "discover_corpus", side_effect=AssertionError("No source access")), \
                     patch("sol.terminal.neovim.validate_environment"):
@@ -151,7 +146,7 @@ class ReaderViewCLITests(unittest.TestCase):
         with patch("sol.terminal.neovim.validate_environment"), \
                 patch("builtins.input", side_effect=AssertionError("No prompt needed")), \
                 patch.object(app, "run_reader", return_value=0) as view:
-            status, _, error = self.call(["--reader", "--workspace", "reading", "--actor", "Invented reader",
+            status, _, error = self.call(["being", "--workspace", "reading", "--actor", "Invented reader",
                                            "--workspace-dir", str(self.root / "workspaces")])
         self.assertEqual(status, 0, error)
         self.assertEqual(view.call_args.args[1].actor, "Invented reader")
@@ -162,8 +157,9 @@ class ReaderViewCLITests(unittest.TestCase):
                 redirect_stdout(StringIO()) as output, self.assertRaises(SystemExit) as caught:
             app.main(["--help"])
         self.assertEqual(caught.exception.code, 0)
-        self.assertIn("--reader", output.getvalue())
-        self.assertNotIn("--engine", output.getvalue())
+        self.assertIn("being", output.getvalue())
+        for removed in ("--reader", "--engine", "--pdf", "--ui", "--editing-mode", "compare", "analyze"):
+            self.assertNotIn(removed, output.getvalue())
 
     def test_first_interactive_launch_uses_guided_import_then_the_same_reader(self):
         book = app.load_corpus_book(self.corpus)
@@ -187,7 +183,7 @@ class ReaderViewCLITests(unittest.TestCase):
         with patch("sol.terminal.neovim.validate_environment", side_effect=ValueError("Neovim unavailable")), \
                 patch.object(app, "discover_corpus", side_effect=AssertionError("No source access")), \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")):
-            status, _, error = self.call(["--engine", "neovim"])
+            status, _, error = self.call(["being"])
         self.assertEqual(status, 2)
         self.assertIn("Neovim unavailable", error)
         self.assertFalse((self.root / "config").exists())
@@ -197,18 +193,11 @@ class ReaderViewCLITests(unittest.TestCase):
         with patch("sol.terminal.neovim.validate_environment"), \
                 patch("sol.terminal.neovim_reader.run_reader", return_value=0) as reader, \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")):
-            status, _, error = self.call(["-n", "--engine", "neovim", "--width", "64", "--emphasis", "underline"])
+            status, _, error = self.call(["-n", "--width", "64", "--emphasis", "underline"])
         self.assertEqual(status, 0, error)
         reader.assert_called_once()
         self.assertEqual(reader.call_args.kwargs, {"width": 64, "emphasis": "underline", "theme": "mocha"})
         self.assertFalse((self.root / "data").exists())
-
-    def test_neovim_engine_is_not_a_shell_or_one_shot_option(self):
-        for arguments in (["--shell"], ["-r"], ["--structure"], ["guide"], ["--workspace-list"]):
-            with self.subTest(arguments=arguments), \
-                    patch.object(app, "discover_corpus", side_effect=AssertionError("No source access")):
-                status, _, _ = self.call(["--engine", "neovim", *arguments])
-            self.assertEqual(status, 2)
 
     def test_dynamic_structure_launches_temporary_native_tree_without_onboarding(self):
         with patch("sol.terminal.neovim.validate_environment"), \
@@ -219,9 +208,8 @@ class ReaderViewCLITests(unittest.TestCase):
         self.assertEqual(reader.call_args.kwargs, {"width": DEFAULT_READER_WIDTH, "start_tree": True, "tree_depth": 3, "theme": "mocha"})
         self.assertFalse((self.root / "data").exists())
 
-    def test_dynamic_structure_refuses_workspace_pdf_and_noninteractive_output(self):
-        for options in (["--pdf", "source.pdf"], ["--workspace", "reading"], ["--actor", "Actor"],
-                        ["--json"], ["--plain"], ["--depth", "0"], ["--engine", "builtin"]):
+    def test_dynamic_structure_refuses_workspace_and_noninteractive_output(self):
+        for options in (["--workspace", "reading"], ["--actor", "Actor"], ["--json"], ["--plain"], ["--depth", "0"]):
             with self.subTest(options=options), \
                     patch.object(app, "discover_corpus", side_effect=AssertionError("No source access")):
                 status, _, _ = self.call(["--dynamic-structure", *options])

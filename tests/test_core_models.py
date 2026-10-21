@@ -11,7 +11,6 @@ import unittest
 from unittest.mock import Mock
 
 from sol.core import models, paths, references
-from sol.reader import models as reader_models
 from sol.workspace import reader as workspace_reader
 
 
@@ -28,11 +27,6 @@ def invented_tree():
 
 
 class CoreModelTests(unittest.TestCase):
-    def test_reader_compatibility_preserves_class_and_function_identity(self):
-        for name in reader_models.__all__:
-            with self.subTest(name=name):
-                self.assertIs(getattr(reader_models, name), getattr(models, name))
-
     def test_model_parent_paths_and_facsimile_projection_are_unchanged(self):
         _, _, _, leaf, _ = invented_tree()
         self.assertEqual(models.node_path(leaf), ("BEING", "i-quality", "a-being.txt"))
@@ -101,30 +95,6 @@ class CorePathTests(unittest.TestCase):
             paths.resolve_path(None, ("missing",), self.root)
         with self.assertRaisesRegex(ValueError, "no such path"):
             paths.resolve_path("/missing", (), self.root)
-
-    def test_comparison_accepts_shared_default_and_explicit_resolver(self):
-        from sol.workspace.comparison import capture_paths
-
-        passages = [
-            models.Passage("Invented prose.", 80, 7, leaf, models.node_path(leaf),
-                           80, 7, f"aaaaaaaa-0000-4000-8000-{index + 1:012d}")
-            for index, leaf in enumerate((self.leaf, self.other))
-        ]
-        book = models.Book(self.root, passages, canonical_records={
-            passage.identifier: {"id": passage.identifier, "type": "paragraph", "order": index,
-                                 "reader_path": paths.display_path(passage.path),
-                                 "plain_text": passage.text, "markdown": passage.text}
-            for index, passage in enumerate(passages)
-        })
-        selected_paths = ["/being/quality/being", "/being/quality/nothing"]
-        shared = capture_paths(book, selected_paths)
-        explicit_resolver = Mock(wraps=paths.resolve_path)
-        explicit = capture_paths(book, selected_paths, resolve_path=explicit_resolver)
-        self.assertEqual(shared["selections"], explicit["selections"])
-        self.assertEqual(shared["records"], explicit["records"])
-        self.assertEqual(explicit_resolver.call_count, 2)
-        for invocation in explicit_resolver.call_args_list:
-            self.assertIs(invocation.args[2], self.root)
 
 
 class CoreReferenceTests(unittest.TestCase):

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from unittest.mock import patch
+from contextlib import nullcontext
 import unittest
 
 import sol.reader.app as sol
@@ -101,7 +102,7 @@ class GuideTests(unittest.TestCase):
 
     def test_source_free_guide_explains_configuration_without_loading_or_conversion(self):
         with patch("sol.reader.app.load_corpus_book", side_effect=AssertionError("No corpus load")), \
-                patch("sol.reader.app.load_book", side_effect=AssertionError("No PDF extraction")), \
+                nullcontext(), \
                 patch("builtins.open", side_effect=AssertionError("No file I/O")):
             text = sol.render_guide()
         self.assertIn("abbreviated fallback", text)

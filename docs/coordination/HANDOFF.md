@@ -32,6 +32,31 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Cleanup steps 1, 3 and `sol being` — 21 October 2026
+
+**Task:** maintainer's cleanup plan (CURRENT_TASK, 21 October), steps 1, 3 and the reader half of 6.
+**Branch / PR:** `claude/minimal-shell` · see the pull request
+
+### Changed files
+- `sol/reader/shell.py` — rewritten as a browsing-only shell on `input()`/readline; no workspace, Kitty, handoff or prompt adapter.
+- Removed: `sol/terminal/{kitty,handoff,comparison,essence,prompt}.py`, `sol/workspace/{commands,comparison}.py`, `sol/reader/{legacy_pdf,models}.py`; `sol read`'s path resolver moved into `sol/terminal/commands.py`.
+- `sol/reader/options.py`, `app.py` — `sol being`; `--shell` refuses workspace/actor options and skips onboarding; `--pdf`, `--engine`, `--ui`, `--editing-mode`, `--source-pdf`, `sol compare`, neofetch removed.
+- `sol/terminal/reference.py` — `return` removed; `sol/workspace/reader.py` — `execute`, comparison/review/relation writers removed (store tables unchanged).
+- `pyproject.toml`, `scripts/install.py` — no `prompt-toolkit`, `sol-kitty`, empty extras, Kitty/Zsh tool checks.
+- Tests: 16 modules for removed features deleted; shell-driven tests pruned; onboarding, packaging and CLI tests converted to `sol being`; new completion and shell-help tests.
+- Docs: BEING §§2–3, 6–7, CORE §§6–8, ARCHITECTURE (maintainer's 21 October decision recorded beside the superseded `sol-kitty` one), README, CONTRIBUTING, `sol guide`, CHANGELOG.
+
+### Tests performed
+- Documentation check and full suite: 1,329 tests OK (7 skipped, 4 expected failures).
+
+### Outstanding issues
+- ESSENCE §6 still describes the term study's Kitty round trip; Codex's step 5 PR removes the term study and should rewrite that section.
+- BEING §5's formula review sheet is left for the same PR, which removes the script.
+
+### Decisions requiring approval
+None reserved: the maintainer decided these removals on 21 October.
+
+
 ## ESSENCE Results in small windows — 21 October 2026
 
 **Task:** [Codex: ESSENCE Results in small windows](https://github.com/dialectmaterial/SOL/blob/a7827cf/docs/coordination/CURRENT_TASK.md#codex-essence-results-in-small-windows).

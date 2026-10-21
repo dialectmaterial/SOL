@@ -1,10 +1,9 @@
-"""JSON reference exchange and explicit return through a private handoff."""
+"""JSON reference exchange: capture or check a canonical reference."""
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
 import sys
 
@@ -21,12 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     check = actions.add_parser("check", help="verify reference JSON against a local corpus")
     check.add_argument("file", nargs="?", default="-", metavar="FILE|-",
                        help="reference JSON file, or - for piped input (default)")
-    returning = actions.add_parser("return", help="submit a canonical reference to the calling reader")
-    returning.add_argument("identifier", nargs="?", metavar="ID",
-                           help="record UUID or prefix (default: the original requested UUID)")
-    returning.add_argument("--handoff-dir", type=Path, metavar="DIRECTORY",
-                           help="private session directory (otherwise SOL_HANDOFF_DIR)")
-    for command in (capture, check, returning):
+    for command in (capture, check):
         command.add_argument("--corpus", type=Path, metavar="DIRECTORY",
                              help="use this local canonical corpus instead of discovery")
     return parser
@@ -40,7 +34,7 @@ def _read_reference(filename: str, maximum: int) -> bytes | str:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    """Inspect canonical data or explicitly submit one private handoff return."""
+    """Capture or check one canonical reference."""
     options = build_parser().parse_args(arguments)
     try:
         from sol.core import (
@@ -51,22 +45,11 @@ def main(arguments: list[str] | None = None) -> int:
         payload = None
         if options.action == "check":
             payload = decode_reference(_read_reference(options.file, MAX_REFERENCE_BYTES))
-        handoff = None
-        if options.action == "return":
-            selected = options.handoff_dir or os.environ.get("SOL_HANDOFF_DIR")
-            if not selected:
-                raise ValueError("sol reference return needs --handoff-dir DIRECTORY or SOL_HANDOFF_DIR from an ESSENCE session")
-            handoff = Path(selected).expanduser()
         directory = discover_corpus(options.corpus)
         if directory is None:
             raise ValueError("No canonical corpus configured; use --corpus DIRECTORY or configure one with sol --set-corpus DIRECTORY")
         snapshot = load_snapshot(directory)
-        if options.action == "return":
-            from sol.terminal.handoff import submit_return
-
-            result = submit_return(handoff, snapshot, options.identifier)
-            print(json.dumps(result, ensure_ascii=True, sort_keys=True, separators=(",", ":"), allow_nan=False))
-        elif options.action == "capture":
+        if options.action == "capture":
             print(encode_reference(capture_reference(snapshot, options.identifier)))
         else:
             reference = check_reference(snapshot, payload)
@@ -85,7 +68,7 @@ def main(arguments: list[str] | None = None) -> int:
             print(json.dumps(result, ensure_ascii=True, sort_keys=True, separators=(",", ":"), allow_nan=False))
         return 0
     except (ValueError, OSError) as error:
-        if options.action in {"check", "return"}:
+        if options.action == "check":
             status = getattr(error, "status", "invalid")
             result = {"status": status, "error": str(error)}
             if hasattr(error, "code"):

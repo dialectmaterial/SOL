@@ -34,7 +34,7 @@ ARCHIVES = {
 }
 TOOLS = {"pipx": "pipx", "git": "git", "pdftotext": "poppler-utils",
          "pdftohtml": "poppler-utils", "pdftoppm": "poppler-utils",
-         "java": "default-jre-headless", "kitty": "kitty", "zsh": "zsh"}
+         "java": "default-jre-headless"}
 
 
 def missing_packages():
@@ -55,7 +55,7 @@ def missing_packages():
 
 def check_existing_commands():
     """Never let --force replace an unrelated command with the same name."""
-    for name in ("sol", "sol-kitty", "sol-corpus", "sol-corpus-check"):
+    for name in ("sol", "sol-window", "sol-corpus", "sol-corpus-check"):
         location = shutil.which(name)
         if location:
             target = Path(location).resolve()
