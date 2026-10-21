@@ -32,6 +32,29 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Cleanup step 4: legacy documents folded in and removed — 21 October 2026
+
+**Task:** maintainer's cleanup plan (CURRENT_TASK, 21 October), step 4.
+**Branch / PR:** `claude/legacy-docs` · PR #83
+**Last implementation commit:** `ddc6e3ffc97773d50d73a09f45e407b9964d5f1e` (this report is committed after it)
+
+### Changed files
+- `docs/CORE.md` §§9–10 — corpus contract v1 and reference protocol v1 in detail (verified against `sol/corpus/contract.py`, `sol/core/protocol.py`, `sol/core/wire.py`).
+- `docs/ESSENCE.md` §3 — prose-input projection rules (`sol/essence/prose.py`).
+- `docs/BEING.md` §3 — workspace storage, backup/upgrade, export, review-binding limits, and the list/delete/recover contract (`sol/workspace/store.py`, `lifecycle.py`, `profiles.py`, `export.py`).
+- `docs/ARCHITECTURE.md` §5 — Hegel's Remark on the particular concept, pointed to rather than quoted (copyrighted translation); documentation policy: history lives in Git.
+- Removed `docs/legacy/` (36 files), two finished proposals and HANDOFF reports older than the last five; `scripts/check_docs.py` no longer verifies the archive inventory.
+
+### Tests performed
+- Documentation check and full suite: OK. Codex reviewed and asked for the three BEING additions above, now made.
+
+### Outstanding issues
+- None known.
+
+### Decisions requiring approval
+None reserved: the maintainer decided the removal on 21 October; Decision wording in ESSENCE §7 is unchanged apart from replacing a link to the removed proposal.
+
+
 ## ESSENCE Results in small windows — 21 October 2026
 
 **Task:** [Codex: ESSENCE Results in small windows](https://github.com/dialectmaterial/SOL/blob/a7827cf/docs/coordination/CURRENT_TASK.md#codex-essence-results-in-small-windows).
