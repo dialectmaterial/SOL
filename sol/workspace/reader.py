@@ -98,7 +98,7 @@ class WorkspaceReader:
         position = state.get("position")
         if self.store.schema_version < 3:
             messages.append("This older workspace retains passages, not cursor positions. "
-                            "Use workspace upgrade FILE.sqlite3 to create a version-3 copy; "
+                            "Use sol --workspace NAME --workspace-upgrade FILE.sqlite3 to create a version-3 copy; "
                             "the original is retained.")
             return 0, None, False
         if position is None:
@@ -285,7 +285,7 @@ class WorkspaceReader:
             return ""
         if self.store.schema_version < 3:
             return ("Cursor position was not saved: this older workspace retains passages only. "
-                    "Use workspace upgrade FILE.sqlite3 to create a version-3 copy.")
+                    "Use sol --workspace NAME --workspace-upgrade FILE.sqlite3 to create a version-3 copy.")
         values = self._checkpoint_values(session, cwd, previous)
         if values == self._saved_state:
             return ""
@@ -316,7 +316,7 @@ class WorkspaceReader:
         self.require_author()
         if self.store.schema_version < 2:
             raise ValueError("annotation editing needs workspace version 2. "
-                             "Use workspace upgrade FILE.sqlite3 to create an upgraded copy; "
+                             "Use sol --workspace NAME --workspace-upgrade FILE.sqlite3 to create an upgraded copy; "
                              "the original is retained.")
         record = self.store.get_annotation(identifier)
         if record is None:

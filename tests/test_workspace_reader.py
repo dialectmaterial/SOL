@@ -68,13 +68,6 @@ class WorkspaceReaderTests(unittest.TestCase):
         return WorkspaceReader(self.book, store or self.store, actor, sol.resolve_path,
                                sol.display_path, sol.render_passage)
 
-    def shell(self, commands, reader=None):
-        stdout = StringIO()
-        with redirect_stdout(stdout), patch('builtins.input', side_effect=commands), \
-                patch('sol.reader.shell.install_completion', return_value=lambda: None):
-            status = sol.run_shell(self.book, 80, workspace_reader=reader or self.reader)
-        return status, stdout.getvalue()
-
     def main(self, arguments):
         stdout, stderr = StringIO(), StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr), \
@@ -83,6 +76,37 @@ class WorkspaceReaderTests(unittest.TestCase):
                 nullcontext():
             status = sol.main(arguments)
         return status, stdout.getvalue(), stderr.getvalue()
+
+    def test_queue_without_workspace_uses_no_database_and_backup_never_overwrites(self):
+        self.book.canonical_records[IDS[0]]['transcription_status'] = 'needs_review'
+        with patch('sol.workspace.store.Workspace', side_effect=AssertionError('No workspace database')):
+            status, output, error = self.main(['--review-queue', '--json'])
+        self.assertEqual(status, 0, error)
+        self.assertEqual(json.loads(output)[0]['id'], IDS[0])
+        destination = self.directory / 'existing.sqlite3'
+        destination.write_bytes(b'A file to preserve')
+        before = self.store.get_state()
+        status, _, _ = self.main(['--workspace', 'reading', '--workspace-dir', str(self.directory),
+                                  '--workspace-backup', str(destination)])
+        self.assertEqual(status, 2)
+        self.assertEqual(destination.read_bytes(), b'A file to preserve')
+        self.assertEqual(self.store.get_state(), before)
+
+    def test_workspace_options_are_refused_in_the_wrong_context(self):
+        for args in [['--resume-revision', '1'], ['--workspace-backup', str(self.directory / 'b.sqlite3')],
+                     ['--workspace-check'], ['--word', '--review-queue']]:
+            with self.subTest(args=args):
+                status, _, _ = self.main(args)
+                self.assertEqual(status, 2)
+
+    def test_upgrade_name_that_reopens_another_file_is_refused_before_writing(self):
+        target = self.directory / 'upgraded.SQLITE3'
+        status, _, error = self.main(['--workspace', 'reading', '--workspace-dir', str(self.directory),
+                                      '--workspace-upgrade', str(target)])
+        self.assertEqual(status, 2)
+        self.assertIn('lowercase .sqlite3', error)
+        self.assertFalse(target.exists())
+        self.assertFalse((self.directory / 'upgraded.sqlite3').exists())
 
     def test_reordering_recomputes_cursor_by_uuid_not_numeric_position(self):
         self.session.read(('BEING',), first=True)

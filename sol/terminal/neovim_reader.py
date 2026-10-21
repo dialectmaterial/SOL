@@ -207,7 +207,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                 target = book.redirects[target]
             if target in shown_ids:
                 if record["revision"] is None:
-                    refusal = "editing needs workspace version 2; upgrade a copy with workspace upgrade FILE"
+                    refusal = "editing needs workspace version 2; upgrade a copy with sol --workspace NAME --workspace-upgrade FILE.sqlite3"
                 elif record["actor"] != workspace_reader.actor:
                     refusal = "only the note's author can edit it"
                 elif any(unicodedata.category(c) in {"Cc", "Cf", "Cs", "Zl", "Zp"} and c not in "\n\t"
