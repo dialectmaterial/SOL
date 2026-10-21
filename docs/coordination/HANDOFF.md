@@ -32,6 +32,54 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## ESSENCE cleanup (steps 5 and 6) — 21 October 2026
+
+**Task:** [Codex: ESSENCE cleanup (steps 5 and 6)](https://github.com/dialectmaterial/SOL/blob/a26cefc7302928bde0de0f4ef5cbc05f32cdb9d4/docs/coordination/CURRENT_TASK.md#codex-essence-cleanup-steps-5-and-6), assigned directly by the maintainer.
+**Branch / PR:** `codex/essence-cleanup` · [pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fessence-cleanup); Claude reviews; author does not merge.
+**Last implementation commit:** `a26cefc7302928bde0de0f4ef5cbc05f32cdb9d4` (this report is committed afterward).
+
+### Changed files
+
+- `sol/essence/cli.py`, `__init__.py`, Methods and encyclopedia catalogs — remove the term experiment and four segmentation-pilot commands, their artifact dispatch and public term exports. The six remaining commands use `sol essence`; no `analyze` alias. Unknown/retired artifacts are refused before corpus discovery.
+- `sol/essence/corpus_inputs.py` — relocate the unchanged freshness, provenance, doctrine/path, selection and facsimile-mask helpers used by words and sentences out of the deleted `terms.py`. `word_inputs.py` and `sentences.py` import the new module. The tokenizer was already extracted in `tokenization.py`; keep its algorithm unchanged and update its description. Word/sentence/TF-IDF methods and artifact formats remain unchanged.
+- `sol/essence/tui/app.py` — saved-study messages say `sol essence check`. `sol/reader/app.py` changes **only the single subcommand dispatch condition**.
+- ESSENCE, BEING, Architecture, CHANGELOG — update command examples and current descriptions, retire segmentation-pilot and formula-sheet instructions. Keep formula/source acceptance and the need for human review. Historical `docs/legacy/` and old coordination reports/proposals are untouched.
+- Tests — retire term/pilot/formula-sheet tests and the term-based handoff/live-Kitty round trips. Keep prose coverage; check the renamed dispatch, removed commands and artifacts, and read-only word/check round trips. Preserve all four sentence-rule expected failures in `test_sentence_study.py`; make that fixture independent of the removed term TestCase. Packaging now runs a sentence experiment without reader/workspace/UI dependencies and checks the exact six retained Methods entries.
+- Publication checkout: `/tmp/sol-essence-cleanup`, cloned from `origin/main` at `eb44ef2`, because the supplied checkout's Git metadata is read-only. No edits to Claude's shell, terminal, options or pyproject files.
+
+### Removed files and line counts
+
+Counts against `origin/main` at `eb44ef2`: **10 complete files / 2,636 lines** removed. The implementation commit changes **31 files: 343 added, 3,520 deleted, net −3,177 lines**, excluding this report. The new shared corpus helper module accounts for 105 added lines; the four expected-failure tests were relocated rather than discarded.
+
+| Removed file | Lines |
+| --- | ---: |
+| `scripts/formula_review_sheet.py` | 379 |
+| `sol/essence/segmentation_check.py` | 241 |
+| `sol/essence/segmentation_marking.py` | 164 |
+| `sol/essence/terms.py` | 377 |
+| `tests/test_analysis_handoff.py` | 92 |
+| `tests/test_formula_review_sheet.py` | 265 |
+| `tests/test_kitty_handoff_integration.py` | 159 |
+| `tests/test_segmentation_check.py` | 269 |
+| `tests/test_segmentation_marking.py` | 292 |
+| `tests/test_term_experiment.py` | 398 |
+
+### Tests performed
+
+- `/home/dima/Projects/code/sol/.venv/bin/python -B scripts/check_docs.py` — OK (four authorities, local links/anchors and legacy inventory); external URLs not network-checked. `git diff --check` — OK.
+- `/home/dima/Projects/code/sol/.venv/bin/python -B -m unittest discover -s tests` — **1,518 tests, OK (7 skipped, 4 expected failures)**, 101.685 s. Includes wheel/source-archive and retained headless reader checks. An initial run exposed the old eleven-entry Methods assertion; the final run checks the six retained entries and passes.
+- Focused CLI, word-frequency, Methods and sentence checks passed. `python -B -m sol essence --help` lists sentences, words, tfidf, check, words-export and prose; the retired term command exits 2. Automated checks reject the `analyze` namespace and all four segmentation commands.
+
+### Outstanding issues
+
+- Root help still has two `analyze` mentions in `sol/reader/options.py`; that file is explicitly owned by Claude's concurrent rename/cleanup. Actual `analyze` dispatch is removed and tested. Legacy docs await Claude's separate document-removal PR; their historical command spellings were not rewritten.
+- No private-corpus or real-terminal trial: this is command removal/rename, with retained engines covered by invented corpora and packaging checks. No segmentation accuracy or formula-review claim is made.
+
+### Decisions requiring approval
+
+None beyond the maintainer-approved cleanup. Default: reject retired term artifacts rather than retain a hidden compatibility verifier. Claude reviews the PR; do not merge as author.
+
+
 ## ESSENCE Results in small windows — 21 October 2026
 
 **Task:** [Codex: ESSENCE Results in small windows](https://github.com/dialectmaterial/SOL/blob/a7827cf/docs/coordination/CURRENT_TASK.md#codex-essence-results-in-small-windows).
