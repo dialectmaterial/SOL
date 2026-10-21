@@ -1,7 +1,7 @@
 """Shared deterministic word tokens; no corpus, interface or runtime imports.
 
 Offsets address the original Python string, before normalization. Keep this
-algorithm stable: the existing sol.term-study v1 artifact depends on it.
+algorithm stable: word and sentence study artifacts depend on it.
 """
 from __future__ import annotations
 

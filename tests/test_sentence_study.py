@@ -15,7 +15,10 @@ from sol.essence.sentences import (
     encode_sentence_result, segment,
 )
 from fixtures_corpus import write_runtime_corpus
-import test_term_experiment
+import hashlib
+from sol import core
+
+_GENERATED = {"markdown", "plain_text", "document", "context", "content_sha256"}
 
 
 def sentences(text):
@@ -48,8 +51,62 @@ class SegmentationTests(unittest.TestCase):
                          ["As 0.285714 . . . or 1 + a and so on.", "The series etc. are long.", "A list"])
 
 
+PARENTHETICAL = ["The diary says (A bell rang.", "Another bell answered.) before its owner leaves."]
+WRAPPED = "The traveller carried\nan unopened letter."
+
+
+class KnownRuleLimitations(unittest.TestCase):
+    """Human-desired boundaries deliberately fail against the frozen v1 method.
+
+    Unexpected success requires reviewing a method change, not updating gold to
+    whatever the algorithm predicts. These cases document limits of the retained
+    sentence segmenter.
+    """
+    @unittest.expectedFailure
+    def test_sentence_inside_parenthesis_opened_mid_sentence(self):
+        text = " ".join(PARENTHETICAL)
+        self.assertEqual([text[a:b] for a, b in segment(text)], PARENTHETICAL)
+
+    @unittest.expectedFailure
+    def test_physical_line_break_inside_a_sentence_is_not_a_sentence_boundary(self):
+        self.assertEqual([WRAPPED[a:b] for a, b in segment(WRAPPED)], [WRAPPED])
+
+    @unittest.expectedFailure
+    def test_an_abbreviation_can_also_end_a_sentence(self):
+        gold = ["Consult ibid.", "Another account follows."]
+        text = " ".join(gold)
+        self.assertEqual([text[a:b] for a, b in segment(text)], gold)
+
+    @unittest.expectedFailure
+    def test_lowercase_sentence_start_is_a_boundary_when_marked_by_a_reviewer(self):
+        gold = ["One event ends.", "another begins."]
+        text = " ".join(gold)
+        self.assertEqual([text[a:b] for a, b in segment(text)], gold)
+
+
 class SentenceStudyTests(unittest.TestCase):
-    rewrite = test_term_experiment.TermExperimentTests.rewrite
+    def rewrite(self, modify):
+        manifest = json.loads((self.corpus / "corpus.json").read_text())
+        rows = [json.loads(line) for line in (self.corpus / "index.jsonl").read_text().splitlines()]
+        modify(manifest, rows)
+        for row in rows:
+            row["content_sha256"] = hashlib.sha256(row["markdown"].encode()).hexdigest()
+        markdown = "\n".join(contract.render_record(
+            {key: value for key, value in row.items() if key not in _GENERATED}, row["markdown"])
+            for row in rows)
+        manifest_bytes = json.dumps(manifest, ensure_ascii=False).encode()
+        index_bytes = ("".join(json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                               + "\n" for row in rows)).encode()
+        (self.corpus / "corpus.json").write_bytes(manifest_bytes)
+        (self.corpus / "sample.md").write_text(markdown, encoding="utf-8")
+        (self.corpus / "index.jsonl").write_bytes(index_bytes)
+        (self.corpus / "index.meta.json").write_text(json.dumps({
+            "contract_version": 1, "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+            "source_sha256": manifest["source"]["sha256"],
+            "documents": {"sample.md": hashlib.sha256(markdown.encode()).hexdigest()},
+            "index_sha256": hashlib.sha256(index_bytes).hexdigest(), "record_count": len(rows),
+        }), encoding="utf-8")
+        return core.load_snapshot(self.corpus)
 
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="sol-sentence-study-")
@@ -109,7 +166,7 @@ class SentenceStudyTests(unittest.TestCase):
         self.assertEqual(stale.exception.status, "stale")
 
     def test_cli_runs_and_checks_a_saved_study(self):
-        command = [sys.executable, "-B", "-m", "sol", "analyze"]
+        command = [sys.executable, "-B", "-m", "sol", "essence"]
         study = subprocess.run(command + ["sentences", "--corpus", str(self.corpus), "--json"],
                                capture_output=True, text=True, check=True).stdout
         self.assertEqual(json.loads(study)["protocol"], "sol.sentence-study")

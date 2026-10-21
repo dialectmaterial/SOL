@@ -236,14 +236,11 @@ class CoreWordTests(CorpusFixture, unittest.TestCase):
     def source(self, scope=None):
         return CoreProvider(self.book.corpus_snapshot, scope)
 
-    def test_same_core_projection_and_shared_tokenizer_as_term_study(self):
-        from sol.essence.terms import _tokens, analyze_term
-        self.assertIs(_tokens, word_tokens)
+    def test_core_projection_uses_shared_tokenizer(self):
         self.rewrite_body("Ground and ground. Café isn't a number: 123.")
         result = analyze_words(self.source())
-        term = analyze_term(self.book.corpus_snapshot, "ground")
-        self.assertEqual(result["target"]["summary"]["token_count"], term["totals"]["token_count"])
-        self.assertEqual(table(result)["ground"]["target"]["count"], term["totals"]["occurrences"])
+        self.assertEqual(result["target"]["summary"]["token_count"], 7)
+        self.assertEqual(table(result)["ground"]["target"]["count"], 2)
         self.assertEqual(result["target"]["inputs"][0]["id"], self.identifier)
         self.assertEqual(check_word_result(self.source(), result), result)
 

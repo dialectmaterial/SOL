@@ -18,38 +18,35 @@ The relation between Hegel's explicit argument and the output of an algorithm is
 
 ESSENCE is not currently a complete model environment. The inspected code contains:
 
-- `sol.essence.prose.export_prose` and `sol analyze prose --json`: a **verified, Hegel-specific** prose-only analysis view over the current corpus.
-- `sol analyze term WORD`: a reproducible lexical-distribution experiment with reference-bound source matches; `sol analyze check FILE` checks its result against a current corpus generation.
-- `sol analyze sentences [--within PATH]`: the existing v1 corpus sentence-length study (run from the reader with `S` until 19 October, when the maintainer removed that key). `sol analyze sentences --file PATH [--span START END]` and the provider API add v2 studies over UTF-8 files or independently scoped CORE inputs; `sol analyze check FILE --input-file PATH` verifies file studies against an explicit local source.
-- `sol analyze tfidf`: dependency-free, versioned lexical TF-IDF over the existing word providers; engine, CLI and interactive study. Top terms per document and overall retain word-study provenance and are recomputable with `check` (details below).
+- `sol.essence.prose.export_prose` and `sol essence prose --json`: a **verified, Hegel-specific** prose-only analysis view over the current corpus.
+- `sol essence sentences [--within PATH]`: the existing v1 corpus sentence-length study (run from the reader with `S` until 19 October, when the maintainer removed that key). `sol essence sentences --file PATH [--span START END]` and the provider API add v2 studies over UTF-8 files or independently scoped CORE inputs; `sol essence check FILE --input-file PATH` verifies file studies against an explicit local source.
+- `sol essence tfidf`: dependency-free, versioned lexical TF-IDF over the existing word providers; engine, CLI and interactive study. Top terms per document and overall retain word-study provenance and are recomputable with `check` (details below).
 - The optional Textual interface and the word engine's CORE/file counts, comparison measures and CSV/TSV export described in §4–§5. The interface also runs the sentence-length study through the provider API (19 October).
 - `sol.core` public snapshot/reference APIs, including source/edition/generation binding and batch captures; these are usable without opening BEING.
 - A narrow optional `sol-kitty` + Zsh handoff for a source passage, with an explicit proposed return to BEING. The handoff carries **references**, not an ML result database or unrestricted authority to save notes.
 - A bundled, offline methods encyclopedia on screen `1`, with nine entries and individually attributed Wikipedia excerpts ([§7](#7-methods-encyclopedia)).
 - Checkout-only reading/rendering research, not an installed ESSENCE model suite.
 
-**Not implemented/verified:** a general experiment picker beyond the three shipped lexical/sentence studies; parameter dashboard; GPU/model registry; task/capability registry and adapters; file providers for the older term/prose and segmentation-review workflows; syntactic research panel; UltraBERT embedding pipeline; TensorFlow Projector launch as a SOL command; durable research context/experiment history. Sustained human acceptance of the reader and investigation interface remains open. Do not describe these as shipping features until code and tests verify them.
+**Not implemented/verified:** a general experiment picker beyond the three shipped lexical/sentence studies; parameter dashboard; GPU/model registry; task/capability registry and adapters; file providers for prose exports; syntactic research panel; UltraBERT embedding pipeline; TensorFlow Projector launch as a SOL command; durable research context/experiment history. Sustained human acceptance of the reader and investigation interface remains open. Do not describe these as shipping features until code and tests verify them.
+
+The command namespace is `sol essence`; the former `analyze` name has no alias.
 
 ### Existing commands
 
 ```sh
-sol analyze tfidf --input-file /absolute/path/to/text.txt --top-n 20 --json > tfidf.sol-analysis.json
-sol analyze check tfidf.sol-analysis.json --input-file /absolute/path/to/text.txt --json
-sol analyze tfidf --within /ESSENCE --corpus local-corpus
-sol analyze prose
-sol analyze prose --json > prose.sol-analysis.json
-sol analyze term ground
-sol analyze term ground --doctrine essence --limit 5
-sol analyze term ground --json > ground.sol-analysis.json
-sol analyze check ground.sol-analysis.json
-sol analyze sentences --within /BEING/i-determinateness-quality
-sol analyze sentences --json > quality.sol-analysis.json
-sol analyze sentences --file /absolute/path/to/text.txt --span 0 500 --json > sentences.sol-analysis.json
-sol analyze check sentences.sol-analysis.json --input-file /absolute/path/to/text.txt
+sol essence tfidf --input-file /absolute/path/to/text.txt --top-n 20 --json > tfidf.sol-analysis.json
+sol essence check tfidf.sol-analysis.json --input-file /absolute/path/to/text.txt --json
+sol essence tfidf --within /ESSENCE --corpus local-corpus
+sol essence prose
+sol essence prose --json > prose.sol-analysis.json
+sol essence sentences --within /BEING/i-determinateness-quality
+sol essence sentences --json > quality.sol-analysis.json
+sol essence sentences --file /absolute/path/to/text.txt --span 0 500 --json > sentences.sol-analysis.json
+sol essence check sentences.sol-analysis.json --input-file /absolute/path/to/text.txt
 sol reference capture RECORD_UUID --corpus local-corpus | sol reference check --corpus local-corpus
 ```
 
-The first `prose` command summarizes eligible records. The JSON export is for consumption by scripts. The lexical study measures exact normalized token occurrences and can break results down by the three doctrines, but a word occurrence does not prove concept identity. `check` verifies term, word-frequency, TF-IDF and sentence studies by recomputation, not arbitrary generated model outputs or `prose` exports. File analysis through the Python API or `python -m sol.essence.cli` needs no CORE import or configured corpus; the installed `sol` entry point still loads BEING's command dispatcher.
+The first `prose` command summarizes eligible records. The JSON export is for consumption by scripts. Word frequencies measure normalized lexical occurrences, which do not prove concept identity. `check` verifies word-frequency, TF-IDF and sentence studies by recomputation, not arbitrary generated model outputs or `prose` exports. File analysis through the Python API or `python -m sol.essence.cli` needs no CORE import or configured corpus; the installed `sol` entry point still loads BEING's command dispatcher.
 
 ### TF-IDF engine contract (tfidf-v1)
 
@@ -131,11 +128,11 @@ In particular, avoid these errors:
 
 **Implemented (18 October 2026), stage 1 shell:** `sol.essence.tui` is a Textual application with four screens (Encyclopedia, Methods, Experiment, Results) initially holding placeholder text; Encyclopedia now browses the bundled catalog (§7), and Methods (20 October) browses the bundled methods catalog (`sol/essence/methods.json`): for each runnable study its inputs, settings, output, limits and command line, with its encyclopedia entry named; the reader's origin is shown at the top. `1`–`4` switch screens, `q` or Ctrl-Q leaves; the command palette is off. Leaving saves only the open screen and the origin record, owner-only, under `$XDG_STATE_HOME/sol/essence/` for workspace sessions (temporary `-n` sessions save nothing); the next opening returns to that screen. Opening it imports no model. Measured on this machine inside Neovim's terminal: start-up about 110 ms; a split-to-fullscreen change reflows without a restart; Escape, Alt-Left/Right, Alt+letters, Ctrl-S/N, Tab, function keys and arrows arrive intact through terminal mode. Textual reads Escape-then-letter as Alt+letter, binds Ctrl-Q to quit and Ctrl-P to its palette, so ESSENCE avoids those for other purposes. Reader-side behaviour: [BEING §6](BEING.md#6-being--essence-without-terminal-dogma).
 
-**Implemented (18 October 2026), stage 2 interface side:** the Experiment screen chooses a **target** (this passage, its section, the whole book, or a UTF-8 text file) and an optional **reference** (its section, the whole book, or a text file) and runs the stage 2 word-frequency engine (`sol.essence.words.analyze_words`) in a background worker. Results shows, for each side, tokens, distinct words, inputs, provider and scope, the engine's warnings (unequal denominators, different projections), and a table of the most frequent 2,000 words with counts and rates per 10,000 tokens; an undefined rate is shown as such. Workspace sessions save the artifact owner-only as `~/.local/share/sol/studies/words-*.sol-analysis.json` for `sol analyze check`; temporary sessions save nothing. Choosing only text files needs no CORE corpus. Opening a word's passage in the reader is stage 3. On the real book through this interface code: a passage counts in about 0.5 s, a section against the whole book in about 1.4 s.
+**Implemented (18 October 2026), stage 2 interface side:** the Experiment screen chooses a **target** (this passage, its section, the whole book, or a UTF-8 text file) and an optional **reference** (its section, the whole book, or a text file) and runs the stage 2 word-frequency engine (`sol.essence.words.analyze_words`) in a background worker. Results shows, for each side, tokens, distinct words, inputs, provider and scope, the engine's warnings (unequal denominators, different projections), and a table of the most frequent 2,000 words with counts and rates per 10,000 tokens; an undefined rate is shown as such. Workspace sessions save the artifact owner-only as `~/.local/share/sol/studies/words-*.sol-analysis.json` for `sol essence check`; temporary sessions save nothing. Choosing only text files needs no CORE corpus. Opening a word's passage in the reader is stage 3. On the real book through this interface code: a passage counts in about 0.5 s, a section against the whole book in about 1.4 s.
 
 **Implemented (18 October 2026), stage 3 interface side:** with a reference, a count calls `sol.essence.comparison.compare_words` once (it runs the stage 2 study and adds the measures), so the interface computes no measure itself. Results then adds **Difference** (per 10,000 tokens) and **Log₂ ratio** columns; an undefined measure says why in the engine's terms (*absent in target*, *absent in reference*, *empty target*, *empty reference*), and the summary states both formulas, that there is no smoothing, and the engine's warnings, including that the measures are descriptive only. Below the table, **Sources** lists where the highlighted word occurs: one row per occurrence, numbered within its passage or file (*2 of 5*), with the words around it (about 40 characters each side, the word in bold) and the passage's heading and printed page (19–20 October). The study records only each input's first occurrence; the others are found again at display time with the same tokenizer in the verified text and are never saved. Where they cannot be confirmed (the text changed, or masked tokens were left out of the count), only the first is listed, with the input's count. At most 1,000 rows are listed per word, and the label says when fewer than all occurrences are shown. The context is read from the loaded book or the chosen file for display only and is shown only if that text still has the digest the count recorded; otherwise the row says the text has changed. After a count the word table has the focus: arrows choose a word, Enter moves to its sources, Escape back; switching screens with `1`–`4` starts on that screen's first control. Enter on a corpus row opens that occurrence in the reader ([BEING §6](BEING.md#6-being--essence-without-terminal-dogma)); text-file rows are listed but cannot open. **Export CSV / Export TSV** call `export_word_comparison`, which checks the sources against the study again first, and write `~/.local/share/sol/studies/words-*.csv|tsv` owner-only, never overwriting; temporary sessions write nothing, and a count without a reference has no table to export. **Cancel** abandons a running count: the engine cannot be interrupted, so it finishes in the background and its result is discarded and not saved. On the real book (this machine): a section against the whole book about 2.8 s (the comparison adds about 0.5 s to the count), an export about 3.2 s.
 
-**Implemented (19 October 2026), the sentence study in the interface:** the Experiment screen first chooses a study, **Word frequencies** or **Sentence lengths**; sentence lengths take the same targets (this passage, its section, the whole book, a text file) and no reference. They run `sol.essence.sentences.analyze_sentences` with the word engine's providers, so the result is the `sol.sentence-study` v2 artifact of [§5](#5-prioritized-experiments), saved owner-only as `~/.local/share/sol/studies/sentences-*.sol-analysis.json` in workspace sessions (nothing in temporary ones) and checked with `sol analyze check`. Results then shows the totals, the distribution of words per sentence as bars, the means by place in the paragraph, what was left out, and that the study describes the translation's sentences under `punctuation-rules-v1`; the table lists the twelve longest sentences with their length, how they begin and their heading and page. Beginnings, headings and pages are read for display and never saved. Enter opens a sentence at its first character in the reader through `essence_source`, and Alt-Left returns; a text file's sentences cannot open there. This replaces the reader's former `S`. On the real book: a chapter of 137 passages (624 sentences) measures in about 1 s; the longest sentence opened at its first letter.
+**Implemented (19 October 2026), the sentence study in the interface:** the Experiment screen first chooses a study, **Word frequencies** or **Sentence lengths**; sentence lengths take the same targets (this passage, its section, the whole book, a text file) and no reference. They run `sol.essence.sentences.analyze_sentences` with the word engine's providers, so the result is the `sol.sentence-study` v2 artifact of [§5](#5-prioritized-experiments), saved owner-only as `~/.local/share/sol/studies/sentences-*.sol-analysis.json` in workspace sessions (nothing in temporary ones) and checked with `sol essence check`. Results then shows the totals, the distribution of words per sentence as bars, the means by place in the paragraph, what was left out, and that the study describes the translation's sentences under `punctuation-rules-v1`; the table lists the twelve longest sentences with their length, how they begin and their heading and page. Beginnings, headings and pages are read for display and never saved. Enter opens a sentence at its first character in the reader through `essence_source`, and Alt-Left returns; a text file's sentences cannot open there. This replaces the reader's former `S`. On the real book: a chapter of 137 passages (624 sentences) measures in about 1 s; the longest sentence opened at its first letter.
 
 **Implemented (20 October 2026), study layout and TF-IDF:** Experiment offers Word frequencies, Sentence lengths and **TF-IDF · top terms by passage**. Reference choices appear only for word frequencies; file path fields appear only when their source is **A text file**. Borderless groups and neutral Run/Cancel controls use the active Textual theme, including SOL Paper and Night. Encyclopedia and Methods have taller, bounded lists and correctly named help. Word results without a reference omit its columns and export controls; summaries use singular/plural input counts. Sources reserve a wrapping heading/page column before the wrapping context; spaces adjoining the bold word survive line folding. Results reflow when the terminal changes size.
 
@@ -143,7 +140,7 @@ In particular, avoid these errors:
 
 **Small-window Results (21 October 2026):** at 80×24 and 120×40 the Results pane stays within its window. The scrollable summary takes at most a fifth of its height; word frequencies and their occurrences share the remaining space, with compact source help and one-line export controls. Column widths reserve room for cell padding and vertical scrollbars: words, undefined measures, sentence beginnings, locations and TF-IDF terms wrap rather than requiring sideways scrolling. All comparison columns remain present. The occurrence list stays visible while arrows choose a word; Enter focuses its occurrences, Enter there opens the reader, and Escape returns to words. Resizing preserves the selected word/occurrence, focus and export status. Long rows and summaries remain available by vertical scrolling; engines, saved artifacts and exports are unchanged.
 
-TF-IDF calls `sol.essence.analyze_tfidf` with the same passage/section/book/file targets and no reference, retaining the default top 20. Results lists each passage in reading order with its ranked terms and weights **first**, then a separate overall mean-weight table. Every retained top term remains available by scrolling. Enter on a passage sends its ID, span start and content digest through the same guarded reader request as sentences; file rows explain that they cannot open. Workspace sessions save `tfidf-*.sol-analysis.json` owner-only beside other studies, checkable with `sol analyze check`; temporary sessions save nothing. Headings and pages are display-only. TF-IDF declares raw-count TF, smoothed IDF, L2 normalization and no stop-word removal; it does not claim to identify concepts.
+TF-IDF calls `sol.essence.analyze_tfidf` with the same passage/section/book/file targets and no reference, retaining the default top 20. Results lists each passage in reading order with its ranked terms and weights **first**, then a separate overall mean-weight table. Every retained top term remains available by scrolling. Enter on a passage sends its ID, span start and content digest through the same guarded reader request as sentences; file rows explain that they cannot open. Workspace sessions save `tfidf-*.sol-analysis.json` owner-only beside other studies, checkable with `sol essence check`; temporary sessions save nothing. Headings and pages are display-only. TF-IDF declares raw-count TF, smoothed IDF, L2 normalization and no stop-word removal; it does not claim to identify concepts.
 
 **Proposed launch and return requirements:**
 
@@ -199,7 +196,7 @@ A result should distinguish **reproducing the exact experiment generation** (str
 | 4. Encyclopedia (implemented, 20 October) | Bundled methods table of contents; short attributed Wikipedia excerpts and further links | Browsable offline, without CORE or model downloads |
 | 5. Model adapters | Capability-driven registry; optional runtimes; comparison experiments (including Experiment B below) | Model versions, input limits, policies and reproducibility documented and tested |
 
-**The first new experiment stays elementary:** a deterministic, documented word tokenizer, with token count, type count and a frequency table for the selected scope. Its purpose is to test the whole research loop, not to settle what a word is. The term study's existing tokenizer (`sol.essence.terms`) is the natural candidate: it takes runs of letters with combining marks and internal apostrophes, applies NFC and case folding, excludes digits and punctuation, and splits hyphenated compounds; the final choice is open ([§4](#4-interaction-model-and-inquiry-contract)). Model-specific subword tokenization and morphology come later as **distinct analyses**, never as aliases of this one.
+**The first new experiment stays elementary:** a deterministic, documented word tokenizer, with token count, type count and a frequency table for the selected scope. Its purpose is to test the whole research loop, not to settle what a word is. The shared word tokenizer (`sol.essence.tokenization`) is implemented: it takes runs of letters with combining marks and internal apostrophes, applies NFC and case folding, excludes digits and punctuation, and splits hyphenated compounds; the method is declared in each artifact ([§4](#4-interaction-model-and-inquiry-contract)). Model-specific subword tokenization and morphology come later as **distinct analyses**, never as aliases of this one.
 
 The shipped sentence study (Experiment A, below) is not superseded; it remains the first complete reader-to-ESSENCE round trip and moves into the new interface once stage 1 exists.
 
@@ -226,7 +223,7 @@ from `sol.essence`). Providers can differ; no Textual import is involved.
   `{"kind":"passages","ids":["FULL_UUID",...]}`, or
   `{"kind":"span","id":"FULL_UUID","start":0,"end":20}`.
   IDs must be exact and distinct; inputs retain canonical order. Reader paths
-  match whole path components. The existing term-study projection selects
+  match whole path components. The CORE word-study projection selects
   Hegel main-text paragraphs, quotations and list items in the three doctrines,
   excludes generated/pending-review records, and masks converter facsimile
   labels. Exclusion reasons and masked token counts are explicit.
@@ -263,11 +260,11 @@ sequences are stored; normalized vocabulary is intrinsic to the table. Keep
 these artifacts private and outside Git.
 
 ```sh
-sol analyze words --corpus /absolute/path/to/corpus --within /BEING --compare
-sol analyze words --corpus /absolute/path/to/corpus --passage FULL_UUID --span 0 20
-sol analyze words --file /private/target.txt --reference-file /private/reference.txt
-sol analyze words --file /private/target.txt --span 0 20 --compare --json > /private/words.json
-sol analyze check /private/words.json --input-file /private/target.txt
+sol essence words --corpus /absolute/path/to/corpus --within /BEING --compare
+sol essence words --corpus /absolute/path/to/corpus --passage FULL_UUID --span 0 20
+sol essence words --file /private/target.txt --reference-file /private/reference.txt
+sol essence words --file /private/target.txt --span 0 20 --compare --json > /private/words.json
+sol essence check /private/words.json --input-file /private/target.txt
 ```
 
 `--compare` uses the whole target source as reference. `--reference-within`,
@@ -281,7 +278,7 @@ and `n/a` in text, including the missing side of a union-vocabulary row.
 `encode_word_result`/`decode_word_result` validate bounded (16 MiB), strict
 UTF-8 JSON with no duplicate keys, nonfinite numbers, unknown fields or method
 versions. `check_word_result(target, result, *, reference=None)` recomputes
-with caller-supplied providers and matching scopes. `sol analyze check`
+with caller-supplied providers and matching scopes. `sol essence check`
 reuses validated artifact scopes, but file paths must be supplied explicitly;
 CORE sources come from `--corpus`/discovery and `--reference-corpus`. It emits
 a verification receipt, not another study. Any changed corpus generation or
@@ -332,10 +329,10 @@ writing files. From the CLI, export a saved target/reference study with
 explicit sources (replace these private paths):
 
 ```sh
-sol analyze words --file /private/target.txt --reference-file /private/reference.txt --json > /private/study.json
-sol analyze words-export /private/study.json --input-file /private/target.txt --reference-file /private/reference.txt --format csv > /private/comparison.csv
-sol analyze words-export /private/study.json --input-file /private/target.txt --reference-file /private/reference.txt --format tsv > /private/comparison.tsv
-sol analyze words-export /private/core-study.json --corpus /private/corpus --format csv
+sol essence words --file /private/target.txt --reference-file /private/reference.txt --json > /private/study.json
+sol essence words-export /private/study.json --input-file /private/target.txt --reference-file /private/reference.txt --format csv > /private/comparison.csv
+sol essence words-export /private/study.json --input-file /private/target.txt --reference-file /private/reference.txt --format tsv > /private/comparison.tsv
+sol essence words-export /private/core-study.json --corpus /private/corpus --format csv
 ```
 
 CORE scopes are recovered from the validated artifact, just as for `check`;
@@ -415,10 +412,10 @@ its 1 MiB bound and original encoding/method; bare-snapshot calls, existing
 artifacts and ordinary corpus CLI output remain v1 (as did the reader's `S` until its removal on 19 October).
 
 ```sh
-sol analyze sentences --file /absolute/path/to/text.txt
-sol analyze sentences --file /absolute/path/to/text.txt --span 10 500 --json > sentences.sol-analysis.json
-sol analyze check sentences.sol-analysis.json --input-file /absolute/path/to/text.txt
-sol analyze sentences --corpus local-corpus --passage RECORD_UUID --span 10 500 --json
+sol essence sentences --file /absolute/path/to/text.txt
+sol essence sentences --file /absolute/path/to/text.txt --span 10 500 --json > sentences.sol-analysis.json
+sol essence check sentences.sol-analysis.json --input-file /absolute/path/to/text.txt
+sol essence sentences --corpus local-corpus --passage RECORD_UUID --span 10 500 --json
 ```
 
 ```python
@@ -432,130 +429,15 @@ This adds no model, dependency, corpus/workspace contract or interface control.
 The underlying segmenter's known limitations and the need for human boundary
 validation remain unchanged.
 
-#### Measuring segmentation error against private marks
+#### Segmentation validation remains open
 
-**Implemented (18 October): validation tools, with the method unchanged.**
-`sol analyze segmentation-sample` prepares a blind local annotation form;
-`sol analyze segmentation-check` compares completed marks with the existing
-`punctuation-rules-v1`. These are review commands, not a replacement segmenter
-or a change to `sol.sentence-study` v1 or CORE. No dependency was added.
-**No real-book error rate has been established:** human marking is still required.
-
-The sample uses complete, eligible nonempty passages from each doctrine, with
-the existing sentence study's attribution/type/review filters. A declared seed
-and SHA-256 ranking of `seed:UUID` select equal counts per doctrine; records
-are then presented in canonical order. The form retains source text, IDs,
-digests, pages, generation and method, but reveals no predicted boundaries or
-counts. This balanced passage sample is a descriptive pilot, not a book-wide
-weighted error estimate. It measures `segment` boundaries in exact canonical
-`plain_text`, not the accuracy of token counts or subsequent facsimile masking.
-
-**Marking in an ordinary text editor (18 October).** No JSON editing is needed:
-
-1. After approving a size, create an unmarked sample in an existing private
-   directory outside Git and outside the corpus. Replace the example paths.
-
-   ```sh
-   sol analyze segmentation-sample --corpus /absolute/path/to/local-corpus \
-     --per-doctrine 30 --seed 20261018 --output /absolute/private/path/sample.json
-   ```
-
-2. Export a blind text form. Keep the original `sample.json` unchanged.
-
-   ```sh
-   sol analyze segmentation-export /absolute/private/path/sample.json \
-     --corpus /absolute/path/to/local-corpus --output /absolute/private/path/sentences.txt
-   ```
-
-3. Open `sentences.txt` in your text editor, using UTF-8, LF line endings and
-   **soft wrap**. Inside each `TEXT` block, press Enter after every complete
-   sentence, including its punctuation and closing quotes/brackets. Keep every
-   original space when possible. If your editor trims whitespace before an added
-   sentence break or at a passage end, import restores it from the source.
-   Do not delete spaces inside sentences, correct words, change Unicode,
-   hard-wrap, auto-indent or edit headings. Turn off those editor features.
-   An original source newline is **not** a mark; add another Enter there if it
-   really ends a sentence. An unsplit block declares one whole sentence. Visit
-   every block; put a reason on its `EXCLUDE: ` line if it is unreviewed or too
-   doubtful to adjudicate. Even excluded text must remain intact. Save the file.
-
-4. Import using that same original sample, supply your reviewer label, then score
-   the new review. Output files must not already exist.
-
-   ```sh
-   sol analyze segmentation-import /absolute/private/path/sample.json \
-     /absolute/private/path/sentences.txt --reviewer "Your name" \
-     --corpus /absolute/path/to/local-corpus --output /absolute/private/path/review.json
-   sol analyze segmentation-check /absolute/private/path/review.json \
-     --corpus /absolute/path/to/local-corpus
-   ```
-
-For example, this invented text has a retained space at the start of the second
-line; Enter was **added**, not substituted for that space:
-
-```text
-TEXT
-A first invented statement.
- A second one follows.
-```
-
-The form shows the original unsplit text and passage IDs/doctrines, never the
-segmenter's boundaries or counts. A fingerprint binds it to the complete
-original sample. Import allows added LF breaks inside `TEXT`, source whitespace
-trimmed at those breaks or passage ends, and reasons on the designated exclusion
-lines (`EXCLUDE:` with or without its trailing space). It reconstructs sentence
-strings from canonical source slices, not the edited form. An edited word,
-missing space inside a sentence, dropped or reordered passage, changed sample or
-changed source generation is refused. Existing v1 form headers remain unchanged
-for compatibility; their advice to retain spaces is conservative, not a demand
-to disable line-end trimming at added sentence breaks.
-Text mismatches name the passage, source codepoint (1-based) and form line/column.
-No newline is inserted into canonical text: the new JSON stores exact source
-slices in the existing `gold_sentences` field, or an explicit `exclude_reason`.
-JSON-based marking remains supported for scripts and expert users.
-
-Sample, form and review creation use owner-only files, refuse existing targets
-and symlinks, and refuse Git checkouts. Keep raw samples, marked forms and reports
-private and outside Git. Keep the corpus unchanged while marking. The example's
-size and seed are explicit, not approved defaults. Import is a declaration of
-marks, not evidence that each block was read; blank exclusion lines and no added
-breaks cannot distinguish an unreviewed passage from a one-sentence passage.
-Reviews with no scored passages are refused, and exclusions are reported, not
-hidden. Mark the pilot before inspecting predictions and have a second reader
-independently check doubtful cases. A reviewer label is attribution, not proof
-of human review. To save the text-free score report privately, use
-`segmentation-check ... --json > /absolute/private/path/report.json`.
-
-Scoring compares exact **internal sentence-end codepoint offsets**. The final
-passage end is obligatory and excluded. A false split is a predicted boundary
-absent from the marks; a miss is a marked boundary absent from the prediction.
-A shifted boundary counts as both; no fuzzy matching is used. With `TP` matching
-boundaries, `FP` false splits and `FN` misses, precision is `TP/(TP+FP)`, recall
-is `TP/(TP+FN)`, and F1 is `2TP/(2TP+FP+FN)`. Zero denominators are `null`, not
-perfect scores. Reports retain counts, affected-passage counts, per-doctrine
-metrics, explicit exclusions and exact error offsets without copying book text.
-A successful command means the review was compared, not that a quality target
-was met. Retain the private form alongside the report to reproduce it.
-
-Synthetic tests preserve four known limitations as **expected failures**:
-a sentence inside a parenthesis opened mid-sentence, an artificial line break
-inside a sentence, an abbreviation that also ends a sentence, and a deliberately
-lowercase sentence start. The latter three are test challenges, not claims about
-their frequency in this edition. They are not silently corrected or grounds
-for inferring a real-book error percentage. A later rule change must trigger
-review of those expected failures and use a separately approved method version.
-
-**Proposed for maintainer approval:** begin with 90 complete passages (30 per
-doctrine), seed `20261018`, and report the actual number of internal gold
-boundaries. Seek at least 300 marked internal boundaries before treating the
-quality targets as useful evidence; if necessary, approve expansion by ten
-passages per doctrine using the same ranking. Proposed pilot targets are at
-least 98% precision and recall overall, and at least 95% of both in each
-doctrine. These are discussion targets, not statistical population guarantees
-or an acceptance rule enabled in code. Adjudicate disagreements and report
-exclusions before deciding whether to retain the rules or compare an established
-external segmenter on the same held-out sample. No method/dependency change or
-real-book acceptance is approved by this validation step.
+The segmentation-pilot sample, export, import and scoring tools were removed
+in the maintainer's 21 October cleanup. No real-book segmentation error rate
+has been established. Human boundary validation remains necessary before
+claiming accuracy for `punctuation-rules-v1`; the sentence study and its method
+are unchanged. Four expected-failure tests still document known rule limits:
+mid-sentence parentheses, physical line breaks, sentence-final abbreviations
+and lowercase sentence starts. They do not establish a real-book error rate.
 
 ### Experiment B — embeddings and TensorFlow Embedding Projector
 
@@ -573,7 +455,15 @@ Only after the workflow is proven: lexical concordances and collocations, full d
 
 ## 6. The present lexical experiment as a reference
 
-The shipped term study normalizes Unicode token spellings, counts full-word matches, reports totals and normalized frequencies per 10,000 eligible tokens, and records contributing passage IDs/pages. It filters explicit attributed main-text records and review flags rather than reinterpreting the document tree. Results retain a method identifier, source and generation hashes and can be verified against the same corpus; changing even unrelated canonical material invalidates a strict v1 study check. Zero-token groups have undefined rate, not a manufactured zero. A source match is *lexical evidence*, not the classification of the underlying philosophical concept.
+The word-frequency study normalizes Unicode token spellings, counts words,
+reports counts and rates per 10,000 eligible tokens, and records contributing
+passage IDs and offsets. It filters explicit attributed main-text records and
+review flags rather than reinterpreting the document tree. Results retain a
+method identifier, source and generation hashes and can be checked by
+recomputation. Zero-token inputs have undefined rates. A source match is lexical
+evidence, not classification of a philosophical concept. The former one-word
+term experiment was removed in the maintainer's 21 October cleanup; the shared
+word tokenizer remains in `sol/essence/tokenization.py`.
 
 With the optional **existing** Kitty handoff, one can open an ESSENCE Zsh pane from the compatibility reader workflow, execute an analysis, publish a return UUID, and accept the proposed navigation back in BEING. This validates reference passing, **not** a full model-output/parameter/visualization pipeline. Preserve its safety and permissions model while researching a terminal-independent equivalent.
 

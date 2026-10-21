@@ -370,7 +370,7 @@ class EssenceApp(App):
         lines = words.summary(count)
         if len(shown) < total:
             lines.append(f"Showing the {len(shown):,} most frequent of {total:,} words.")
-        lines.append(f"Saved: {saved} (check with: sol analyze check FILE)" if saved else
+        lines.append(f"Saved: {saved} (check with: sol essence check FILE)" if saved else
                      "Not saved: this reader session has no workspace.")
         self.query_one("#summary", Static).update("\n".join(lines))
         self.query_one("#result-status", Static).update("")
@@ -413,7 +413,7 @@ class EssenceApp(App):
         lines = sentences.summary(count)
         if count.study["longest"]:
             lines.append("The longest sentences are below; Enter opens one in the reader (Alt-Left there returns).")
-        lines.append(f"Saved: {saved} (check with: sol analyze check FILE)" if saved else
+        lines.append(f"Saved: {saved} (check with: sol essence check FILE)" if saved else
                      "Not saved: this reader session has no workspace.")
         # The length bars take the theme's accent rather than the full ink colour.
         summary = Text("\n".join(lines))
