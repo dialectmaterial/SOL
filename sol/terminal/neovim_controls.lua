@@ -533,7 +533,17 @@ return function(reader)
     if not found then missing[#missing + 1] = from end
   end
   for _, move in ipairs(moves) do vim.keymap.del(move[1], move[2], {buffer = buffer}) end
-  for _, move in ipairs(moves) do vim.keymap.set(move[1], move[3], move[4], {buffer = buffer, silent = true}) end
+  local taken = {}
+  for _, move in ipairs(moves) do
+    vim.keymap.set(move[1], move[3], move[4], {buffer = buffer, silent = true})
+    taken[move[1] .. vim.keycode(move[3])] = true
+  end
+  -- A key moved away does nothing, rather than falling back to Vim's meaning.
+  for _, move in ipairs(moves) do
+    if not taken[move[1] .. vim.keycode(move[2])] then
+      vim.keymap.set(move[1], move[2], '<Nop>', {buffer = buffer, silent = true})
+    end
+  end
   if #missing > 0 then
     table.sort(missing)
     vim.notify('keys.json names keys SOL does not use: ' .. table.concat(missing, ' '), vim.log.levels.WARN)

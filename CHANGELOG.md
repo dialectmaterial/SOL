@@ -9,6 +9,11 @@
 - Scan ASCII source controls in bulk with the same Unicode refusal policy.
   Reference verification, export freshness checks and staged saves are unchanged.
 
+### A moved key does nothing — 20 October 2026
+
+A key moved away in `keys.json` no longer falls back to Vim's own meaning
+(`gp` pasted and reported an error); it does nothing.
+
 ### Faster occurrence navigation — 20 October 2026
 
 - Ctrl-N / Ctrl-P within the shown passage updates the exact cursor and search

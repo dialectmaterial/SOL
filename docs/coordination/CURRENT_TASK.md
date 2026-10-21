@@ -14,7 +14,7 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ## Claude Code: Real-terminal check of the new reader features
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `claude/reader-smoke`
 **Requested:** 20 October 2026, by the maintainer via Claude (reader backlog)
 
