@@ -32,6 +32,32 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Cleanup steps 1, 3 and `sol being` — 21 October 2026
+
+**Task:** maintainer's cleanup plan (CURRENT_TASK, 21 October), steps 1, 3 and the reader half of 6.
+**Branch / PR:** `claude/minimal-shell` · see the pull request
+**Last implementation commit:** `955a2648780073b70a18b2ab65db5bfc7b1c3645` (this report is committed after it)
+
+### Changed files
+- `sol/reader/shell.py` — rewritten as a browsing-only shell on `input()`/readline; no workspace, Kitty, handoff or prompt adapter.
+- Removed: `sol/terminal/{kitty,handoff,comparison,essence,prompt}.py`, `sol/workspace/{commands,comparison}.py`, `sol/reader/{legacy_pdf,models}.py`; `sol read`'s path resolver moved into `sol/terminal/commands.py`.
+- `sol/reader/options.py`, `app.py` — `sol being`; `--shell` refuses workspace/actor options and skips onboarding; `--pdf`, `--engine`, `--ui`, `--editing-mode`, `--source-pdf`, `sol compare`, neofetch removed.
+- `sol/terminal/reference.py` — `return` removed; `sol/workspace/reader.py` — `execute`, comparison/review/relation writers removed (store tables unchanged).
+- `pyproject.toml`, `scripts/install.py` — no `prompt-toolkit`, `sol-kitty`, empty extras, Kitty/Zsh tool checks.
+- Tests: 16 modules for removed features deleted; shell-driven tests pruned; onboarding, packaging and CLI tests converted to `sol being`; new completion and shell-help tests.
+- Docs: BEING §§2–3, 6–7, CORE §§6–8, ARCHITECTURE (maintainer's 21 October decision recorded beside the superseded `sol-kitty` one), README, CONTRIBUTING, `sol guide`, CHANGELOG.
+
+### Tests performed
+- Documentation check and full suite after merging main (with #83 and #84): 1,249 tests OK (7 skipped, 4 expected failures).
+- Codex's review asked for still-valid cases to be kept: added `tests/test_read_paths.py` (moved resolver: virtual files, relative aliases, directory order, Markdown path forms, refusal of outside/unlisted files without reading them) and, in `test_workspace_reader.py`, the uppercase `.SQLITE3` upgrade refusal, the no-database `--review-queue --json`, non-overwriting `--workspace-backup` and misplaced workspace options.
+- Recovery messages now name `sol --workspace NAME --workspace-upgrade FILE.sqlite3` instead of the removed shell command.
+
+### Outstanding issues
+- None: #84 (merged) renamed `sol essence`, removed the term study and rewrote ESSENCE §6; its formula-sheet removal covered BEING §5.
+
+### Decisions requiring approval
+None reserved: the maintainer decided these removals on 21 October.
+
 ## ESSENCE cleanup (steps 5 and 6) — 21 October 2026
 
 **Task:** [Codex: ESSENCE cleanup (steps 5 and 6)](https://github.com/dialectmaterial/SOL/blob/a26cefc7302928bde0de0f4ef5cbc05f32cdb9d4/docs/coordination/CURRENT_TASK.md#codex-essence-cleanup-steps-5-and-6), assigned directly by the maintainer.

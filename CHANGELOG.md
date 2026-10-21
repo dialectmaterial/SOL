@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### A smaller SOL: one reader, a minimal shell, no Kitty — 21 October 2026
+
+- `sol being` names the reader; bare `sol` still opens it. `--reader` is gone.
+- `sol --shell` is a minimal command line for browsing the book (`ls`, `cd`,
+  `tree`, `read`, `cat`, `search`, `open`, `context`, `info`, `guide`). It uses
+  no workspace, saves nothing and needs no `prompt-toolkit`, which is no longer
+  a dependency.
+- Removed: `sol-kitty` and its panes, the Kitty/Zsh ESSENCE handoff and
+  `sol reference return`, `sol compare`, the shell's workspace commands
+  (notes, bookmarks, comparisons, reviews, relations), `neofetch`, the legacy
+  PDF reader (`--pdf`), the hidden `--engine`, `--ui`, `--editing-mode`,
+  `--source-pdf` and the empty `corpus`/`shell`/`extraction` extras. Comparisons,
+  reviews and relations already stored in a workspace stay readable and
+  exportable.
+
 ### ESSENCE cleanup — 21 October 2026
 
 - Rename the analysis CLI to `sol essence`, with no `analyze` alias; update

@@ -98,7 +98,7 @@ class WorkspaceManagementCLITests(unittest.TestCase):
         self.assertFalse((self.root / "data").exists())
 
     def test_management_rejects_unrelated_flags_before_storage_access(self):
-        for flag in (("--reader",), ("-n",), ("--actor", "Somebody"),
+        for flag in (("being",), ("-n",), ("--actor", "Somebody"),
                      ("--workspace", "reading"), ("--width", "0"),
                      ("--corpus", "missing"), ("--plain",), ("--depth", "1")):
             with self.subTest(flag=flag), \

@@ -26,7 +26,6 @@ PACKAGE_ASSETS.update({"sol/essence/encyclopedia.json", "sol/essence/methods.jso
                        "sol/terminal/fonts/LibertinusMono-Regular.ttf", "sol/terminal/fonts/OFL.txt"})
 ENTRY_POINTS = {
     "sol": "sol:cli",
-    "sol-kitty": "sol.terminal.kitty:main",
     "sol-window": "sol.terminal.window:main",
     "sol-corpus": "sol.corpus.convert:main",
     "sol-corpus-check": "sol.corpus.contract:main",
@@ -153,19 +152,13 @@ print(catalog['license'])
                              (ROOT / "LICENSE").read_bytes())
         self.assertEqual(dict(entry_points["console_scripts"]), ENTRY_POINTS)
         requirements = metadata.get_all("Requires-Dist") or []
-        self.assertEqual(set(metadata.get_all("Provides-Extra") or []), {"corpus", "shell", "extraction", "essence"})
-        self.assertEqual(len(requirements), 4)
+        self.assertEqual(set(metadata.get_all("Provides-Extra") or []), {"essence"})
+        self.assertEqual(len(requirements), 3)
         # ESSENCE's interface is the only optional dependency, and never a base one.
         essence = [requirement for requirement in requirements if 'extra == "essence"' in requirement]
         self.assertEqual([requirement.split(";")[0].strip() for requirement in essence], ["textual<9,>=8"])
         base = [requirement for requirement in requirements if ";" not in requirement]
-        corpus = [requirement for requirement in requirements if 'extra == "corpus"' in requirement]
-        shell = [requirement for requirement in requirements if 'extra == "shell"' in requirement]
-        extraction = [requirement for requirement in requirements if 'extra == "extraction"' in requirement]
-        self.assertEqual(len(corpus), 0)
-        self.assertEqual(len(shell), 0)
-        self.assertEqual(len(extraction), 0)
-        self.assertEqual(set(base), {"prompt-toolkit<4,>=3.0.52", "markdown-it-py<4,>=3", "opendataloader-pdf==2.5.13"})
+        self.assertEqual(set(base), {"markdown-it-py<4,>=3", "opendataloader-pdf==2.5.13"})
 
     def test_sdist_contains_sources_and_docs_without_local_material(self):
         with tarfile.open(self.sdist) as archive:
@@ -234,7 +227,7 @@ import builtins, importlib, sys
 sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def guard(name, *args, **kwargs):
-    if (name.split('.')[0] in {'prompt_toolkit', 'markdown_it', 'opendataloader_pdf'}
+    if (name.split('.')[0] in {'markdown_it', 'opendataloader_pdf'}
             or name in {'experiments.reader_surfaces.baseline', 'sol.workspace.launch', 'sol.workspace.profiles'}):
         raise AssertionError('Help imported a runtime reader component ' + name)
     return original_import(name, *args, **kwargs)
@@ -278,7 +271,7 @@ def native(payload, executable, **options):
     assert payload['records'] and payload['restore']['cursor_offset'] == 0
     return 0, {'action': 'quit', 'packet': payload['restore']}
 neovim.launch_payload = native
-raise SystemExit(app.main(['-n', '--engine', 'neovim', '--corpus', sys.argv[2]]))
+raise SystemExit(app.main(['being', '-n', '--corpus', sys.argv[2]]))
 """
         result = subprocess.run([sys.executable, "-I", "-B", "-c", program, str(installed), str(corpus)],
                                 cwd=self.temporary.name, capture_output=True, text=True, timeout=30)
@@ -380,7 +373,7 @@ from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def guard(name, *args, **kwargs):
-    if name.split('.')[0] in {'prompt_toolkit', 'markdown_it', 'opendataloader_pdf'}:
+    if name.split('.')[0] in {'markdown_it', 'opendataloader_pdf'}:
         raise AssertionError('Routing fixture imported a live presentation dependency ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
@@ -411,7 +404,7 @@ assert events == (['terminal', 'reader'] if '-n' in sys.argv[5:]
                   else ['terminal', 'identity', 'reader'])
 print(json.dumps(events))
 """
-        for number, arguments in enumerate(([], ["-n"], ["--reader"])):
+        for number, arguments in enumerate(([], ["-n"], ["being"])):
             with self.subTest(arguments=arguments):
                 private = Path(self.temporary.name) / f"reader-routing-private-{number}"
                 environment = os.environ.copy()
@@ -450,7 +443,7 @@ view.validate_environment = unavailable
 app.discover_corpus = app.load_corpus_book = app.shell_identity = forbidden
 assert app.cli(sys.argv[2:]) == 2
 """
-        for arguments in ([], ["-n"], ["--reader"]):
+        for arguments in ([], ["-n"], ["being"]):
             with self.subTest(arguments=arguments):
                 result = subprocess.run(
                     [sys.executable, "-I", "-B", "-c", program, str(installed), *arguments],
@@ -505,7 +498,7 @@ assert 'markdown_it' not in sys.modules
         program = """
 import builtins, contextlib, io, json, sys
 sys.path.insert(0, sys.argv[1])
-forbidden = ('sol.reader', 'sol.workspace', 'sol.terminal', 'prompt_toolkit',
+forbidden = ('sol.reader', 'sol.workspace', 'sol.terminal',
              'markdown_it', 'rich', 'textual', 'openai', 'pypdf', 'pdfplumber',
              'sol.corpus.convert', 'sol.corpus.extraction', 'opendataloader_pdf')
 original_import = builtins.__import__
@@ -593,7 +586,7 @@ from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 forbidden = ('sol.reader', 'sol.workspace', 'sol.terminal', 'markdown_it',
              'sol.corpus.extraction', 'sol.corpus.ingest', 'sol.corpus.backends', 'opendataloader_pdf',
-             'prompt_toolkit', 'rich', 'textual', 'pypdf', 'pdfplumber')
+             'rich', 'textual', 'pypdf', 'pdfplumber')
 original_import = builtins.__import__
 def guard(name, *args, **kwargs):
     if any(name == prefix or name.startswith(prefix + '.') for prefix in forbidden):
@@ -673,9 +666,6 @@ builtins.__import__ = block_parser
 sol = importlib.import_module("sol.reader.app")
 assert Path(sol.__file__).parents[2] == Path(sys.argv[1])
 assert not (Path(sys.argv[1]) / "local-corpus").exists()
-def block_pdf(*args, **kwargs):
-    raise AssertionError("Installed reader must not extract the PDF")
-sol.load_book = block_pdf
 raise SystemExit(sol.cli(sys.argv[2:]))
 """
         for editable in (False, True):
@@ -717,15 +707,12 @@ import builtins, importlib, sys
 sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def block_optional_and_profiles(name, *args, **kwargs):
-    if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'opendataloader_pdf'}
+    if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'opendataloader_pdf'}
             or name in {'sol.workspace.profiles', 'sol.workspace.catalog'}):
         raise AssertionError('Temporary/one-shot reader imported ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional_and_profiles
 sol = importlib.import_module('sol.reader.app')
-def block_pdf(*args, **kwargs):
-    raise AssertionError('Installed reader must not extract a PDF')
-sol.load_book = block_pdf
 if sys.argv[2:] == ['guide']:
     def block_book(*args, **kwargs):
         raise AssertionError('Source-free guide must not load a corpus')
@@ -733,7 +720,7 @@ if sys.argv[2:] == ['guide']:
 raise SystemExit(sol.cli(sys.argv[2:]))
 """
         cases = [
-            (["--corpus", str(corpus), "--shell", "-n", "--ui", "prompt"], "first /being\nexit\n"),
+            (["--corpus", str(corpus), "--shell"], "first /being\nexit\n"),
             (["--corpus", str(corpus), "-r", "--json"], ""),
             (["guide"], ""),
         ]
@@ -751,102 +738,12 @@ raise SystemExit(sol.cli(sys.argv[2:]))
                     returned = json.loads(result.stdout)
                     self.assertEqual(returned["id"], passage_id)
                     self.assertEqual(returned["text"], body)
-                elif "-n" in arguments:
+                elif "--shell" in arguments:
                     self.assertIn(body, " ".join(result.stdout.split()))
                 else:
                     self.assertIn("START READING", result.stdout)
                     self.assertIn("sol -n", result.stdout)
                     self.assertIn("sol -r", result.stdout)
-
-    def test_installed_explicit_shell_requires_initial_labels_and_resumes_attributed_work(self):
-        installed = Path(self.temporary.name) / "installed-shell-onboarding"
-        with zipfile.ZipFile(self.wheel) as archive:
-            archive.extractall(installed)
-        corpus = Path(self.temporary.name) / "shell-onboarding-corpus"
-        passage_id, body = write_runtime_corpus(corpus)
-        elsewhere = Path(self.temporary.name) / "shell-onboarding-outside-checkout"
-        elsewhere.mkdir()
-        data = Path(self.temporary.name) / "shell-onboarding-data"
-        environment = os.environ.copy()
-        environment.pop("SOL_CORPUS", None)
-        environment["XDG_CONFIG_HOME"] = str(Path(self.temporary.name) / "shell-onboarding-config")
-        environment["XDG_DATA_HOME"] = str(data)
-        program = """
-import builtins, importlib, sys
-sys.path.insert(0, sys.argv[1])
-original_import = builtins.__import__
-def block_optional(name, *args, **kwargs):
-    if name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'opendataloader_pdf'}:
-        raise AssertionError('Installed basic reader imported optional dependency ' + name)
-    return original_import(name, *args, **kwargs)
-builtins.__import__ = block_optional
-module = importlib.import_module(sys.argv[2])
-if sys.argv[2] == 'sol.reader.app':
-    def block_pdf(*args, **kwargs):
-        raise AssertionError('Installed reader must not extract a PDF')
-    module.load_book = block_pdf
-    entry = module.cli
-else:
-    entry = module.main
-status = entry(sys.argv[3:])
-if status == 2:
-    assert sys.stdin.read() == 'first /being\\nexit\\n', 'Setup consumed noninteractive commands'
-raise SystemExit(status)
-"""
-
-        def run(module, arguments, *, commands="", expected_status=0):
-            result = subprocess.run(
-                [sys.executable, "-I", "-c", program, str(installed), module, *arguments],
-                cwd=elsewhere, env=environment, input=commands,
-                capture_output=True, text=True,
-            )
-            self.assertEqual(result.returncode, expected_status, result.stdout + result.stderr)
-            self.assertNotIn("\x1b", result.stdout)
-            return result
-
-        run("sol.corpus.contract", [str(corpus), "--initialize-identity"])
-        base = ["--corpus", str(corpus)]
-        for supplied in ([], ["--workspace", "installed-reading"], ["--actor", "Installed author"]):
-            with self.subTest(supplied=supplied):
-                result = run("sol.reader.app", [*base, "--shell", *supplied], commands="first /being\nexit\n", expected_status=2)
-                self.assertIn("interactive input", result.stderr)
-                if "--workspace" not in supplied:
-                    self.assertIn("--workspace NAME", result.stderr)
-                if "--actor" not in supplied:
-                    self.assertIn("--actor NAME", result.stderr)
-                self.assertIn("sol -n", result.stderr)
-                self.assertIn("sol -r", result.stderr)
-                self.assertFalse(data.exists(), "Rejected onboarding must not create private storage")
-        selected = [*base, "--shell", "--workspace", "installed-reading", "--actor", "Installed author"]
-        opened = run("sol.reader.app", selected,
-                     commands='first /being\nnote add "A private installed-reader question."\nexit\n')
-        self.assertIn("Actor: Installed author", opened.stdout)
-        self.assertTrue((data / "sol" / "profiles.sqlite3").is_file())
-        self.assertTrue((data / "sol" / "workspaces" / "installed-reading.sqlite3").is_file())
-        # Inspection remains one-shot and needs no actor; it must preserve the saved passage.
-        inspection = [*base, "--workspace", "installed-reading"]
-        resumed = json.loads(run("sol.reader.app", [*inspection, "--resume", "--json"]).stdout)
-        self.assertEqual(resumed["id"], passage_id)
-        self.assertEqual(resumed["text"], body)
-        exported = json.loads(run("sol.reader.app", [*inspection, "--workspace-export"]).stdout)
-        self.assertEqual(exported["schema_version"], 3)
-        self.assertEqual(exported["state"]["current_id"], passage_id)
-        self.assertEqual(len(exported["annotations"]), 1)
-        self.assertEqual(exported["annotations"][0]["actor"], "Installed author")
-        note = exported["annotations"][0]
-        self.assertEqual(note["revision"], 1)
-        self.assertEqual([row["kind"] for row in exported["annotation_history"]], ["created"])
-        edited = run("sol.reader.app", selected, commands=(
-            f'note edit {note["id"]} "A revised installed-reader question." --expect-revision 1\n'
-            f'note history {note["id"]}\nexit\n'))
-        self.assertIn("A revised installed-reader question.", edited.stdout)
-        final = json.loads(run("sol.reader.app", [*inspection, "--workspace-export"]).stdout)
-        self.assertEqual(final["annotations"][0]["revision"], 2)
-        self.assertEqual(final["annotations"][0]["actor"], note["actor"])
-        self.assertEqual(final["annotations"][0]["target_id"], note["target_id"])
-        self.assertEqual(final["annotations"][0]["content_sha256"], note["content_sha256"])
-        self.assertEqual(final["state"], exported["state"], "Editing must not create a reading checkpoint")
-        self.assertEqual([row["kind"] for row in final["annotation_history"]], ["created", "edited"])
 
     def test_installed_explicit_upgrade_preserves_legacy_workspace_and_baseline(self):
         installed = Path(self.temporary.name) / "installed-upgrade"
@@ -867,15 +764,12 @@ import builtins, importlib, sys
 sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def block_optional(name, *args, **kwargs):
-    if name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'opendataloader_pdf'}:
+    if name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'opendataloader_pdf'}:
         raise AssertionError('Installed upgrade imported optional dependency ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional
 module = importlib.import_module(sys.argv[2])
 if sys.argv[2] == 'sol.reader.app':
-    def block_pdf(*args, **kwargs):
-        raise AssertionError('Installed upgrade must not extract a PDF')
-    module.load_book = block_pdf
     entry = module.cli
 else:
     entry = module.main
@@ -955,14 +849,6 @@ with closing(sqlite3.connect(sys.argv[2])) as connection, connection:
         published_digest = hashlib.sha256(upgraded.read_bytes()).hexdigest()
         run("sol.reader.app", [*arguments, "--workspace-upgrade", str(upgraded)], expected_status=2)
         self.assertEqual(hashlib.sha256(upgraded.read_bytes()).hexdigest(), published_digest)
-        edited = run("sol.reader.app", [*copy_arguments, "--shell", "--actor", "Installed legacy author"], commands=(
-            f'note edit {note_id} "An explicitly audited revision." --expect-revision 1\nexit\n'))
-        self.assertIn("revision 2", edited.stdout)
-        after = json.loads(run("sol.reader.app", [*copy_arguments, "--workspace-export"]).stdout)
-        self.assertEqual(after["annotations"][0]["body"], "An explicitly audited revision.")
-        self.assertEqual(after["annotations"][0]["revision"], 2)
-        self.assertEqual(after["annotations"][0]["content_sha256"], digest)
-        self.assertEqual([row["kind"] for row in after["annotation_history"]], ["legacy_baseline", "edited"])
         self.assertEqual(hashlib.sha256(legacy.read_bytes()).hexdigest(), before_digest)
 
     def test_installed_workspace_identity_resume_and_export_need_no_optional_dependencies(self):
@@ -985,15 +871,12 @@ import sys
 sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def block_optional(name, *args, **kwargs):
-    if name.split(".")[0] in {"markdown_it", "rich", "textual", "prompt_toolkit", "opendataloader_pdf"}:
+    if name.split(".")[0] in {"markdown_it", "rich", "textual", "opendataloader_pdf"}:
         raise AssertionError("Installed workspace must not import optional dependency " + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional
 module = importlib.import_module(sys.argv[2])
 if sys.argv[2] == "sol.reader.app":
-    def block_pdf(*args, **kwargs):
-        raise AssertionError("Installed workspace must not extract a PDF")
-    module.load_book = block_pdf
     entry = module.cli
 else:
     entry = module.main
@@ -1088,16 +971,13 @@ urllib.request.urlopen = block_network
 urllib.request.OpenerDirector.open = block_network
 original_import = builtins.__import__
 def block_optional(name, *args, **kwargs):
-    if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'prompt_toolkit', 'opendataloader_pdf', 'requests', 'httpx'}
-            or name in {'sol.workspace.profiles', 'sol.workspace.catalog', 'sol.terminal.source', 'sol.terminal.kitty'}):
+    if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'opendataloader_pdf', 'requests', 'httpx'}
+            or name in {'sol.workspace.profiles', 'sol.workspace.catalog', 'sol.terminal.source'}):
         raise AssertionError('Inquiry export imported unrelated dependency ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional
 module = importlib.import_module(sys.argv[2])
 if sys.argv[2] == 'sol.reader.app':
-    def block_pdf(*args, **kwargs):
-        raise AssertionError('Inquiry export must not extract a PDF')
-    module.load_book = block_pdf
     entry = module.cli
 else:
     entry = module.main

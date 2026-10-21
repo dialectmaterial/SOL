@@ -814,7 +814,7 @@ class Workspace:
                           expected_revision: int | None = None) -> dict:
         if self.schema_version == 1:
             raise WorkspaceError("editing needs workspace schema 2; explicitly copy-upgrade this "
-                                 "workspace with 'workspace upgrade NEW.sqlite3' first")
+                                 "workspace with sol --workspace NAME --workspace-upgrade NEW.sqlite3 first")
         if type(expected_revision) is not int or expected_revision < 1:
             raise WorkspaceError("an explicit positive expected annotation revision is required")
         identifier = _uuid(identifier, "annotation identifier")

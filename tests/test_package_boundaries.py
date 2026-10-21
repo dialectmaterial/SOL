@@ -29,19 +29,14 @@ class PackageBoundaryTests(unittest.TestCase):
         self.assertNotIn("sol.reader.app", modules)
         self.assertFalse(any(name.startswith("sol.terminal.") for name in modules))
 
-    def test_generic_comparison_does_not_import_kitty_host(self):
-        modules = self.imported_modules("import sol.terminal.comparison")
-        self.assertNotIn("sol.terminal.kitty", modules)
-
     def test_workspace_services_do_not_load_command_parser_adapter(self):
         modules = self.imported_modules("import sol.workspace.reader")
         self.assertNotIn("sol.workspace.commands", modules)
 
     def test_reader_import_does_not_load_pdf_conversion_or_optional_ui(self):
         modules = self.imported_modules("from sol.reader import app; app.build_parser()")
-        for name in ("sol.reader.legacy_pdf", "sol.corpus.layout", "sol.corpus.convert",
-                     "sol.terminal.prompt", "sol.terminal.source", "sol.terminal.kitty",
-                     "markdown_it", "prompt_toolkit"):
+        for name in ("sol.corpus.layout", "sol.corpus.convert", "sol.reader.shell",
+                     "sol.terminal.source", "markdown_it", "textual"):
             with self.subTest(module=name):
                 self.assertNotIn(name, modules)
 
@@ -63,15 +58,6 @@ class PackageBoundaryTests(unittest.TestCase):
         self.assertNotIn("sol.reader.app", modules)
         self.assertNotIn("sol.core.corpus", modules)
         self.assertFalse(any(name.startswith("sol.terminal.") for name in modules))
-
-    def test_kitty_help_does_not_import_the_reader_application(self):
-        modules = self.imported_modules(
-            "import io; from sol.terminal import kitty; "
-            "sys.stdout = io.StringIO(); assert kitty.main(['--help']) == 0; "
-            "sys.stdout = sys.__stdout__"
-        )
-        self.assertNotIn("sol.reader.app", modules)
-        self.assertNotIn("sol.core.corpus", modules)
 
 
 class SourceCheckoutDiscoveryTests(unittest.TestCase):

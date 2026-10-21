@@ -23,7 +23,7 @@ ESSENCE is not currently a complete model environment. The inspected code contai
 - `sol essence tfidf`: dependency-free, versioned lexical TF-IDF over the existing word providers; engine, CLI and interactive study. Top terms per document and overall retain word-study provenance and are recomputable with `check` (details below).
 - The optional Textual interface and the word engine's CORE/file counts, comparison measures and CSV/TSV export described in §4–§5. The interface also runs the sentence-length study through the provider API (19 October).
 - `sol.core` public snapshot/reference APIs, including source/edition/generation binding and batch captures; these are usable without opening BEING.
-- A narrow optional `sol-kitty` + Zsh handoff for a source passage, with an explicit proposed return to BEING. The handoff carries **references**, not an ML result database or unrestricted authority to save notes.
+- ESSENCE opens beside the reader (`E`) with the reader's exact position, and opens a result's source passage back in the reader. The earlier `sol-kitty` + Zsh handoff was removed on 21 October 2026.
 - A bundled, offline methods encyclopedia on screen `1`, with nine entries and individually attributed Wikipedia excerpts ([§7](#7-methods-encyclopedia)).
 - Checkout-only reading/rendering research, not an installed ESSENCE model suite.
 

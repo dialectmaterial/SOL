@@ -9,7 +9,10 @@ from pathlib import Path
 import re
 from types import SimpleNamespace
 import tempfile
+from contextlib import nullcontext
 import unittest
+
+from sol.corpus.edition import default_pdf
 from unittest.mock import Mock, patch
 
 import sol.reader.app as sol
@@ -52,7 +55,7 @@ class TerminalTests(unittest.TestCase):
                 patch('sol.reader.app.Path.cwd', return_value=Path('/synthetic-missing-directory')), \
                 patch('sol.reader.app.discover_corpus', side_effect=lambda explicit=None: explicit), \
                 patch('sol.reader.app.load_corpus_book', return_value=self.book, side_effect=effect), \
-                patch('sol.reader.app.load_book', side_effect=AssertionError('PDF extraction forbidden')):
+                nullcontext():
             try:
                 status = sol.main(arguments)
             except SystemExit as error:
@@ -114,7 +117,7 @@ class TerminalTests(unittest.TestCase):
             direct = root / 'Hegel-SOL.pdf'
             direct.write_bytes(b'Synthetic working fixture')
             with patch('sol.reader.app.Path.cwd', return_value=root):
-                self.assertEqual(sol.default_pdf(), direct)
+                self.assertEqual(default_pdf(), direct)
 
     def test_pdf_discovery_uses_short_name_in_sources(self):
         with tempfile.TemporaryDirectory(prefix='sol-pdf-name-') as directory:
@@ -123,7 +126,7 @@ class TerminalTests(unittest.TestCase):
             source.parent.mkdir()
             source.write_bytes(b'Synthetic source fixture')
             with patch('sol.reader.app.Path.cwd', return_value=root):
-                self.assertEqual(sol.default_pdf(), source)
+                self.assertEqual(default_pdf(), source)
 
     def test_missing_pdf_diagnostic_uses_short_name(self):
         status, _, stderr = self.run_main(['-r'], allow_source=False)
@@ -206,84 +209,33 @@ class TerminalTests(unittest.TestCase):
         for word in ('SOL', 'BEING', 'ESSENCE', 'CONCEPT', '01-quality'):
             self.assertIn(word, rendered)
 
-    def test_neofetch_is_a_concept_preview_with_actual_book_context(self):
-        rendered = sol.render_neofetch(self.book, ('ESSENCE',), 80)
-        self.assertTrue(rendered.isascii())
-        self.assertNotIn('\x1b', rendered)
-        for field in (
-                'OS: SOL (concept preview)', 'Shell: SOL-shell ' + __version__,
-                'Stage: BEING', 'Passages: 4', 'Location: /ESSENCE',
-                'Kernel: dialectic [placeholder]', 'Packages: [placeholder]',
-                'Terminal: [placeholder]', 'Theme: [placeholder]'):
-            self.assertIn(field, rendered)
-        self.assertIn('G. W. F. Hegel', rendered)
-
-    def test_neofetch_fits_narrow_and_wide_layouts_without_losing_long_path(self):
-        cwd = ('BEING', 'unusually-long-division-' + 'a' * 90, 'further-subdivision')
-        for width in (20, 40, 80, 240):
-            for color in (False, True):
-                with self.subTest(width=width, color=color):
-                    rendered = sol.render_neofetch(self.book, cwd, width, color)
-                    visible = re.sub(r'\x1b\[[0-9;]*m', '', rendered)
-                    self.assertTrue(visible.isascii())
-                    self.assertTrue(all(len(line) <= width for line in visible.splitlines()))
-                    rows = visible.splitlines()
-                    header = next(index for index, line in enumerate(rows) if 'SOL@Idea' in line)
-                    column = rows[header].index('SOL@Idea')
-                    panel = '\n'.join(line[column:] for line in rows[header:])
-                    location = panel.split('Location:', 1)[1]
-                    self.assertEqual(''.join(location.split()), sol.display_path(cwd))
-                    self.assertIn('Passages: 4', visible)
-
-    def test_neofetch_stacks_at_narrow_width_and_shares_rows_at_wide_width(self):
-        for width, portrait in ((20, sol.HEGEL_ASCII_SMALL), (40, sol.HEGEL_ASCII)):
-            with self.subTest(width=width):
-                rendered = sol.render_neofetch(self.book, width=width)
-                self.assertTrue(rendered.startswith(portrait + '\n\nSOL@Idea\n'))
-        rendered = sol.render_neofetch(self.book, width=80)
-        self.assertIn('SOL@Idea', rendered.splitlines()[0])
-        self.assertIn(sol.HEGEL_ASCII.splitlines()[0], rendered.splitlines()[0])
-        self.assertIn('OS: SOL (concept preview)', rendered.splitlines()[2])
-
-    def test_neofetch_color_changes_only_ansi_styling(self):
-        plain = sol.render_neofetch(self.book, ('BEING',), 80, color=False)
-        colored = sol.render_neofetch(self.book, ('BEING',), 80, color=True)
-        self.assertNotIn('\x1b', plain)
-        self.assertIn('\x1b', colored)
-        self.assertEqual(re.sub(r'\x1b\[[0-9;]*m', '', colored), plain)
-
-    def test_neofetch_does_not_read_sources_or_inspect_the_host(self):
-        forbidden = (
-            'sol.reader.app.load_book', 'sol.reader.app.load_corpus_book', 'subprocess.run',
-            'subprocess.Popen', 'platform.uname', 'socket.create_connection',
-            'socket.socket', 'sol.reader.app.Path.read_text', 'sol.reader.app.Path.read_bytes',
-        )
-        with contextlib.ExitStack() as guards:
-            for target in forbidden:
-                guards.enter_context(patch(target, side_effect=AssertionError(
-                    'neofetch must use the already loaded book, not ' + target)))
-            status, output = self.run_shell(['neofetch', 'exit'])
-        self.assertEqual(status, 0)
-        self.assertIn('OS: SOL (concept preview)', output)
-        self.assertNotIn('sol: ', output)
-
-    def test_neofetch_completion_restores_previous_readline_settings(self):
+    def test_completion_restores_previous_readline_settings(self):
+        from sol.reader.shell import install_completion
         readline = Mock(name='readline')
         old_completer = object()
         readline.get_completer.return_value = old_completer
         readline.get_completer_delims.return_value = 'original-delimiters'
-        readline.get_line_buffer.return_value = 'neo'
+        readline.get_line_buffer.return_value = 'sea'
         with patch.dict('sys.modules', {'readline': readline}):
-            restore = sol.install_completion(self.book.root, lambda: ())
+            restore = install_completion(self.book.root, lambda: ())
             try:
                 complete = readline.set_completer.call_args.args[0]
-                self.assertEqual(complete('neo', 0), 'neofetch')
-                self.assertIsNone(complete('neo', 1))
+                self.assertEqual(complete('sea', 0), 'search')
+                self.assertIsNone(complete('sea', 1))
                 readline.parse_and_bind.assert_called_once_with('tab: complete')
             finally:
                 restore()
         readline.set_completer.assert_called_with(old_completer)
         readline.set_completer_delims.assert_called_with('original-delimiters')
+
+    def test_shell_help_lists_only_browsing_commands_and_saves_nothing(self):
+        status, output = self.run_shell(['help', 'exit'])
+        self.assertEqual(status, 0)
+        for command in ('ls [PATH]', 'search QUERY', 'open ID|RESULT', 'guide [PATH]'):
+            self.assertIn(command, output)
+        for removed in ('neofetch', 'essence', 'compare', 'source show', 'note add', 'bookmark add'):
+            self.assertNotIn(removed, output)
+        self.assertIn('Nothing is saved here', output)
 
     def test_plain_passage_body_only_and_wraps(self):
         rendered = sol.render_passage(self.first, 44, plain=True)
@@ -442,62 +394,6 @@ class TerminalTests(unittest.TestCase):
         self.assertIn('Position 2 of 3 in /BEING', output)
         self.assertIn(self.second.identifier, output)
         self.assertNotIn('sol: ', output)
-
-    def test_shell_neofetch_preserves_directory_cursor_and_search_results(self):
-        commands = [
-            'cd /being', 'first', 'search ground --word --limit 2',
-            'neofetch', 'where', 'next', 'where', 'open 2', 'where', 'pwd', 'exit',
-        ]
-        session = sol.ReadingSession(self.book)
-        with patch('sol.reader.shell.ReadingSession', return_value=session), \
-                patch('sol.reader.shell.render_neofetch', wraps=sol.render_neofetch) as render:
-            status, output = self.run_shell(commands)
-        self.assertEqual(status, 0)
-        render.assert_called_once_with(self.book, ('BEING',), 80, False)
-        for position in (1, 2, 3):
-            self.assertIn(f'Position {position} of 3 in /BEING', output)
-        self.assertEqual(session.path, ('BEING',))
-        self.assertIs(session.current(), self.third)
-        self.assertTrue(output.endswith('/BEING\n'))
-        self.assertNotIn('sol: ', output)
-
-    def test_shell_neofetch_rejects_arguments_and_continues_without_side_effects(self):
-        status, output = self.run_shell([
-            'cd /being', 'first', 'neofetch extra', 'where',
-            'neofetch --color yes', 'next', 'where', 'pwd', 'exit',
-        ])
-        self.assertEqual(status, 0)
-        self.assertIn('sol: neofetch does not take an argument', output)
-        self.assertIn('sol: neofetch expects at most one argument', output)
-        self.assertIn('Position 1 of 3 in /BEING', output)
-        self.assertIn('Position 2 of 3 in /BEING', output)
-        self.assertNotIn('SOL@Idea', output)
-        self.assertTrue(output.endswith('/BEING\n'))
-
-    def test_shell_help_explains_neofetch_and_reader_guide_points_to_shell(self):
-        status, output = self.run_shell(['help', 'exit'])
-        self.assertEqual(status, 0)
-        self.assertIn("neofetch                          ASCII Hegel and SOL's concept-preview identity", output)
-        self.assertIn('sol --shell', sol.render_guide(self.book))
-
-    def test_shell_plain_retains_neofetch_art_without_color(self):
-        status, output = self.run_shell(['neofetch', 'exit'], plain=True, color=True)
-        self.assertEqual(status, 0)
-        self.assertNotIn('\x1b', output)
-        self.assertIn(sol.HEGEL_ASCII.splitlines()[0], output)
-        self.assertIn('G. W. F. Hegel', output)
-        self.assertIn('OS: SOL (concept preview)', output)
-
-    def test_cli_plain_shell_keeps_neofetch_art_and_suppresses_color(self):
-        with patch('builtins.input', side_effect=['neofetch', 'exit']), \
-                patch('sol.reader.shell.install_completion', return_value=lambda: None), \
-                patch('sol.reader.app.terminal_color', return_value=True):
-            status, output, error = self.run_main(['--corpus', 'synthetic', '--shell', '-n', '--plain'])
-        self.assertEqual(status, 0, error)
-        self.assertNotIn('\x1b', output)
-        self.assertIn(sol.HEGEL_ASCII.splitlines()[0], output)
-        self.assertIn('G. W. F. Hegel', output)
-        self.assertIn('Passages: 4', output)
 
     def test_cli_search_json_scope_and_limit(self):
         status, output, error = self.run_main(['--corpus', 'synthetic', '--search', 'ground', '--within', '/being',

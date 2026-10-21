@@ -85,12 +85,9 @@ Packaging checks copy the actual source tree into a temporary build directory,
 add synthetic private sentinels, inspect both archives and run checks from the
 unpacked source archive. They do not copy the local book or personal databases.
 
-Research adapters remain opt-in, checkout/source-archive tools. Their presence in
-the source archive does not install them as reader commands. Keep engine adoption
-dependent on the existing reading trials rather than adding more frontends.
-The original Neovim experiment reuses the installed reader backend. Its Lua
-assets are included in the wheel; the historical prompt_toolkit fullscreen
-baseline and wrapping code remain research-only, outside the installed package.
+SOL has one reader, the Neovim-backed one; its Lua assets are included in the
+wheel. Earlier reader experiments are in Git history; keep engine changes
+dependent on reading trials rather than adding more frontends.
 Bare `sol` opens the Neovim-backed reader. See [BEING](docs/BEING.md#2-what-is-implemented)
 for workspace boundaries, bounded section transitions, controls and acceptance checks.
 

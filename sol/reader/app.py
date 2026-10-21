@@ -2,8 +2,8 @@
 """SOL: a terminal reader for the Cambridge *Science of Logic*.
 
 Canonical local Markdown is indexed once and read through a verified JSONL
-index using standard-library Python. Poppler remains available for explicit
-legacy PDF reading. Corpus/PDF loading and the terminal interface stay separate.
+index using standard-library Python. Corpus loading and the terminal interface
+stay separate.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 
-from sol.corpus.edition import PDF_FILENAME, ROOT, default_pdf
+from sol.corpus.edition import PDF_FILENAME, ROOT
 from sol.core.config import (
     config_path, configured_corpus, configured_theme, discover_corpus, installed_project_directory,
     save_corpus, save_theme, source_project_directory,
@@ -30,29 +30,15 @@ from sol.reader.options import (DEFAULT_READER_THEME, DEFAULT_READER_WIDTH, LEGA
 from sol.reader.actions import ReaderActions, ReadingSession, context_passages
 from sol.reader.launch import interactive_input_available, shell_identity
 from sol.terminal.text import display_text, safe_output
-from sol.reader.render import (HEGEL_ASCII, HEGEL_ASCII_SMALL, NEOFETCH_PLACEHOLDERS,
-    sensible_width, page_range, source_line, fold_path, fold_body, render_passage,
+from sol.reader.render import (    sensible_width, page_range, source_line, fold_path, fold_body, render_passage,
     passage_data, render_context, render_search_results, location_data, render_info,
-    render_listing, render_tree, render_guide, render_neofetch)
-
-
-def install_completion(*args, **kwargs):
-    """Compatibility entry point; the native reader does not use a book shell."""
-    from sol.reader.shell import install_completion as install
-    return install(*args, **kwargs)
+    render_listing, render_tree, render_guide)
 
 
 def run_shell(*args, **kwargs):
-    """Import the optional command loop only when selected."""
+    """Import the minimal book command interface only when selected."""
     from sol.reader.shell import run_shell as run
     return run(*args, **kwargs)
-
-
-def load_book(pdf: Path) -> Book:
-    """Load historical PDF prose only when --pdf was explicitly requested."""
-    from sol.reader.legacy_pdf import load_book as load_legacy_book
-
-    return load_legacy_book(pdf)
 
 
 def load_corpus_book(corpus: Path) -> Book:
@@ -146,7 +132,7 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
     if (args.resume or args.workspace_export or args.workspace_check or args.workspace_backup is not None
             or args.workspace_upgrade is not None
             or args.review_queue) and not location.exists():
-        raise ValueError(f"workspace does not exist: {args.workspace}; start with --workspace NAME --shell")
+        raise ValueError(f"workspace does not exist: {args.workspace}; start reading with sol --workspace NAME")
     provenance = {"edition": book.corpus_manifest["edition"], "source": book.corpus_manifest["source"]}
     with Workspace(location, identity, provenance, actor=args.actor or "Reader") as store:
         reader = WorkspaceReader(book, store, args.actor, resolve_path, display_path,
@@ -192,7 +178,7 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
                       f"Open with: sol --workspace {shlex.quote(destination.stem)} "
                       f"--workspace-dir {shlex.quote(str(destination.parent))}"))
             return 0
-        if args.reader or args.shell:
+        if args.reader:
             # Personal launch preferences are separate from the workspace
             # schema and are saved only after the selected store/service have
             # validated. One-shot inspection never changes the next author.
@@ -200,12 +186,8 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
             from sol.workspace.profiles import register_actor
             register_actor(args.actor)
             remember_launch(args.actor, store.path, identity, book.corpus_manifest['source']['sha256'])
-            if args.reader:
-                return run_reader(book, reader, width=args.width or DEFAULT_READER_WIDTH,
-                                  emphasis=args.emphasis or "auto", theme=args.theme)
-            return run_shell(book, width, args.plain, color, reader,
-                             ui_mode=args.ui or 'auto', editing_mode=args.editing_mode or 'emacs',
-                             source_pdf=args.source_pdf, auto_width=args.width is None)
+            return run_reader(book, reader, width=args.width or DEFAULT_READER_WIDTH,
+                              emphasis=args.emphasis or "auto", theme=args.theme)
         actions = ReaderActions(book, reader, session=ReadingSession(book))
         if args.resume:
             passage, message = actions.restore(args.resume_revision)
@@ -238,7 +220,7 @@ def main(argv: list[str] | None = None) -> int:
     if arguments and arguments[0] == "reference":
         from sol.terminal.reference import main as reference_main
         return reference_main(arguments[1:])
-    if arguments and arguments[0] in {"read", "compare"}:
+    if arguments and arguments[0] == "read":
         from sol.terminal.commands import main as command_main
         return command_main(arguments)
     parser = build_parser()
@@ -273,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         width = sensible_width(args.width)
         color = terminal_color() and not args.plain and not args.json
-        if mode is ExecutionMode.GUIDE and args.corpus is None and args.pdf is None:
+        if mode is ExecutionMode.GUIDE and args.corpus is None:
             # The guide must still explain setup when an automatic source is broken.
             try:
                 corpus = discover_corpus()
@@ -283,18 +265,9 @@ def main(argv: list[str] | None = None) -> int:
                 book = None
             print(render_guide(book, width, 1 if args.depth is None else args.depth))
             return 0
-        corpus = None if args.pdf is not None else discover_corpus(args.corpus)
+        corpus = discover_corpus(args.corpus)
         if corpus is not None:
             book = load_corpus_book(corpus)
-        elif args.pdf is not None:
-            pdf = args.pdf.expanduser()
-            if args.passage and re.fullmatch(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", args.passage):
-                raise ValueError("A canonical passage UUID requires the Markdown corpus, not --pdf.\n"
-                                 "Use sol --set-corpus DIRECTORY, then rerun without --pdf. "
-                                 "The legacy PDF reader has different passage identifiers.")
-            if not pdf.is_file():
-                raise ValueError(f"PDF not found: {pdf}")
-            book = load_book(pdf)
         else:
             if mode is ExecutionMode.GUIDE:
                 print(render_guide(width=width, depth=1 if args.depth is None else args.depth))
@@ -313,7 +286,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 raise ValueError(f"No local corpus found. Run sol in a terminal to import the supported {PDF_FILENAME}, "
                                  "or select an existing corpus with sol --set-corpus DIRECTORY.")
-        if mode.interactive and not args.none:
+        if mode.personal and not args.none:
             shell_identity(book, args)
         if args.workspace is not None:
             return run_workspace_cli(book, args, width, color)
@@ -327,8 +300,6 @@ def main(argv: list[str] | None = None) -> int:
                                    "Press s in the reader to see a passage's printed source."))
             return 0
         if mode is ExecutionMode.REVIEW_QUEUE:
-            if not book.canonical_records:
-                raise ValueError("--review-queue requires the canonical Markdown corpus, not the legacy PDF reader")
             from sol.workspace.diagnostics import review_queue
             from sol.workspace.reader import render_review_queue
             within = None if args.within is None else resolve_path(args.within, (), book.root)[1]
@@ -353,9 +324,7 @@ def main(argv: list[str] | None = None) -> int:
             return run_reader(book, width=args.width or DEFAULT_READER_WIDTH, emphasis=args.emphasis or "auto",
                               theme=args.theme)
         elif mode is ExecutionMode.SHELL:
-            return run_shell(book, width, args.plain, color, ui_mode=args.ui or 'auto',
-                             editing_mode=args.editing_mode or 'emacs', source_pdf=args.source_pdf,
-                             auto_width=args.width is None)
+            return run_shell(book, width, args.plain, color, auto_width=args.width is None)
         elif mode is ExecutionMode.SEARCH:
             _, path = resolve_path(args.within, (), book.root)
             passages = book.search(args.search, path, args.word,

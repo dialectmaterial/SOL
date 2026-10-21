@@ -76,35 +76,6 @@ class NativeCommandsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("Not a canonical Markdown file", result.stderr)
 
-    def test_json_comparison_keeps_two_complete_groups(self):
-        result = self.run_cli(["compare", "sample.md", "sample.md", "--json", "--question", "What repeats?"])
-        self.assertEqual(result.returncode, 0, result.stderr)
-        snapshot = json.loads(result.stdout)
-        self.assertEqual(len(snapshot["records"]), 2)
-        self.assertEqual([len(r["members"]) for r in snapshot["records"]], [2, 2])
-        self.assertEqual(snapshot["comparison"]["question"], "What repeats?")
-        self.assertFalse(snapshot["records"][0]["notes"])
-
-    def test_foreground_viewer_uses_private_disposable_snapshot(self):
-        observed = {}
-        def view(path):
-            observed["path"] = path
-            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-            snapshot = json.loads(path.read_text())["request"]
-            self.assertEqual(len(snapshot["records"]), 2)
-            return 0
-        with patch.dict(os.environ, self.env), redirect_stdout(StringIO()), \
-                patch("sys.stdin.isatty", return_value=True), patch("sys.stdout.isatty", return_value=True), \
-                patch("sol.terminal.comparison.viewer_main", side_effect=view):
-            result = app.cli(["compare", str(self.corpus / "sample.md"), str(self.corpus / "sample.md")])
-        self.assertEqual(result, 0)
-        self.assertFalse(observed["path"].exists())
-
-    def test_noninteractive_comparison_explains_json_output(self):
-        result = self.run_cli(["compare", "sample.md", "sample.md"])
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("use --json for pipes", result.stderr)
-
     def test_real_zsh_pipeline_redirection_and_current_directory(self):
         zsh = shutil.which("zsh")
         if not zsh or not shutil.which("rg"):
@@ -117,36 +88,11 @@ class NativeCommandsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(output.read_text(), self.body + "\n")
 
-    def test_foreground_compare_returns_cleanly_to_real_terminal(self):
-        master, slave = pty.openpty()
-        self.addCleanup(os.close, master)
-        self.addCleanup(os.close, slave)
-        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 26, 100, 0, 0))
-        original = termios.tcgetattr(slave)
-        process = subprocess.Popen([sys.executable, "-B", "-m", "sol", "compare", "sample.md", "sample.md"],
-                                   cwd=self.corpus, env=self.env, stdin=slave, stdout=slave, stderr=slave)
-        def cleanup():
-            if process.poll() is None:
-                process.kill()
-                process.wait()
-        self.addCleanup(cleanup)
-        captured = b""
-        deadline = time.monotonic() + 5
-        while time.monotonic() < deadline and b"q returns to your shell" not in captured:
-            if select.select([master], [], [], .1)[0]:
-                captured += os.read(master, 65536)
-        self.assertIn(b"q returns to your shell", captured)
-        self.assertIn(b"Synthetic section", captured)
-        os.write(master, b"bq")
-        self.assertEqual(process.wait(timeout=5), 0)
-        self.assertEqual(termios.tcgetattr(slave), original)
 
     def test_readonly_commands_do_not_change_corpus_files(self):
         before = {p.name: p.read_bytes() for p in self.corpus.iterdir()}
         self.run_cli(["read", "sample.md"])
-        self.run_cli(["compare", "sample.md", "sample.md", "--json"])
         self.assertEqual(before, {p.name: p.read_bytes() for p in self.corpus.iterdir()})
-
 
 if __name__ == "__main__":
     unittest.main()

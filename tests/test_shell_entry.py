@@ -1,5 +1,5 @@
 """The beginner entry points are tested without a real TTY or personal data."""
-from contextlib import redirect_stdout, redirect_stderr
+from contextlib import redirect_stdout, redirect_stderr, nullcontext
 from io import StringIO
 import json
 from pathlib import Path
@@ -39,7 +39,7 @@ class ShellEntryTests(unittest.TestCase):
         with redirect_stdout(stdout), redirect_stderr(stderr), \
                 patch('sol.reader.app.discover_corpus', return_value=Path('/invented/corpus')), \
                 patch('sol.reader.app.load_corpus_book', return_value=self.book), \
-                patch('sol.reader.app.load_book', side_effect=AssertionError('PDF extraction forbidden')), \
+                nullcontext(), \
                 patch('sol.reader.launch.interactive_input_available', return_value=interactive), \
                 patch('sol.terminal.neovim.validate_environment'), \
                 patch('sol.reader.app.run_reader', side_effect=self.launch_reader), \
@@ -80,7 +80,7 @@ class ShellEntryTests(unittest.TestCase):
         self.assertFalse((self.directory / 'sol').exists())
 
     def test_explicit_temporary_shell_remains_available_without_identity(self):
-        status, output, error = self.main(['--shell', '-n', '--ui', 'basic'],
+        status, output, error = self.main(['--shell'],
                                           ['first /being', 'exit'], interactive=False)
         self.assertEqual(status, 0, error)
         self.assertIn(IDS[0], output)
@@ -95,9 +95,8 @@ class ShellEntryTests(unittest.TestCase):
                 status, _, error = self.main(arguments, commands)
                 self.assertEqual(status, 0, error)
 
-    def test_fully_explicit_workspace_shell_supports_scripted_input(self):
-        status, _, error = self.main(['--shell', '--workspace', 'script', '--actor', 'Ada', '--ui', 'basic'],
-                                    ['exit'], interactive=False)
+    def test_fully_explicit_workspace_reader_needs_no_prompts(self):
+        status, _, error = self.main(['--workspace', 'script', '--actor', 'Ada'], interactive=False)
         self.assertEqual(status, 0, error)
         self.assertTrue((self.directory / 'sol' / 'profiles.sqlite3').exists())
 
@@ -122,7 +121,7 @@ class ShellEntryTests(unittest.TestCase):
 
     def test_incompatible_modes_and_implicit_json_fail_before_creation(self):
         for arguments in [['-n', '--actor', 'Ada'], ['-n', '--workspace', 'study'],
-                          ['-r', '--ui', 'prompt'], ['--json'], ['--actor', '', '--workspace', 'x']]:
+                          ['--shell', '--workspace', 'study'], ['--json'], ['--actor', '', '--workspace', 'x']]:
             with self.subTest(arguments=arguments):
                 status, _, error = self.main(arguments)
                 self.assertEqual(status, 2, error)
@@ -139,24 +138,23 @@ class ShellEntryTests(unittest.TestCase):
     def test_picker_displays_recent_compatible_workspaces_and_selects_number(self):
         for name, timestamp in [('older', '2026-10-10T00:00:00Z'), ('newer', '2026-10-12T00:00:00Z')]:
             with patch('sol.workspace.store._now', return_value=timestamp):
-                status, _, error = self.main(['--shell', '--workspace', name, '--actor', 'Ada'], ['first /being', 'exit'])
+                status, _, error = self.main(['--workspace', name, '--actor', 'Ada'])
                 self.assertEqual(status, 0, error)
-        status, output, error = self.main(['--shell', '--actor', 'Bob'], ['2', 'where', 'exit'])
+        status, output, error = self.main(['--actor', 'Bob'], ['2'])
         self.assertEqual(status, 0, error)
         self.assertIn('1. newer', output)
         self.assertIn('2. older', output)
-        self.assertIn('Workspace: older', output)
-        self.assertIn(IDS[0], output)
+        self.assertEqual(self.reader_launches[-1][1].store.path.stem, 'older')
 
     def test_blank_choice_keeps_numeric_workspace_default_as_name(self):
         self.assertEqual(self.main(['--workspace', '42', '--actor', 'Ada'])[0], 0)
-        status, output, error = self.main(['--shell'], ['exit'])
+        status, output, error = self.main([], [''])
         self.assertEqual(status, 0, error)
-        self.assertIn('Workspace: 42', output)
+        self.assertEqual(self.reader_launches[-1][1].store.path.stem, '42')
 
     def test_picker_retries_unknown_number_and_explicit_flags_bypass_catalog(self):
         self.assertEqual(self.main(['--workspace', 'study', '--actor', 'Ada'])[0], 0)
-        status, output, error = self.main(['--shell', '--actor', 'Bob'], ['9' * 5000, '5', '1', 'exit'])
+        status, output, error = self.main(['--actor', 'Bob'], ['9' * 5000, '5', '1'])
         self.assertEqual(status, 0, error)
         self.assertIn('choose a displayed workspace number', output)
         with patch('sol.workspace.catalog.discover_workspaces', side_effect=AssertionError('No picker')):
@@ -168,14 +166,6 @@ class ShellEntryTests(unittest.TestCase):
         status, _, error = self.main(['--workspace-upgrade', str(self.directory / 'copy.sqlite3')])
         self.assertEqual(status, 2, error)
         self.assertIn('--workspace NAME', error)
-        self.assertFalse((self.directory / 'sol').exists())
-
-    def test_legacy_pdf_default_is_refused_before_slow_extraction(self):
-        for arguments in [['--pdf', 'unused.pdf'], ['--shell', '--pdf', 'unused.pdf']]:
-            with self.subTest(arguments=arguments):
-                status, _, error = self.main(arguments, interactive=False)
-                self.assertEqual(status, 2, error)
-                self.assertIn('sol -r --pdf PATH', error)
         self.assertFalse((self.directory / 'sol').exists())
 
 
