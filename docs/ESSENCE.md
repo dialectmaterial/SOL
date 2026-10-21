@@ -93,7 +93,7 @@ The TUI can call this API later; this change adds no TUI controls or persistence
 
 ## 3. Proper model inputs: projections, not destructive cleaning
 
-**Current version-1 prose projection** (see the [archived input policy](legacy/PROSE_INPUTS.md)) selects records that are Hegel-attributed `main_text`, with types `paragraph`, `quotation` or `list_item`, excluding pending-review and explicitly generated text. Canonical section/headings, note callouts, image labels, formulas, editorial material and indexes are **not** silently concatenated into feature strings. Heading ancestry, locations, source pages, attribution, source digests, record type and corpus generation are retained as separate metadata. Words such as *Being*, *Remark*, or *Ground* that occur in **actual prose** are not blacklisted. Headings are removed by structural selection, not a word-level blacklist.
+**Current version-1 prose projection** (`sol.prose-input`, `sol.essence.export_prose(snapshot)`) selects records that are Hegel-attributed `main_text`, with types `paragraph`, `quotation` or `list_item`, excluding pending-review and explicitly generated text. Canonical section/headings, note callouts, image labels, formulas, editorial material and indexes are **not** silently concatenated into feature strings. Heading ancestry, locations, source pages, attribution, source digests, record type and corpus generation are retained as separate metadata. Words such as *Being*, *Remark*, or *Ground* that occur in **actual prose** are not blacklisted. Headings are removed by structural selection, not a word-level blacklist.
 
 Use precisely `passages[].text` as the input to a prose embedding experiment; preserve `passages[].id` as the map back to the corpus. Example:
 
@@ -105,6 +105,8 @@ texts = [p['text'] for p in view['passages']]
 ids   = [p['id'] for p in view['passages']]
 meta  = [p['metadata'] for p in view['passages']]
 ```
+
+**How the projection reads text.** It uses the CommonMark parser and visible-text renderer with explicit exclusions: Markdown headings (ATX, setext, and headings nested in quotations or lists) and HTML `h1`–`h6` contribute no text; Markdown and HTML image labels, including converter facsimile captions, contribute none; emphasis and visible link text stay prose; SOL note callouts stay omitted; ordinary superscripts and literal blocks stay visible. No word list, stemming, case folding or stop-word removal is applied. A heading wrongly transcribed as a prose sentence needs a canonical correction; capitalization is not a substitute for recorded structure. Each row keeps the record UUID, the derived text and its SHA-256, and separate `metadata` (canonical Markdown digest, type, parent, order, document, attribution, source pages, heading/title/path fields, and root-first ancestry from canonical parents); none of it is concatenated into `text`. The export carries corpus/edition/source identity, generation and projection version, checks the generation before and after, refuses a caller-modified snapshot, and writes nothing. Do not vectorize serialized rows, whole JSON or whole Markdown documents. A classifier gets prose as `X` and a deliberately derived category as `y`; category names and paths are never prefixed to `X`. A heading study, if wanted, is a separate experiment on titles.
 
 **Decision:** this is one useful projection, **not** the cleaned text for every method. Maintain a typed, versioned preprocessing policy **per experiment**. Sentence length needs sentence segmentation and punctuation. Syntax needs clause/token/POS/dependency information and a declared pipeline. Some rhetorical studies need heading, annotation, note or formula context. Embedding requires explicit passage granularity and truncation/chunking policies. For every experiment, record why features were included or excluded; preserve the unmodified underlying canonical text and make derivations reproducible.
 
@@ -582,7 +584,7 @@ With the optional **existing** Kitty handoff, one can open an ESSENCE Zsh pane f
 ## 7. Methods encyclopedia
 
 **Decision (maintainer, 20 October 2026), implemented:** the encyclopedia stays a
-modest table of contents. The broader [encyclopedia proposal](coordination/proposals/ESSENCE_ENCYCLOPEDIA_PROPOSAL.md)
+modest table of contents. The broader encyclopedia proposal (PR #37; in Git history since 21 October 2026)
 remains historical design material; its §9 is deferred. No genealogy graph,
 editorial review states, catalog CLI, task registry or model execution is adopted.
 
@@ -646,4 +648,4 @@ excerpt, attribution, date, links and description of ESSENCE's actual support.
 
 **Manual acceptance for the first interface prototype (stage 1):** start `sol` in an ordinary terminal and confirm no Textual process exists; select a passage and enter ESSENCE, checking the shown source identity and that no model is imported or downloaded; switch fullscreen and split repeatedly, checking one process, an unchanged scope and sane behaviour at narrow widths; return focus to BEING, navigate, reopen ESSENCE with the expected context, then exit and confirm the original source offset is restored; force a launch failure, a UI exception and a job cancellation, and confirm BEING stays usable and the failure is visible; run the same tokenizer headlessly and in the interface on identical input and compare input digests, counts, parameters and output.
 
-**Source lineage:** consolidated from installed `sol.essence` implementation and tests, prose-input policy, term study, reference protocol, handoff, modularity/usage manuals, research discussions and the present 17 October priorities. Archived historical details should remain accessible under `docs/legacy/`.
+**Source lineage:** consolidated from installed `sol.essence` implementation and tests, prose-input policy, term study, reference protocol, handoff, modularity/usage manuals, research discussions and the present 17 October priorities. Earlier documents are in Git history.
