@@ -35,6 +35,19 @@ The reader presently uses a centered maximum width of **72 terminal columns** (c
 
 The current implementation also includes literal book search, source-positioned results, a dynamic outline/tree, selection and copy, markers, focus/paragraph modes, a session navigation trail, saved reading position, annotated workspaces, comparisons, notes and source-review operations. The most mature workspace operations are additionally exposed via `sol --shell`; not every operation has an equally convenient Neovim keybinding. Avoid claiming full GUI/TUI parity.
 
+**Startup measurement (21 October):** the opening screen still covers a fully
+verified corpus load and checked first view. The loader hashes the same raw
+bytes it validates as UTF-8, and resolves the corpus boundary once per file
+scan while resolving and checking each document anew. No source fingerprint,
+reference check or final export check is skipped or newly cached. The optional
+book shell imports only when used. `scripts/reader_timings.py --startup-only`
+measures fresh application imports and dispatch to the first payload, using an
+explicit corpus and new temporary workspace per run; the ordinary probe keeps
+its existing warm-process measurements. Neither measures Neovim painting or
+physical time to readable text; version probing and the opening screen are
+replaced at the terminal boundary. Real-book medians and limits are in the
+[handoff report](coordination/HANDOFF.md#faster-startup-to-readable-text--21-october-2026).
+
 ### Reading controls (current)
 
 | Input | Function |

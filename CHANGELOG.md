@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Cheaper verified reader startup — 21 October 2026
+
+- Hash canonical bytes directly after UTF-8 validation; reduce path allocation
+  and resolve the corpus boundary once per scan, retaining all document reads,
+  hashes, parent-link checks and final generation checks.
+- Defer optional book-shell imports; add an isolated fresh-process startup probe
+  alongside the existing warm-process reader measurements.
+- Source verification policy, CORE/reference contracts and caches are unchanged.
+
 ### Zathura highlights the passage and follows your reading — 21 October 2026
 
 `S` now highlights the passage on the printed page, and the Zathura window it

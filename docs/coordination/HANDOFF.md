@@ -32,6 +32,63 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Faster startup to readable text — 21 October 2026
+
+**Task:** [Codex: Faster startup to readable text](https://github.com/dialectmaterial/SOL/blob/e602ce668b6e840e838026c65c9c05586d900574/docs/coordination/CURRENT_TASK.md#codex-faster-startup-to-readable-text).
+**Branch / PR:** `codex/startup-time` · [PR #67](https://github.com/dialectmaterial/SOL/pull/67); Claude reviews; do not merge as author.
+**Last implementation commit:** `275dcb24ab67cd78fff1e1a6496486844fce85a3` (integration of current main; startup implementation `12734c0`; this report is committed afterward).
+
+### Changed files
+- `sol/corpus/contract.py` — hash the exact bytes already decoded as UTF-8; use string-based resolved-path containment and resolve the scan boundary once per scan. Each document still resolves its parents, refuses symlinks and is read/hashed anew; all before/after generation checks remain.
+- `sol/reader/app.py` — lazy compatibility wrappers defer the optional book shell.
+- `scripts/reader_timings.py` — `--startup-only` runs fresh application imports/dispatch through the first checked payload in a new process and temporary workspace per sample; existing version 2 measurements remain unchanged.
+- Regression tests, BEING §2, CHANGELOG and Codex's task status. No protocol, verification cache, dependency, schema or Claude source-request changes. Read-only Git metadata in the supplied checkout required a clean clone at `/tmp/sol-startup-time`, initially based on `origin/main` at `e602ce6`. PR #66 reached main after publication; merged `7dda0ae` into the published branch without rewriting it, preserving both changelog entries. Relative to current main, Claude’s files remain untouched.
+
+### Tests performed
+- Focused corpus contract (41 tests) and timing probe (6 tests) — OK. Coverage includes repeated byte reads, CRLF fingerprint changes, invalid UTF-8, escaping parent links, undeclared canonical documents, fresh-process isolation and deferred shell imports.
+- `.venv/bin/python -B scripts/check_docs.py` and `git diff --check` — OK; external URLs were not network-checked.
+- `.venv/bin/python -B -m unittest discover -s tests` — final integrated branch: 1,807 tests, OK (12 skipped, 4 expected failures); pre-integration run: 1,803 tests, OK. Isolated XDG/Neovim paths; packaging and headless Neovim checks included.
+- Read-only real book: 4,629 records / 1,803 passages; identical index SHA-256 before/after. No private text, PDF, workspace or profile is committed. No source PDF or personal workspace opened. Python 3.14.8, width 72, warm OS cache, sequential runs without concurrent tests/profiling. All CORE verification remains real; terminal boundary replaced.
+
+| Measurement | Before median (ms) | After median (ms) |
+| --- | ---: | ---: |
+| Fresh application imports/dispatch to first payload | 1,360 | 1,289 |
+| Fresh process wall time, including harness/setup/cleanup | 1,539 | 1,466 |
+| Existing warm-process startup to first controller payload | 1,126 | 1,041 |
+| Snapshot load | 354 | 333 |
+| Book load | 424 | 402 |
+| Source verification | 26.4 | 19.3 |
+| Ordinary standalone payload | 421 | 400 |
+| Footnote-heavy standalone payload | 663 | 640 |
+
+Fresh-process medians: same new harness on baseline and implementation,
+`reader_timings.py --startup-only --corpus LOCAL_CORPUS --repeats 5 --warmups 1 --json`.
+One discarded warmup, five measured fresh processes with new temporary SQLite
+workspaces; application time starts before reader imports. Wall time also
+includes interpreter/harness setup and cleanup. Other rows use the unchanged
+version 2 probe, `--corpus LOCAL_CORPUS --repeats 3 --warmups 1 --json`, with
+one discarded warmup and three samples. Reports remain outside Git at
+`/tmp/startup-{before,after}-final-v3.json`, `/tmp/startup-before-v2.json` and
+`/tmp/startup-after-final-v2.json`.
+
+The fresh-application improvement is modest (5%); warm controller startup is
+8% smaller. A separate one-run startup cProfile comparison attributes
+399 → 275 ms to canonical file scans and 213 → 114 ms to safe-path work;
+these are overlapping profiled totals, not additive stage medians.
+Measurements precede that integration; #66 adds source-follow request handling, not startup work. Both profiles retain 10 `verify_snapshot_current` calls, 12 canonical scans
+and 1,274 safe-path checks. The largest remaining fresh-load cost is whole-graph
+JSON validation/detachment in the existing CORE trust machinery, left unchanged.
+Profile overhead distorts totals (whole profiled dispatch was 2.19 → 2.36 s);
+use the unprofiled medians for outcome claims. Profiles are outside Git at
+`/tmp/startup-only-{before,after}-final.prof`.
+
+### Outstanding issues
+- Startup still takes about a second; this change does not establish subsecond or physical time to readable text. Version probing, splash, Neovim launch/IPC/painting, remembered-personal-workspace resume and a human reading trial are excluded. Existing terminal acceptance evidence is unchanged.
+- Small local samples with warm OS cache, not cold-storage performance or a cross-host guarantee. Full source reads/hashes and full-graph trust validation remain substantial costs.
+
+### Decisions requiring approval
+None reserved. Default: resolve the boundary once within each canonical-file scan, never retain path or verification results across scans; hash the exact bytes after decoding them as UTF-8. Existing CORE/reference policies and caches are untouched.
+
 ## Faster section and outline view preparation — 20 October 2026
 
 **Task:** [Codex: Faster section and outline moves](https://github.com/dialectmaterial/SOL/blob/6eddeaa94c979adf73cf02d5783329b550d84b2f/docs/coordination/CURRENT_TASK.md#codex-faster-section-and-outline-moves).
