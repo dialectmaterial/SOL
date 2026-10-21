@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### A genealogy opens the ESSENCE encyclopedia — 21 October 2026
+
+The encyclopedia's first page is a small map of where its methods come from,
+from the 1230 concordance and Mendenhall's 1887 word counting to TF-IDF (1972),
+word vectors (2013) and Transformers (2017), each date sourced. ● marks what
+ESSENCE runs; Enter on a method opens its entry.
+
 ### ESSENCE looks right in small windows and every theme — 21 October 2026
 
 - Results keep their tables in view in small windows; summaries name the section

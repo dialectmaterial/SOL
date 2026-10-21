@@ -15,10 +15,11 @@ from textual.binding import Binding
 from textual.theme import Theme
 from textual import work
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.widgets.option_list import Option
 from textual.widgets import (Button, DataTable, Footer, Input, Label, Markdown, OptionList, RadioButton, RadioSet, Static,
                              TabbedContent, TabPane)
 
-from sol.essence.encyclopedia import entry_markdown, load_catalog
+from sol.essence.encyclopedia import entry_markdown, genealogy_rows, load_catalog
 from sol.essence.methods import load_methods, method_markdown
 from sol.essence.tui import sentences, tfidf, words
 from sol.essence.tui.context import load_state, save_state
@@ -41,8 +42,8 @@ SOURCES_HELP = ("Sources · Enter on a word focuses its occurrences; Enter here 
 
 # Screens that browse a bundled catalog, with their one-line help.
 BROWSERS = {
-    "encyclopedia": "Encyclopedia · arrows browse · Enter reads · Escape returns to the list. "
-                    "Links open only when selected.",
+    "encyclopedia": "Encyclopedia · arrows browse · Enter reads (on Genealogy, moves through the map) · "
+                    "Escape returns to the list. Links open only when selected.",
     "methods": "What ESSENCE runs: inputs, settings, output, limits and the command line · arrows browse · "
                "Enter reads · Escape returns to the list.",
 }
@@ -82,6 +83,7 @@ class EssenceApp(App):
     .browser-detail { height: 1fr; margin-top: 1; }
     #origin, #layout-hint { padding: 0 2; color: $text-muted; }
     Markdown { padding: 0 1; }
+    #genealogy-map { height: auto; border: none; background: transparent; padding: 0 1; }
     .choices { height: auto; }
     .choice-group { height: auto; width: 1fr; margin-top: 1; }
     .section-label { color: $text-muted; text-style: bold; height: 1; }
@@ -155,9 +157,11 @@ class EssenceApp(App):
         return (self.catalog if name == "encyclopedia" else self.methods)["entries"]
 
     def browser_markdown(self, name, index):
-        item = self.browser_items(name)[index]
         if name == "encyclopedia":
-            return entry_markdown(self.catalog, item)
+            if index == 0:
+                return self.genealogy_markdown()
+            return entry_markdown(self.catalog, self.browser_items(name)[index - 1])
+        item = self.browser_items(name)[index]
         # Name the encyclopedia entry, not its ID, and say how to get there.
         titles = {entry["id"]: entry["title"] for entry in self.catalog["entries"]}
         reference = item["encyclopedia"]
@@ -166,20 +170,59 @@ class EssenceApp(App):
 
     def compose_browser(self, name) -> ComposeResult:
         yield Static(BROWSERS[name], classes="browser-help")
-        yield OptionList(*(item["title"] for item in self.browser_items(name)), id=f"{name}-list",
+        # The encyclopedia opens on its genealogy, a map of where the methods come from.
+        first = ["Genealogy"] if name == "encyclopedia" else []
+        yield OptionList(*first, *(item["title"] for item in self.browser_items(name)), id=f"{name}-list",
                          classes="browser-list")
         with VerticalScroll(id=f"{name}-detail", classes="browser-detail"):
             yield Markdown(self.browser_markdown(name, 0), id=f"{name}-entry")
+            if name == "encyclopedia":
+                yield OptionList(*self.genealogy_options(), id="genealogy-map")
+                yield Markdown(self.genealogy_sources(), id="genealogy-sources")
+
+    def genealogy_options(self):
+        """One line per method: year, line of descent, ● runs in ESSENCE, ○ a reading topic."""
+        options = []
+        for row in genealogy_rows(self.catalog):
+            mark = "● " if row["runs"] else "○ " if row["entry"] else ""
+            line = Text.assemble((f"{row['year']:>5}  ", "dim"), (row["prefix"], "dim"), (mark, "bold"),
+                                 (row["label"], "" if row["entry"] else "italic"),
+                                 ((" · " + row["detail"]) if row["detail"] else "", "dim"))
+            options.append(Option(line, disabled=row["entry"] is None))
+        return options
+
+    def genealogy_markdown(self):
+        genealogy = self.catalog["genealogy"]
+        return (f"## {genealogy['title']}\n\n{genealogy['note']}\n\n"
+                "● ESSENCE runs it · ○ a reading topic. Arrows move through the map; Enter opens a method.\n")
+
+    def genealogy_sources(self):
+        sources = ", ".join(f"[{row['label']}]({row['source']})" for row in genealogy_rows(self.catalog)
+                            if row["source"])
+        return f"Dates from Wikipedia, accessed {self.catalog['genealogy']['accessed']}: {sources}."
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         name = (event.option_list.id or "").removesuffix("-list")
         if name in BROWSERS:
             self.query_one(f"#{name}-entry", Markdown).update(self.browser_markdown(name, event.option_index))
             self.query_one(f"#{name}-detail", VerticalScroll).scroll_home(animate=False)
+            if name == "encyclopedia":
+                for part in ("#genealogy-map", "#genealogy-sources"):
+                    self.query_one(part).display = event.option_index == 0
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if event.option_list.id == "genealogy-map":
+            # A method on the map opens its entry, as if chosen from the list.
+            entry = genealogy_rows(self.catalog)[event.option_index]["entry"]
+            ids = [item["id"] for item in self.catalog["entries"]]
+            if entry in ids:
+                self.query_one("#encyclopedia-list", OptionList).highlighted = ids.index(entry) + 1
+                self.query_one("#encyclopedia-detail").focus()
+            return
         name = (event.option_list.id or "").removesuffix("-list")
-        if name in BROWSERS:
+        if name == "encyclopedia" and event.option_index == 0:
+            self.query_one("#genealogy-map", OptionList).focus()
+        elif name in BROWSERS:
             self.query_one(f"#{name}-detail").focus()
 
     def compose_experiment(self) -> ComposeResult:
