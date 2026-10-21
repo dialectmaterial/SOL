@@ -12,53 +12,55 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Claude Code: Visual audit of the reader, as options for the maintainer
+## Claude Code: Visual audit of ESSENCE's screens
 
-**Status:** In review
-**Branch:** `claude/visual-audit`
-**Requested:** 21 October 2026, by the maintainer via Claude ([BEING §4](../BEING.md#4-theming-and-typography-next-bounded-task) "Not yet done")
-
-### Goal
-
-Rendered before/after comparisons of spacing, heading density, status-line
-weight and popup intrusion on the real book, in each theme, as concrete options
-the maintainer chooses from. Nothing changes the look until chosen.
-
-### Scope
-
-Audit tooling under `scripts/` if needed; no change to the reader's look in
-this task.
-
-### Acceptance
-
-An options page for the maintainer; BEING §4 records that the audit was done.
-
-## Codex: A faster full test suite
-
-**Status:** In review
-**Branch:** `codex/test-speed`
+**Status:** In progress
+**Branch:** `claude/essence-audit`
 **Requested:** 21 October 2026, by the maintainer via Claude
 
 ### Goal
 
-`python -B -m unittest discover -s tests` takes clearly less than its current
-~150 s on this machine, with the same tests and assertions.
+Every ESSENCE screen (Encyclopedia, Methods, Experiment, each study's Results)
+rendered at several terminal sizes and themes on the book; faults fixed, matters
+of taste left for the maintainer.
 
 ### Scope
 
-`tests/` (fixtures, shared setup, slow helpers), `CONTRIBUTING.md` if the
-commands change, CHANGELOG. No product code unless a test-only seam is needed.
-
-### Constraints
-
-No test deleted, skipped or weakened; the same test count (1,807 now, plus
-any added). No new dependency (no pytest-xdist). CI configuration unchanged
-unless it gets faster too.
+`sol/essence/tui/` presentation, its tests, ESSENCE §4, CHANGELOG. No change to
+engines or artifacts, and nothing under `docs/coordination/proposals/` (Codex).
 
 ### Acceptance
 
-Before/after wall-clock times in the handoff; the slowest tests listed;
-documentation check and full suite.
+Before/after renders of each fix; Textual pilot tests; documentation check and
+full suite.
+
+## Codex: Stage 5 design proposal (model adapters and Experiment B)
+
+**Status:** Ready
+**Branch:** `codex/stage5-proposal`
+**Requested:** 21 October 2026, by the maintainer via Claude ([ESSENCE §5](../ESSENCE.md#5-prioritized-experiments), stage 5)
+
+### Goal
+
+A reviewable proposal for the capability registry, optional runtimes and the
+first adapter-based experiment (Experiment B, embeddings for the TensorFlow
+Embedding Projector): interfaces, artifacts, reproducibility records, what each
+optional dependency would be, and the smallest first step.
+
+### Scope
+
+`docs/coordination/proposals/ESSENCE_STAGE5_PROPOSAL.md` only. No code.
+
+### Constraints
+
+New dependencies, artifact formats and changes to Decision statements are
+**reserved**: name them as decisions for the maintainer, with options and a
+recommendation. Follow ESSENCE §1's decision (orchestrate, never reimplement)
+and §3 (projections, not destructive cleaning).
+
+### Acceptance
+
+Documentation check; the handoff lists every reserved decision.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
