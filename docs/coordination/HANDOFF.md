@@ -32,6 +32,29 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## SPECULATIVE leads the documentation — 21 October 2026
+
+**Task:** maintainer request (21 October 2026): make the speculative architecture document leading and align all documentation with it.
+**Branch / PR:** `claude/speculative-docs` · PR #86
+**Last implementation commit:** `aaf0bbf8c8be4716452652e06786e96969417330` (this report is committed after it)
+
+### Changed files
+- `docs/SPECULATIVE.md` — the maintainer's document, verbatim (front matter dropped).
+- `docs/ARCHITECTURE.md` — rewritten in SPECULATIVE's terms; all earlier decisions, statuses and measurements kept; restructuring stages A–F; reading protocol and autonomy; placement register.
+- `docs/BEING.md`, `ESSENCE.md`, `CORE.md` — framing sections for each division; the workspace store's CORE-or-BEING placement recorded as an open restructuring question.
+- `README.md`, `CONTRIBUTING.md`, `CLAUDE.md`, `scripts/check_docs.py` — five governing documents; CLAUDE.md gains the structural-autonomy rule and reading protocol.
+- `docs/coordination/CURRENT_TASK.md` — stage A inventory assigned, split by package.
+
+### Tests performed
+- Documentation check (every link into SPECULATIVE resolves) and full suite: OK.
+
+### Outstanding issues
+- Restructuring has not begun; the placement register is empty.
+
+### Decisions requiring approval
+None reserved: the maintainer made SPECULATIVE leading. Default: SPECULATIVE is treated as maintainer-only (agents never edit it).
+
+
 ## Cleanup steps 1, 3 and `sol being` — 21 October 2026
 
 **Task:** maintainer's cleanup plan (CURRENT_TASK, 21 October), steps 1, 3 and the reader half of 6.
