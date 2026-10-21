@@ -38,11 +38,10 @@ return function(reader, supplied)
   if data.emphasis ~= nil and data.emphasis ~= "italic" and data.emphasis ~= "underline" then
     fail("invalid semantic emphasis presentation")
   end
-  local integrated = data.integrated == true
   local mode = data.mode or "continuous"
   if mode ~= "continuous" and mode ~= "paragraph" then fail("invalid reading mode") end
   local focused_id = data.restore and data.restore ~= vim.NIL and data.restore.reference.reference.target_id or data.records[1].id
-  if integrated and (not exact_keys(data.navigation, { "previous", "next" })
+  if (not exact_keys(data.navigation, { "previous", "next" })
     or type(data.navigation.previous) ~= "boolean" or type(data.navigation.next) ~= "boolean"
     or type(data.notice) ~= "string") then fail("invalid reading navigation") end
   if data.personal ~= nil and (type(data.personal) ~= "table" or type(data.personal.persistent) ~= "boolean"
@@ -84,7 +83,7 @@ return function(reader, supplied)
 
   local records, by_id, positions, source_rows = data.records, {}, {}, {}
   local projection, heading_rows, warning_rows, style_runs = {}, {}, {}, {}
-  local namespace = api.nvim_create_namespace("sol-research-semantic-styles")
+  local namespace = api.nvim_create_namespace("sol-reader-semantic-styles")
   local function append(text)
     if type(text) ~= "string" or text:find("\n", 1, true) then fail("invalid presentation row") end
     boundaries(text)
@@ -103,7 +102,7 @@ return function(reader, supplied)
   end
   local previous_heading
   append("")
-  if integrated and data.notice ~= "" then
+  if data.notice ~= "" then
     append_lines(data.notice, function(_, row) warning_rows[#warning_rows + 1] = row end)
     append("")
   end
@@ -170,19 +169,16 @@ return function(reader, supplied)
   vim.o.mouse, vim.o.clipboard = "", ""
   -- In the reader the mouse scrolls and selects; a selection is copied when
   -- the button is released. No right-click menu.
-  if integrated then vim.o.mouse, vim.o.mousemodel = "a", "extend" end
+  vim.o.mouse, vim.o.mousemodel = "a", "extend"
   -- No "~" past the text and no "@@@" when a paragraph continues below the window.
   vim.o.fillchars = "eob: ,lastline: "
-  vim.o.statusline = " j/k lines   [p/]p passages   / search   v select   c source/notes   ? help   q return"
-  if integrated then
-    local progress = data.progress
-    if progress ~= nil and (type(progress) ~= "table" or not exact_keys(progress, { "first", "total" })
-        or not integer(progress.first) or not integer(progress.total) or progress.first < 0
-        or progress.total < 1 or progress.first >= progress.total) then
-      fail("invalid reading progress")
-    end
-    vim.o.statusline = "%!v:lua.SOLStatus()"
+  local progress = data.progress
+  if progress ~= nil and (type(progress) ~= "table" or not exact_keys(progress, { "first", "total" })
+      or not integer(progress.first) or not integer(progress.total) or progress.first < 0
+      or progress.total < 1 or progress.first >= progress.total) then
+    fail("invalid reading progress")
   end
+  vim.o.statusline = "%!v:lua.SOLStatus()"
   vim.o.selection = "inclusive"
   vim.o.hlsearch = true
   -- Native visible escaping, not replacement source text. C1 source scalars keep
@@ -313,7 +309,7 @@ return function(reader, supplied)
   end
 
   local function validate_packet(packet)
-    if not exact_keys(packet, { "reference", "selection", "cursor_offset" }) then fail("invalid research packet shape") end
+    if not exact_keys(packet, { "reference", "selection", "cursor_offset" }) then fail("invalid reader packet shape") end
     local binding = type(packet.reference) == "table" and packet.reference.reference
     local record = type(binding) == "table" and by_id[binding.target_id]
     if not record or not vim.deep_equal(packet.reference, record.reference) then
@@ -398,7 +394,7 @@ return function(reader, supplied)
 
   local function export(action)
     local packet = capture()
-    local result = integrated and { action = action or "quit", packet = packet } or packet
+    local result = { action = action or "quit", packet = packet }
     local encoded = vim.json.encode(result)
     local output, problem = uv.fs_open(output_path, "wx", 384) -- exclusive owner-only file, never overwrite
     if not output then fail("cannot create private result: " .. tostring(problem)) end
@@ -541,7 +537,6 @@ return function(reader, supplied)
 
   return {
     data = data,
-    integrated = integrated,
     mode = mode,
     focused_id = focused_id,
     records = records,

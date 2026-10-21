@@ -34,7 +34,7 @@ ENTRY_POINTS = {
 PUBLIC_FILES = {"pyproject.toml", "MANIFEST.in", "README.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE",
                 "docs/legacy/inventory.json"} | PACKAGE_FILES | PACKAGE_ASSETS
 for directory, suffixes in (("docs", {".md"}), ("tests", {".py"}),
-                            ("experiments", {".py", ".lua", ".js", ".cjs"}), ("scripts", {".py"})):
+                            ("scripts", {".py"})):
     PUBLIC_FILES.update(path.relative_to(ROOT).as_posix()
                         for path in (ROOT / directory).rglob("*")
                         if path.is_file() and path.suffix in suffixes)
@@ -189,14 +189,14 @@ print(catalog['license'])
         self.assertNotIn("sol/terminal/reading_layout.py", names)
         self.assertFalse(any(name.startswith("experiments/") for name in names))
 
-    def test_source_archive_runs_its_research_contract_checks(self):
+    def test_source_archive_runs_its_reader_source_guard_checks(self):
         destination = Path(self.temporary.name) / "source-archive-check"
         with tarfile.open(self.sdist) as archive:
             # This archive was just built from our disposable source fixture.
             archive.extractall(destination)
         source = next(destination.iterdir())
         self.assertTrue((source / "sol" / "terminal" / "neovim.lua").is_file())
-        self.assertTrue((source / "experiments" / "reader_surfaces" / "browser.js").is_file())
+        self.assertFalse((source / "experiments").exists())
         environment = dict(os.environ)
         environment.pop("PYTHONPATH", None)
         result = subprocess.run(
@@ -275,7 +275,6 @@ from sol.terminal import neovim
 assert Path(neovim.__file__).with_name('neovim.lua').is_file()
 neovim.validate_environment = lambda width: '/invented/nvim'
 def native(payload, executable, **options):
-    assert payload['integrated'] is True
     assert payload['records'] and payload['restore']['cursor_offset'] == 0
     return 0, {'action': 'quit', 'packet': payload['restore']}
 neovim.launch_payload = native
@@ -321,6 +320,7 @@ root = Path(sys.argv[1])
 assert Path(sol.__file__).is_relative_to(Path(sys.prefix)), 'reader came from outside the installed wheel'
 book = core.load_corpus_book(root / 'corpus')
 payload = neovim.build_payload(sample_from_book(book, count=1))
+payload.update(navigation={'previous': False, 'next': False}, notice='')
 input_path, output_path = root / 'input.json', root / 'output.json'
 input_path.write_text(json.dumps(payload), encoding='utf-8')
 env = neovim._isolated_environment(root, input_path, output_path)
@@ -359,7 +359,7 @@ vim.cmd('qa!')
 result = subprocess.run([sys.argv[2], '-u', 'NONE', '--noplugin', '-i', 'NONE', '-n', '--headless', '-l', str(scenario)],
                         cwd=root, env=env, capture_output=True, text=True, timeout=15)
 assert result.returncode == 0, result.stdout + result.stderr
-assert json.loads(output_path.read_text())['reference']['reference']['target_id'] == book.passages[0].identifier
+assert json.loads(output_path.read_text())['packet']['reference']['reference']['target_id'] == book.passages[0].identifier
 '''
         result = subprocess.run([str(python), "-I", "-B", "-c", program, str(directory), shutil.which("nvim")],
                                 cwd=directory, capture_output=True, text=True, timeout=30)

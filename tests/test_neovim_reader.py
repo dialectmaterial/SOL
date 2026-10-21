@@ -96,7 +96,6 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         def native(payload, executable, **options):
             self.assertEqual([row["id"] for row in payload["records"]],
                              [p.identifier for p in self.book.passages])
-            self.assertTrue(payload["integrated"])
             self.assertEqual(payload["navigation"], {"previous": False, "next": False})
             self.assertEqual(executable, "/invented/nvim")
             return 0, self.reply(payload, record=2)

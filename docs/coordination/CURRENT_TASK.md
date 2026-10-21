@@ -55,7 +55,7 @@ test. No code. Next: steps 1, 3 and 6's `sol being` (app, options, shell,
 
 ## Codex: Remove the experiments and the research-export mode (step 2)
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/remove-experiments`
 
 ### Scope

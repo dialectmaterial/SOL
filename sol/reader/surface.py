@@ -1,7 +1,7 @@
 """Read-only surface projections over verified CORE records and source offsets.
 
-The projection is detached from personal state. Installed and research frontends
-share this validation; only ReaderActions may accept a position into a workspace.
+The projection is detached from personal state. The installed reader uses this
+validation; only ReaderActions may accept a position into a workspace.
 """
 from __future__ import annotations
 
@@ -211,7 +211,7 @@ def record_payload(sample: Sample, passage: Passage, *, capture: CaptureExport |
                    requested_id=None) -> dict:
     """Capture the existing reference protocol, not a renderer-specific identity."""
     if sample.actions.workspace_reader is not None:
-        raise ValueError("reader experiments do not accept a personal workspace")
+        raise ValueError("detached reader views do not accept a personal workspace")
     owned = capture is None
     capture = CaptureExport(sample.book) if owned else capture
     if capture.book is not sample.book:
@@ -245,7 +245,7 @@ def _agree_with_core(book, reference):
 
 
 def selection_packet(book: Book, identifier: str, start: int, end: int) -> dict:
-    """Research bridge wrapper over CORE and TextSelection, not a new protocol."""
+    """Reader selection wrapper over CORE and TextSelection, not a new protocol."""
     if book.corpus_snapshot is None:
         raise ValueError("a verified corpus snapshot is required")
     reference = capture_reference(book.corpus_snapshot, identifier)
@@ -260,12 +260,11 @@ def selection_packet(book: Book, identifier: str, start: int, end: int) -> dict:
 def validate_packet(book: Book, packet: dict) -> TextSelection | None:
     """Refuse stale/mismatched exported positions; never write a workspace.
 
-    The file carries no corpus path, command, actor, or write authority. The caller
-    supplies its own locally verified corpus. Exact generation checks intentionally
-    make these disposable research exports stricter than future ordinary reading.
+    The packet carries no corpus path, command, actor, or write authority. The
+    caller supplies its locally verified corpus; exact generation checks apply.
     """
     if not isinstance(packet, dict) or set(packet) != {"reference", "selection", "cursor_offset"}:
-        raise ValueError("a research packet requires reference, selection, and cursor_offset only")
+        raise ValueError("a reader packet requires reference, selection, and cursor_offset only")
     if book.corpus_snapshot is None:
         raise ValueError("a verified corpus snapshot is required")
     reference = check_reference(book.corpus_snapshot, packet["reference"])

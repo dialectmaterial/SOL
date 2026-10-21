@@ -2,12 +2,8 @@
 from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
-import asyncio
-import importlib.util
 import unittest
 from unittest.mock import patch
-
-from fixtures_async import UIEventLoop
 
 from sol.reader.actions import ReaderActions, ReadingSession
 from sol.reader.navigation import character_cells, source_layout, validate_layout, vertical_offset
@@ -328,67 +324,3 @@ class SourceLayoutTests(unittest.TestCase):
                        ((0, 0), (0, True)), ((0, 0), (0, 1, 2)), (False,)):
             with self.subTest(layout=layout), self.assertRaises(ValueError):
                 validate_layout(layout, 1)
-
-
-@unittest.skipUnless(importlib.util.find_spec('prompt_toolkit') is not None
-                     and importlib.util.find_spec('markdown_it') is not None,
-                     'optional reader dependencies are absent')
-class ToolkitSourceGeometryTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
-    async def assert_live_geometry(self, text):
-        from prompt_toolkit.input import create_pipe_input
-        from prompt_toolkit.output import DummyOutput
-        from experiments.reader_surfaces.baseline import ReaderView, _character_display
-        book = invented_book()
-        book.passages[0] = replace(book.passages[0], text=text)
-        book.canonical_records[IDS[0]].update(
-            plain_text=text, markdown=text, content_sha256=sha256(text.encode()).hexdigest())
-        actions = ReaderActions(book)
-        actions.read(first=True)
-        with create_pipe_input() as pipe:
-            view = ReaderView(actions, input=pipe, output=DummyOutput(), width=20)
-            task = asyncio.create_task(view.application.run_async())
-            try:
-                for _ in range(200):
-                    if view.body.window.render_info is not None:
-                        break
-                    await asyncio.sleep(0.005)
-                info = view.body.window.render_info
-                self.assertIsNotNone(info)
-                positions = view._source_positions()
-                self.assertEqual(len(positions), len(text) + 1)
-                offset = 0
-                for line_number, line in enumerate(view.body.buffer.document.lines):
-                    display_column = 0
-                    for source_column in range(len(line) + 1):
-                        coordinate = info._rowcol_to_yx.get((line_number, display_column))
-                        if coordinate is not None:
-                            row, column = coordinate
-                            self.assertEqual(positions[offset],
-                                             (row - info._y_offset, column - info._x_offset),
-                                             (text, offset, positions))
-                        offset += 1
-                        if source_column < len(line):
-                            display_column += len(_character_display(line[source_column]))
-                return positions
-            finally:
-                pipe.send_text('\x03')
-                await asyncio.wait_for(task, 2)
-
-    async def test_wide_character_boundary_is_after_actual_pre_wrap(self):
-        positions = await self.assert_live_geometry('a' * 19 + '界Z')
-        self.assertEqual(positions[19], (1, 0))
-        self.assertEqual(positions[20], (1, 2))
-
-    async def test_exact_width_newline_includes_toolkit_cursor_space(self):
-        positions = await self.assert_live_geometry('a' * 20 + '\nx')
-        self.assertEqual(positions[20], (1, 0))
-        self.assertEqual(positions[21], (2, 0))
-
-    async def test_combining_and_escaped_source_coordinates_match_live_renderer(self):
-        for text in ('a' * 19 + 'e\u0301Z', 'a' * 18 + '\x1bZ', 'a' * 18 + '\u202e界'):
-            with self.subTest(text=text):
-                await self.assert_live_geometry(text)
-
-
-if __name__ == '__main__':
-    unittest.main()

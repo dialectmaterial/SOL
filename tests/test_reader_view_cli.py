@@ -195,7 +195,6 @@ class ReaderViewCLITests(unittest.TestCase):
 
     def test_neovim_temporary_reader_does_not_require_builtin_frontend(self):
         with patch("sol.terminal.neovim.validate_environment"), \
-                patch("experiments.reader_surfaces.baseline.validate_reader_environment", side_effect=AssertionError("Wrong frontend")), \
                 patch("sol.terminal.neovim_reader.run_reader", return_value=0) as reader, \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")):
             status, _, error = self.call(["-n", "--engine", "neovim", "--width", "64", "--emphasis", "underline"])

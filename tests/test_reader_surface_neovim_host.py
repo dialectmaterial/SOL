@@ -15,8 +15,8 @@ from unittest.mock import patch
 from sol import core
 from sol.reader.typography import Typography
 
-from experiments.reader_surfaces import neovim
-from experiments.reader_surfaces.common import sample_from_book, selection_packet
+from sol.terminal import neovim
+from sol.reader.surface import sample_from_book, selection_packet
 import fixtures_corpus as fixtures
 
 
@@ -60,7 +60,9 @@ class NeovimHostTests(fixtures.CorpusFixture, unittest.TestCase):
 
         with patch.object(neovim, "validate_environment", return_value="/invented/bin/nvim"), \
                 patch.object(neovim.subprocess, "run", side_effect=native):
-            result = neovim.run(self.sample(), **options)
+            payload = neovim.build_payload(self.sample(), **options)
+            payload.update(navigation={"next": False, "previous": False}, notice="")
+            result = neovim.launch_payload(payload, "/invented/bin/nvim")
         return result, observed
 
     def test_payload_exact_unicode_text_and_reference_without_source_mutation(self):
@@ -196,7 +198,7 @@ class NeovimHostTests(fixtures.CorpusFixture, unittest.TestCase):
         sample = self.sample()
         with patch.object(sample.actions, "workspace_reader", object()), self.assertRaisesRegex(ValueError, "workspace"):
             neovim.build_payload(sample)
-        from experiments.reader_surfaces.common import Sample
+        from sol.reader.surface import Sample
         duplicate = Sample(sample.book, sample.passages * 2, sample.actions)
         with self.assertRaisesRegex(ValueError, "distinct"):
             neovim.build_payload(duplicate)
@@ -288,7 +290,7 @@ class NeovimHostTests(fixtures.CorpusFixture, unittest.TestCase):
     def test_native_launch_inherits_tty_and_has_isolated_private_files(self):
         before = self.files()
         result, observed = self.launch(packet=self.packet())
-        self.assertEqual(result, 0)
+        self.assertEqual(result[0], 0)
         self.assertEqual(observed["root_mode"], 0o700)
         self.assertEqual(observed["input_mode"], 0o600)
         self.assertFalse(Path(observed["cwd"]).exists())
@@ -306,73 +308,13 @@ class NeovimHostTests(fixtures.CorpusFixture, unittest.TestCase):
         self.assertIn("--noplugin", command)
         self.assertEqual(self.files(), before)
 
-    def test_explicit_export_is_exclusive_owner_only_checked_packet(self):
-        output = self.root / "position.json"
-        packet = self.packet()
-        result, _ = self.launch(packet=packet, export=output)
-        self.assertEqual(result, 0)
-        self.assertEqual(json.loads(output.read_text()), packet)
-        self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
+    def test_nonzero_native_exit_discards_return_packet(self):
+        result, _ = self.launch(packet=self.packet(), code=1)
+        self.assertEqual(result, (1, None))
 
-    def test_existing_and_symlink_exports_are_refused_before_native_launch(self):
-        target = self.root / "existing.json"
-        target.write_text("Invented user-owned content")
-        link = self.root / "link.json"
-        link.symlink_to(target)
-        broken = self.root / "broken.json"
-        broken.symlink_to(self.root / "absent.json")
-        with patch.object(neovim, "validate_environment", return_value="/invented/bin/nvim"), \
-                patch.object(neovim.subprocess, "run") as native:
-            for output in (target, link, broken):
-                with self.subTest(output=output), self.assertRaises(FileExistsError):
-                    neovim.run(self.sample(), export=output)
-            native.assert_not_called()
-        self.assertEqual(target.read_text(), "Invented user-owned content")
-
-    def test_export_into_corpus_is_refused_before_launch(self):
-        with patch.object(neovim, "validate_environment", return_value="/invented/bin/nvim"), \
-                patch.object(neovim.subprocess, "run") as native, self.assertRaisesRegex(ValueError, "canonical corpus"):
-            neovim.run(self.sample(), export=self.corpus / "position.json")
-        native.assert_not_called()
-
-    def test_racing_output_creation_never_overwrites_a_file(self):
-        output = self.root / "position.json"
-        def create_destination(command, options):
-            output.write_text("Invented concurrently created file")
-        with self.assertRaises(FileExistsError):
-            self.launch(packet=self.packet(), export=output, operation=create_destination)
-        self.assertEqual(output.read_text(), "Invented concurrently created file")
-
-    def test_invalid_native_packet_is_not_exported(self):
-        output = self.root / "position.json"
-        packet = self.packet()
-        packet["selection"]["text"] = "Forged native result"
-        with self.assertRaises(ValueError):
-            self.launch(packet=packet, export=output)
-        self.assertFalse(output.exists())
-
-    def test_source_changed_while_editor_open_is_refused_before_export(self):
-        output = self.root / "position.json"
-        def change_source(command, options):
-            source = self.corpus / "sample.md"
-            source.write_text(source.read_text() + "\nAn invented source edit while reading.\n")
-        with self.assertRaises(ValueError):
-            self.launch(packet=self.packet(), export=output, operation=change_source)
-        self.assertFalse(output.exists())
-
-    def test_nonzero_native_exit_does_not_export_a_packet(self):
-        output = self.root / "position.json"
-        result, _ = self.launch(packet=self.packet(), code=1, export=output)
-        self.assertEqual(result, 1)
-        self.assertFalse(output.exists())
-
-    def test_explicit_quit_without_capture_is_ok_unless_export_requested(self):
+    def test_explicit_quit_without_capture_is_ok(self):
         result, _ = self.launch()
-        self.assertEqual(result, 0)
-        output = self.root / "position.json"
-        with self.assertRaisesRegex(ValueError, "without a captured packet"):
-            self.launch(export=output)
-        self.assertFalse(output.exists())
+        self.assertEqual(result, (0, None))
 
     def test_strict_packet_reader_refuses_duplicates_nonfinite_and_oversize(self):
         path = self.root / "packet.json"
@@ -396,13 +338,6 @@ class NeovimHostTests(fixtures.CorpusFixture, unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "regular file"):
             neovim._read_packet(fifo)
 
-    def test_restore_file_passes_existing_packet_into_isolated_payload(self):
-        path = self.root / "packet.json"
-        packet = self.packet()
-        path.write_text(json.dumps(packet))
-        result, observed = self.launch(restore=path)
-        self.assertEqual(result, 0)
-        self.assertEqual(observed["payload"]["restore"], packet)
 
     def test_environment_removes_inherited_editor_config_and_remote_channels(self):
         with patch.dict(os.environ, NVIM="/unrelated/server", NVIM_LISTEN_ADDRESS="/unrelated/socket",
