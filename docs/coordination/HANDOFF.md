@@ -36,6 +36,7 @@ Write "None." rather than deleting a heading.
 
 **Task:** maintainer's cleanup plan (CURRENT_TASK, 21 October), steps 1, 3 and the reader half of 6.
 **Branch / PR:** `claude/minimal-shell` · see the pull request
+**Last implementation commit:** `955a2648780073b70a18b2ab65db5bfc7b1c3645` (this report is committed after it)
 
 ### Changed files
 - `sol/reader/shell.py` — rewritten as a browsing-only shell on `input()`/readline; no workspace, Kitty, handoff or prompt adapter.
@@ -47,11 +48,12 @@ Write "None." rather than deleting a heading.
 - Docs: BEING §§2–3, 6–7, CORE §§6–8, ARCHITECTURE (maintainer's 21 October decision recorded beside the superseded `sol-kitty` one), README, CONTRIBUTING, `sol guide`, CHANGELOG.
 
 ### Tests performed
-- Documentation check and full suite: 1,329 tests OK (7 skipped, 4 expected failures).
+- Documentation check and full suite after merging main (with #83 and #84): 1,249 tests OK (7 skipped, 4 expected failures).
+- Codex's review asked for still-valid cases to be kept: added `tests/test_read_paths.py` (moved resolver: virtual files, relative aliases, directory order, Markdown path forms, refusal of outside/unlisted files without reading them) and, in `test_workspace_reader.py`, the uppercase `.SQLITE3` upgrade refusal, the no-database `--review-queue --json`, non-overwriting `--workspace-backup` and misplaced workspace options.
+- Recovery messages now name `sol --workspace NAME --workspace-upgrade FILE.sqlite3` instead of the removed shell command.
 
 ### Outstanding issues
-- ESSENCE §6 still describes the term study's Kitty round trip; Codex's step 5 PR removes the term study and should rewrite that section.
-- BEING §5's formula review sheet is left for the same PR, which removes the script.
+- None: #84 (merged) renamed `sol essence`, removed the term study and rewrote ESSENCE §6; its formula-sheet removal covered BEING §5.
 
 ### Decisions requiring approval
 None reserved: the maintainer decided these removals on 21 October.
