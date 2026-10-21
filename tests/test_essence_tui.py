@@ -994,3 +994,93 @@ class PresentationHelperTests(unittest.TestCase):
         self.assertEqual(tui_words.scope_name(book, part), "Quality, from p. 84")
         self.assertEqual(tui_words.scope_name(None, part), "/BEING/quality")
         self.assertEqual(tui_words.scope_name(book, {"scope": {"kind": "corpus"}}), "corpus")
+
+
+@unittest.skipUnless(tui.textual_available() and _engine_installed(), "needs Textual and engines")
+class SmallResultsTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
+    async def test_each_study_fits_and_opens_sources_at_both_sizes(self):
+        from fixtures_corpus import write_runtime_corpus
+        from sol import core
+        from sol.corpus import contract
+        from sol.essence.tui import sentences, tfidf
+        from sol.essence.tui.app import EssenceApp
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            corpus = root / 'corpus'
+            identifier, _ = write_runtime_corpus(corpus)
+            contract.initialize_corpus_identity(corpus)
+            ctx = {**context(), 'corpus': str(corpus),
+                   'reference': core.capture_reference(core.load_snapshot(corpus), identifier)}
+            counts = [tui_words.run(ctx, 'book', 'none'), tui_words.run(ctx, 'section', 'book'),
+                      sentences.run(ctx, 'book'), tfidf.run(ctx, 'book')]
+            app = EssenceApp(ctx)
+            async with app.run_test(size=(120, 40)) as pilot:
+                for count in counts:
+                    receipt = json.dumps(count.study, sort_keys=True)
+                    app.show_result(count, None)
+                    await pilot.pause()
+                    table = app.query_one('#frequencies')
+                    for width, height in ((80, 24), (120, 40), (80, 24)):
+                        with self.subTest(study=type(count).__name__, size=(width, height)):
+                            table.move_cursor(row=1)
+                            row = table.cursor_row
+                            await pilot.resize_terminal(width, height)
+                            await pilot.pause()
+                            self.assertEqual(table.cursor_row, row)
+                            self.assertIs(app.focused, table)
+                            bottom = app.query_one('#layout-hint').region.y
+                            for selector in ('#frequencies', '#sources', '#overall', '#export-row'):
+                                widget = app.query_one(selector)
+                                if not widget.display:
+                                    continue
+                                self.assertLessEqual(widget.region.bottom, bottom)
+                                self.assertGreater(widget.region.height, 0)
+                                if selector != '#export-row':
+                                    self.assertEqual(widget.max_scroll_x, 0)
+                                    self.assertGreaterEqual(widget.region.height, 3)
+                            with patch.object(app, 'open_in_reader') as opened:
+                                await pilot.press('enter')
+                                if isinstance(count, tui_words.Count):
+                                    sources = app.query_one('#sources')
+                                    self.assertIs(app.focused, sources)
+                                    self.assertGreater(sources.region.height, 3)
+                                    await pilot.press('enter')
+                                    opened.assert_called_once_with(app.shown_sources[sources.cursor_row]['open'])
+                                    await pilot.press('escape')
+                                    self.assertIs(app.focused, table)
+                                else:
+                                    opened.assert_called_once()
+                    self.assertEqual(json.dumps(count.study, sort_keys=True), receipt)
+
+    async def test_long_words_undefined_measures_and_themes_survive_resize(self):
+        from sol.essence.tui.app import EssenceApp, TEXTUAL_THEMES
+
+        count, _ = comparison_count()
+        count.study['frequencies'][0]['word'] = '超長語' * 30
+        count.comparison['rows'][0].update(log2_rate_ratio=None, log2_ratio_status='empty_reference')
+        for theme in TEXTUAL_THEMES:
+            with self.subTest(theme=theme):
+                app = EssenceApp(context(), theme=theme)
+                async with app.run_test(size=(120, 40)) as pilot:
+                    app.show_result(count, None)
+                    await pilot.pause()
+                    await pilot.press('enter', 'down')
+                    sources = app.query_one('#sources')
+                    source_row = sources.cursor_row
+                    app.query_one('#result-status').update('Checking sources and exporting…')
+                    app.query_one('#export-csv').disabled = True
+                    await pilot.resize_terminal(80, 24)
+                    await pilot.pause()
+                    table = app.query_one('#frequencies')
+                    self.assertEqual(table.max_scroll_x, 0)
+                    self.assertEqual(sources.max_scroll_x, 0)
+                    self.assertIs(app.focused, sources)
+                    self.assertEqual(sources.cursor_row, source_row)
+                    self.assertTrue(app.query_one('#export-csv').disabled)
+                    self.assertIn('exporting', str(app.query_one('#result-status').render()))
+                    self.assertIn('empty reference', table.get_row_at(0)[-1])
+                    self.assertGreater(table.get_row_height(table.ordered_rows[0].key), 1)
+                    self.assertLessEqual(sources.region.bottom, app.query_one('#layout-hint').region.y)
+                    await pilot.press('escape')
+                    self.assertIs(app.focused, table)
