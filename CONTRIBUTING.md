@@ -67,6 +67,12 @@ book-shell commands or writing workspace tables directly. Domain operations
 retain author checks, source freshness and optimistic revision checks. Keep
 source-codepoint positions separate from wrapped rows and UTF-8 byte columns.
 
+UI behavior tests keep a fresh isolated asyncio loop per test, using the normal
+application loop mode to avoid recording creation stacks for every UI task. For
+asyncio creation-stack and slow-callback diagnostics, run the same suite with
+`PYTHONASYNCIODEBUG=1 .venv/bin/python -B -m unittest discover -s tests`.
+Assertions, worker synchronization and loop cleanup are the same in both modes.
+
 Tests share corpus builders through `tests/fixtures_corpus.py`. Do not borrow a
 different TestCase's setup methods. Patch the module that owns an operation;
 historical re-exports from `reader.app` do not own those operations.

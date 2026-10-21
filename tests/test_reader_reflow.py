@@ -16,6 +16,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from fixtures_async import UIEventLoop
+
 from sol.core.paths import display_path, resolve_path
 from sol.reader.actions import ReaderActions
 from experiments.reader_surfaces.baseline import ReaderView
@@ -45,7 +47,7 @@ def styled_book():
 
 
 @unittest.skipUnless(OPTIONAL, "optional reader dependencies absent")
-class ReaderReflowTests(unittest.IsolatedAsyncioTestCase):
+class ReaderReflowTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def wait_for(self, condition):
         deadline = asyncio.get_running_loop().time() + 3
         while not condition():

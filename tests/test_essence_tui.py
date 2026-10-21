@@ -10,6 +10,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from fixtures_async import UIEventLoop
+
 from sol.essence import tui
 from sol.essence.tui import words as tui_words
 from sol.essence.tui import __main__ as entry
@@ -61,8 +63,9 @@ class ContextTests(unittest.TestCase):
 
 
 @unittest.skipUnless(tui.textual_available(), "the essence extra (Textual) is not installed")
-class EssenceAppTests(unittest.IsolatedAsyncioTestCase):
+class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        await super().asyncSetUp()
         temporary = tempfile.TemporaryDirectory(prefix="sol-essence-")
         self.addCleanup(temporary.cleanup)
         self.state = Path(temporary.name) / "state" / "investigation.json"
@@ -303,7 +306,7 @@ class WordChoiceTests(unittest.TestCase):
 
 
 @unittest.skipUnless(tui.textual_available(), "the essence extra (Textual) is not installed")
-class WordScreenTests(unittest.IsolatedAsyncioTestCase):
+class WordScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def test_count_fills_results_and_failures_stay_on_the_experiment_screen(self):
         from sol.essence.tui.app import EssenceApp
 
@@ -399,7 +402,7 @@ class StaleContextTests(unittest.TestCase):
 
 
 @unittest.skipUnless(tui.textual_available(), "the essence extra (Textual) is not installed")
-class CountOrderTests(unittest.IsolatedAsyncioTestCase):
+class CountOrderTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def test_an_older_count_never_replaces_a_newer_one(self):
         # Reported by Codex's review of PR #25: delayed A, fast B.
         import threading
@@ -463,7 +466,7 @@ def comparison_count():
 
 
 @unittest.skipUnless(tui.textual_available(), "the essence extra (Textual) is not installed")
-class ComparisonScreenTests(unittest.IsolatedAsyncioTestCase):
+class ComparisonScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def counted(self, app, pilot):
         await pilot.press("3")
         await pilot.click("#run")
@@ -796,7 +799,7 @@ class SentenceStudyTests(unittest.TestCase):
 
 
 @unittest.skipUnless(tui.textual_available() and _engine_installed(), "needs Textual and the ESSENCE engines")
-class SentenceScreenTests(unittest.IsolatedAsyncioTestCase):
+class SentenceScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def test_sentence_results_list_the_longest_and_open_one_in_the_reader(self):
         from sol.essence.tui import sentences as tui_sentences
         from sol.essence.tui.app import EssenceApp
@@ -851,7 +854,7 @@ class SentenceScreenTests(unittest.IsolatedAsyncioTestCase):
 
 
 @unittest.skipUnless(tui.textual_available(), "needs Textual")
-class RefinedLayoutTests(unittest.IsolatedAsyncioTestCase):
+class RefinedLayoutTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def test_conditional_fields_and_reference_free_columns(self):
         from sol.essence.tui.app import EssenceApp, BROWSERS
         app = EssenceApp(context())
@@ -914,7 +917,7 @@ class RefinedLayoutTests(unittest.IsolatedAsyncioTestCase):
 
 
 @unittest.skipUnless(tui.textual_available() and _engine_installed(), "needs Textual and engines")
-class TfidfStudyTests(unittest.IsolatedAsyncioTestCase):
+class TfidfStudyTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def test_tfidf_engine_save_passage_navigation_and_file_switch(self):
         from fixtures_corpus import write_runtime_corpus
         from sol import core

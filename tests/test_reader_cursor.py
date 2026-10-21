@@ -7,6 +7,8 @@ import importlib.util
 import unittest
 from unittest.mock import patch
 
+from fixtures_async import UIEventLoop
+
 from sol.reader.actions import ReaderActions, ReadingSession
 from sol.reader.navigation import character_cells, source_layout, validate_layout, vertical_offset
 from test_reader_actions import IDS, RETIRED, invented_book
@@ -331,7 +333,7 @@ class SourceLayoutTests(unittest.TestCase):
 @unittest.skipUnless(importlib.util.find_spec('prompt_toolkit') is not None
                      and importlib.util.find_spec('markdown_it') is not None,
                      'optional reader dependencies are absent')
-class ToolkitSourceGeometryTests(unittest.IsolatedAsyncioTestCase):
+class ToolkitSourceGeometryTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def assert_live_geometry(self, text):
         from prompt_toolkit.input import create_pipe_input
         from prompt_toolkit.output import DummyOutput
