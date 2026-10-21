@@ -7,6 +7,8 @@ import importlib.util
 import unittest
 from unittest.mock import patch
 
+from fixtures_async import UIEventLoop
+
 from sol.reader.actions import ReaderActions
 from experiments.reader_surfaces.baseline import ReaderView, emphasis_style
 from test_reader_view import IDS, reader_book
@@ -26,7 +28,7 @@ class EmphasisFallbackTests(unittest.TestCase):
 
 @unittest.skipUnless(importlib.util.find_spec("prompt_toolkit") and
                      importlib.util.find_spec("markdown_it"), "optional reader dependencies absent")
-class ReaderExperienceTests(unittest.IsolatedAsyncioTestCase):
+class ReaderExperienceTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def wait_for(self, condition):
         deadline = asyncio.get_running_loop().time() + 2
         while not condition():

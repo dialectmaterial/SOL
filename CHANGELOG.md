@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Less test-runner overhead in UI checks — 21 October 2026
+
+- Run UI behavior checks on isolated asyncio loops in the normal application
+  mode, avoiding per-task debug stack tracing. Keep every test and assertion,
+  synchronization wait, worker check and cleanup.
+- `PYTHONASYNCIODEBUG=1` retains the diagnostic tracing mode. No product code,
+  dependency, CI job or ordinary suite command changes.
+
 ### Cleaner prompts and outline — 21 October 2026
 
 Answering `/`, `gp` or `M` no longer leaves the question and answer on the

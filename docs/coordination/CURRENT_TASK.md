@@ -35,7 +35,7 @@ An options page for the maintainer; BEING §4 records that the audit was done.
 
 ## Codex: A faster full test suite
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/test-speed`
 **Requested:** 21 October 2026, by the maintainer via Claude
 

@@ -3,6 +3,8 @@ from copy import deepcopy
 from datetime import date
 import unittest
 
+from fixtures_async import UIEventLoop
+
 from sol.essence.encyclopedia import entry_markdown, load_catalog
 from sol.essence.tui import textual_available
 
@@ -64,7 +66,7 @@ class CatalogTests(unittest.TestCase):
 
 
 @unittest.skipUnless(textual_available(), 'the essence extra is not installed')
-class EncyclopediaBrowserTests(unittest.IsolatedAsyncioTestCase):
+class EncyclopediaBrowserTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def test_browse_read_scroll_and_return_at_terminal_sizes(self):
         from textual.widgets import Markdown, OptionList
         from sol.essence.tui.app import EssenceApp

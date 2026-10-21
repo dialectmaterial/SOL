@@ -13,6 +13,8 @@ from hashlib import sha256
 import importlib.util
 import unittest
 
+from fixtures_async import UIEventLoop
+
 from sol.reader.actions import ReaderActions
 from experiments.reader_surfaces.baseline import ReaderView
 from test_reader_view import IDS, reader_book
@@ -39,7 +41,7 @@ def spacing_book():
 
 
 @unittest.skipUnless(OPTIONAL, "optional reader dependencies absent")
-class ReaderSpacingTests(unittest.IsolatedAsyncioTestCase):
+class ReaderSpacingTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def wait_for(self, condition):
         deadline = asyncio.get_running_loop().time() + 3
         while not condition():

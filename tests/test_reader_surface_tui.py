@@ -13,6 +13,8 @@ import sys
 from types import SimpleNamespace
 import unittest
 
+from fixtures_async import UIEventLoop
+
 from experiments.reader_surfaces.tui import ContinuousProjection, ContinuousView, SourceLocation
 from sol.reader.actions import ReaderActions
 from test_reader_view import IDS, reader_book
@@ -273,7 +275,7 @@ assert not any(name == 'markdown_it' or name.startswith('markdown_it.') for name
 
 
 @unittest.skipUnless(OPTIONAL, "optional continuous terminal dependencies absent")
-class ContinuousViewTests(unittest.IsolatedAsyncioTestCase):
+class ContinuousViewTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def wait_for(self, condition):
         deadline = asyncio.get_running_loop().time() + 2
         while not condition():

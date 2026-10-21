@@ -14,6 +14,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from fixtures_async import UIEventLoop
+
 from sol.core.models import Book, Node, Passage
 from sol.reader.actions import ReaderActions
 from experiments.reader_surfaces.baseline import ReaderView, run_reader, safe_reader_text, validate_reader_environment
@@ -128,7 +130,7 @@ print(json.dumps(sorted(sys.modules)))
 
 
 @unittest.skipUnless(OPTIONAL, "optional prompt_toolkit is absent")
-class ReaderViewTests(unittest.IsolatedAsyncioTestCase):
+class ReaderViewTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def wait_for(self, condition):
         deadline = asyncio.get_running_loop().time() + 2
         while not condition():
