@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Cleaner prompts and outline — 21 October 2026
+
+Answering `/`, `gp` or `M` no longer leaves the question and answer on the
+command line, and the outline panel is no taller than its contents.
+
 ### The guide and README describe today's reader — 21 October 2026
 
 `sol guide` and the README now name complete search, `gp`, `s`/`S` with
