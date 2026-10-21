@@ -744,6 +744,44 @@ end
         self.assertIn("Your keys (keys.json)", help_text)
         self.assertIn("does what gp does above", help_text)
 
+    def test_zathura_follows_the_resting_passage_after_s_until_it_closes(self):
+        report = self.run_lua(r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  _G.SOLReaderFollow = nil
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local first, second = data.records[1].id, data.records[2].id
+  local function rest_on(id)
+    reader.restore(reader.capture('n', nil, reader.source_point(id, 5)))
+    vim.api.nvim_exec_autocmds('CursorMoved', {buffer = reader.buffer})
+    vim.wait(700, function() return false end)
+  end
+  rest_on(second)
+  report.before_s = #sent
+  vim.api.nvim_feedkeys('S', 'xt', false)
+  _G.SOLReaderChannel.pending[sent[1].id]({pdf = {viewer = 'zathura', pdf_page = 7, printed_page = '5'}})
+  rest_on(second)
+  report.same_passage = #sent
+  _G.SOLReaderChannel.navigation_pending = 99  -- while a move is loading, nothing follows
+  rest_on(first)
+  report.during_move = #sent
+  _G.SOLReaderChannel.navigation_pending = nil
+  rest_on(first)  -- the move's reload moves the cursor again
+  report.follow_op = sent[2] and sent[2].op
+  report.not_blocking = _G.SOLReaderChannel.navigation_pending == nil
+  _G.SOLReaderChannel.pending[sent[2].id]({follow = {active = false}})  -- Zathura was closed
+  rest_on(second)
+  report.after_close = #sent
+''', integrated=True)
+        self.assertEqual(report["before_s"], 0)  # nothing follows until S opened Zathura
+        self.assertEqual(report["same_passage"], 1)  # resting on the same passage sends nothing
+        self.assertEqual(report["during_move"], 1)
+        self.assertEqual(report["follow_op"], "source_follow")
+        self.assertTrue(report["not_blocking"])
+        self.assertEqual(report["after_close"], 2)
+
     def test_note_editor_saves_restores_selection_and_protects_drafts(self):
         report = self.run_lua(r'''
   local sent = {}

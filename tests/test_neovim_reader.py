@@ -522,6 +522,34 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             self.assertEqual(self.run_view(service), 0)
         self.assertEqual(opened, [1, 1])
 
+    def test_source_follow_turns_only_an_open_zathura_window(self):
+        service = self.service()
+        self.position(service, 4)
+        captured = {"version": 1, "title": "Synthetic section", "target_id": self.identifier,
+                    "source": {"verified_pdf": "/cache/pdf/x.pdf"}, "sources": [{"pdf_page": 7, "printed_page": "5"}]}
+        answers, followed = [True, False], []
+        class Service:
+            def __init__(self, book):
+                pass
+            def capture(self, identifier):
+                return captured
+        def follow(request, index):
+            followed.append((request, index))
+            return answers.pop(0)
+        def native(payload, _, on_request):
+            packet = self.packet(3, 14)
+            for expected in (True, False):
+                result = on_request({"op": "source_follow", "packet": packet, "mode": "continuous"})
+                self.assertEqual(result, {"follow": {"active": expected}})
+            with self.assertRaises(ValueError):
+                on_request({"op": "source_follow", "page": 1, "packet": packet, "mode": "continuous"})
+            return 0, None
+        with patch("sol.terminal.source.SourceService", Service), \
+                patch("sol.terminal.source.follow_pdf", side_effect=follow), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+        self.assertEqual(followed, [(captured, 0), (captured, 0)])
+
     def test_stale_source_capture_is_replaced_on_the_next_request(self):
         from sol.terminal.source import SourceError
         captures = []

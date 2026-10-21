@@ -20,6 +20,8 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import zlib
 
 from sol.corpus.contract import CorpusError, load_snapshot, verify_snapshot_current
@@ -529,7 +531,7 @@ def open_pdf(request, page_index):
         if found is None:
             return None
         name, arguments = found
-        if name == "zathura" and _turn_companion(pdf, page):
+        if name == "zathura" and _show_on_companion(request, page_index):
             return name
         command = [name, *arguments(page, str(pdf))]
     else:
@@ -544,23 +546,82 @@ def open_pdf(request, page_index):
         raise SourceError(f"Cannot start PDF viewer {command[0]}: {error}") from error
     name = Path(command[0]).name
     _companion = (process, pdf) if name == "zathura" else None
+    if _companion is not None:
+        # A new window registers on D-Bus only once the PDF is loaded.
+        threading.Thread(target=_highlight_when_ready, args=(process, request, page_index),
+                         name="sol-pdf-highlight", daemon=True).start()
     return name
 
 
-def _turn_companion(pdf, page):
-    """Turn the Zathura window SOL opened on this PDF to `page`; False if there is none."""
+def follow_pdf(request, page_index=0):
+    """Turn SOL's open Zathura window to this passage; False when there is none.
+
+    Following never opens a window: it only moves one the reader opened with S.
+    """
+    _request_current(request)
+    if type(page_index) is not int or not 0 <= page_index < len(request["sources"]):
+        raise SourceError("Choose a source page index within this record's captured page list")
+    _verify_file(Path(request["source"]["verified_pdf"]), request["source"]["sha256"])
+    return _show_on_companion(request, page_index)
+
+
+def _show_on_companion(request, page_index):
+    """Turn the Zathura window SOL opened on this PDF to the passage; False if there is none."""
     global _companion
     if _companion is None:
         return False
     process, shown = _companion
-    gdbus = shutil.which("gdbus")
-    if shown != pdf or process.poll() is not None or not gdbus:
+    if shown != Path(request["source"]["verified_pdf"]) or process.poll() is not None or not shutil.which("gdbus"):
         _companion = None
+        return False
+    return _show(process, request, page_index)
+
+
+def _show(process, request, page_index):
+    page = request["sources"][page_index]["pdf_page"]
+    if not _zathura_call(process, "GotoPage", str(page - 1)):
+        return False
+    highlight = _highlight_arguments(request, page_index)
+    if highlight is not None:
+        _zathura_call(process, "HighlightRects", *highlight)
+    return True
+
+
+def _highlight_when_ready(process, request, page_index, attempts=40, pause=0.25):
+    for _ in range(attempts):
+        if process.poll() is not None:
+            return
+        if _show(process, request, page_index):
+            return
+        time.sleep(pause)
+
+
+def _highlight_arguments(request, page_index):
+    """HighlightRects arguments: the recorded box on the shown page, and on the passage's other pages.
+
+    Boxes are PDF points from the page's top-left corner, which is what Zathura
+    expects; pages are zero-based. None when the passage has no recorded box.
+    """
+    rows = request["sources"]
+    def numbers(box):
+        return ", ".join(repr(float(value)) for value in box)
+    primary = [f"({numbers(rows[page_index]['bbox'])})"] if "bbox" in rows[page_index] else []
+    secondary = [f"(uint32 {row['pdf_page'] - 1}, {numbers(row['bbox'])})"
+                 for index, row in enumerate(rows) if index != page_index and "bbox" in row]
+    if not primary and not secondary:
+        return None
+    return [str(rows[page_index]["pdf_page"] - 1), "@a(dddd) [" + ", ".join(primary) + "]",
+            "@a(udddd) [" + ", ".join(secondary) + "]"]
+
+
+def _zathura_call(process, method, *arguments):
+    gdbus = shutil.which("gdbus")
+    if not gdbus:
         return False
     try:
         result = subprocess.run([gdbus, "call", "--session", "--dest", f"org.pwmt.zathura.PID-{process.pid}",
-                                 "--object-path", "/org/pwmt/zathura", "--method", "org.pwmt.zathura.GotoPage",
-                                 str(page - 1)], capture_output=True, timeout=5)
+                                 "--object-path", "/org/pwmt/zathura", "--method", f"org.pwmt.zathura.{method}",
+                                 *arguments], capture_output=True, timeout=5)
     except (OSError, subprocess.SubprocessError):
         return False
     return result.returncode == 0 and b"true" in result.stdout

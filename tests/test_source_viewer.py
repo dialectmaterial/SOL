@@ -354,10 +354,14 @@ class SourceViewerTests(unittest.TestCase):
         found = {"zathura": "/bin/zathura", "gdbus": "/bin/gdbus"}
         with patch.dict(os.environ, {"WAYLAND_DISPLAY": "wayland-1"}), \
                 patch("sol.terminal.source.shutil.which", side_effect=found.get), \
+                patch("sol.terminal.source.threading.Thread") as thread, \
                 patch("sol.terminal.source.subprocess.Popen") as popen:
             self.assertEqual(open_pdf(request, 1), "zathura")
             self.assertEqual(popen.call_args.args[0], ["/bin/zathura", "--page=3", snapshot])
             self.assertTrue(popen.call_args.kwargs["start_new_session"])
+            # The new window is highlighted once it is on D-Bus, in the background.
+            self.assertEqual(thread.call_args.kwargs["args"], (popen.return_value, request, 1))
+            thread.return_value.start.assert_called_once_with()
             # The window SOL opened is turned to the next page instead of duplicated.
             popen.return_value.poll.return_value = None
             popen.return_value.pid = 4242
@@ -365,13 +369,47 @@ class SourceViewerTests(unittest.TestCase):
                        return_value=SimpleNamespace(returncode=0, stdout=b"(true,)\n")) as run:
                 self.assertEqual(open_pdf(request, 0), "zathura")
             self.assertEqual(popen.call_count, 1)
-            self.assertIn("org.pwmt.zathura.PID-4242", run.call_args.args[0])
-            self.assertEqual(run.call_args.args[0][-1], "0")
+            turn, highlight = (call.args[0] for call in run.call_args_list)
+            self.assertIn("org.pwmt.zathura.PID-4242", turn)
+            self.assertEqual(turn[-2:], ["org.pwmt.zathura.GotoPage", "0"])
+            # The passage's recorded box on that page, in PDF points from the top left.
+            self.assertEqual(highlight[-4:], ["org.pwmt.zathura.HighlightRects", "0",
+                                              "@a(dddd) [(20.0, 20.0, 140.0, 140.0)]", "@a(udddd) []"])
             # Once that window is closed, a new one opens.
             popen.return_value.poll.return_value = 0
             open_pdf(request, 0)
             self.assertEqual(popen.call_count, 2)
             self.assertEqual(popen.call_args.args[0], ["/bin/zathura", "--page=1", snapshot])
+
+    def test_highlight_marks_the_box_on_its_page_and_on_the_passages_other_pages(self):
+        request = {"sources": [{"pdf_page": 7, "bbox": [1, 2.5, 3, 4]}, {"pdf_page": 8, "bbox": [5, 6, 7, 8]},
+                               {"pdf_page": 9}]}
+        self.assertEqual(source_module._highlight_arguments(request, 0),
+                         ["6", "@a(dddd) [(1.0, 2.5, 3.0, 4.0)]", "@a(udddd) [(uint32 7, 5.0, 6.0, 7.0, 8.0)]"])
+        self.assertEqual(source_module._highlight_arguments(request, 2),
+                         ["8", "@a(dddd) []", "@a(udddd) [(uint32 6, 1.0, 2.5, 3.0, 4.0), "
+                                              "(uint32 7, 5.0, 6.0, 7.0, 8.0)]"])
+        self.assertIsNone(source_module._highlight_arguments({"sources": [{"pdf_page": 3}]}, 0))
+
+    def test_following_turns_only_a_window_sol_opened_and_never_opens_one(self):
+        request = self.service.capture(PASSAGE)
+        self.addCleanup(setattr, source_module, "_companion", None)
+        found = {"gdbus": "/bin/gdbus"}
+        ok = SimpleNamespace(returncode=0, stdout=b"(true,)\n")
+        with patch("sol.terminal.source.shutil.which", side_effect=found.get), \
+                patch("sol.terminal.source.subprocess.Popen") as popen, \
+                patch("sol.terminal.source.subprocess.run", return_value=ok) as run:
+            source_module._companion = None
+            self.assertFalse(source_module.follow_pdf(request))
+            window = SimpleNamespace(pid=77, poll=lambda: None)
+            source_module._companion = (window, Path(request["source"]["verified_pdf"]))
+            self.assertTrue(source_module.follow_pdf(request))
+            self.assertEqual(run.call_count, 2)  # turn, then highlight
+            closed = SimpleNamespace(pid=77, poll=lambda: 0)
+            source_module._companion = (closed, Path(request["source"]["verified_pdf"]))
+            self.assertFalse(source_module.follow_pdf(request))
+            self.assertIsNone(source_module._companion)
+        popen.assert_not_called()
 
     def test_pdf_viewer_is_configurable_and_never_guessed_without_a_display(self):
         request = self.service.capture(PASSAGE)
