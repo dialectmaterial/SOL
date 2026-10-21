@@ -736,7 +736,7 @@ class SentenceStudyTests(unittest.TestCase):
                 self.assertIn("punctuation-rules-v1", lines[-1])
                 (words_cell, beginning, where), = tui_sentences.rows(count)
                 self.assertEqual((words_cell, where), ("13", "Synthetic section | p. 7"))
-                self.assertTrue(text.startswith(beginning))
+                self.assertTrue(text.startswith(beginning.removesuffix('…')))
                 source = tui_sentences.source(count, 0)
                 self.assertEqual((source["id"], source["start"]), (self.identifier, 0))
         saved = tui_sentences.save(count, data_home=self.root / "data")
@@ -879,7 +879,7 @@ class RefinedLayoutTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             app.show_result(count, None)
             await pilot.pause()
             self.assertEqual([str(c.label) for c in app.query_one('#frequencies').columns.values()],
-                             ['Word', 'Target', 'per 10,000'])
+                             ['Word', 'Target', 'per 10k'])
             self.assertNotIn('Reference:', str(app.query_one('#summary').render()))
             self.assertIn('1 input (', str(app.query_one('#summary').render()))
             self.assertFalse(app.query_one('#export-row').display)
@@ -975,3 +975,22 @@ class TfidfStudyTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             contract.reindex(corpus)
             with self.assertRaises(core.ProtocolError):
                 tfidf.run(real, 'section')
+
+
+class PresentationHelperTests(unittest.TestCase):
+    def test_beginnings_end_at_a_word_with_an_ellipsis(self):
+        from sol.essence.tui import sentences as tui_sentences
+        long = "True, the individual is more than just restrictions on all sides and yet nothing"
+        self.assertEqual(tui_sentences._beginning(long), "True, the individual is more than just restrictions on all…")
+        self.assertEqual(tui_sentences._beginning("  A  short\nsentence "), "A short sentence")
+        self.assertEqual(tui_sentences._beginning("x" * 70), "x" * 60 + "…")
+
+    def test_a_section_scope_is_named_by_its_title_and_first_page(self):
+        from types import SimpleNamespace
+        passage = SimpleNamespace(path=("BEING", "quality", "p1"), printed_page=84,
+                                  node=SimpleNamespace(title="Quality"))
+        book = SimpleNamespace(passages=[passage])
+        part = {"scope": {"kind": "section", "path": "/BEING/quality"}}
+        self.assertEqual(tui_words.scope_name(book, part), "Quality, from p. 84")
+        self.assertEqual(tui_words.scope_name(None, part), "/BEING/quality")
+        self.assertEqual(tui_words.scope_name(book, {"scope": {"kind": "corpus"}}), "corpus")

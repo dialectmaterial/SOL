@@ -14,7 +14,7 @@ replace it with the agent's next one; Git history keeps the old ones.
 
 ## Claude Code: Visual audit of ESSENCE's screens
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `claude/essence-audit`
 **Requested:** 21 October 2026, by the maintainer via Claude
 

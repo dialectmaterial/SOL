@@ -58,6 +58,18 @@ def comparison_engine():
     return comparison
 
 
+def scope_name(book, part):
+    """How a summary names an input's scope: a section by its title, not its corpus path."""
+    path = part["scope"].get("path")
+    if not path or book is None:
+        return path or part["scope"]["kind"]
+    from sol.core.paths import display_path
+    for passage in book.passages:
+        if len(passage.path) > 1 and display_path(passage.path[:-1]) == path:
+            return f"{passage.node.title}, from p. {passage.printed_page}"
+    return path
+
+
 def reader_section(book, target_id):
     """The reader path of the section holding the reader's passage."""
     from sol.core.paths import display_path
@@ -257,7 +269,7 @@ def summary(count):
         if part is None:
             return f"{name}: none"
         totals = part["summary"]
-        where = part["scope"].get("path") or part["scope"]["kind"]
+        where = scope_name(count.book, part)
         return (f"{name}: {totals['token_count']:,} tokens, {totals['type_count']:,} distinct words, "
                 f"{totals['input_count']:,} input{'s' if totals['input_count'] != 1 else ''} ({part['provider']}, {where})")
     if count.comparison is None:
