@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from sol.workspace.diagnostics import reference_data, review_queue, workspace_health
+from sol.being.workspace.diagnostics import reference_data, review_queue, workspace_health
 
 
 CORPUS = "aaaaaaaa-0000-4000-8000-000000000001"

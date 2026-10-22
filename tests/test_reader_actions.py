@@ -14,9 +14,9 @@ from unittest.mock import patch
 
 from sol.core.models import Book, Node, Passage, node_path
 from sol.core.paths import display_path, resolve_path
-from sol.reader.actions import ReaderActions, ReadingSession, context_passages
-from sol.workspace.reader import WorkspaceReader
-from sol.workspace.store import Workspace, WorkspaceConflict, WorkspaceError
+from sol.being.actions import ReaderActions, ReadingSession, context_passages
+from sol.being.workspace.reader import WorkspaceReader
+from sol.being.workspace.store import Workspace, WorkspaceConflict, WorkspaceError
 
 
 CORPUS_ID = 'dddddddd-0000-4000-8000-000000000001'
@@ -192,7 +192,7 @@ class ReaderActionsTests(unittest.TestCase):
         statement = '''
 import json, sys
 from sol.core.models import Book, Node, Passage
-from sol.reader.actions import ReaderActions
+from sol.being.actions import ReaderActions
 root = Node('', 'Invented', 1)
 leaf = Node('sample.txt', 'Sample', 1, parent=root)
 root.children = (leaf,)
@@ -211,7 +211,7 @@ print(json.dumps(sorted(sys.modules)))
                                 cwd=Path(__file__).resolve().parents[1],
                                 text=True, capture_output=True, check=True)
         modules = set(json.loads(result.stdout))
-        for prefix in ('sol.reader.app', 'sol.workspace', 'sol.terminal', 'sol.corpus',
+        for prefix in ('sol.reader.app', 'sol.being.workspace', 'sol.terminal', 'sol.corpus',
                        'prompt_toolkit', 'markdown_it', 'openai'):
             with self.subTest(prefix=prefix):
                 self.assertFalse(any(name == prefix or name.startswith(prefix + '.')

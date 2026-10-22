@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### BEING's code moves into its divisions — 22 October 2026
+
+Restructuring stage D, BEING lane: the Neovim reader is `sol.being.neovim`
+(`neovim.py` is now `host.py`, `neovim_reader.py` is `reader.py`,
+`reader_channel.py` is `channel.py`; the Lua files and fonts moved with it);
+the reading session, surface, rendering and shell are in `sol.being`; layout
+geometry is in `sol.being.quantity`; search, outline and typography are in
+`sol.being.quality`; workspaces are `sol.being.workspace`. Code is moved, not
+rewritten; commands, workspaces and behaviour are unchanged, and `sol-window`
+keeps its name (reinstall to refresh its entry point).
+
 ### The logical divisions exist — 22 October 2026
 
 Restructuring stage B: empty packages for BEING (Quality, Quantity, Measure),

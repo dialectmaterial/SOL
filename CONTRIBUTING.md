@@ -47,17 +47,17 @@ task, reviewed before merging.
 | Command syntax and execution mode | `sol/reader/options.py` |
 | Startup and dispatch | `sol/reader/app.py` |
 | First-run PDF import and actor/workspace selection | `sol/reader/onboarding.py`, `sol/reader/launch.py` |
-| Optional book command interface | `sol/reader/shell.py` |
-| One-shot and book-shell text rendering | `sol/reader/render.py` |
-| Semantic reading cursor, selection and history | `sol/reader/actions.py` |
-| Single fullscreen reader | `sol/terminal/neovim_reader.py`, `sol/terminal/neovim.py`, `sol/terminal/neovim.lua` |
-| Reader outline | `sol/reader/structure.py`, `sol/terminal/neovim_tree.lua` |
+| Optional book command interface | `sol/being/shell.py` |
+| One-shot and book-shell text rendering | `sol/being/render.py` |
+| Semantic reading cursor, selection and history | `sol/being/actions.py`; layout geometry in `sol/being/quantity/navigation.py`; literal search in `sol/being/quality/search.py` |
+| Single fullscreen reader | `sol/being/neovim/reader.py` (controller), `sol/being/neovim/host.py` (payload, launch), `sol/being/neovim/neovim.lua` |
+| Reader outline | `sol/being/quality/structure.py`, `sol/being/neovim/neovim_tree.lua` |
 | Verified source pages and formula crops | `sol/terminal/source.py` |
 | Reader theme presets (presentation only) | `sol/terminal/theme.py`; names in `sol/reader/options.py` |
 | Complete checkout installation | `scripts/install.py` |
-| Checked read-only surface projections | `sol/reader/surface.py` |
+| Checked read-only surface projections | `sol/being/surface.py`; typography in `sol/being/quality/typography.py` |
 | Generic terminal escaping | `sol/terminal/text.py` |
-| Workspace operations and persistence guards | `sol/workspace/reader.py`, `sol/workspace/store.py` |
+| Workspace operations and persistence guards | `sol/being/workspace/reader.py`, `sol/being/workspace/store.py` |
 | Verified corpus and portable references | `sol.core`, backed by `sol/corpus/contract.py` |
 | Shared CommonMark visibility and plain-text projection | `sol/corpus/markdown.py` |
 

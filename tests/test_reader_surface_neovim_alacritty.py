@@ -75,8 +75,8 @@ class NeovimAlacrittyTests(unittest.TestCase):
     def test_native_visual_selection_and_owned_terminal_resize(self):
         if not shutil.which("alacritty") or not shutil.which("nvim") or not os.environ.get("DISPLAY"):
             self.skipTest("installed Neovim, Alacritty, and X11/XWayland display are required")
-        from sol.reader.surface import validate_packet
-        from sol.terminal.neovim import build_payload
+        from sol.being.surface import validate_packet
+        from sol.being.neovim.host import build_payload
 
         with tempfile.TemporaryDirectory(prefix="sol-neovim-alacritty-") as temporary:
             root = Path(temporary)
@@ -88,7 +88,7 @@ class NeovimAlacrittyTests(unittest.TestCase):
                 "dimensions = { columns = 100, lines = 28 }\n", encoding="utf-8")
             script.write_text(_SCENARIO, encoding="utf-8")
             source.write_text(json.dumps({**build_payload(sample), "navigation": {"next": False, "previous": False}, "notice": ""}, ensure_ascii=False), encoding="utf-8")
-            adapter = Path(__file__).resolve().parents[1] / "sol/terminal/neovim.lua"
+            adapter = Path(__file__).resolve().parents[1] / "sol/being/neovim/neovim.lua"
             environment = {**neovim_environment(root), "SOL_NVIM_INPUT": str(source),
                 "SOL_NVIM_OUTPUT": str(output), "SOL_NVIM_ADAPTER": str(adapter),
                 "SOL_NVIM_TEST_REPORT": str(report)}

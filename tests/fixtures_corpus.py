@@ -12,7 +12,7 @@ import tempfile
 from sol import core
 from sol.core.corpus import load_corpus_book
 from sol.corpus import contract
-from sol.reader.actions import ReaderActions
+from sol.being.actions import ReaderActions
 
 _GENERATED = {"markdown", "plain_text", "document", "context", "content_sha256"}
 

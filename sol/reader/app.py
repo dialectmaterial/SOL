@@ -27,17 +27,17 @@ from sol.core.paths import resolve_path as resolve_book_path
 from sol.reader.options import (DEFAULT_READER_THEME, DEFAULT_READER_WIDTH, LEGACY_READER_THEMES, READER_THEMES,
                                 ExecutionMode, build_parser, validate_options,
                                 validate_workspace_management)
-from sol.reader.actions import ReaderActions, ReadingSession, context_passages
+from sol.being.actions import ReaderActions, ReadingSession, context_passages
 from sol.reader.launch import interactive_input_available, shell_identity
 from sol.terminal.text import display_text, safe_output
-from sol.reader.render import (    sensible_width, page_range, source_line, fold_path, fold_body, render_passage,
+from sol.being.render import (    sensible_width, page_range, source_line, fold_path, fold_body, render_passage,
     passage_data, render_context, render_search_results, location_data, render_info,
     render_listing, render_tree, render_guide)
 
 
 def run_shell(*args, **kwargs):
     """Import the minimal book command interface only when selected."""
-    from sol.reader.shell import run_shell as run
+    from sol.being.shell import run_shell as run
     return run(*args, **kwargs)
 
 
@@ -56,7 +56,7 @@ def resolve_path(value: str | None, cwd: tuple[str, ...], root: Node = ROOT) -> 
 def run_reader(book: Book, workspace_reader=None, *, width=DEFAULT_READER_WIDTH,
                emphasis="auto", theme=DEFAULT_READER_THEME) -> int:
     """Load the terminal adapter only for interactive reading."""
-    from sol.terminal.neovim_reader import run_reader as run_view
+    from sol.being.neovim.reader import run_reader as run_view
 
     return run_view(book, workspace_reader, width=width, emphasis=emphasis, theme=theme)
 
@@ -74,8 +74,8 @@ def tree_data(node: Node, depth: int | None = None) -> dict:
 
 def run_workspace_management(args) -> int:
     """An exact delete request archives personal data; it never opens a book."""
-    from sol.workspace.lifecycle import delete_workspace, list_workspaces
-    from sol.workspace.reader import safe_output
+    from sol.being.workspace.lifecycle import delete_workspace, list_workspaces
+    from sol.being.workspace.reader import safe_output
 
     if args.workspace_list:
         rows = list_workspaces(args.workspace_dir)
@@ -90,7 +90,7 @@ def run_workspace_management(args) -> int:
             print("No recognized local workspaces.")
         return 0
     result = delete_workspace(args.workspace_delete, args.workspace_dir)
-    from sol.workspace.launch import forget_workspace
+    from sol.being.workspace.launch import forget_workspace
     try:
         forget_workspace(Path(result["path"]))
     except ValueError as error:
@@ -119,8 +119,8 @@ def emit_json(value: object) -> None:
 
 def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
     """Named durable state, kept separate from corpus-only one-shot reading."""
-    from sol.workspace.store import SCHEMA_VERSION, Workspace
-    from sol.workspace.reader import WorkspaceReader, workspace_path
+    from sol.being.workspace.store import SCHEMA_VERSION, Workspace
+    from sol.being.workspace.reader import WorkspaceReader, workspace_path
 
     identity = book.corpus_manifest.get("corpus_id")
     if not identity:
@@ -182,8 +182,8 @@ def run_workspace_cli(book: Book, args, width: int, color: bool) -> int:
             # Personal launch preferences are separate from the workspace
             # schema and are saved only after the selected store/service have
             # validated. One-shot inspection never changes the next author.
-            from sol.workspace.launch import remember_launch
-            from sol.workspace.profiles import register_actor
+            from sol.being.workspace.launch import remember_launch
+            from sol.being.workspace.profiles import register_actor
             register_actor(args.actor)
             remember_launch(args.actor, store.path, identity, book.corpus_manifest['source']['sha256'])
             return run_reader(book, reader, width=args.width or DEFAULT_READER_WIDTH,
@@ -233,11 +233,11 @@ def main(argv: list[str] | None = None) -> int:
         if mode in (ExecutionMode.READER, ExecutionMode.DYNAMIC_STRUCTURE):
             # Refuse an unavailable view before corpus discovery, onboarding,
             # actor registration or opening/creating a personal workspace.
-            from sol.terminal.neovim import validate_environment
+            from sol.being.neovim.host import validate_environment
             validate_environment(args.width or DEFAULT_READER_WIDTH)
             args.theme = args.theme or configured_theme(READER_THEMES, LEGACY_READER_THEMES) or DEFAULT_READER_THEME
             # The opening screen covers loading; it steps aside for any prompt.
-            from sol.terminal import splash
+            from sol.being.neovim import splash
             splash.start(args.theme)
         if mode is ExecutionMode.SET_THEME:
             configuration = save_theme(args.set_theme, READER_THEMES)
@@ -300,8 +300,8 @@ def main(argv: list[str] | None = None) -> int:
                                    "Press s in the reader to see a passage's printed source."))
             return 0
         if mode is ExecutionMode.REVIEW_QUEUE:
-            from sol.workspace.diagnostics import review_queue
-            from sol.workspace.reader import render_review_queue
+            from sol.being.workspace.diagnostics import review_queue
+            from sol.being.workspace.reader import render_review_queue
             within = None if args.within is None else resolve_path(args.within, (), book.root)[1]
             rows = review_queue(book, {"reviews": []}, within, 20 if args.limit is None else args.limit)
             if args.json:
@@ -315,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print(render_tree(book.root, depth=args.depth))
         elif mode is ExecutionMode.DYNAMIC_STRUCTURE:
-            from sol.terminal.neovim_reader import run_reader as run_native_reader
+            from sol.being.neovim.reader import run_reader as run_native_reader
             return run_native_reader(book, width=args.width or DEFAULT_READER_WIDTH,
                                      start_tree=True, tree_depth=args.depth or 2, theme=args.theme)
         elif mode is ExecutionMode.GUIDE:
@@ -409,8 +409,8 @@ def cli(argv: list[str] | None = None) -> int:
 def _close_splash():
     """A refusal or error before Neovim starts must not leave the opening
     screen up; once Neovim has drawn it is already gone and this does nothing."""
-    if "sol.terminal.splash" in sys.modules:
-        sys.modules["sol.terminal.splash"].stop()
+    if "sol.being.neovim.splash" in sys.modules:
+        sys.modules["sol.being.neovim.splash"].stop()
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from sol.corpus.markdown import plain_text
-from sol.reader.typography import Typography, TypographySpan, map_typography
+from sol.being.quality.typography import Typography, TypographySpan, map_typography
 
 
 HAS_COMMONMARK = importlib.util.find_spec("markdown_it") is not None
@@ -19,7 +19,7 @@ class TypographyFallbackTests(unittest.TestCase):
     def test_import_stays_dependency_light(self):
         result = subprocess.run([
             sys.executable, "-S", "-c",
-            "import sys; import sol.reader.typography; "
+            "import sys; import sol.being.quality.typography; "
             "assert 'markdown_it' not in sys.modules; "
             "assert 'prompt_toolkit' not in sys.modules; "
             "assert 'sol.corpus.contract' not in sys.modules",
@@ -157,7 +157,7 @@ class CommonMarkTypographyTests(unittest.TestCase):
                 self.assertIn("disagree", result.reason)
 
     def test_mapping_contract_drift_explicitly_degrades(self):
-        with patch("sol.reader.typography._project", return_value=("changed", (), ())):
+        with patch("sol.being.quality.typography._project", return_value=("changed", (), ())):
             result = map_typography("A *term*.", "A term.")
         self.assertTrue(result.degraded)
         self.assertEqual(result.spans, ())

@@ -412,7 +412,7 @@ class ReaderActions:
         return self.set_cursor(max(0, min(len(current.text), self.cursor_offset + delta)))
 
     def _move_vertical(self, rows, width=None, *, layout=None):
-        from sol.reader.navigation import source_layout, validate_layout, vertical_offset
+        from sol.being.quantity.navigation import source_layout, validate_layout, vertical_offset
         if type(rows) is not int:
             raise ValueError("cursor row movement must be an integer")
         current = self.snapshot().current
@@ -449,7 +449,7 @@ class ReaderActions:
         A selection (including an adapter's empty anchor) remains passage-local.
         Row budgets never skip across several passages or wrap the reading scope.
         """
-        from sol.reader.navigation import source_layout, validate_layout
+        from sol.being.quantity.navigation import source_layout, validate_layout
         if type(rows) is not int:
             raise ValueError("cursor row movement must be an integer")
         if type(selecting) is not bool:
@@ -516,7 +516,7 @@ class ReaderActions:
 
     def search_occurrences(self):
         """Derive matches from immutable text values; never cache corpus trust."""
-        from sol.reader.search import search_projection
+        from sol.being.quality.search import search_projection
         by_id = {p.identifier: p for p in self.book.passages}
         try:
             passages = [by_id[p.identifier] for p in self.results]
@@ -734,7 +734,7 @@ class ReaderActions:
             raise ValueError("this result no longer matches the query; search again")
         def change():
             passage = self._open_resolution(identifier)
-            from sol.reader.search import search_projection
+            from sol.being.quality.search import search_projection
             projection = search_projection(passage.text, self.search_query,
                 whole_word=self.search_whole_word, facsimile_labels=passage.facsimile_labels)
             if not projection.spans and not projection.degraded:
@@ -752,7 +752,7 @@ class ReaderActions:
 
     def search_highlights(self):
         """Derived source ranges, never a second selection or persistent ID."""
-        from sol.reader.search import SearchProjection, search_projection
+        from sol.being.quality.search import SearchProjection, search_projection
         current = self._current()
         if current is None or self.search_query is None:
             return SearchProjection(())

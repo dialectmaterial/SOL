@@ -374,7 +374,7 @@ original = builtins.__import__
 def guarded(name, *args, **kwargs):
     if name.startswith(('markdown_it', 'prompt_toolkit', 'textual', 'rich', 'fitz',
                         'pypdf', 'pdfplumber', 'opendataloader', 'torch', 'tensorflow',
-                        'sol.workspace', 'sol.reader.legacy_pdf', 'sol.corpus.extraction',
+                        'sol.being.workspace', 'sol.reader.legacy_pdf', 'sol.corpus.extraction',
                         'sol.terminal.prompt', 'sol.terminal.comparison', 'sol.terminal.source')):
         raise AssertionError('Unexpected reference dependency: ' + name)
     return original(name, *args, **kwargs)

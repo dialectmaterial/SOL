@@ -15,7 +15,7 @@ import re
 import textwrap
 
 from sol.core.references import Reference, resolve_reference
-from sol.workspace.store import Workspace, WorkspaceError, _position
+from sol.being.workspace.store import Workspace, WorkspaceError, _position
 from sol.terminal.text import safe_output
 
 
@@ -138,7 +138,7 @@ class WorkspaceReader:
                                  "Reindex if necessary, then reopen SOL before continuing. " + freshness["reason"])
 
     def health(self):
-        from sol.workspace.diagnostics import workspace_health
+        from sol.being.workspace.diagnostics import workspace_health
         report = workspace_health(self.book, self.store.export())
         report["corpus_freshness"] = self.corpus_freshness()
         if report["corpus_freshness"]["state"] == "changed":
@@ -156,7 +156,7 @@ class WorkspaceReader:
         snapshot = self.store.export()
         if format == 'json':
             return json.dumps(snapshot, ensure_ascii=False, indent=2)
-        from sol.workspace.export import render_workspace_markdown
+        from sol.being.workspace.export import render_workspace_markdown
         return render_workspace_markdown(self.book, snapshot, workspace_name=self.store.path.stem,
                                          include_passages=include_passages, freshness=self.corpus_freshness())
 
@@ -184,7 +184,7 @@ class WorkspaceReader:
         return resolve_reference(self.book, session.current().identifier if identifier is None else identifier)
 
     def queue(self, within=None, limit=20):
-        from sol.workspace.diagnostics import review_queue
+        from sol.being.workspace.diagnostics import review_queue
         return review_queue(self.book, self.store.export(), within, limit)
 
     def render_queue(self, rows):

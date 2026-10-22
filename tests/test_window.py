@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from sol.terminal import window
+from sol.being.neovim import window
 
 
 class WindowTests(unittest.TestCase):

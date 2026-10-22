@@ -13,7 +13,7 @@ import re
 import sqlite3
 from uuid import UUID
 
-from sol.workspace.profiles import actor_name
+from sol.being.workspace.profiles import actor_name
 
 
 APPLICATION_ID = 0x534F4C4C  # SOLL

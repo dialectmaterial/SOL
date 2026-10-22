@@ -13,11 +13,12 @@ from fixtures_corpus import CorpusFixture
 from sol import core
 from sol.core.paths import display_path, resolve_path
 from sol.reader import app
-from sol.reader.actions import ReaderActions
-from sol.terminal import neovim, neovim_reader
+from sol.being.actions import ReaderActions
+from sol.being.neovim import host as neovim
+from sol.being.neovim import reader as neovim_reader
 from sol.terminal.theme import THEMES
-from sol.workspace.reader import WorkspaceReader
-from sol.workspace.store import Workspace, WorkspaceConflict
+from sol.being.workspace.reader import WorkspaceReader
+from sol.being.workspace.store import Workspace, WorkspaceConflict
 
 
 RETIRED = "dddddddd-0000-4000-8000-000000000004"
@@ -65,7 +66,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             return neovim_reader.run_reader(self.book, service, **kwargs)
 
     def test_typography_reuse_keeps_payloads_detached_and_source_checks_live(self):
-        from sol.reader.typography import Typography, TypographySpan
+        from sol.being.quality.typography import Typography, TypographySpan
         calls = []
         def project(markdown, text):
             calls.append((markdown, text))
@@ -336,7 +337,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             self.assertEqual(shown["restore"]["reference"]["reference"]["target_id"], self.book.passages[2].identifier)
             return 0, {"action": "quit", "packet": shown["restore"]}
         with patch.object(neovim, "launch_payload", side_effect=native), \
-                patch("sol.workspace.store.Workspace", side_effect=AssertionError("No personal store")):
+                patch("sol.being.workspace.store.Workspace", side_effect=AssertionError("No personal store")):
             self.assertEqual(self.run_view(), 0)
         self.assertEqual(self.files(), before)
 
@@ -384,7 +385,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             self.assertEqual(shown["restore"]["reference"]["reference"]["target_id"], self.book.passages[1].identifier)
             return 0, {"action": "quit", "packet": shown["restore"]}
         with patch.object(neovim, "launch_payload", side_effect=native), \
-                patch("sol.workspace.store.Workspace", side_effect=AssertionError("No personal store")):
+                patch("sol.being.workspace.store.Workspace", side_effect=AssertionError("No personal store")):
             self.assertEqual(self.run_view(), 0)
         self.assertEqual(self.files(), before)
 
