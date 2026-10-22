@@ -4,7 +4,7 @@
 **Edition:** Hegel, *The Science of Logic*, trans. George di Giovanni (Cambridge, 2010): SOL's CORE edition, read in the local verified corpus through `sol read`. Page numbers are the edition's printed pages as the corpus records them for the **start of each section**; a claim about a passage inside a longer section cites that section's start and names the section. No German text was consulted for this pass.
 **Method:** [SPECULATIVE §5.2](../../SPECULATIVE.md#52-required-reasoning-protocol): read, interpret, inspect, propose. Nothing is moved. Paraphrase is mine; the few quoted phrases are short and attributed. The module facts come from `INVENTORY_BEING.md` (PR #87) and from the code itself.
 
-**Read for this pass:** the general division of being (p. 56); the introductions to Quality (p. 58), Existence (p. 83), Something (p. 88), *Determination, constitution and limit* (p. 95), Being-for-itself (p. 126), Quantity (p. 152), *Continuous and discrete magnitude* (p. 165), *Number* (p. 168), *Ratio* (p. 271), Measure (p. 282), *The rule* (p. 291), *Nodal lines of measure-relations* (p. 318), *Absolute indifference* (p. 326) and *Transition into essence* (p. 333). Not read in full: the long remarks on mathematics (pp. 155–280 passim), elective affinity (p. 308), the measureless (p. 323). Proposals that would depend on those sections are marked as such.
+**Read for this pass** (corpus paths in §7): the general division of being (p. 56); the introductions to Quality (p. 58), Existence (p. 83), Something (p. 88), *Determination, constitution and limit* (p. 95), Being-for-itself (p. 126), Quantity (p. 152), *Continuous and discrete magnitude* (p. 165), *Number* (p. 168), *Ratio* (p. 271), Measure (p. 282), *The rule* (p. 291), *Nodal lines of measure-relations* (p. 318), *Absolute indifference* (p. 326) and *Transition into essence* (p. 333). Not read in full: the long remarks on mathematics (pp. 155–280 passim), elective affinity (p. 308), the measureless (p. 323). Proposals that would depend on those sections are marked as such.
 
 ## 1. What the text says
 
@@ -42,12 +42,12 @@ Being is determined in three ways. **First**, as determinateness as such: qualit
 
 1. **Quality.** Does it concern what the text *is* in its own determinateness? That covers its forms and boundaries: where a passage or section begins and ends, how it is marked, what distinguishes it from its neighbours. If changing the determination would change which text is meant, it is qualitative.
 2. **Quantity.** Does it concern determinations that can change "without altering the fact itself" (p. 56)? Examples are position in a sequence, counts, offsets, width, layout geometry and scrolling. The book stays the same book while these vary; this indifference is the mark of quantity, not the mere presence of numbers.
-3. **Measure.** Does it concern a quantity that *carries* qualitative meaning? Examples are a number whose value fixes which thing is meant, a correspondence between two independently measured forms of the same text, or a threshold where quantitative change becomes a qualitative one. *The rule* (p. 291) also warns that applying an external yardstick is not yet measure in the specific sense.
+3. **Measure.** Is a quantity *constitutive* of what something qualitatively is? That means sides that are themselves measures, whose quantitative relation determines a quality (pp. 302–303), or a threshold where quantitative change turns into a qualitative one (p. 318). A number that identifies or locates a thing is addressability, not measure, and applying an external yardstick is only the external rule (p. 291). On this pass no BEING-side module meets the criterion.
 
 Two consequences follow, both in line with [SPECULATIVE §9](../../SPECULATIVE.md#9-risks-and-criteria-of-success)'s risks:
 
 - **Not everything belongs in a subdivision.** The reading environment as a whole, the Neovim reader, *presents* all three determinations at once. Filing it under one of them would be the superficial classification SPECULATIVE warns against. I propose that such code sit at the BEING division root (`sol/being/`), with subdivisions holding only code whose work is one determination.
-- **Quantity is the most secure placement here; Measure is the most tempting and the least secure.** Code that merely uses numbers is not quantity in Hegel's sense unless its point is indifference. Code that compares two things is not measure unless the comparison makes qualitative identity depend on quantity. Most "measuring" code would fall under the external rule of p. 291, not under specific measure.
+- **Quantity is the most secure placement here; Measure is the most tempting and the least secure.** Code that merely uses numbers is not quantity in Hegel's sense unless its point is indifference. Code that compares or locates is not measure unless a quantitative relation constitutes what something is. Most "measuring" code falls under the external rule of p. 291 or under CORE's addressability. `sol/being/measure/` stays empty for now; an empty division is preferable to a forced one.
 
 ## 3. Proposed placements
 
@@ -100,19 +100,15 @@ All rows are **proposed** (SPECULATIVE's "provisional"). Each names its alternat
     - Of `theme`, only the palette data concerns other components; see 3.6.
   - *The splash:* its animation is the opening triad of Quality (being, nothing, becoming, pp. 59–82). That is a depiction, not a reason to file the splash under Quality.
   - *Alternative:* terminal infrastructure outside the hierarchy. Rejected because SPECULATIVE names the reader as BEING's.
-  - *Consequence:* `neovim_reader` imports `sol.essence.tui` directly. That BEING → ESSENCE edge should be removed when the package moves, by launching ESSENCE through its CLI entry (the return path already uses no import).
+  - *Consequence:* ESSENCE already runs as its own process (`python -m sol.essence.tui`, from `essence_panel` in `neovim_reader`). The remaining BEING → ESSENCE imports are the availability probe (`textual_available`, `TEXTUAL_HINT`) and `tui.context.write_context`, which writes the context file ESSENCE reads. Decoupling means moving the context file's format to a neutral module both sides import, and probing availability without importing ESSENCE's interface package. A changed launch command alone removes neither. The return path already uses no import.
 
 ### 3.4 Printed source: `terminal.source`
 
-- **→ `sol/being/measure/` for the source view; verified snapshot and capture to CORE** (confidence: low-medium).
-  - *What the code does:* the typed canonical text and the printed page are two self-subsisting forms of the same record. The source view relates them through quanta: page number, PDF page, bounding box.
-  - *Why Measure:* that quantitative correspondence carries the qualitative claim *this is the same passage*. A wrong bounding box is not a slightly different passage but a different one. This is closer to the relation of self-subsisting measures (p. 302 ff.) than to the external rule. The external-rule reading (p. 291) is still possible: page coordinates as an arbitrary yardstick applied to the text. A closer reading of *Real measure* (pp. 302–318, not read in full) should decide between the two.
-  - *Split:*
-    - Snapshot verification, page capture and crops are provenance and addressability, which SPECULATIVE §4.1 assigns to CORE.
-    - The viewer (Zathura highlight and follow) is reading.
-  - *Alternatives:*
-    - all of it to CORE as provenance;
-    - all of it to the BEING root with the reader.
+- **Snapshot verification, page capture and crops → CORE; the viewer → `sol/being/` root with the reader. Measure stays an unresolved hypothesis** (confidence: medium for the split; none for Measure).
+  - *What the code does:* `SourceService.capture(identifier)` resolves an existing record and copies the source coordinates recorded for it (PDF page, printed page, bounding box); the viewer (Zathura highlight and follow) uses them to locate and mark that record on the printed page.
+  - *Why not Measure, for now:* a number that identifies or locates a thing is not by itself measure. *The rule* (p. 291) separates external comparison from specific measure; *Real measure* (p. 302) and *The relation of independent measures* (p. 303) concern sides that are themselves measures, whose quantitative relation *constitutes* a qualitative determination. Here the record's identity is fixed by CORE before any coordinate is read. A wrong bounding box *mislocates the same record*; it does not make a different passage. That is addressability and provenance (SPECULATIVE §4.1, CORE), not a constitutive measure-relation. An earlier draft of this note argued the opposite and overstated it.
+  - *The hypothesis kept open:* whether the relation between the typed text and its facsimile could ever be constitutive. For example, mathematics retyped from a crop is held to the crop until a person confirms it ([CORE §2](../../CORE.md#2-actual-artifact-and-identity-layers)). That needs the full reading of *Real measure* (pp. 302–325) before it is argued, not assumed.
+  - *Alternatives:* all of it to CORE as provenance; all of it to the BEING root with the reader.
 
 ### 3.5 Plain-terminal output: `reader.render`, `reader.shell`, `terminal.text`, `terminal.commands`
 
@@ -143,24 +139,20 @@ All rows are **proposed** (SPECULATIVE's "provisional"). Each names its alternat
 
 ### 3.7 Workspace: `sol.workspace`
 
-- **Store → CORE; the reading-side binding stays in BEING** — **(reserved)**.
-  - *What SPECULATIVE says:* §4.1 gives CORE "shared persistent research state". §4.2 requires that shared research state survive transitions between BEING and ESSENCE without either user interface owning the corpus.
-  - *What CORE.md says:* [CORE §7](../../CORE.md#7-workspaces-provenance-and-deliberate-correction) states "Workspaces are **BEING**, not CORE", and item 7 of its §8 checklist keeps CORE independent of "user workspace state".
-  - *A third view:* [BEING §2](../../BEING.md) says "Python/CORE owns … workspace persistence".
-  - *Why it is reserved:* the governing documents contradict each other here. Resolving it changes CORE's rules, not only a placement. The contradiction also has positive content. A personal reading record is *attributed* work done in BEING, yet it has to outlast the reading that produced it, which is the role of a shared service.
-  - *Proposal for the maintainer:*
-    - `store`, `time`, `catalog`, `lifecycle`, `profiles` and the launch preferences go to CORE, as the persistent service.
-    - `workspace.reader` (binding the store to the loaded book, guarded authored writes, resume) goes to the BEING root.
-    - `export` and `diagnostics` go to CORE.
-    - The workspace schema itself is unchanged, so no contract changes.
-  - *Alternatives:*
-    - all of the workspace to CORE;
-    - all of it stays in BEING (CORE §7 as written), with ESSENCE's study state kept separate as today.
-  - *Status:* no code moves until the maintainer decides.
+- **→ `sol/being/` root, as one package** — **Decision (maintainer, 22 October 2026): the workspace stays in BEING.**
+  - *The question:* SPECULATIVE §4.1 gives CORE "shared persistent research state"; [CORE §7](../../CORE.md#7-workspaces-provenance-and-deliberate-correction) states "Workspaces are **BEING**, not CORE", and item 7 of its §8 checklist keeps CORE independent of "user workspace state". This draft first proposed moving the store to CORE.
+  - *Why BEING:*
+    - what the workspace holds (notes on passages, named places, markers, reading position, each attributed to its author) is reading work: the immediate encounter with the text that SPECULATIVE §4.1 gives BEING;
+    - it is not shared today: only the reader uses it, and ESSENCE keeps its own study state without importing it;
+    - CORE stays the verified book and its addressing, avoiding the "dumping ground" SPECULATIVE §9 warns against;
+    - SPECULATIVE §3.2 restructures when growth calls for it, not in anticipation.
+  - *Root, not a subdivision:* the workspace records work on all three determinations; filing it under one would be classification by association.
+  - *When to revisit:* once ESSENCE actually needs to read or write the same research state (notes shown in ESSENCE, analysis results attached to passages), SPECULATIVE's assignment of *shared* state to CORE applies and the store moves or splits then.
+  - *Technical consequences:* `workspace.reader`'s import of `terminal.text` is replaced when both are placed (3.5); the schema is unchanged.
 
 ## 4. Answers to the inventory's stage C questions
 
-1. **Workspace:** a split, store to CORE and binding to BEING. It is **reserved**, because CORE §7 and SPECULATIVE disagree (3.7).
+1. **Workspace:** BEING, at the division root, by the maintainer's decision of 22 October 2026; it moves to CORE only once it is actually shared with ESSENCE (3.7).
 2. **Reading state:**
    - `navigation` is Quantity;
    - `search` is provisionally Quality, pending Codex's reading of reflection;
@@ -184,4 +176,29 @@ These are added to [ARCHITECTURE §9](../../ARCHITECTURE.md#9-placement-register
 
 - **Re-reading.** Read *Real measure* (pp. 302–325) and the mathematical remarks before implementing 3.4 or any placement under Measure. Today no module's placement under Measure rests on a full reading of that division.
 - **Search and the tokenizer.** Confirm the search and tokenizer questions with READING_ESSENCE (identity and difference).
-- **Order for stage D.** Proposed order: the Neovim reader package to the BEING root; `navigation` to Quantity; `typography` and `structure` to Quality; then the CORE-side moves. The workspace waits for the reserved decision. Each move gets its own pull request, with tests and the register status updated.
+- **Order for stage D.** Proposed order: the Neovim reader package to the BEING root; `navigation` to Quantity; `typography` and `structure` to Quality; then the CORE-side moves; the workspace with the reader package. Nothing goes under Measure on this pass. Each move gets its own pull request, with tests and the register status updated.
+
+## 7. Corpus paths
+
+Each cited section, its section-start page, and its virtual path in the local corpus (`sol read PATH --plain`). Pages are section starts, not the page of each sentence inside a section.
+
+| Section | Starts | Path |
+|---|---:|---|
+| General division of being | p. 56 | `/BEING/general-division-of-being.txt` |
+| Quality: introduction | p. 58 | `/BEING/i-determinateness-quality/00-introduction.txt` |
+| Being, nothing, becoming | p. 59 | `/BEING/i-determinateness-quality/1-being/` |
+| Existence: introduction | p. 83 | `/BEING/i-determinateness-quality/2-existence/00-introduction.txt` |
+| Something | p. 88 | `/BEING/i-determinateness-quality/2-existence/a-existence-as-such/c-something.txt` |
+| Determination, constitution and limit | p. 95 | `/BEING/i-determinateness-quality/2-existence/b-finitude/b-determination-constitution-and-limit.txt` |
+| Being-for-itself: introduction | p. 126 | `/BEING/i-determinateness-quality/3-being-for-itself/00-introduction.txt` |
+| Quantity: introduction | p. 152 | `/BEING/ii-magnitude-quantity/00-introduction.txt` |
+| Continuous and discrete magnitude | p. 165 | `/BEING/ii-magnitude-quantity/1-quantity/b-continuous-and-discrete-magnitude/00-introduction.txt` |
+| Number | p. 168 | `/BEING/ii-magnitude-quantity/2-quantum/a-number/00-introduction.txt` |
+| Ratio: introduction | p. 271 | `/BEING/ii-magnitude-quantity/3-ratio-or-the-quantitative-relation/00-introduction.txt` |
+| Measure: introduction | p. 282 | `/BEING/iii-measure/00-introduction.txt` |
+| The rule | p. 291 | `/BEING/iii-measure/1-specific-quantity/b-specifying-measure/a-the-rule.txt` |
+| Real measure: introduction | p. 302 | `/BEING/iii-measure/2-real-measure/00-introduction.txt` |
+| The relation of independent measures | p. 303 | `/BEING/iii-measure/2-real-measure/a-the-relation-of-independent-measures/00-introduction.txt` |
+| Nodal lines of measure-relations | p. 318 | `/BEING/iii-measure/2-real-measure/b-nodal-lines-of-measure-relations/00-introduction.txt` |
+| Absolute indifference | p. 326 | `/BEING/iii-measure/3-the-becoming-of-essence/a-absolute-indifference.txt` |
+| Transition into essence | p. 333 | `/BEING/iii-measure/3-the-becoming-of-essence/c-transition-into-essence.txt` |

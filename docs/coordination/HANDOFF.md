@@ -53,7 +53,7 @@ Write "None." rather than deleting a heading.
 - `INVENTORY_BEING.md` (#87) is referenced by name; it is still under review.
 
 ### Decisions requiring approval
-- **(reserved)** Workspace placement: SPECULATIVE §§4.1–4.2 give shared persistent research state to CORE; CORE §7 says workspaces are BEING's and its §8 item 7 keeps CORE independent of user workspace state. Proposed: store and services to CORE, the reading binding (`workspace.reader`) to BEING; schema unchanged. Nothing moves until the maintainer decides.
+- Workspace placement: decided by the maintainer on 22 October 2026, after review began. The workspace stays in BEING (root package) and moves to CORE only once ESSENCE shares it; recorded in READING_BEING §3.7, the register, ARCHITECTURE §2, CORE §1 and BEING §2.
 - Defaults: BEING-root placement for code that presents all three determinations (the Neovim reader, the session, the shell); the composition root, terminal escaping and themes outside the hierarchy.
 
 ## Restructuring stage A: BEING inventory — 22 October 2026
