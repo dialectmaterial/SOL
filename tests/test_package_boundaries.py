@@ -38,7 +38,7 @@ class PackageBoundaryTests(unittest.TestCase):
             "import sol.being.quality, sol.being.quantity, sol.being.measure, sol.concept, "
             "sol.essence.essence_as_reflection_within_itself, sol.essence.appearance, sol.essence.actuality")
         for name in ("sol.reader.app", "sol.terminal.neovim", "sol.workspace.store", "sol.corpus.contract",
-                     "sol.essence.words", "textual"):
+                     "sol.essence.essence_as_reflection_within_itself.words", "textual"):
             with self.subTest(module=name):
                 self.assertNotIn(name, modules)
 

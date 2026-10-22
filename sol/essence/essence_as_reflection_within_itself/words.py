@@ -12,8 +12,8 @@ import re
 import unicodedata
 import uuid
 
-from sol.essence.tokenization import NORMALIZATION, TOKENIZATION, word_tokens
-from sol.essence.word_inputs import CoreProvider, FileProvider, WordStudyError, _scope, load_input
+from sol.essence.essence_as_reflection_within_itself.tokenization import NORMALIZATION, TOKENIZATION, word_tokens
+from sol.essence.essence_as_reflection_within_itself.word_inputs import CoreProvider, FileProvider, WordStudyError, _scope, load_input
 
 
 MAX_RESULT_BYTES = 16 * 1024 * 1024

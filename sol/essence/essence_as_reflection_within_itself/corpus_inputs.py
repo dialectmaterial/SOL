@@ -4,7 +4,7 @@ import posixpath
 import re
 
 from sol import core
-from sol.essence.validation import TermExperimentError, _json, _json_value
+from sol.essence.essence_as_reflection_within_itself.validation import TermExperimentError, _json, _json_value
 
 _DOCTRINES = ("BEING", "ESSENCE", "CONCEPT")
 _TYPES = {"paragraph", "quotation", "list_item"}

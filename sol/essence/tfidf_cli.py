@@ -1,7 +1,7 @@
 """Headless TF-IDF adapter; files need neither CORE nor a UI."""
-from sol.essence.tfidf import analyze_tfidf, check_tfidf_result, encode_tfidf_result
+from sol.essence.essence_as_reflection_within_itself.tfidf import analyze_tfidf, check_tfidf_result, encode_tfidf_result
 from sol.essence.word_cli import _provider
-from sol.essence.word_inputs import WordStudyError
+from sol.essence.essence_as_reflection_within_itself.word_inputs import WordStudyError
 
 
 def render_tfidf(result):

@@ -508,7 +508,7 @@ def guard(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
 from sol.essence.cli import main
-from sol.essence.sentences import check_sentence_result
+from sol.essence.essence_as_reflection_within_itself.sentences import check_sentence_result
 from sol.core import load_snapshot
 output = io.StringIO()
 with contextlib.redirect_stdout(output):

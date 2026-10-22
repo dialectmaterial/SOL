@@ -140,7 +140,7 @@ def _file(provider):
 
 def _core(provider):
     # This adapter alone imports CORE and the established corpus projection.
-    from sol.essence.corpus_inputs import _binding, _current, _facsimile_spans, _fresh, _selection
+    from sol.essence.essence_as_reflection_within_itself.corpus_inputs import _binding, _current, _facsimile_spans, _fresh, _selection
 
     scope = _scope(provider.scope, "core")
     snapshot = _fresh(provider.snapshot)
