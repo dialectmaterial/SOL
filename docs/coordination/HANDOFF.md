@@ -37,7 +37,7 @@ Write "None." rather than deleting a heading.
 ## C3 projection-boundary proposal — 23 October 2026
 
 **Task:** [Codex A: C3 projection-boundary proposal](https://github.com/dialectmaterial/SOL/blob/6b9634ea9aa145218c333b7955ed68ed432ded9d/docs/coordination/CURRENT_TASK.md#codex-a-c3-projection-boundary-proposal), assigned directly by the maintainer.
-**Branch / PR:** `codex/c3-projection-proposal` · publication pending; author does not merge.
+**Branch / PR:** `codex/c3-projection-proposal` · [#111](https://github.com/dialectmaterial/SOL/pull/111); author does not merge.
 **Last implementation commit:** `6b9634ea9aa145218c333b7955ed68ed432ded9d` (this report is committed afterward).
 
 ### Changed files
