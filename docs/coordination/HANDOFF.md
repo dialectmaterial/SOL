@@ -32,6 +32,39 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Stage D: ESSENCE relocation — 22 October 2026
+
+**Task:** [Codex A: ESSENCE relocation](https://github.com/dialectmaterial/SOL/blob/16703fcb0e2c938bd97070a2177b66f7e7834995/docs/coordination/CURRENT_TASK.md#codex-a-essence-relocation).
+**Branch / PR:** `codex/essence-relocation` · [relocation pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fessence-relocation); Claude reviews; author does not merge.
+**Last implementation commit:** `a9c49769299d82927d9efa0e9b95794b6bbe1810` (this report is committed afterward).
+
+### Changed files
+
+- `sol/essence/essence_as_reflection_within_itself/` — move all ten E1–E4 engine modules intact. Reversing the import-path substitutions reproduces every original module byte-for-byte. Stage C's cohesive reflection placement and alternatives remain the rationale; reread the CORE edition's doctrine/section openings and determining reflection (di Giovanni, Cambridge 2010; READING_ESSENCE L1–L2) before implementing.
+- `sol/essence/__init__.py`, CLI/UI adapters and affected tests — preserve all lazy public exports and TUI engine loading; update direct imports, dynamic module strings and patch targets. Keep CLI/catalog/UI locations (E5–E7), methods, versions, offsets, exception identity and v1 fixtures. No compatibility shims. Update the catalog's one moving `main` engine link; retain historical commit-pinned links.
+- `tests/test_packaging.py` — import every moved module from the built wheel outside the checkout, check absent old modules, lazy facade/TUI loading and public object identity. Existing archive, resources, entry-point and private-file exclusions still pass; setuptools discovery already includes the new package, so no packaging configuration change is needed.
+- `docs/ARCHITECTURE.md` §2 and E1–E4, `docs/ESSENCE.md`, `CHANGELOG.md` — current module paths and implemented stage D status, with the PR locator; keep placements provisional. `CURRENT_TASK.md` — only Codex A's status becomes `In review`.
+
+### Tests performed
+
+All Python checks used `/home/dima/Projects/code/sol/.venv/bin/python -B`.
+
+- `-m unittest discover -s tests` — **1,251 tests, OK (7 skipped, 4 expected failures)**, 113.427 s. The four sentence-rule limitations remain expected failures.
+- Focused word/comparison, sentence/provider, TF-IDF, prose, TUI and analysis-CLI suites — all pass. `-m unittest discover -s tests -p 'test_packaging.py'` — **21 tests, OK**, including wheel/sdist builds and installed resources.
+- Built again through the packaging fixture's public-file staging; pip-installed the wheel with `--no-deps --no-index` in a disposable venv. Outside the checkout: `sol --help`, `sol essence --help`, `python -I -B -m sol --help`, `python -I -B -m sol.essence.cli --help`, and all ten engine imports — OK, with imports verified under the installed venv.
+- `scripts/check_docs.py` and `git diff --check` — OK. Documentation check covers local links/anchors; external URLs are not network-checked.
+- Grepped every old dotted/file path and from-import across `sol/`, `tests/`, `scripts/`, `docs/`, Lua and `pyproject.toml`; Python AST checks also find no old engine from-imports. All 183 Python/Lua/config files are clear. Remaining old paths are historical stage A/C inventories, earlier handoffs and five catalog URLs pinned to `2fe28c3`; the task's source-path scope remains historical instruction. Current documentation and runtime references are updated.
+- Changed-file audit — public code/tests/docs only; no private corpus, source PDF, workspace or analysis export committed. Latest fetch still has `origin/main` at `16703fcb0e2c938bd97070a2177b66f7e7834995`.
+
+### Outstanding issues
+
+- No new linguistic accuracy or human UI acceptance claim; the pre-existing sentence limitations are unchanged.
+- The supplied worktree's shared Git metadata is read-only. All edits/checks stayed in `/home/dima/Projects/code/sol-codex-perf`; branch commits/publication use writable metadata at `/tmp/sol-essence-relocation.git` (`git --git-dir=/tmp/sol-essence-relocation.git …`). The original `.git` remains attached to its initial detached HEAD; use the published branch for review or reattach outside the sandbox.
+
+### Decisions requiring approval
+
+None reserved. Defaults: implement the reviewed E1–E4 placements as cohesive modules, retain E5–E7 at their present locations, and preserve historical evidence links and baseline inventories. Leave the PR open for Claude's review; do not merge.
+
 ## Stage C: reading the Doctrine of Essence — 22 October 2026
 
 **Task:** [Codex: Reading the Doctrine of Essence](https://github.com/dialectmaterial/SOL/blob/0f5156aa511f8305abf3bf6fd7719a4e51515d8d/docs/coordination/CURRENT_TASK.md#codex-reading-the-doctrine-of-essence).
