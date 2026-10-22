@@ -12,7 +12,7 @@ from unittest.mock import patch
 from fixtures_corpus import write_runtime_corpus
 from sol.core.config import configured_corpus
 from sol.corpus import contract
-from sol.reader import onboarding
+from sol.corpus import onboarding
 
 
 class FirstRunTests(unittest.TestCase):
@@ -64,10 +64,10 @@ class FirstRunTests(unittest.TestCase):
         self.assertEqual(before, {file.name: file.read_bytes() for file in self.output.iterdir()})
 
     def test_failure_to_remember_the_pdf_keeps_the_finished_import(self):
-        from sol.terminal.source import SourceError
+        from sol.core.source import SourceError
         with patch("builtins.input", return_value=str(self.source)), \
                 patch("sol.corpus.convert.convert", side_effect=self.converted_fixture), \
-                patch("sol.terminal.source.SourceService.set_pdf", side_effect=SourceError("Invented cache failure")):
+                patch("sol.core.source.SourceService.set_pdf", side_effect=SourceError("Invented cache failure")):
             onboarding.prepare_first_corpus()
         self.assertEqual(configured_corpus(), self.output)
         self.assertIn("sol --set-source-pdf PATH", onboarding.sys.stdout.getvalue())

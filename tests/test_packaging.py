@@ -98,6 +98,36 @@ class PackagingTests(unittest.TestCase):
         self.assertTrue(all(name in PACKAGE_FILES | PACKAGE_ASSETS
                             or ".dist-info/" in name for name in names))
 
+    def test_installed_reflection_engines_and_lazy_public_facade(self):
+        installed = Path(self.temporary.name) / "reflection-wheel"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        program = """
+import importlib, importlib.util, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import sol.essence as essence
+import sol.essence.tui.words, sol.essence.tui.sentences, sol.essence.tui.tfidf
+prefix = 'sol.essence.essence_as_reflection_within_itself'
+assert not any(name.startswith(prefix + '.') for name in sys.modules)
+assert 'textual' not in sys.modules
+for name in ('tokenization', 'word_inputs', 'corpus_inputs', 'words', 'validation',
+             'comparison', 'tfidf', 'sentences', 'sentence_inputs', 'prose'):
+    assert importlib.util.find_spec('sol.essence.' + name) is None, name
+    module = importlib.import_module(prefix + '.' + name)
+    assert Path(sys.argv[1]) in Path(module.__file__).parents, module.__file__
+for name in essence.__all__:
+    value = getattr(essence, name)
+    module = importlib.import_module(value.__module__)
+    assert module.__name__.startswith(prefix + '.'), name
+    assert value is getattr(module, name), name
+assert essence.WordStudyError is importlib.import_module(prefix + '.word_inputs').WordStudyError
+assert essence.SentenceStudyError is importlib.import_module(prefix + '.sentences').SentenceStudyError
+"""
+        result = subprocess.run([sys.executable, "-I", "-B", "-c", program, str(installed)],
+                                cwd=self.temporary.name, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_installed_encyclopedia_loads_offline_without_optional_dependencies(self):
         installed = Path(self.temporary.name) / "installed-encyclopedia"
         with zipfile.ZipFile(self.wheel) as archive:
@@ -217,6 +247,56 @@ print(catalog['license'])
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("usage:", result.stdout)
+
+    def test_installed_relocated_modules_preserve_core_and_presentation_boundaries(self):
+        directory = Path(self.temporary.name) / "relocated-wheel"
+        environment = directory / "environment"
+        venv.EnvBuilder(with_pip=True, system_site_packages=True).create(environment)
+        python = environment / "bin" / "python"
+        result = subprocess.run(
+            [str(python), "-I", "-m", "pip", "install", "--no-index", "--no-deps",
+             "--no-compile", "--ignore-installed", str(self.wheel)],
+            capture_output=True, text=True, timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        program = """
+import builtins, importlib, pathlib, sys
+original_import = builtins.__import__
+def guard(name, *args, **kwargs):
+    if name.startswith(('sol.reader', 'sol.terminal', 'sol.being.workspace', 'sol.being',
+                        'markdown_it', 'opendataloader_pdf', 'textual')):
+        raise AssertionError('CORE imported an interface or extraction engine: ' + name)
+    return original_import(name, *args, **kwargs)
+def no_data_io(*args, **kwargs):
+    raise AssertionError('Import touched application data')
+builtins.__import__ = guard
+pathlib.Path.read_text = no_data_io
+pathlib.Path.read_bytes = no_data_io
+pathlib.Path.mkdir = no_data_io
+for name in ('sol.core', 'sol.core.files', 'sol.core.reference_cli', 'sol.core.source',
+             'sol.corpus.onboarding'):
+    module = importlib.import_module(name)
+    assert pathlib.Path(module.__file__).is_relative_to(pathlib.Path(sys.prefix)), name
+builtins.__import__ = original_import
+for name in ('sol.being.source_view', 'sol.reader.commands',
+             'sol.presentation', 'sol.presentation.text', 'sol.presentation.theme'):
+    module = importlib.import_module(name)
+    assert pathlib.Path(module.__file__).is_relative_to(pathlib.Path(sys.prefix)), name
+from sol.presentation.theme import DEFAULT_READER_WIDTH, DEFAULT_READER_THEME, READER_THEMES
+assert DEFAULT_READER_WIDTH == 66 and DEFAULT_READER_THEME == 'mocha'
+assert READER_THEMES == ('mocha', 'latte', 'paper', 'night', 'terminal')
+assert 'sol.reader.options' not in sys.modules
+assert not any(name.startswith('sol.terminal') for name in sys.modules)
+"""
+        result = subprocess.run([str(python), "-I", "-B", "-c", program],
+                                cwd=directory, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for arguments in (["--help"], ["essence", "--help"], ["reference", "--help"], ["read", "--help"]):
+            with self.subTest(arguments=arguments):
+                result = subprocess.run([str(environment / "bin" / "sol"), *arguments],
+                                        cwd=directory, capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("usage:", result.stdout)
 
     def test_installed_reader_help_and_guide_do_not_import_presentation_dependencies(self):
         installed = Path(self.temporary.name) / "reader-help-wheel"
@@ -508,7 +588,7 @@ def guard(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
 from sol.essence.cli import main
-from sol.essence.sentences import check_sentence_result
+from sol.essence.essence_as_reflection_within_itself.sentences import check_sentence_result
 from sol.core import load_snapshot
 output = io.StringIO()
 with contextlib.redirect_stdout(output):
@@ -584,7 +664,7 @@ print(json.dumps({'sentences': result['summary']['sentences']}))
 import builtins, json, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
-forbidden = ('sol.reader', 'sol.being', 'sol.terminal', 'markdown_it',
+forbidden = ('sol.reader', 'sol.terminal', 'sol.being', 'markdown_it',
              'sol.corpus.extraction', 'sol.corpus.ingest', 'sol.corpus.backends', 'opendataloader_pdf',
              'rich', 'textual', 'pypdf', 'pdfplumber')
 original_import = builtins.__import__
@@ -594,6 +674,8 @@ def guard(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
 from sol import core
+from sol.core.files import resolve_file_path
+from sol.core import reference_cli, source
 assert Path(core.__file__).parents[2] == Path(sys.argv[1])
 assert core.API_VERSION == 1
 corpus = Path(sys.argv[2])
@@ -602,6 +684,8 @@ assert isinstance(snapshot, core.CorpusSnapshot)
 core.verify_snapshot_current(snapshot)
 book = core.load_corpus_book(corpus)
 assert isinstance(book, core.Book)
+assert resolve_file_path(book, 'sample.md')['target_ids'][-1] == sys.argv[3]
+assert callable(reference_cli.build_parser) and callable(source.render_region)
 passage = book.find_passage(sys.argv[3])
 assert isinstance(passage, core.Passage)
 reference = core.resolve_reference(book, sys.argv[3])
@@ -972,7 +1056,7 @@ urllib.request.OpenerDirector.open = block_network
 original_import = builtins.__import__
 def block_optional(name, *args, **kwargs):
     if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'opendataloader_pdf', 'requests', 'httpx'}
-            or name in {'sol.being.workspace.profiles', 'sol.being.workspace.catalog', 'sol.terminal.source'}):
+            or name in {'sol.being.workspace.profiles', 'sol.being.workspace.catalog', 'sol.core.source'}):
         raise AssertionError('Inquiry export imported unrelated dependency ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional

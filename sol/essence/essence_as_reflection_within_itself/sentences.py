@@ -13,9 +13,9 @@ import re
 import statistics
 import unicodedata
 
-from sol.essence.word_inputs import CoreProvider, FileProvider
-from sol.essence.tokenization import word_tokens as _tokens
-from sol.essence.validation import TermExperimentError, _integer, _json, _json_value, _keys, _validate_binding
+from sol.essence.essence_as_reflection_within_itself.word_inputs import CoreProvider, FileProvider
+from sol.essence.essence_as_reflection_within_itself.tokenization import word_tokens as _tokens
+from sol.essence.essence_as_reflection_within_itself.validation import TermExperimentError, _integer, _json, _json_value, _keys, _validate_binding
 
 
 MAX_RESULT_BYTES = 1048576
@@ -154,7 +154,7 @@ def _in_scope(record, scope):
 
 
 def _selection(record, scope):
-    from sol.essence.corpus_inputs import _reader_doctrine
+    from sol.essence.essence_as_reflection_within_itself.corpus_inputs import _reader_doctrine
 
     attribution = record["attribution"]
     if not _in_scope(record, scope):
@@ -205,7 +205,7 @@ def _measure(passages, rows):
 
 def _analyze(snapshot, scope, origin):
     from sol import core
-    from sol.essence.corpus_inputs import _binding, _current, _facsimile_spans
+    from sol.essence.essence_as_reflection_within_itself.corpus_inputs import _binding, _current, _facsimile_spans
 
     binding = _binding(snapshot)
     if origin is not None:
@@ -252,10 +252,10 @@ def _analyze(snapshot, scope, origin):
 
 def _validate(result):
     if isinstance(result, dict) and result.get("protocol") == "sol.sentence-study" and result.get("version") == 2:
-        from sol.essence.sentence_inputs import validate_result
+        from sol.essence.essence_as_reflection_within_itself.sentence_inputs import validate_result
         return validate_result(result)
     from sol import core
-    from sol.essence.corpus_inputs import _reader_doctrine
+    from sol.essence.essence_as_reflection_within_itself.corpus_inputs import _reader_doctrine
 
     result = _json_value(result)
     _keys(result, {"protocol", "version", "corpus", "generation", "method", "scope", "origin", "summary",
@@ -323,9 +323,9 @@ def analyze_sentences(snapshot, *, scope=None, origin=None):
     if isinstance(snapshot, (CoreProvider, FileProvider)):
         if scope is not None:
             raise SentenceStudyError("Set the sentence scope on the provider", code="invalid_scope")
-        from sol.essence.sentence_inputs import analyze_provider
+        from sol.essence.essence_as_reflection_within_itself.sentence_inputs import analyze_provider
         return analyze_provider(snapshot, origin=origin)
-    from sol.essence.corpus_inputs import _fresh
+    from sol.essence.essence_as_reflection_within_itself.corpus_inputs import _fresh
 
     scope = _scope({"kind": "corpus"} if scope is None else _json_value(scope))
     return _analyze(_fresh(snapshot), scope, origin)
@@ -334,7 +334,7 @@ def analyze_sentences(snapshot, *, scope=None, origin=None):
 def check_sentence_result(snapshot, result):
     """Recompute; return fresh data only after exact agreement with explicit inputs."""
     if isinstance(result, dict) and result.get("version") == 2:
-        from sol.essence.sentence_inputs import check_provider_result
+        from sol.essence.essence_as_reflection_within_itself.sentence_inputs import check_provider_result
         return check_provider_result(snapshot, result)
     if isinstance(snapshot, FileProvider):
         raise SentenceStudyError("File providers require a v2 sentence study", code="invalid_provider")
@@ -342,7 +342,7 @@ def check_sentence_result(snapshot, result):
         if snapshot.scope is not None and _json(snapshot.scope) != _json(result.get("scope")):
             raise SentenceStudyError("Provider scope differs from the saved study", status="mismatch", code="scope_mismatch")
         snapshot = snapshot.snapshot
-    from sol.essence.corpus_inputs import _binding, _current, _fresh
+    from sol.essence.essence_as_reflection_within_itself.corpus_inputs import _binding, _current, _fresh
 
     result = _validate(result)
     fresh = _fresh(snapshot)

@@ -12,10 +12,10 @@ import uuid
 
 import json
 
-from sol.essence.sentences import PROVIDER_MAX_RESULT_BYTES, SentenceStudyError, _METHOD, _measure, segment
-from sol.essence.tokenization import word_tokens
-from sol.essence.validation import _integer, _json, _json_value, _keys, _validate_binding
-from sol.essence.word_inputs import CoreProvider, FileProvider, WordStudyError, _scope, load_input
+from sol.essence.essence_as_reflection_within_itself.sentences import PROVIDER_MAX_RESULT_BYTES, SentenceStudyError, _METHOD, _measure, segment
+from sol.essence.essence_as_reflection_within_itself.tokenization import word_tokens
+from sol.essence.essence_as_reflection_within_itself.validation import _integer, _json, _json_value, _keys, _validate_binding
+from sol.essence.essence_as_reflection_within_itself.word_inputs import CoreProvider, FileProvider, WordStudyError, _scope, load_input
 
 
 METHOD = {**_METHOD, "algorithm": "sentence-length-distribution-providers-v1",

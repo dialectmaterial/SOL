@@ -17,7 +17,7 @@ from sol.reader import app
 from sol.being.actions import ReaderActions
 from sol.being.neovim import host as neovim
 from sol.being.neovim import reader as neovim_reader
-from sol.terminal.theme import THEMES
+from sol.presentation.theme import THEMES
 from sol.being.workspace.reader import WorkspaceReader
 from sol.being.workspace.store import Workspace, WorkspaceConflict
 
@@ -529,9 +529,9 @@ assert 'textual' not in sys.modules
                 with self.subTest(page=bad), self.assertRaises(ValueError):
                     on_request({"op": "source_preview", "page": bad, "packet": packet, "mode": "continuous"})
             return 0, None
-        with patch("sol.terminal.source.SourceService", Service), \
-                patch("sol.terminal.source.render_region", side_effect=render), \
-                patch("sol.terminal.source.open_viewer", return_value="invented-viewer"), \
+        with patch("sol.core.source.SourceService", Service), \
+                patch("sol.core.source.render_region", side_effect=render), \
+                patch("sol.being.source_view.open_viewer", return_value="invented-viewer"), \
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 0)
         self.assertEqual(rendered, [0, 1])
@@ -565,10 +565,10 @@ assert 'textual' not in sys.modules
             with self.assertRaises(ValueError):
                 on_request({"op": "source_pdf", "page": 3, "packet": packet, "mode": "continuous"})
             return 0, None
-        with patch("sol.terminal.source.SourceService", Service), \
-                patch("sol.terminal.source.open_pdf", side_effect=lambda request, index: opened.append(index) or viewers[-1]), \
-                patch("sol.terminal.source.render_region", return_value=("/cache/1.png", False)), \
-                patch("sol.terminal.source.open_viewer", return_value="invented-viewer"), \
+        with patch("sol.core.source.SourceService", Service), \
+                patch("sol.being.source_view.open_pdf", side_effect=lambda request, index: opened.append(index) or viewers[-1]), \
+                patch("sol.core.source.render_region", return_value=("/cache/1.png", False)), \
+                patch("sol.being.source_view.open_viewer", return_value="invented-viewer"), \
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 0)
         self.assertEqual(opened, [1, 1])
@@ -595,14 +595,14 @@ assert 'textual' not in sys.modules
             with self.assertRaises(ValueError):
                 on_request({"op": "source_follow", "page": 1, "packet": packet, "mode": "continuous"})
             return 0, None
-        with patch("sol.terminal.source.SourceService", Service), \
-                patch("sol.terminal.source.follow_pdf", side_effect=follow), \
+        with patch("sol.core.source.SourceService", Service), \
+                patch("sol.being.source_view.follow_pdf", side_effect=follow), \
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 0)
         self.assertEqual(followed, [(captured, 0), (captured, 0)])
 
     def test_stale_source_capture_is_replaced_on_the_next_request(self):
-        from sol.terminal.source import SourceError
+        from sol.core.source import SourceError
         captures = []
         class Service:
             def __init__(self, book):
@@ -623,9 +623,9 @@ assert 'textual' not in sys.modules
                 on_request(dict(request))
             self.assertEqual(on_request(dict(request))["source"]["image"], "/cache/0.png")
             return 0, None
-        with patch("sol.terminal.source.SourceService", Service), \
-                patch("sol.terminal.source.render_region", side_effect=render), \
-                patch("sol.terminal.source.open_viewer", return_value=None), \
+        with patch("sol.core.source.SourceService", Service), \
+                patch("sol.core.source.render_region", side_effect=render), \
+                patch("sol.being.source_view.open_viewer", return_value=None), \
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(), 0)
         self.assertEqual(len(captures), 2)

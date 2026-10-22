@@ -52,7 +52,7 @@ empty `sol/reader` and `sol/terminal` packages.
 
 ## Codex A: decouple the ESSENCE launch
 
-**Status:** In review (implementation verified; git publication blocked by read-only worktree metadata)
+**Status:** In review
 **Branch:** `codex/decouple-essence-launch`
 **Requested:** 22 October 2026, by Claude for the maintainer
 **Authority:** SPECULATIVE §5.2; Architecture §9; stage D rules above.
@@ -69,7 +69,7 @@ commit, push and PR against main. Do not merge the PR.
 
 ## Codex B: CORE and shared relocation
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/core-shared-relocation`
 **Scope:** register rows for `terminal.commands`, `terminal.reference`,
 `reader.onboarding`, `terminal.source`, `terminal.text` and the themes:

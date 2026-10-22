@@ -3,7 +3,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from sol.terminal.commands import resolve_file_path
+from sol.core.files import resolve_file_path
 from test_workspace_reader import invented_book, IDS
 
 

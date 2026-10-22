@@ -118,11 +118,11 @@ class FileSentenceTests(unittest.TestCase):
         self.assertEqual((caught.exception.status, caught.exception.code), ("stale", "file_changed"))
 
     def test_a_file_changed_during_analysis_is_refused(self):
-        from sol.essence.sentences import segment
+        from sol.essence.essence_as_reflection_within_itself.sentences import segment
         def change(text):
             self.path.write_bytes((text + " ").encode())
             return segment(text)
-        with patch("sol.essence.sentence_inputs.segment", side_effect=change), self.assertRaises(SentenceStudyError) as caught:
+        with patch("sol.essence.essence_as_reflection_within_itself.sentence_inputs.segment", side_effect=change), self.assertRaises(SentenceStudyError) as caught:
             analyze_sentences(self.provider)
         self.assertEqual(caught.exception.code, "file_changed")
 
@@ -156,7 +156,7 @@ class FileSentenceTests(unittest.TestCase):
             decode_sentence_result(" " * 1048576 + BASELINES["corpus"])
 
     def test_file_anchor_is_rejected_before_any_source_is_opened(self):
-        with patch("sol.essence.sentence_inputs.load_input", side_effect=AssertionError("No source open")):
+        with patch("sol.essence.essence_as_reflection_within_itself.sentence_inputs.load_input", side_effect=AssertionError("No source open")):
             with self.assertRaisesRegex(SentenceStudyError, "reference anchor"):
                 analyze_sentences(self.provider, origin={})
 

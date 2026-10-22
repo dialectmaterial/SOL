@@ -9,7 +9,18 @@ from __future__ import annotations
 import os
 import re
 
-from sol.reader.options import DEFAULT_READER_THEME as DEFAULT_THEME, READER_THEMES as THEMES
+DEFAULT_READER_WIDTH = 66
+# Presentation presets; their highlight data lives in sol.presentation.theme.
+# Paper and Night are SOL's own, from actualspirit.com; Catppuccin Mocha and
+# Latte (catppuccin.com); Terminal inherits your own colors.
+READER_THEMES = ("mocha", "latte", "paper", "night", "terminal")
+DEFAULT_READER_THEME = "mocha"
+# A name saved before Catppuccin replaced the earlier Dark preset.
+LEGACY_READER_THEMES = {"dark": "mocha"}
+
+
+DEFAULT_THEME = DEFAULT_READER_THEME
+THEMES = READER_THEMES
 
 LABELS = {"mocha": "Catppuccin Mocha", "latte": "Catppuccin Latte", "paper": "SOL Paper", "night": "SOL Night",
           "terminal": "Terminal"}

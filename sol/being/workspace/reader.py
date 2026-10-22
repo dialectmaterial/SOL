@@ -16,7 +16,7 @@ import textwrap
 
 from sol.core.references import Reference, resolve_reference
 from sol.being.workspace.store import Workspace, WorkspaceError, _position
-from sol.terminal.text import safe_output
+from sol.presentation.text import safe_output
 
 
 def workspace_path(name: str, directory: Path | None = None) -> Path:

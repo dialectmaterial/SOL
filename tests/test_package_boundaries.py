@@ -38,14 +38,14 @@ class PackageBoundaryTests(unittest.TestCase):
             "import sol.being.quality, sol.being.quantity, sol.being.measure, sol.concept, "
             "sol.essence.essence_as_reflection_within_itself, sol.essence.appearance, sol.essence.actuality")
         for name in ("sol.reader.app", "sol.being.neovim.host", "sol.being.workspace.store", "sol.corpus.contract",
-                     "sol.essence.words", "textual"):
+                     "sol.essence.essence_as_reflection_within_itself.words", "textual"):
             with self.subTest(module=name):
                 self.assertNotIn(name, modules)
 
     def test_reader_import_does_not_load_pdf_conversion_or_optional_ui(self):
         modules = self.imported_modules("from sol.reader import app; app.build_parser()")
         for name in ("sol.corpus.layout", "sol.corpus.convert", "sol.being.shell",
-                     "sol.terminal.source", "markdown_it", "textual"):
+                     "sol.core.source", "markdown_it", "textual"):
             with self.subTest(module=name):
                 self.assertNotIn(name, modules)
 
@@ -67,6 +67,12 @@ class PackageBoundaryTests(unittest.TestCase):
         self.assertNotIn("sol.reader.app", modules)
         self.assertNotIn("sol.core.corpus", modules)
         self.assertFalse(any(name.startswith("sol.terminal.") for name in modules))
+
+    def test_essence_theme_selection_does_not_import_reader_options(self):
+        modules = self.imported_modules("import sol.essence.tui.__main__")
+        self.assertIn("sol.presentation.theme", modules)
+        for prefix in ("sol.reader", "sol.terminal", "sol.being.workspace", "sol.being"):
+            self.assertFalse(any(name == prefix or name.startswith(prefix + ".") for name in modules))
 
 
 class SourceCheckoutDiscoveryTests(unittest.TestCase):

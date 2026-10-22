@@ -78,7 +78,7 @@ def prepare_first_corpus():
     print(f"Corpus ready: {destination}")
     # Source previews render from this same verified PDF; remembering it is a
     # convenience, so a failure here never undoes the finished import.
-    from sol.terminal.source import SourceError, SourceService
+    from sol.core.source import SourceError, SourceService
     try:
         SourceService(book).set_pdf(source)
         print("Source PDF remembered for printed-source previews (s in the reader).\n")

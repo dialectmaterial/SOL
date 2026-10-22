@@ -10,6 +10,23 @@ Textual without importing ESSENCE's interface. Context bytes, validation,
 permissions, lifetime, install hint and the OSC source-return path are unchanged;
 ESSENCE still owns its saved investigation state.
 
+### CORE and shared presentation relocation — 22 October 2026
+
+Move canonical-file resolution and the reference command face into `sol.core`,
+first-run corpus import into `sol.corpus`, and verified source capture/rendering
+into `sol.core.source`. Detached PDF/image viewers and source following live in
+`sol.being.source_view`; `sol read` printing stays in `sol.reader.commands`.
+Shared escaping, theme data and width defaults now live in `sol.presentation`,
+so ESSENCE no longer imports reader options for themes. Command behavior and the
+public CORE API are unchanged; the old internal module paths have no shims.
+
+### ESSENCE engines relocated — 22 October 2026
+
+Restructuring stage D: move the ten analytical engine modules to
+`sol.essence.essence_as_reflection_within_itself` (register E1–E4). Keep the
+lazy `sol.essence` exports, commands, method receipts and behavior unchanged;
+update CLI/UI imports and test patch targets without old-path shims.
+
 ### BEING's code moves into its divisions — 22 October 2026
 
 Restructuring stage D, BEING lane: the Neovim reader is `sol.being.neovim`

@@ -5,7 +5,7 @@ import argparse
 import sys
 
 from sol.interchange.essence import TEXTUAL_HINT, textual_available, read_context
-from sol.reader.options import DEFAULT_READER_THEME, READER_THEMES
+from sol.presentation.theme import DEFAULT_READER_THEME, READER_THEMES
 
 
 def main(arguments=None):
