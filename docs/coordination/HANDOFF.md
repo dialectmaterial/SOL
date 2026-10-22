@@ -63,6 +63,64 @@ Write "None." rather than deleting a heading.
 
 None reserved. Implemented the stage C defaults: retrieval/provenance in CORE, viewer interaction at the BEING root, shared presentation outside the logical hierarchy. Measure remains unresolved as the register already records; no new philosophical placement is claimed.
 
+## Stage D: ESSENCE relocation — 22 October 2026
+
+**Task:** [Codex A: ESSENCE relocation](https://github.com/dialectmaterial/SOL/blob/16703fcb0e2c938bd97070a2177b66f7e7834995/docs/coordination/CURRENT_TASK.md#codex-a-essence-relocation).
+**Branch / PR:** `codex/essence-relocation` · [relocation pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fessence-relocation); Claude reviews; author does not merge.
+**Last implementation commit:** `a9c49769299d82927d9efa0e9b95794b6bbe1810` (this report is committed afterward).
+
+### Changed files
+
+- `sol/essence/essence_as_reflection_within_itself/` — move all ten E1–E4 engine modules intact. Reversing the import-path substitutions reproduces every original module byte-for-byte. Stage C's cohesive reflection placement and alternatives remain the rationale; reread the CORE edition's doctrine/section openings and determining reflection (di Giovanni, Cambridge 2010; READING_ESSENCE L1–L2) before implementing.
+- `sol/essence/__init__.py`, CLI/UI adapters and affected tests — preserve all lazy public exports and TUI engine loading; update direct imports, dynamic module strings and patch targets. Keep CLI/catalog/UI locations (E5–E7), methods, versions, offsets, exception identity and v1 fixtures. No compatibility shims. Update the catalog's one moving `main` engine link; retain historical commit-pinned links.
+- `tests/test_packaging.py` — import every moved module from the built wheel outside the checkout, check absent old modules, lazy facade/TUI loading and public object identity. Existing archive, resources, entry-point and private-file exclusions still pass; setuptools discovery already includes the new package, so no packaging configuration change is needed.
+- `docs/ARCHITECTURE.md` §2 and E1–E4, `docs/ESSENCE.md`, `CHANGELOG.md` — current module paths and implemented stage D status, with the PR locator; keep placements provisional. `CURRENT_TASK.md` — only Codex A's status becomes `In review`.
+
+### Tests performed
+
+All Python checks used `/home/dima/Projects/code/sol/.venv/bin/python -B`.
+
+- `-m unittest discover -s tests` — **1,251 tests, OK (7 skipped, 4 expected failures)**, 113.427 s. The four sentence-rule limitations remain expected failures.
+- Focused word/comparison, sentence/provider, TF-IDF, prose, TUI and analysis-CLI suites — all pass. `-m unittest discover -s tests -p 'test_packaging.py'` — **21 tests, OK**, including wheel/sdist builds and installed resources.
+- Built again through the packaging fixture's public-file staging; pip-installed the wheel with `--no-deps --no-index` in a disposable venv. Outside the checkout: `sol --help`, `sol essence --help`, `python -I -B -m sol --help`, `python -I -B -m sol.essence.cli --help`, and all ten engine imports — OK, with imports verified under the installed venv.
+- `scripts/check_docs.py` and `git diff --check` — OK. Documentation check covers local links/anchors; external URLs are not network-checked.
+- Grepped every old dotted/file path and from-import across `sol/`, `tests/`, `scripts/`, `docs/`, Lua and `pyproject.toml`; Python AST checks also find no old engine from-imports. All 183 Python/Lua/config files are clear. Remaining old paths are historical stage A/C inventories, earlier handoffs and five catalog URLs pinned to `2fe28c3`; the task's source-path scope remains historical instruction. Current documentation and runtime references are updated.
+- Changed-file audit — public code/tests/docs only; no private corpus, source PDF, workspace or analysis export committed. Latest fetch still has `origin/main` at `16703fcb0e2c938bd97070a2177b66f7e7834995`.
+
+### Outstanding issues
+
+- No new linguistic accuracy or human UI acceptance claim; the pre-existing sentence limitations are unchanged.
+- The supplied worktree's shared Git metadata is read-only. All edits/checks stayed in `/home/dima/Projects/code/sol-codex-perf`; branch commits/publication use writable metadata at `/tmp/sol-essence-relocation.git` (`git --git-dir=/tmp/sol-essence-relocation.git …`). The original `.git` remains attached to its initial detached HEAD; use the published branch for review or reattach outside the sandbox.
+
+### Decisions requiring approval
+
+None reserved. Defaults: implement the reviewed E1–E4 placements as cohesive modules, retain E5–E7 at their present locations, and preserve historical evidence links and baseline inventories. Leave the PR open for Claude's review; do not merge.
+
+## Stage D, BEING lane: code moves into `sol.being` — 22 October 2026
+
+**Task:** [Claude Code: BEING relocation](https://github.com/dialectmaterial/SOL/blob/16703fc/docs/coordination/CURRENT_TASK.md#claude-code-being-relocation)
+**Branch / PR:** `claude/being-relocation` · pull request opened with this report; Codex reviews.
+**Last implementation commit:** `6c405b8d9b60a2a062b82eeb65efbbcc17885ae2` (this report is committed after it)
+
+### Changed files
+- `sol/being/neovim/` — from `sol/terminal/`: `neovim.py` → `host.py`, `neovim_reader.py` → `reader.py`, `reader_channel.py` → `channel.py`, `runtime`, `splash`, `window`, the ten Lua files and `fonts/`.
+- `sol/being/{actions,surface,render,shell}.py`, `sol/being/quantity/navigation.py`, `sol/being/quality/{search,structure,typography}.py`, `sol/being/workspace/` — from `sol/reader/` and `sol/workspace/`.
+- Every importer, string patch target and path in `sol/`, `tests/`, `scripts/`; `pyproject.toml` (`sol-window` target, package data); renamed modules are imported under their old local names (`from sol.being.neovim import host as neovim`) so no body changed.
+- `docs/ARCHITECTURE.md` (§2 packages, eight register rows → Implemented), `docs/BEING.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `CURRENT_TASK.md`.
+
+### Tests performed
+- `.venv/bin/python -B -m unittest discover -s tests` — 1,250 tests OK (7 skipped, 4 expected failures), including the wheel and sdist checks and headless Neovim runs of the moved Lua.
+- `.venv/bin/python -B scripts/check_docs.py` — passes.
+- `python -m sol --help`, `python -m sol essence --help`, `python -m sol.being.neovim.window --help` — work.
+- Grep for every old dotted and file path in code, tests, scripts, Lua and pyproject — none left. Historical coordination files keep old paths as snapshots.
+
+### Outstanding issues
+- Second PR after Codex B: the composition root (`sol/reader/{app,launch,options}.py`) and removal of the then-empty `sol/reader` and `sol/terminal`.
+- An editable install needs reinstalling for the new `sol-window` entry point.
+
+### Decisions requiring approval
+- None. Defaults: module renames inside `sol.being.neovim` (`host`, `reader`, `channel`); the CORE-only forbidden-import checks in `test_packaging.py` now forbid all of `sol.being`.
+
 ## Stage C: reading the Doctrine of Essence — 22 October 2026
 
 **Task:** [Codex: Reading the Doctrine of Essence](https://github.com/dialectmaterial/SOL/blob/0f5156aa511f8305abf3bf6fd7719a4e51515d8d/docs/coordination/CURRENT_TASK.md#codex-reading-the-doctrine-of-essence).

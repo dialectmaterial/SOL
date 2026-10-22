@@ -22,7 +22,7 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from sol.terminal.runtime import NEOVIM_VERSION, managed_neovim
+from sol.being.neovim.runtime import NEOVIM_VERSION, managed_neovim
 
 # Digests published with the official v0.11.6 release assets, not fetched at install.
 # https://github.com/neovim/neovim/releases/expanded_assets/v0.11.6

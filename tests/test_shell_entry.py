@@ -8,8 +8,8 @@ import unittest
 from unittest.mock import patch
 
 import sol.reader.app as sol
-import sol.workspace.profiles as sol_profiles
-from sol.workspace.store import Workspace
+import sol.being.workspace.profiles as sol_profiles
+from sol.being.workspace.store import Workspace
 from test_workspace_reader import invented_book, CORPUS_ID, IDS
 
 
@@ -41,9 +41,9 @@ class ShellEntryTests(unittest.TestCase):
                 patch('sol.reader.app.load_corpus_book', return_value=self.book), \
                 nullcontext(), \
                 patch('sol.reader.launch.interactive_input_available', return_value=interactive), \
-                patch('sol.terminal.neovim.validate_environment'), \
+                patch('sol.being.neovim.host.validate_environment'), \
                 patch('sol.reader.app.run_reader', side_effect=self.launch_reader), \
-                patch('sol.reader.shell.install_completion', return_value=lambda: None), \
+                patch('sol.being.shell.install_completion', return_value=lambda: None), \
                 patch('builtins.input', side_effect=commands):
             status = sol.main(arguments)
         return status, stdout.getvalue(), stderr.getvalue()
@@ -65,9 +65,9 @@ class ShellEntryTests(unittest.TestCase):
         self.assertEqual(sol_profiles.list_actors()[0]['id'], profile['id'])
 
     def test_none_skips_workspace_profiles_and_prompts(self):
-        with patch('sol.workspace.profiles.list_actors', side_effect=AssertionError('No actor registry')), \
-                patch('sol.workspace.profiles.register_actor', side_effect=AssertionError('No actor registry')), \
-                patch('sol.workspace.store.Workspace', side_effect=AssertionError('No workspace')):
+        with patch('sol.being.workspace.profiles.list_actors', side_effect=AssertionError('No actor registry')), \
+                patch('sol.being.workspace.profiles.register_actor', side_effect=AssertionError('No actor registry')), \
+                patch('sol.being.workspace.store.Workspace', side_effect=AssertionError('No workspace')):
             status, output, error = self.main(['-n'], interactive=False)
         self.assertEqual(status, 0, error)
         self.assertIsNone(self.reader_launches[-1][1])
@@ -137,7 +137,7 @@ class ShellEntryTests(unittest.TestCase):
 
     def test_picker_displays_recent_compatible_workspaces_and_selects_number(self):
         for name, timestamp in [('older', '2026-10-10T00:00:00Z'), ('newer', '2026-10-12T00:00:00Z')]:
-            with patch('sol.workspace.store._now', return_value=timestamp):
+            with patch('sol.being.workspace.store._now', return_value=timestamp):
                 status, _, error = self.main(['--workspace', name, '--actor', 'Ada'])
                 self.assertEqual(status, 0, error)
         status, output, error = self.main(['--actor', 'Bob'], ['2'])
@@ -157,7 +157,7 @@ class ShellEntryTests(unittest.TestCase):
         status, output, error = self.main(['--actor', 'Bob'], ['9' * 5000, '5', '1'])
         self.assertEqual(status, 0, error)
         self.assertIn('choose a displayed workspace number', output)
-        with patch('sol.workspace.catalog.discover_workspaces', side_effect=AssertionError('No picker')):
+        with patch('sol.being.workspace.catalog.discover_workspaces', side_effect=AssertionError('No picker')):
             self.assertEqual(self.main(['--workspace', 'study', '--actor', 'Ada'])[0], 0)
             self.assertEqual(self.main(['-n'], interactive=False)[0], 0)
             self.assertEqual(self.main(['-r'], interactive=False)[0], 0)

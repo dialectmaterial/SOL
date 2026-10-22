@@ -12,8 +12,8 @@ from io import StringIO
 import json
 import math
 
-from sol.essence.word_inputs import CoreProvider, FileProvider, WordStudyError
-from sol.essence.words import analyze_words, check_word_result, encode_word_result
+from sol.essence.essence_as_reflection_within_itself.word_inputs import CoreProvider, FileProvider, WordStudyError
+from sol.essence.essence_as_reflection_within_itself.words import analyze_words, check_word_result, encode_word_result
 
 
 _METHOD = {

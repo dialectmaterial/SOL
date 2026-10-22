@@ -13,10 +13,10 @@ import sys
 import unicodedata
 
 from sol.core.protocol import capture_reference, single_action
-from sol.reader.actions import ReaderActions
-from sol.reader.surface import Sample
-from sol.reader.structure import structure_payload
-from sol.terminal import neovim
+from sol.being.actions import ReaderActions
+from sol.being.surface import Sample
+from sol.being.quality.structure import structure_payload
+from sol.being.neovim import host as neovim
 from sol.presentation.text import safe_label, safe_output
 from sol.presentation.theme import DEFAULT_THEME, THEMES
 

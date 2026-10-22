@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from sol.terminal import splash
+from sol.being.neovim import splash
 
 
 class FrameTests(unittest.TestCase):
@@ -81,7 +81,7 @@ class LifecycleTests(unittest.TestCase):
 
     def test_neovim_launch_hands_over_at_the_last_moment(self):
         from pathlib import Path
-        from sol.terminal import neovim
+        from sol.being.neovim import host as neovim
         order = []
         with patch.object(neovim, "_isolated_environment", side_effect=lambda *a: order.append("prepared") or {}), \
                 patch.object(splash, "handoff", side_effect=lambda: order.append("handoff")), \

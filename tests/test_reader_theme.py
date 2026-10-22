@@ -158,7 +158,7 @@ class ThemeCommandTests(unittest.TestCase):
         return status, output.getvalue(), error.getvalue()
 
     def reader_theme(self, arguments):
-        with patch("sol.terminal.neovim.validate_environment"), \
+        with patch("sol.being.neovim.host.validate_environment"), \
                 patch.object(app, "run_reader", return_value=0) as view:
             status, _, error = self.call(arguments)
         self.assertEqual(status, 0, error)

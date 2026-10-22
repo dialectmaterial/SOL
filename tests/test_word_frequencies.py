@@ -18,7 +18,7 @@ from sol import core
 from sol.essence import (CoreProvider, FileProvider, WordStudyError, analyze_words,
                          check_word_result, decode_word_result, encode_word_result)
 from sol.essence import cli
-from sol.essence.tokenization import word_tokens
+from sol.essence.essence_as_reflection_within_itself.tokenization import word_tokens
 from fixtures_corpus import CorpusFixture
 
 
@@ -132,7 +132,7 @@ class FileWordTests(unittest.TestCase):
             self.path.write_text("A different input.")
             yield from original(text)
 
-        with patch("sol.essence.words.word_tokens", side_effect=changed), self.assertRaises(WordStudyError) as caught:
+        with patch("sol.essence.essence_as_reflection_within_itself.words.word_tokens", side_effect=changed), self.assertRaises(WordStudyError) as caught:
             analyze_words(self.provider)
         self.assertEqual(caught.exception.code, "file_changed")
 
@@ -152,7 +152,7 @@ class FileWordTests(unittest.TestCase):
                 analyze_words(FileProvider(fifo))
         with self.assertRaises(OSError):
             analyze_words(FileProvider(self.root / "missing"))
-        from sol.essence.word_inputs import MAX_INPUT_BYTES
+        from sol.essence.essence_as_reflection_within_itself.word_inputs import MAX_INPUT_BYTES
         with self.path.open("wb") as stream:
             stream.truncate(MAX_INPUT_BYTES + 1)  # Sparse, never read/allocated.
         with self.assertRaises(WordStudyError):
@@ -170,7 +170,7 @@ class FileWordTests(unittest.TestCase):
                 self.path.write_bytes(content)
             return original_fstat(descriptor)
 
-        with patch("sol.essence.word_inputs.os.fstat", side_effect=replaced), self.assertRaises(WordStudyError) as caught:
+        with patch("sol.essence.essence_as_reflection_within_itself.word_inputs.os.fstat", side_effect=replaced), self.assertRaises(WordStudyError) as caught:
             analyze_words(self.provider)
         self.assertEqual(caught.exception.code, "file_changed")
 
@@ -203,7 +203,7 @@ class FileWordTests(unittest.TestCase):
             altered["frequencies"][0]["target"][field] = value
             with self.subTest(field=field), self.assertRaises(WordStudyError):
                 check_word_result(self.provider, altered)
-        with patch("sol.essence.words.MAX_RESULT_BYTES", 10), self.assertRaises(WordStudyError):
+        with patch("sol.essence.essence_as_reflection_within_itself.words.MAX_RESULT_BYTES", 10), self.assertRaises(WordStudyError):
             encode_word_result(result)
 
     def test_file_api_and_cli_run_with_core_and_ui_imports_forbidden(self):
@@ -211,7 +211,7 @@ class FileWordTests(unittest.TestCase):
 import importlib.abc, sys
 class Block(importlib.abc.MetaPathFinder):
     def find_spec(self, name, *args):
-        if name.startswith(("sol.core", "sol.corpus", "sol.reader", "sol.terminal", "sol.workspace", "textual", "torch")):
+        if name.startswith(("sol.core", "sol.corpus", "sol.reader", "sol.terminal", "sol.being.workspace", "textual", "torch")):
             raise AssertionError("Forbidden import: " + name)
 sys.meta_path.insert(0, Block())
 from sol.essence import FileProvider, analyze_words, check_word_result
@@ -220,7 +220,7 @@ source = FileProvider(sys.argv[1])
 result = analyze_words(source)
 check_word_result(source, result)
 assert main(["words", "--file", sys.argv[1], "--json"]) == 0
-from sol.essence.words import encode_word_result
+from sol.essence.essence_as_reflection_within_itself.words import encode_word_result
 from pathlib import Path
 saved = Path(sys.argv[2])
 saved.write_text(encode_word_result(result))

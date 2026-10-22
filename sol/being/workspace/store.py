@@ -19,7 +19,7 @@ from typing import Any, Iterator
 import unicodedata
 from uuid import UUID, uuid4
 
-from sol.workspace.time import parse_utc_timestamp
+from sol.being.workspace.time import parse_utc_timestamp
 
 try:
     import fcntl

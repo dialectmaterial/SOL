@@ -9,8 +9,8 @@ import unittest
 from unittest.mock import patch
 
 import sol.reader.app as sol
-from sol.workspace.store import Workspace
-from sol.workspace.reader import WorkspaceReader
+from sol.being.workspace.store import Workspace
+from sol.being.workspace.reader import WorkspaceReader
 from test_workspace_reader import invented_book, CORPUS_ID, IDS
 
 
@@ -44,7 +44,7 @@ class WorkspaceExportRoutingTests(unittest.TestCase):
         return status, output.getvalue(), errors.getvalue()
 
     def test_json_default_and_explicit_json_are_unchanged(self):
-        with patch('sol.workspace.store._now', return_value='2026-10-12T00:00:00Z'):
+        with patch('sol.being.workspace.store._now', return_value='2026-10-12T00:00:00Z'):
             expected = self.store.export()
             for options in ([], ['--export-format', 'json'], ['--json']):
                 with self.subTest(options=options):

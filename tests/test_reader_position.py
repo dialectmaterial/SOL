@@ -12,9 +12,9 @@ import unittest
 from unittest.mock import patch
 
 import sol.reader.app as sol
-from sol.workspace.catalog import discover_workspaces
-from sol.workspace.reader import WorkspaceReader
-from sol.workspace.store import (APPLICATION_ID, Workspace, WorkspaceConflict, WorkspaceError,
+from sol.being.workspace.catalog import discover_workspaces
+from sol.being.workspace.reader import WorkspaceReader
+from sol.being.workspace.store import (APPLICATION_ID, Workspace, WorkspaceConflict, WorkspaceError,
                                  _SCHEMA, _ANNOTATION_SCHEMA)
 from test_workspace_reader import CORPUS_ID, IDS, invented_book
 
@@ -228,7 +228,7 @@ class ReaderPositionTests(unittest.TestCase):
             connection.execute("DROP TRIGGER reading_positions_no_update")
             connection.execute("UPDATE reading_positions SET content_sha256='bad'")
             # Restore the exact protection: this tests values, not missing schema.
-            from sol.workspace.store import _POSITION_SCHEMA
+            from sol.being.workspace.store import _POSITION_SCHEMA
             connection.execute(_POSITION_SCHEMA[1])
         with self.assertRaisesRegex(WorkspaceError, "digest"):
             self.open(self.path)

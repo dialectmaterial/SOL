@@ -1,6 +1,6 @@
 """Sentence lengths from the interface: choices in, the v2 study out.
 
-The study is Experiment A's sentence-length half (`sol.essence.sentences`,
+The study is Experiment A's sentence-length half (`sol.essence.essence_as_reflection_within_itself.sentences`,
 `punctuation-rules-v1`), run through the same CORE/file providers as word
 frequencies. This module holds no Textual code and keeps no book text: the
 beginnings shown for the longest sentences are read at display time and never
@@ -34,7 +34,7 @@ class SentenceCount:
 
 def engine():
     try:
-        from sol.essence import sentences
+        from sol.essence.essence_as_reflection_within_itself import sentences
     except ImportError as error:
         raise words.EngineMissing("Sentence lengths need the ESSENCE sentence engine, which is not installed.") \
             from error

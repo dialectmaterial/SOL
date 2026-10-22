@@ -22,12 +22,12 @@ import unittest
 
 from sol.core.corpus import load_corpus_book
 from sol.corpus import contract
-from sol.reader.surface import sample_from_book, validate_packet
+from sol.being.surface import sample_from_book, validate_packet
 from fixtures_corpus import write_runtime_corpus
 
 
 _ROOT = Path(__file__).resolve().parents[1]
-_ADAPTER = _ROOT / "sol/terminal/neovim.lua"
+_ADAPTER = _ROOT / "sol/being/neovim/neovim.lua"
 _GENERATED = {"markdown", "plain_text", "document", "context", "content_sha256"}
 
 
@@ -112,7 +112,7 @@ class ReaderSurfaceNeovimTests(unittest.TestCase):
         self.result = self.root / "report.json"
 
     def run_lua(self, scenario, *, restore=None, automatic_quit=True, theme=None):
-        from sol.terminal.neovim import build_payload
+        from sol.being.neovim.host import build_payload
         from sol.presentation.theme import theme_payload
 
         self.payload = build_payload(self.sample, width=72, restore=restore)
@@ -443,9 +443,9 @@ end
         self.assertEqual(report["clipboard"], "thought")
 
     def test_outline_keeps_selection_across_resize_and_returns_without_navigation(self):
-        from sol.reader.structure import structure_payload
+        from sol.being.quality.structure import structure_payload
         from unittest.mock import patch
-        from sol.terminal import neovim
+        from sol.being.neovim import host as neovim
         original = neovim.build_payload
         def payload(*args, **kwargs):
             value = original(*args, **kwargs)
@@ -487,9 +487,9 @@ end
         self.assertEqual(report["shift"], "shift:17")
 
     def test_outline_marks_folds_the_current_section_and_pages(self):
-        from sol.reader.structure import structure_payload
+        from sol.being.quality.structure import structure_payload
         from unittest.mock import patch
-        from sol.terminal import neovim
+        from sol.being.neovim import host as neovim
         original = neovim.build_payload
         def payload(*args, **kwargs):
             value = original(*args, **kwargs)
@@ -1471,7 +1471,7 @@ while True:
 
     def prepare_footnote_panels(self):
         from fixtures_footnotes import add_footnote_corpus
-        from sol.terminal import neovim
+        from sol.being.neovim import host as neovim
         identifier = self.sample.passages[0].identifier
         notes, _ = add_footnote_corpus(self.corpus, identifier)
         self.sample = sample_from_book(load_corpus_book(self.corpus), count=3)

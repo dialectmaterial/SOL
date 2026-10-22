@@ -15,8 +15,8 @@ import sqlite3
 import stat
 from uuid import uuid4
 
-from sol.workspace.catalog import _directory, _NAME
-from sol.workspace.store import (
+from sol.being.workspace.catalog import _directory, _NAME
+from sol.being.workspace.store import (
     APPLICATION_ID, Workspace, WorkspaceError, _decode, _source_fingerprint, _uuid,
     fcntl,
 )

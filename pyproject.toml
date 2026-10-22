@@ -26,7 +26,7 @@ essence = ["textual>=8,<9"]
 
 [project.scripts]
 sol = "sol:cli"
-sol-window = "sol.terminal.window:main"
+sol-window = "sol.being.neovim.window:main"
 sol-corpus = "sol.corpus.convert:main"
 sol-corpus-check = "sol.corpus.contract:main"
 
@@ -43,5 +43,5 @@ include = ["sol", "sol.*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-"sol.terminal" = ["*.lua", "fonts/*.ttf", "fonts/OFL.txt"]
+"sol.being.neovim" = ["*.lua", "fonts/*.ttf", "fonts/OFL.txt"]
 "sol.essence" = ["encyclopedia.json", "methods.json"]

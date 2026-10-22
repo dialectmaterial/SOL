@@ -18,12 +18,12 @@ import sys
 import tempfile
 import unicodedata
 
-from sol.reader.typography import map_typography
+from sol.being.quality.typography import map_typography
 from sol.presentation.text import emphasis_style
-from sol.terminal.runtime import managed_neovim
+from sol.being.neovim.runtime import managed_neovim
 from sol.presentation.theme import theme_payload
 
-from sol.reader.surface import (CaptureExport, Sample, FOOTNOTE_DEPTH, FOOTNOTE_LINKS,
+from sol.being.surface import (CaptureExport, Sample, FOOTNOTE_DEPTH, FOOTNOTE_LINKS,
                                 footnote_links, footnote_scope, note_paragraph_ids, record_payload, validate_packet)
 
 
@@ -390,7 +390,7 @@ def launch_payload(payload, executable, *, on_request=None):
         _write_json(input_path, payload)
         command = [executable, "--clean", "-u", "NONE", "-i", "NONE", "-n", "--noplugin",
                    "--cmd", _READ_ONLY_OPTIONS, "-c", _STOP_SERVERS, "-c", _LOAD_ADAPTER]
-        from sol.terminal import splash
+        from sol.being.neovim import splash
         try:
             # Neovim draws over the opening screen's last frame. Handed over at
             # the last moment, so keys typed while preparing never reach it; if
@@ -403,7 +403,7 @@ def launch_payload(payload, executable, *, on_request=None):
             if on_request is None:
                 code = subprocess.run(command, cwd=root, env=environment, check=False).returncode
             else:
-                from sol.terminal.reader_channel import run_native
+                from sol.being.neovim.channel import run_native
                 code = run_native(command, cwd=root, env=environment, handler=on_request)
         except KeyboardInterrupt:
             splash.forget()

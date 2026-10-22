@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 import unittest
 
-from sol.workspace.time import parse_utc_timestamp
+from sol.being.workspace.time import parse_utc_timestamp
 
 
 class WorkspaceTimeTests(unittest.TestCase):

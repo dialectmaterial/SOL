@@ -137,7 +137,7 @@ class ProseExportTests(CorpusFixture, unittest.TestCase):
             export_prose(snapshot)
 
     def test_changes_during_projection_are_refused_before_return(self):
-        from sol.essence import prose
+        from sol.essence.essence_as_reflection_within_itself import prose
 
         original = prose.prose_text
         def change(markdown):

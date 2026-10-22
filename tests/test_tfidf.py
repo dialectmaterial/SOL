@@ -77,7 +77,7 @@ class FileTfidfTests(unittest.TestCase):
 
     def test_result_size_bound_and_no_saved_file_authority(self):
         result = analyze_tfidf(self.source)
-        with patch("sol.essence.tfidf.MAX_RESULT_BYTES", 100), self.assertRaises(WordStudyError) as caught:
+        with patch("sol.essence.essence_as_reflection_within_itself.tfidf.MAX_RESULT_BYTES", 100), self.assertRaises(WordStudyError) as caught:
             encode_tfidf_result(result)
         self.assertEqual(caught.exception.code, "size_limit")
         saved = self.root / "study.json"
@@ -112,7 +112,7 @@ class FileTfidfTests(unittest.TestCase):
 import importlib.abc, sys
 class Block(importlib.abc.MetaPathFinder):
     def find_spec(self, name, *args):
-        if name.startswith(("sol.core", "sol.corpus", "sol.reader", "sol.terminal", "sol.workspace", "textual", "torch", "sklearn", "numpy")):
+        if name.startswith(("sol.core", "sol.corpus", "sol.reader", "sol.terminal", "sol.being.workspace", "textual", "torch", "sklearn", "numpy")):
             raise AssertionError("Forbidden import: " + name)
 sys.meta_path.insert(0, Block())
 from sol.essence import FileProvider, analyze_tfidf, check_tfidf_result

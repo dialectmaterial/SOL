@@ -10,8 +10,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-import sol.workspace.export as sol_workspace_export
-from sol.workspace.export import render_workspace_markdown
+import sol.being.workspace.export as sol_workspace_export
+from sol.being.workspace.export import render_workspace_markdown
 
 
 CORPUS = "aaaaaaaa-0000-4000-8000-000000000001"

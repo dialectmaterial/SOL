@@ -14,8 +14,8 @@ from unittest.mock import patch
 
 from sol import core
 
-from sol.reader import surface as common
-from sol.terminal import neovim
+from sol.being import surface as common
+from sol.being.neovim import host as neovim
 import fixtures_corpus as fixtures
 
 
@@ -42,7 +42,7 @@ class ReaderSurfaceExportGuardTests(fixtures.CorpusFixture, unittest.TestCase):
 
     def test_direct_source_guard_refuses_every_reader_provenance_change(self):
         from dataclasses import replace
-        from sol.reader.surface import _agree_with_core
+        from sol.being.surface import _agree_with_core
         reference = core.check_reference(
             self.book.corpus_snapshot,
             core.capture_reference(self.book.corpus_snapshot, self.identifier))

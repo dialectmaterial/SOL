@@ -17,7 +17,7 @@ from unittest.mock import patch
 from sol.essence import (CoreProvider, FileProvider, WordStudyError, analyze_words, check_word_result,
                          compare_words, encode_word_result, export_word_comparison)
 from sol.essence import cli
-from sol.essence.comparison import EXPORT_FIELDS
+from sol.essence.essence_as_reflection_within_itself.comparison import EXPORT_FIELDS
 from fixtures_corpus import CorpusFixture
 
 
@@ -154,7 +154,7 @@ class ComparisonTests(unittest.TestCase):
     def test_missing_reference_and_invalid_format_are_refused(self):
         with self.assertRaisesRegex(WordStudyError, "explicit reference"):
             compare_words(self.target, reference=None)
-        with patch("sol.essence.comparison.compare_words", side_effect=AssertionError("No source open")):
+        with patch("sol.essence.essence_as_reflection_within_itself.comparison.compare_words", side_effect=AssertionError("No source open")):
             with self.assertRaises(WordStudyError):
                 self.export(format="html")
 

@@ -20,7 +20,7 @@ BEING is the place to **read Hegel's *Science of Logic***, locate source evidenc
 Python owns source verification and IDs (CORE), lineage, actions and workspace persistence (BEING). Neovim owns disposable buffers, layout, input, motions and visual styling. A view contains **at most 64 canonical paragraphs**, divided into bounded reading sections; the reading position is a UUID plus source-codepoint offset, *never* a Neovim buffer address or screen row. Reloading a section in the same native Neovim process preserves the semantic contract. The reader can display adjacent passages continuously or one passage at a time. The book is **not** one unbounded editor buffer.
 
 The Lua implementation is split into package-local modules behind the small
-`sol/terminal/neovim.lua` entry: `neovim_text.lua` validates Unicode/spans,
+`sol/being/neovim/neovim.lua` entry: `neovim_text.lua` validates Unicode/spans,
 `neovim_view.lua` builds the page and maps exact source positions,
 `neovim_panels.lua` owns popup lifecycle and result/source panels,
 `neovim_requests.lua` owns the action channel and reloads,

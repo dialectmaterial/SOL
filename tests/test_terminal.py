@@ -65,7 +65,7 @@ class TerminalTests(unittest.TestCase):
     def run_shell(self, commands, width=80, plain=False, color=False):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout), patch('builtins.input', side_effect=commands), \
-                patch('sol.reader.shell.install_completion', return_value=lambda: None):
+                patch('sol.being.shell.install_completion', return_value=lambda: None):
             status = sol.run_shell(self.book, width, plain, color)
         return status, stdout.getvalue()
 
@@ -210,7 +210,7 @@ class TerminalTests(unittest.TestCase):
             self.assertIn(word, rendered)
 
     def test_completion_restores_previous_readline_settings(self):
-        from sol.reader.shell import install_completion
+        from sol.being.shell import install_completion
         readline = Mock(name='readline')
         old_completer = object()
         readline.get_completer.return_value = old_completer
@@ -293,7 +293,7 @@ class TerminalTests(unittest.TestCase):
         session = sol.ReadingSession(self.book)
         session.read(('BEING',), first=True)
         self.assertIs(session.move(1), formula)
-        with patch('sol.reader.actions.random.choice', side_effect=lambda indices: indices[-1]) as choose:
+        with patch('sol.being.actions.random.choice', side_effect=lambda indices: indices[-1]) as choose:
             self.assertIs(session.read(('BEING',)), self.third)
         self.assertEqual(choose.call_args.args[0], [0, 2])
 
@@ -341,7 +341,7 @@ class TerminalTests(unittest.TestCase):
             'cd .', 'cd /being', 'cd /BEING', 'where', 'next', 'where',
             'open 2', 'where', 'pwd', 'exit',
         ]
-        with patch('sol.reader.shell.ReadingSession', return_value=session):
+        with patch('sol.being.shell.ReadingSession', return_value=session):
             status, output = self.run_shell(commands)
         self.assertEqual(status, 0)
         for position in (1, 2, 3):
@@ -353,7 +353,7 @@ class TerminalTests(unittest.TestCase):
 
     def test_shell_root_noop_navigation_preserves_reading_selection(self):
         session = sol.ReadingSession(self.book)
-        with patch('sol.reader.shell.ReadingSession', return_value=session):
+        with patch('sol.being.shell.ReadingSession', return_value=session):
             status, output = self.run_shell([
                 'first', 'next', 'cd /', 'up', 'cd .', 'where', 'pwd', 'exit',
             ])

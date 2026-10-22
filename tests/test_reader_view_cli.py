@@ -83,10 +83,10 @@ class ReaderViewCLITests(unittest.TestCase):
         self.assertFalse((self.root / "data").exists())
 
     def test_unavailable_view_fails_before_any_data_or_profile_access(self):
-        with patch("sol.terminal.neovim.validate_environment", side_effect=ValueError("Invented unavailable view")), \
+        with patch("sol.being.neovim.host.validate_environment", side_effect=ValueError("Invented unavailable view")), \
                 patch.object(app, "discover_corpus", side_effect=AssertionError("No corpus I/O")), \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")), \
-                patch("sol.workspace.profiles.register_actor", side_effect=AssertionError("No profile write")):
+                patch("sol.being.workspace.profiles.register_actor", side_effect=AssertionError("No profile write")):
             status, _, error = self.call([])
         self.assertNotEqual(status, 0)
         self.assertIn("Invented unavailable view", error)
@@ -94,11 +94,11 @@ class ReaderViewCLITests(unittest.TestCase):
         self.assertFalse((self.root / "data").exists())
 
     def test_nonpersistent_view_bypasses_actor_and_workspace_storage(self):
-        with patch("sol.terminal.neovim.validate_environment"), \
+        with patch("sol.being.neovim.host.validate_environment"), \
                 patch.object(app, "run_reader", return_value=0) as view, \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")), \
-                patch("sol.workspace.store.Workspace", side_effect=AssertionError("No workspace")), \
-                patch("sol.workspace.profiles.register_actor", side_effect=AssertionError("No profile")):
+                patch("sol.being.workspace.store.Workspace", side_effect=AssertionError("No workspace")), \
+                patch("sol.being.workspace.profiles.register_actor", side_effect=AssertionError("No profile")):
             status, _, error = self.call(["-n"])
         self.assertEqual(status, 0, error)
         view.assert_called_once()
@@ -112,7 +112,7 @@ class ReaderViewCLITests(unittest.TestCase):
             args.workspace, args.actor = "reading", "Invented reader"
             args.workspace_dir = self.root / "workspaces"
 
-        with patch("sol.terminal.neovim.validate_environment"), \
+        with patch("sol.being.neovim.host.validate_environment"), \
                 patch.object(app, "shell_identity", side_effect=choose) as onboarding, \
                 patch.object(app, "run_reader", return_value=0) as view:
             status, _, error = self.call([])
@@ -123,11 +123,11 @@ class ReaderViewCLITests(unittest.TestCase):
         self.assertIs(reader.book, book)
         self.assertEqual(reader.actor, "Invented reader")
         self.assertEqual(reader.store.path, self.root / "workspaces" / "reading.sqlite3")
-        from sol.workspace.store import SCHEMA_VERSION
+        from sol.being.workspace.store import SCHEMA_VERSION
         self.assertEqual(reader.store.schema_version, SCHEMA_VERSION)
 
     def test_width_and_emphasis_are_forwarded_to_the_reader(self):
-        with patch("sol.terminal.neovim.validate_environment"), \
+        with patch("sol.being.neovim.host.validate_environment"), \
                 patch.object(app, "run_reader", return_value=0) as view:
             status, _, error = self.call(["being", "-n", "--width", "64", "--emphasis", "underline"])
         self.assertEqual(status, 0, error)
@@ -138,12 +138,12 @@ class ReaderViewCLITests(unittest.TestCase):
                           ["being", "--width", "241"]):
             with self.subTest(arguments=arguments), \
                     patch.object(app, "discover_corpus", side_effect=AssertionError("No source access")), \
-                    patch("sol.terminal.neovim.validate_environment"):
+                    patch("sol.being.neovim.host.validate_environment"):
                 status, _, _ = self.call(arguments)
             self.assertNotEqual(status, 0)
 
     def test_explicit_workspace_injects_existing_service_without_prompting(self):
-        with patch("sol.terminal.neovim.validate_environment"), \
+        with patch("sol.being.neovim.host.validate_environment"), \
                 patch("builtins.input", side_effect=AssertionError("No prompt needed")), \
                 patch.object(app, "run_reader", return_value=0) as view:
             status, _, error = self.call(["being", "--workspace", "reading", "--actor", "Invented reader",
@@ -153,7 +153,7 @@ class ReaderViewCLITests(unittest.TestCase):
 
     def test_help_remains_source_and_optional_dependency_free(self):
         with patch.object(app, "discover_corpus", side_effect=AssertionError("No source")), \
-                patch("sol.terminal.neovim.validate_environment", side_effect=AssertionError("No TTY needed")), \
+                patch("sol.being.neovim.host.validate_environment", side_effect=AssertionError("No TTY needed")), \
                 redirect_stdout(StringIO()) as output, self.assertRaises(SystemExit) as caught:
             app.main(["--help"])
         self.assertEqual(caught.exception.code, 0)
@@ -163,7 +163,7 @@ class ReaderViewCLITests(unittest.TestCase):
 
     def test_first_interactive_launch_uses_guided_import_then_the_same_reader(self):
         book = app.load_corpus_book(self.corpus)
-        with patch("sol.terminal.neovim.validate_environment"), \
+        with patch("sol.being.neovim.host.validate_environment"), \
                 patch.object(app, "discover_corpus", return_value=None), \
                 patch("sol.corpus.onboarding.prepare_first_corpus", return_value=book) as setup, \
                 patch.object(app, "run_reader", return_value=0) as reader:
@@ -180,7 +180,7 @@ class ReaderViewCLITests(unittest.TestCase):
         self.assertIn("import the supported Hegel-SOL.pdf", error)
 
     def test_neovim_preflight_precedes_corpus_and_actor_access(self):
-        with patch("sol.terminal.neovim.validate_environment", side_effect=ValueError("Neovim unavailable")), \
+        with patch("sol.being.neovim.host.validate_environment", side_effect=ValueError("Neovim unavailable")), \
                 patch.object(app, "discover_corpus", side_effect=AssertionError("No source access")), \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")):
             status, _, error = self.call(["being"])
@@ -190,8 +190,8 @@ class ReaderViewCLITests(unittest.TestCase):
         self.assertFalse((self.root / "data").exists())
 
     def test_neovim_temporary_reader_does_not_require_builtin_frontend(self):
-        with patch("sol.terminal.neovim.validate_environment"), \
-                patch("sol.terminal.neovim_reader.run_reader", return_value=0) as reader, \
+        with patch("sol.being.neovim.host.validate_environment"), \
+                patch("sol.being.neovim.reader.run_reader", return_value=0) as reader, \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")):
             status, _, error = self.call(["-n", "--width", "64", "--emphasis", "underline"])
         self.assertEqual(status, 0, error)
@@ -200,8 +200,8 @@ class ReaderViewCLITests(unittest.TestCase):
         self.assertFalse((self.root / "data").exists())
 
     def test_dynamic_structure_launches_temporary_native_tree_without_onboarding(self):
-        with patch("sol.terminal.neovim.validate_environment"), \
-                patch("sol.terminal.neovim_reader.run_reader", return_value=0) as reader, \
+        with patch("sol.being.neovim.host.validate_environment"), \
+                patch("sol.being.neovim.reader.run_reader", return_value=0) as reader, \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No actor setup")):
             status, _, error = self.call(["--dynamic-structure", "--depth", "3"])
         self.assertEqual(status, 0, error)

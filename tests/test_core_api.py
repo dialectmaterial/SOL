@@ -86,7 +86,7 @@ class PublicCoreTests(unittest.TestCase):
 import builtins, pathlib, sys
 original = builtins.__import__
 def guarded(name, *args, **kwargs):
-    if name.startswith(('sol.reader', 'sol.workspace', 'sol.terminal',
+    if name.startswith(('sol.reader', 'sol.being.workspace', 'sol.terminal',
                         'markdown_it', 'prompt_toolkit', 'textual', 'rich')):
         raise AssertionError('Shared API imported an interface: ' + name)
     return original(name, *args, **kwargs)

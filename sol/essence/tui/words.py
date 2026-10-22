@@ -1,9 +1,9 @@
 """Word frequencies from the interface: choices in, the engine's artifact out.
 
 This module turns the Experiment screen's choices into the stage 2 engine's
-providers (`sol.essence.words.analyze_words`), and its artifact into table
+providers (`sol.essence.essence_as_reflection_within_itself.words.analyze_words`), and its artifact into table
 rows; with a reference, the stage 3 measures come from
-`sol.essence.comparison`. It holds no Textual code. The engine is imported
+`sol.essence.essence_as_reflection_within_itself.comparison`. It holds no Textual code. The engine is imported
 lazily, so the interface still opens, and says so, when it is not installed.
 """
 from __future__ import annotations
@@ -44,7 +44,7 @@ class EngineMissing(RuntimeError):
 
 def engine():
     try:
-        from sol.essence import word_inputs, words
+        from sol.essence.essence_as_reflection_within_itself import word_inputs, words
     except ImportError as error:
         raise EngineMissing("Word frequencies need the ESSENCE stage 2 engine, which is not installed yet.") from error
     return words, word_inputs
@@ -52,7 +52,7 @@ def engine():
 
 def comparison_engine():
     try:
-        from sol.essence import comparison
+        from sol.essence.essence_as_reflection_within_itself import comparison
     except ImportError as error:
         raise EngineMissing("Comparison needs the ESSENCE stage 3 engine, which is not installed yet.") from error
     return comparison
@@ -212,7 +212,7 @@ def _occurrences(text, word, item, counted, first):
     """Every counted occurrence's offsets, or only the first when they cannot be confirmed."""
     if text is None or counted == 1:
         return [first]
-    from sol.essence.tokenization import word_tokens
+    from sol.essence.essence_as_reflection_within_itself.tokenization import word_tokens
     span = item["span"]
     spans = [(start, end) for token, start, end in word_tokens(text)
              if token == word and span[0] <= start < end <= span[1]]

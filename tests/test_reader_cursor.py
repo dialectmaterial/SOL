@@ -5,8 +5,8 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from sol.reader.actions import ReaderActions, ReadingSession
-from sol.reader.navigation import character_cells, source_layout, validate_layout, vertical_offset
+from sol.being.actions import ReaderActions, ReadingSession
+from sol.being.quantity.navigation import character_cells, source_layout, validate_layout, vertical_offset
 from test_reader_actions import IDS, RETIRED, invented_book
 
 

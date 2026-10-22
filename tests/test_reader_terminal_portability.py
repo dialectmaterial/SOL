@@ -23,7 +23,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PROGRAM = '''
 import sys
 sys.path.insert(0, sys.argv[1])
-from sol.terminal import neovim, reader_channel
+from sol.being.neovim import host as neovim
+from sol.being.neovim import channel as reader_channel
 from sol.reader import app
 original = reader_channel.subprocess.Popen
 def launch(command, **options):
