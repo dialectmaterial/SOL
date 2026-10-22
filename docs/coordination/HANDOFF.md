@@ -66,6 +66,27 @@ Interpreter: `/home/dima/Projects/code/sol-codex/.venv/bin/python`, from isolate
 - **(reserved, existing #104):** the public source validator/interface, strict full-UUID/absolute-path contract, immutable result and facade/version interpretation remain pending. This branch introduces no public name and depends on none of those decisions.
 
 
+## Word units documented — 23 October 2026
+
+**Task:** [Claude Code: document word units](CURRENT_TASK.md#claude-code-document-word-units).
+**Branch / PR:** `claude/word-unit-docs` · pull request from this branch.
+**Last implementation commit:** the commit before this report.
+
+### Changed files
+- `docs/BEING.md` — paragraph after *Complete book search*: `/` is substring-only; `--word` bounds by letter/digit/underscore; how this differs from ESSENCE (invented example), the straight/curly apostrophe trap, link to WORD_UNIT.
+- `docs/ESSENCE.md` — stage 2 tokenizer paragraph names the difference and the 633 measured locations.
+- `sol/app/options.py` — `--word` help text. `CHANGELOG.md` — entry.
+
+### Tests performed
+- Probe on an invented line through `search_projection` and `word_tokens` confirms every example in the docs.
+- `scripts/check_docs.py` — OK. Full suite — 1,273 tests OK (7 skipped, 4 expected failures).
+
+### Outstanding issues
+- None.
+
+### Decisions requiring approval
+- Whether whole-word search should follow the tokenizer (WORD_UNIT §3) remains open; these docs describe the status quo only.
+
 ## Stage F: E2 sensitivity — 22 October 2026
 
 **Task:** [Codex A: stage F E2 sensitivity](https://github.com/dialectmaterial/SOL/blob/82b4477ea2fca9a1ce7469788aea522a1e9f146d/docs/coordination/CURRENT_TASK.md#codex-a-stage-f-e2-sensitivity).
@@ -191,7 +212,7 @@ All Python checks use `/home/dima/Projects/code/sol/.venv/bin/python -B`.
 
 ## Stage F: comparison and Measure — 22 October 2026
 
-**Task:** [Claude Code: stage F, comparison and Measure](CURRENT_TASK.md#claude-code-stage-f-comparison-and-measure).
+**Task:** [Claude Code: stage F, comparison and Measure](https://github.com/dialectmaterial/SOL/blob/729ff24475e0743c86491efe14e1b2e6a4dd35f5/docs/coordination/CURRENT_TASK.md#claude-code-stage-f-comparison-and-measure).
 **Branch / PR:** `claude/measure-comparison` · pull request opened from this branch; Codex reviews and merges.
 **Last implementation commit:** the branch head before this report's commit.
 
