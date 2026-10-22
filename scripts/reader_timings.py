@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 def _startup_worker(directory, state, width):
     """Fresh application imports and dispatch; replace only the terminal boundary."""
     started = time.perf_counter()
-    from sol.reader import app
+    from sol.app import main as app
     from sol.being.neovim import host as neovim
     from sol.being.neovim import splash
 

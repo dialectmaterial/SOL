@@ -13,7 +13,7 @@ from sol.being.neovim import reader as neovim_reader
 from sol.being.workspace.reader import WorkspaceReader
 from sol.being.workspace.store import Workspace
 from sol.core.paths import display_path, resolve_path
-from sol.reader import app
+from sol.app import main as app
 
 
 class FootnoteViewTests(CorpusFixture, unittest.TestCase):

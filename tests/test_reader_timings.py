@@ -69,7 +69,7 @@ class ReaderTimingTests(unittest.TestCase):
 
     def test_application_import_defers_the_optional_shell(self):
         result = subprocess.run([sys.executable, "-B", "-c",
-                                 "import sys; from sol.reader import app; "
+                                 "import sys; from sol.app import main as app; "
                                  "assert 'sol.being.shell' not in sys.modules"],
                                 capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)

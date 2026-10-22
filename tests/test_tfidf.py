@@ -112,7 +112,7 @@ class FileTfidfTests(unittest.TestCase):
 import importlib.abc, sys
 class Block(importlib.abc.MetaPathFinder):
     def find_spec(self, name, *args):
-        if name.startswith(("sol.core", "sol.corpus", "sol.reader", "sol.terminal", "sol.being.workspace", "textual", "torch", "sklearn", "numpy")):
+        if name.startswith(("sol.core", "sol.corpus", "sol.app", "sol.presentation", "sol.being", "textual", "torch", "sklearn", "numpy")):
             raise AssertionError("Forbidden import: " + name)
 sys.meta_path.insert(0, Block())
 from sol.essence import FileProvider, analyze_tfidf, check_tfidf_result

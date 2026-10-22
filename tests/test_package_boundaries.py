@@ -26,8 +26,8 @@ class PackageBoundaryTests(unittest.TestCase):
 
     def test_public_package_import_does_not_load_the_application(self):
         modules = self.imported_modules("import sol")
-        self.assertNotIn("sol.reader.app", modules)
-        self.assertFalse(any(name.startswith("sol.terminal.") for name in modules))
+        self.assertNotIn("sol.app.main", modules)
+        self.assertFalse(any(name.startswith(("sol.being.", "sol.presentation.")) for name in modules))
 
     def test_workspace_services_do_not_load_command_parser_adapter(self):
         modules = self.imported_modules("import sol.being.workspace.reader")
@@ -37,13 +37,13 @@ class PackageBoundaryTests(unittest.TestCase):
         modules = self.imported_modules(
             "import sol.being.quality, sol.being.quantity, sol.being.measure, sol.concept, "
             "sol.essence.essence_as_reflection_within_itself, sol.essence.appearance, sol.essence.actuality")
-        for name in ("sol.reader.app", "sol.being.neovim.host", "sol.being.workspace.store", "sol.corpus.contract",
+        for name in ("sol.app.main", "sol.being.neovim.host", "sol.being.workspace.store", "sol.corpus.contract",
                      "sol.essence.essence_as_reflection_within_itself.words", "textual"):
             with self.subTest(module=name):
                 self.assertNotIn(name, modules)
 
     def test_reader_import_does_not_load_pdf_conversion_or_optional_ui(self):
-        modules = self.imported_modules("from sol.reader import app; app.build_parser()")
+        modules = self.imported_modules("from sol.app import main as app; app.build_parser()")
         for name in ("sol.corpus.layout", "sol.corpus.convert", "sol.being.shell",
                      "sol.core.source", "markdown_it", "textual"):
             with self.subTest(module=name):
@@ -51,27 +51,27 @@ class PackageBoundaryTests(unittest.TestCase):
 
     def test_converter_does_not_import_the_reader_application(self):
         modules = self.imported_modules("import sol.corpus.convert")
-        self.assertNotIn("sol.reader.app", modules)
+        self.assertNotIn("sol.app.main", modules)
         self.assertNotIn("sol.reader.legacy_pdf", modules)
-        self.assertFalse(any(name.startswith("sol.terminal.") for name in modules))
+        self.assertFalse(any(name.startswith(("sol.being.", "sol.presentation.")) for name in modules))
 
     def test_config_import_has_no_reader_corpus_or_interface_dependency(self):
         modules = self.imported_modules("import sol.core.config")
-        self.assertFalse(any(name.startswith("sol.reader.") for name in modules))
-        self.assertFalse(any(name.startswith("sol.terminal.") for name in modules))
+        self.assertFalse(any(name.startswith("sol.app.") for name in modules))
+        self.assertFalse(any(name.startswith(("sol.being.", "sol.presentation.")) for name in modules))
         self.assertNotIn("sol.core.corpus", modules)
         self.assertNotIn("sol.corpus.contract", modules)
 
     def test_options_parser_does_not_import_the_reader_application(self):
-        modules = self.imported_modules("from sol.reader.options import build_parser; build_parser()")
-        self.assertNotIn("sol.reader.app", modules)
+        modules = self.imported_modules("from sol.app.options import build_parser; build_parser()")
+        self.assertNotIn("sol.app.main", modules)
         self.assertNotIn("sol.core.corpus", modules)
-        self.assertFalse(any(name.startswith("sol.terminal.") for name in modules))
+        self.assertFalse(any(name.startswith("sol.being.") for name in modules))
 
     def test_essence_theme_selection_does_not_import_reader_options(self):
         modules = self.imported_modules("import sol.essence.tui.__main__")
         self.assertIn("sol.presentation.theme", modules)
-        for prefix in ("sol.reader", "sol.terminal", "sol.being.workspace", "sol.being"):
+        for prefix in ("sol.app", "sol.being"):
             self.assertFalse(any(name == prefix or name.startswith(prefix + ".") for name in modules))
 
 

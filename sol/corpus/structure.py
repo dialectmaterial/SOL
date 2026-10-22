@@ -318,7 +318,7 @@ def build_hierarchy(pdf_path: str | Path) -> dict:
             "target_audit_id": target})
 
     return {
-        "schema": "sol.reader.app.heading-audit.v1",
+        "schema": "sol.app.main.heading-audit.v1",
         "scope": {"first_pdf_page": 80, "last_pdf_page": 826, "pages_examined": 747,
                   "edition": "Cambridge, George di Giovanni translation, 2010",
                   "runtime_verification": "Poppler word geometry, anchors, and exact structural counts",

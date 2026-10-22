@@ -10,8 +10,8 @@ from sol.presentation.theme import DEFAULT_READER_WIDTH
 from unittest.mock import patch
 
 from sol.corpus import contract
-from sol.reader import app
-from sol.reader.options import build_parser
+from sol.app import main as app
+from sol.app.options import build_parser
 from fixtures_corpus import write_runtime_corpus
 
 
@@ -226,7 +226,7 @@ def guard(name, *args, **kwargs):
         raise AssertionError('Ordinary reading imported optional reader ' + name)
     return original(name, *args, **kwargs)
 builtins.__import__ = guard
-from sol.reader.app import main
+from sol.app.main import main
 assert main(['-r', '--json', '--corpus', sys.argv[1]]) == 0
 '''
         result = subprocess.run([sys.executable, "-B", "-c", statement, str(self.corpus)],

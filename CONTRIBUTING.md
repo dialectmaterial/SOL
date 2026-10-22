@@ -44,9 +44,9 @@ task, reviewed before merging.
 
 | Area | Owner |
 | --- | --- |
-| Command syntax and execution mode | `sol/reader/options.py` |
-| Startup and dispatch | `sol/reader/app.py` |
-| First-run PDF import and actor/workspace selection | `sol/corpus/onboarding.py`, `sol/reader/launch.py` |
+| Command syntax and execution mode | `sol/app/options.py` |
+| Startup and dispatch | `sol/app/main.py`; `sol read` printing in `sol/app/commands.py` |
+| First-run PDF import and actor/workspace selection | `sol/corpus/onboarding.py`, `sol/app/launch.py` |
 | Optional book command interface | `sol/being/shell.py` |
 | One-shot and book-shell text rendering | `sol/being/render.py` |
 | Semantic reading cursor, selection and history | `sol/being/actions.py`; layout geometry in `sol/being/quantity/navigation.py`; literal search in `sol/being/quality/search.py` |
@@ -74,7 +74,7 @@ Assertions, worker synchronization and loop cleanup are the same in both modes.
 
 Tests share corpus builders through `tests/fixtures_corpus.py`. Do not borrow a
 different TestCase's setup methods. Patch the module that owns an operation;
-historical re-exports from `reader.app` do not own those operations.
+historical re-exports from `sol.app.main` do not own those operations.
 
 ## Archives
 

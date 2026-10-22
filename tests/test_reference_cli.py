@@ -385,7 +385,7 @@ if '--help' in sys.argv:
     Path.read_text = no_data_io
     Path.read_bytes = no_data_io
     Path.mkdir = no_data_io
-from sol.reader.app import main
+from sol.app.main import main
 raise SystemExit(main(sys.argv[1:]))
 """
         cases = ((["capture", self.identifier], None), (["check"], self.capture()),
