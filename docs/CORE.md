@@ -1,16 +1,21 @@
 # SOL CORE — Canonical Corpus, Identity, Provenance, and Interchange
 
-**Status:** implemented contract and preservation rules, with explicitly marked future decisions; 17 October 2026, provider and collection decisions 18 October 2026.  
-**Repository baseline:** `dialectmaterial/SOL` `main` at `1d200e4fcbff1ca69f48b5dc96c55765f215f303`.  
-**Companions:** [Architecture](ARCHITECTURE.md) · [BEING](BEING.md) · [ESSENCE](ESSENCE.md).
+**Status:** implemented contract and preservation rules, with explicitly marked future decisions; 17 October 2026, provider and collection decisions 18 October 2026; framed by the leading [SPECULATIVE](SPECULATIVE.md) document on 21 October 2026.  
+**Companions:** [SPECULATIVE](SPECULATIVE.md) (leading) · [Architecture](ARCHITECTURE.md) · [BEING](BEING.md) · [ESSENCE](ESSENCE.md).  
+**Original adoption:** 17 October 2026 at `main` `1d200e4`.
 
 ## 1. Why CORE exists
 
-CORE is SOL's shared, noninteractive foundation. It gives a *specific text* stable identities and verifiable provenance across reading, annotation, correction, analysis and rendering. It is not an independent Hegelian phase, an operating-system kernel, a GUI, a workspace database or a model host. It must not depend on a terminal emulator, Neovim, a machine-learning framework, a real shell or internet access.
+**CORE's place ([SPECULATIVE §4](SPECULATIVE.md#4-initial-repository-hierarchy)).** CORE is a separate service layer for corpus organization, retrieval, metadata, addressability and shared persistent research state. Its exception from the logical hierarchy is an agreed **practical boundary**, not a declaration that it can never be rethought. It serves BEING and ESSENCE; it must not silently absorb ESSENCE's computational responsibilities or become a dumping ground. CORE is also SOL's custodian of the **primary working text** for its agents: the edition held here is the source they read before structural decisions ([SPECULATIVE §5.1](SPECULATIVE.md#51-source-hierarchy)).
+
+**Open restructuring question.** SPECULATIVE assigns shared persistent research state to CORE; today the workspace store (`sol.workspace`) is a separate package used by BEING, and this document's layers (§2) treat workspaces as BEING's. Where the store belongs is decided in the restructuring and recorded in the [placement register](ARCHITECTURE.md#9-placement-register); until then the contracts below stand as written.
+
+
+CORE is SOL's shared, noninteractive foundation. It gives a *specific text* stable identities and verifiable provenance across reading, annotation, correction, analysis and rendering. It is not an independent Hegelian phase, an operating-system kernel, a GUI or a model host. It must not depend on a terminal emulator, Neovim, a machine-learning framework, a real shell or internet access.
 
 **Present scope:** the existing verified canonical edition of Hegel's *Science of Logic*, Cambridge translation by George di Giovanni. General PDFs, scans, other works and multiple-translation alignment are **out of scope for this development cycle**. Do not remove current metadata or bake away future possibilities, but do not prematurely build a generic ingest architecture either.
 
-**CORE as a provider (decision, maintainer, 18 October 2026).** ESSENCE is to run on ordinary text files without CORE; when CORE is present it is the provider that adds verified identity, edition and generation binding, provenance and source return ([Architecture §2](ARCHITECTURE.md#2-component-responsibilities), [ESSENCE §4](ESSENCE.md#4-interaction-model-and-inquiry-contract)). That boundary is an adapter around today's public API; it changes neither API version 1 nor the reference protocol. Results from files carry a file digest instead of a CORE generation and cannot claim CORE's guarantees.
+**CORE as a provider (decision, maintainer, 18 October 2026).** ESSENCE is to run on ordinary text files without CORE; when CORE is present it is the provider that adds verified identity, edition and generation binding, provenance and source return ([Architecture §2](ARCHITECTURE.md#2-logical-divisions-and-component-responsibilities), [ESSENCE §4](ESSENCE.md#4-interaction-model-and-inquiry-contract)). That boundary is an adapter around today's public API; it changes neither API version 1 nor the reference protocol. Results from files carry a file digest instead of a CORE generation and cannot claim CORE's guarantees.
 
 **Future collections (proposed requirements, not a schema).** Later analyses may compare a target with an author's oeuvre, a bibliography or a thematic collection. When that arrives: a text may belong to several collections, so membership is not a single directory parent; edition, translator, source language and attribution stay attached to every record an analysis uses; and large collections need indexed, batched access. None of this is implemented, and any new corpus schema or protocol needs its own versioned proposal and approval.
 

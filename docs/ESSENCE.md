@@ -1,10 +1,15 @@
 # SOL ESSENCE — Computational Inquiry and Reproducible Experiments
 
-**Status:** implemented foundation and bounded research roadmap, 17 October 2026; interface and encyclopedia scope revised 20 October 2026 (supporting research: [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf)).
-**Repository baseline:** `dialectmaterial/SOL` `main` at `1d200e4fcbff1ca69f48b5dc96c55765f215f303`.  
-**Companions:** [Architecture](ARCHITECTURE.md) · [BEING](BEING.md) · [CORE](CORE.md).
+**Status:** implemented foundation and bounded research roadmap, 17 October 2026; interface and encyclopedia scope revised 20 October 2026 (supporting research: [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf)); framed by the leading [SPECULATIVE](SPECULATIVE.md) document on 21 October 2026.  
+**Companions:** [SPECULATIVE](SPECULATIVE.md) (leading) · [Architecture](ARCHITECTURE.md) · [BEING](BEING.md) · [CORE](CORE.md).  
+**Original adoption:** 17 October 2026 at `main` `1d200e4`.
 
 ## 1. Purpose
+
+**ESSENCE as a logical division ([SPECULATIVE §4](SPECULATIVE.md#4-initial-repository-hierarchy)).** ESSENCE is responsible for computation, analytic methods, comparison and the Textual analysis interface; the corpus it analyses is requested from CORE. Its first-level divisions are **Essence as Reflection within Itself, Appearance and Actuality**. Placing today's engines, CLI and interface under them is a restructuring task, argued from the text and recorded in the [placement register](ARCHITECTURE.md#9-placement-register).
+
+**The reciprocal inquiry ([SPECULATIVE §2.1](SPECULATIVE.md#21-the-reciprocal-investigation)).** ESSENCE is where computation investigates philosophy, and also where philosophy investigates computation. A word tokenizer segments text into units; it also raises what makes something a unit, where its boundaries come from, what it presupposes and what abstraction loses, and those questions may change the tokenizer or its role. Every method ESSENCE runs is therefore an object of inquiry as well as an instrument, which is why methods carry their stated limits ([Methods](#7-methods-encyclopedia)) and why no result is taken as evidence that computation is adequate to the Idea ([SPECULATIVE §2.3](SPECULATIVE.md#23-adequacy-to-the-conceptand-the-idea)).
+
 
 ESSENCE investigates patterns, distinctions and relations in the present *Science of Logic* corpus, using established statistical, linguistic, and machine-learning tools. It must form **one reversible inquiry with BEING** rather than become a separate statistics application. The object is identifiable source text; the user chooses a question/method; the result can be checked and traced back to the text.
 
@@ -118,7 +123,7 @@ In particular, avoid these errors:
 
 ## 4. Interaction model and inquiry contract
 
-**Decisions (maintainer, 18 October 2026)**, from the [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf). They direct future work; none is implemented yet.
+**Decisions (maintainer, 18 October 2026)**, from the [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf). They direct the work; how far each is implemented is recorded below and in the dated sections that follow.
 
 1. **Hybrid surfaces.** Neovim remains the persistent BEING reader. ESSENCE gets its own interactive application, built with **Textual**, launched only when ESSENCE is requested. **Textual is an optional extra** (`sol-organizes-logic[essence]`, decided 18 October 2026): the reader installs and runs without it, and ESSENCE explains how to install it when it is missing.
 2. **On-demand lifecycle.** No Textual process exists while the reader is idle. Entering ESSENCE starts it in a Neovim terminal buffer; leaving ESSENCE saves the investigation state and ends the process. ESSENCE remains an ordinary application inside a terminal Neovim provides, not a terminal emulator.
@@ -126,7 +131,7 @@ In particular, avoid these errors:
 4. **Outer versus inner layout.** Neovim owns the outer geometry (split or fullscreen); Textual owns the layout inside its terminal buffer. Textual screens are logical views *within* ESSENCE (encyclopedia, method, experiment, results), not the two outer presentations.
 5. **Interface before analytical breadth.** First prove launch, both presentations, focus, state preservation, close and return; then add the smallest real operation, a word tokenizer and frequency table ([§5](#5-prioritized-experiments)).
 6. **One capability, interactive and headless.** Every analytical operation the interface offers also runs from the CLI with the same inputs and the same artifact, so results can be scripted, checked and reproduced without the UI. The read-only encyclopedia browser has no CLI.
-7. **CORE is optional for ESSENCE.** ESSENCE accepts ordinary text files; CORE is the provider that adds verified identity, provenance and source return when present. The path is staged in [Architecture §2](ARCHITECTURE.md#2-component-responsibilities); today every study requires CORE.
+7. **CORE is optional for ESSENCE.** ESSENCE accepts ordinary text files; CORE is the provider that adds verified identity, provenance and source return when present. The path is staged in [Architecture §2](ARCHITECTURE.md#2-logical-divisions-and-component-responsibilities); this is implemented for the word, sentence and TF-IDF studies, whose CLI and interface accept a UTF-8 text file without CORE (`FileProvider`). File results cannot open in the reader, and BEING still needs a CORE corpus.
 
 **Implemented (18 October 2026), stage 1 shell:** `sol.essence.tui` is a Textual application with four screens (Encyclopedia, Methods, Experiment, Results) initially holding placeholder text; Encyclopedia now browses the bundled catalog (§7), and Methods (20 October) browses the bundled methods catalog (`sol/essence/methods.json`): for each runnable study its inputs, settings, output, limits and command line, with its encyclopedia entry named; the reader's origin is shown at the top. `1`–`4` switch screens, `q` or Ctrl-Q leaves; the command palette is off. Leaving saves only the open screen and the origin record, owner-only, under `$XDG_STATE_HOME/sol/essence/` for workspace sessions (temporary `-n` sessions save nothing); the next opening returns to that screen. Opening it imports no model. Measured on this machine inside Neovim's terminal: start-up about 110 ms; a split-to-fullscreen change reflows without a restart; Escape, Alt-Left/Right, Alt+letters, Ctrl-S/N, Tab, function keys and arrows arrive intact through terminal mode. Textual reads Escape-then-letter as Alt+letter, binds Ctrl-Q to quit and Ctrl-P to its palette, so ESSENCE avoids those for other purposes. Reader-side behaviour: [BEING §6](BEING.md#6-being--essence-without-terminal-dogma).
 
@@ -191,7 +196,7 @@ A result should distinguish **reproducing the exact experiment generation** (str
 
 | Stage | Deliverable | Exit criterion |
 |---|---|---|
-| 0. Documentation | These decisions reconciled in the four authorities | Docs check passes; no application code changed; open decisions listed |
+| 0. Documentation | These decisions reconciled in the governing documents | Docs check passes; no application code changed; open decisions listed |
 | 1. Interface shell | Textual mock (Encyclopedia / Methods / Experiment / Results); entry from and return to Neovim; split and fullscreen | Launches on demand, resizes without restart, restores the reader position, keyboard focus is robust |
 | 2. Minimal experiment | Word tokenizer and frequency table over a selectable target; source-linked counts; plain-text file input | Same output from CLI and TUI; works on a plain-text file without CORE |
 | 3. Comparison | Reference-corpus selector; normalized lexical comparison; navigation and export | Explicit denominators; no false comparability; stale generations refused |
@@ -286,8 +291,8 @@ CORE sources come from `--corpus`/discovery and `--reference-corpus`. It emits
 a verification receipt, not another study. Any changed corpus generation or
 file bytes, including unselected material, invalidate the result; input
 changes during execution are refused too. Rechecking does not overwrite the
-artifact or change canonical/workspace data. Interface integration and its
-CLI/TUI equivalence trial remain separate work.
+artifact or change canonical/workspace data. The interface runs the same engine (stage 3 interface side, §4); a formal
+CLI/TUI equivalence trial remains open.
 
 ### Stage 3 engine — comparison measures and export (implemented, 19 October)
 
@@ -354,7 +359,7 @@ scope details remain in the original study. No passage text, contexts,
 source paths, headings or token sequences are exported. Empty unions produce
 a header-only table; retain the study for empty-scope totals and provenance.
 Keep the study and exports private and outside Git. The engine imports no
-Textual; interface controls and source navigation remain separate work.
+Textual; the interface's controls and source navigation are described in §4.
 
 ### Experiment A — syntax and positionality (highest priority)
 
@@ -487,8 +492,8 @@ The small bundled file `sol/essence/encyclopedia.json` contains nine entries:
 word counts, word tokenization, relative frequencies and comparisons, sentence
 segmentation and length, lexical distribution and source context, prose
 projection, TF-IDF, word vectors, and Transformers. SOL's notes identify the
-existing operations (including term counts and segmentation error measurement)
-and distinguish reading topics without runnable adapters.
+existing operations (word frequencies and occurrences, sentence lengths, TF-IDF,
+prose projection) and distinguish reading topics without runnable adapters.
 
 Each entry has one short **verbatim Wikipedia excerpt**, its article title and
 URL, and one or two further links. Shared attribution to **Wikipedia

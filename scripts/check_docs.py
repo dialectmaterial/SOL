@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check local Markdown links/anchors and the four-document layout.
+"""Check local Markdown links/anchors and the five-document layout.
 
 No network, Git history, private corpus or terminal is required. External URLs
 are not probed; GitHub main/HEAD links to this repository are resolved locally.
@@ -15,7 +15,7 @@ from urllib.parse import unquote, urlsplit
 
 from markdown_it import MarkdownIt
 
-AUTHORITIES = {"ARCHITECTURE.md", "BEING.md", "CORE.md", "ESSENCE.md"}
+AUTHORITIES = {"SPECULATIVE.md", "ARCHITECTURE.md", "BEING.md", "CORE.md", "ESSENCE.md"}
 ROOT_DOCUMENTS = ("README.md", "CONTRIBUTING.md", "CHANGELOG.md")
 _ANCHOR = re.compile(r'\bid\s*=\s*[\'"]([^\'"]+)[\'"]', re.I)
 
@@ -53,7 +53,7 @@ def check(root):
     errors = []
     leading = {path.name for path in (root / "docs").glob("*.md")}
     if leading != AUTHORITIES:
-        errors.append(f"Expected only four leading design documents, got {sorted(leading)}")
+        errors.append(f"Expected only the five governing documents, got {sorted(leading)}")
     documents = [root / name for name in ROOT_DOCUMENTS] + sorted((root / "docs").rglob("*.md"))
     details = {}
     for path in documents:
@@ -97,7 +97,7 @@ def main(argv=None):
         for error in errors:
             print(error)
         return 1
-    print("Documentation OK: four authorities and local links/anchors.")
+    print("Documentation OK: five governing documents and local links/anchors.")
     print("External URLs were not network-checked.")
     return 0
 
