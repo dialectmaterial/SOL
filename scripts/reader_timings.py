@@ -28,7 +28,8 @@ def _startup_worker(directory, state, width):
     """Fresh application imports and dispatch; replace only the terminal boundary."""
     started = time.perf_counter()
     from sol.reader import app
-    from sol.terminal import neovim, splash
+    from sol.being.neovim import host as neovim
+    from sol.being.neovim import splash
 
     class FirstPayload(BaseException):
         pass
@@ -64,13 +65,14 @@ if __name__ == "__main__" and sys.argv[1:2] == ["--_startup-worker"]:
 from sol import core
 from sol.core.paths import display_path, resolve_path
 from sol.corpus import contract
-from sol.reader.actions import ReaderActions
-from sol.reader.render import render_passage
-from sol.reader.surface import Sample, note_paragraph_ids
-from sol.reader.typography import map_typography
-from sol.terminal import neovim, neovim_reader
-from sol.workspace.reader import WorkspaceReader
-from sol.workspace.store import Workspace
+from sol.being.actions import ReaderActions
+from sol.being.render import render_passage
+from sol.being.surface import Sample, note_paragraph_ids
+from sol.being.quality.typography import map_typography
+from sol.being.neovim import host as neovim
+from sol.being.neovim import reader as neovim_reader
+from sol.being.workspace.reader import WorkspaceReader
+from sol.being.workspace.store import Workspace
 
 
 OPERATIONS = ("snapshot_load", "corpus_book_load", "core_verify", "payload_ordinary",

@@ -12,8 +12,8 @@ import unittest
 from unittest.mock import patch
 
 import sol.reader.app as sol
-from sol.workspace.store import Workspace, WorkspaceConflict
-from sol.workspace.reader import WorkspaceReader, resolve_reference, safe_output, workspace_path
+from sol.being.workspace.store import Workspace, WorkspaceConflict
+from sol.being.workspace.reader import WorkspaceReader, resolve_reference, safe_output, workspace_path
 
 
 CORPUS_ID = 'dddddddd-0000-4000-8000-000000000001'
@@ -79,7 +79,7 @@ class WorkspaceReaderTests(unittest.TestCase):
 
     def test_queue_without_workspace_uses_no_database_and_backup_never_overwrites(self):
         self.book.canonical_records[IDS[0]]['transcription_status'] = 'needs_review'
-        with patch('sol.workspace.store.Workspace', side_effect=AssertionError('No workspace database')):
+        with patch('sol.being.workspace.store.Workspace', side_effect=AssertionError('No workspace database')):
             status, output, error = self.main(['--review-queue', '--json'])
         self.assertEqual(status, 0, error)
         self.assertEqual(json.loads(output)[0]['id'], IDS[0])

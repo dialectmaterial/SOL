@@ -11,7 +11,7 @@ from sol import __version__ as VERSION
 from sol.corpus.edition import ROOT
 from sol.core.models import Book, Node, Passage, presentation_text
 from sol.core.paths import display_path
-from sol.reader.actions import context_passages
+from sol.being.actions import context_passages
 from sol.terminal.text import display_text
 
 

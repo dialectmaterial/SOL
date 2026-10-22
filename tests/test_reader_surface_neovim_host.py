@@ -13,10 +13,10 @@ import unittest
 from unittest.mock import patch
 
 from sol import core
-from sol.reader.typography import Typography
+from sol.being.quality.typography import Typography
 
-from sol.terminal import neovim
-from sol.reader.surface import sample_from_book, selection_packet
+from sol.being.neovim import host as neovim
+from sol.being.surface import sample_from_book, selection_packet
 import fixtures_corpus as fixtures
 
 
@@ -198,7 +198,7 @@ class NeovimHostTests(fixtures.CorpusFixture, unittest.TestCase):
         sample = self.sample()
         with patch.object(sample.actions, "workspace_reader", object()), self.assertRaisesRegex(ValueError, "workspace"):
             neovim.build_payload(sample)
-        from sol.reader.surface import Sample
+        from sol.being.surface import Sample
         duplicate = Sample(sample.book, sample.passages * 2, sample.actions)
         with self.assertRaisesRegex(ValueError, "distinct"):
             neovim.build_payload(duplicate)

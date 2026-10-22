@@ -4,8 +4,8 @@ from hashlib import sha256
 import unittest
 from unittest.mock import patch
 
-from sol.reader.actions import ReaderActions
-from sol.reader.navigation import source_layout
+from sol.being.actions import ReaderActions
+from sol.being.quantity.navigation import source_layout
 from sol.core.references import resolve_reference
 from test_reader_actions import IDS, RETIRED, invented_book
 from test_reader_cursor import InjectedWorkspace

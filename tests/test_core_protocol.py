@@ -423,7 +423,7 @@ class CoreProtocolTests(unittest.TestCase):
 import builtins, pathlib, sys
 original = builtins.__import__
 def guard(name, *args, **kwargs):
-    if name.startswith(('sol.reader', 'sol.workspace', 'sol.terminal', 'sol.corpus',
+    if name.startswith(('sol.reader', 'sol.being.workspace', 'sol.terminal', 'sol.corpus',
                         'markdown_it', 'prompt_toolkit', 'opendataloader_pdf')):
         raise AssertionError('Protocol import loaded ' + name)
     return original(name, *args, **kwargs)

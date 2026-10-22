@@ -13,7 +13,7 @@ def interactive_input_available() -> bool:
 
 def _close_splash():
     """Questions are asked on the ordinary screen, not under the opening screen."""
-    from sol.terminal import splash
+    from sol.being.neovim import splash
     splash.stop()
 
 
@@ -24,10 +24,10 @@ def shell_identity(book: Book, args) -> None:
     order a chooser, but never identify the next author or silently select a
     workspace. Only a previously validated interactive launch supplies defaults.
     """
-    from sol.workspace.launch import read_launch_preferences
-    from sol.workspace.profiles import actor_name, list_actors
-    from sol.workspace.reader import workspace_path
-    from sol.workspace.store import Workspace
+    from sol.being.workspace.launch import read_launch_preferences
+    from sol.being.workspace.profiles import actor_name, list_actors
+    from sol.being.workspace.reader import workspace_path
+    from sol.being.workspace.store import Workspace
 
     if not book.corpus_manifest.get('corpus_id'):
         raise ValueError("a persistent reader needs an identified Markdown corpus. "
@@ -76,7 +76,7 @@ def shell_identity(book: Book, args) -> None:
         raise ValueError("workspace setup needs interactive input. Supply --workspace NAME --actor NAME, "
                          "use sol -n for a temporary reader, or sol -r for a random passage.")
     _close_splash()
-    from sol.workspace.catalog import discover_workspaces
+    from sol.being.workspace.catalog import discover_workspaces
     recent = discover_workspaces(book.corpus_manifest['corpus_id'], source_digest, args.workspace_dir)
     if recent:
         print('Available workspaces for this corpus (not actor identities):')

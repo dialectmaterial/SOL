@@ -12,7 +12,7 @@ import sqlite3
 import unicodedata
 from uuid import UUID, uuid4
 
-from sol.workspace.time import parse_utc_timestamp
+from sol.being.workspace.time import parse_utc_timestamp
 
 
 APPLICATION_ID = 0x534F4C41  # SOLA

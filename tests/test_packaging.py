@@ -21,12 +21,12 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_FILES = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol").rglob("*.py")}
-PACKAGE_ASSETS = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol" / "terminal").glob("*.lua")}
+PACKAGE_ASSETS = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol" / "being" / "neovim").glob("*.lua")}
 PACKAGE_ASSETS.update({"sol/essence/encyclopedia.json", "sol/essence/methods.json",
-                       "sol/terminal/fonts/LibertinusMono-Regular.ttf", "sol/terminal/fonts/OFL.txt"})
+                       "sol/being/neovim/fonts/LibertinusMono-Regular.ttf", "sol/being/neovim/fonts/OFL.txt"})
 ENTRY_POINTS = {
     "sol": "sol:cli",
-    "sol-window": "sol.terminal.window:main",
+    "sol-window": "sol.being.neovim.window:main",
     "sol-corpus": "sol.corpus.convert:main",
     "sol-corpus-check": "sol.corpus.contract:main",
 }
@@ -207,7 +207,7 @@ print(catalog['license'])
     def test_wheel_contains_one_reader_and_no_historical_fullscreen_engine(self):
         with zipfile.ZipFile(self.wheel) as archive:
             names = set(archive.namelist())
-        self.assertIn("sol/terminal/neovim_reader.py", names)
+        self.assertIn("sol/being/neovim/reader.py", names)
         self.assertNotIn("sol/terminal/reader.py", names)
         self.assertNotIn("sol/terminal/reading_layout.py", names)
         self.assertFalse(any(name.startswith("experiments/") for name in names))
@@ -218,7 +218,7 @@ print(catalog['license'])
             # This archive was just built from our disposable source fixture.
             archive.extractall(destination)
         source = next(destination.iterdir())
-        self.assertTrue((source / "sol" / "terminal" / "neovim.lua").is_file())
+        self.assertTrue((source / "sol" / "being" / "neovim" / "neovim.lua").is_file())
         self.assertFalse((source / "experiments").exists())
         environment = dict(os.environ)
         environment.pop("PYTHONPATH", None)
@@ -258,7 +258,7 @@ sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def guard(name, *args, **kwargs):
     if (name.split('.')[0] in {'markdown_it', 'opendataloader_pdf'}
-            or name in {'experiments.reader_surfaces.baseline', 'sol.workspace.launch', 'sol.workspace.profiles'}):
+            or name in {'experiments.reader_surfaces.baseline', 'sol.being.workspace.launch', 'sol.being.workspace.profiles'}):
         raise AssertionError('Help imported a runtime reader component ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
@@ -294,7 +294,7 @@ def guard(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
 from sol.reader import app
-from sol.terminal import neovim
+from sol.being.neovim import host as neovim
 assert Path(neovim.__file__).with_name('neovim.lua').is_file()
 neovim.validate_environment = lambda width: '/invented/nvim'
 def native(payload, executable, **options):
@@ -310,7 +310,7 @@ raise SystemExit(app.main(['being', '-n', '--corpus', sys.argv[2]]))
     @unittest.skipUnless(shutil.which("nvim"), "installed Neovim is required for the wheel module smoke test")
     def test_installed_wheel_opens_headlessly_without_user_lua_modules(self):
         """Run all packaged Lua modules, not a mocked native launch boundary."""
-        from sol.terminal import neovim
+        from sol.being.neovim import host as neovim
         version_root = Path(self.temporary.name) / "lua-wheel-version"
         version_root.mkdir()
         version_env = neovim._isolated_environment(version_root, version_root / "input", version_root / "output")
@@ -337,8 +337,8 @@ import json, os, subprocess, sys
 from pathlib import Path
 import sol
 from sol import core
-from sol.reader.surface import sample_from_book
-from sol.terminal import neovim
+from sol.being.surface import sample_from_book
+from sol.being.neovim import host as neovim
 root = Path(sys.argv[1])
 assert Path(sol.__file__).is_relative_to(Path(sys.prefix)), 'reader came from outside the installed wheel'
 book = core.load_corpus_book(root / 'corpus')
@@ -408,7 +408,7 @@ def guard(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
 app = importlib.import_module('sol.reader.app')
-view = importlib.import_module('sol.terminal.neovim')
+view = importlib.import_module('sol.being.neovim.host')
 events = []
 def validate(*args):
     events.append('terminal')
@@ -464,7 +464,7 @@ print(json.dumps(events))
 import importlib, sys
 sys.path.insert(0, sys.argv[1])
 app = importlib.import_module('sol.reader.app')
-view = importlib.import_module('sol.terminal.neovim')
+view = importlib.import_module('sol.being.neovim.host')
 def unavailable(*args):
     raise ValueError('Invented unavailable terminal')
 def forbidden(*args, **kwargs):
@@ -528,7 +528,7 @@ assert 'markdown_it' not in sys.modules
         program = """
 import builtins, contextlib, io, json, sys
 sys.path.insert(0, sys.argv[1])
-forbidden = ('sol.reader', 'sol.workspace', 'sol.terminal',
+forbidden = ('sol.reader', 'sol.being', 'sol.terminal',
              'markdown_it', 'rich', 'textual', 'openai', 'pypdf', 'pdfplumber',
              'sol.corpus.convert', 'sol.corpus.extraction', 'opendataloader_pdf')
 original_import = builtins.__import__
@@ -600,7 +600,7 @@ print(json.dumps({'sentences': result['summary']['sentences']}))
             self.assertFalse(metadata.get_all("Requires-Dist"))
             self.assertFalse(any(name.endswith("/entry_points.txt") for name in members))
             archive.extractall(installed)
-        for directory in ("reader", "workspace", "terminal"):
+        for directory in ("reader", "being", "terminal"):
             self.assertFalse((installed / "sol" / directory).exists())
         corpus = fixture / "invented-corpus"
         passage_id, body = write_runtime_corpus(corpus)
@@ -614,7 +614,7 @@ print(json.dumps({'sentences': result['summary']['sentences']}))
 import builtins, json, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
-forbidden = ('sol.reader', 'sol.workspace', 'sol.terminal', 'markdown_it',
+forbidden = ('sol.reader', 'sol.being', 'sol.terminal', 'markdown_it',
              'sol.corpus.extraction', 'sol.corpus.ingest', 'sol.corpus.backends', 'opendataloader_pdf',
              'rich', 'textual', 'pypdf', 'pdfplumber')
 original_import = builtins.__import__
@@ -738,7 +738,7 @@ sys.path.insert(0, sys.argv[1])
 original_import = builtins.__import__
 def block_optional_and_profiles(name, *args, **kwargs):
     if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'opendataloader_pdf'}
-            or name in {'sol.workspace.profiles', 'sol.workspace.catalog'}):
+            or name in {'sol.being.workspace.profiles', 'sol.being.workspace.catalog'}):
         raise AssertionError('Temporary/one-shot reader imported ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional_and_profiles
@@ -828,7 +828,7 @@ raise SystemExit(entry(sys.argv[3:]))
 from contextlib import closing
 import json, sqlite3, sys
 sys.path.insert(0, sys.argv[1])
-from sol.workspace.store import APPLICATION_ID, _SCHEMA
+from sol.being.workspace.store import APPLICATION_ID, _SCHEMA
 with closing(sqlite3.connect(sys.argv[2])) as connection, connection:
     for statement in _SCHEMA:
         connection.execute(statement)
@@ -1002,7 +1002,7 @@ urllib.request.OpenerDirector.open = block_network
 original_import = builtins.__import__
 def block_optional(name, *args, **kwargs):
     if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'opendataloader_pdf', 'requests', 'httpx'}
-            or name in {'sol.workspace.profiles', 'sol.workspace.catalog', 'sol.terminal.source'}):
+            or name in {'sol.being.workspace.profiles', 'sol.being.workspace.catalog', 'sol.terminal.source'}):
         raise AssertionError('Inquiry export imported unrelated dependency ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional
@@ -1031,7 +1031,7 @@ raise SystemExit(entry(sys.argv[3:]))
 import json, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
-from sol.workspace.store import Workspace
+from sol.being.workspace.store import Workspace
 manifest = json.loads(Path(sys.argv[2]).read_text(encoding='utf-8'))
 provenance = {key: manifest[key] for key in ('edition', 'source')}
 with Workspace(Path(sys.argv[3]), manifest['corpus_id'], provenance, actor='Invented reader') as store:

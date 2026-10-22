@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from sol.terminal import neovim
+from sol.being.neovim import host as neovim
 
 
 class UserKeysTests(unittest.TestCase):

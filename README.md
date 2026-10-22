@@ -4,7 +4,8 @@ SOL is a recursive acronym that stands for SOL Organizes Logic. It is a reader a
 
 The organizing concern is the Idea in Hegel’s technical sense: the articulation and derivation of logical determinations through Being, Essence, and Concept. SOL makes this movement accessible for reading and investigation. The interfaces and classifications are the instruments which themselves are also subject to the inquiry.
 
-SOL is both a computational investigation into philosophy and a philosophical investigation into computation: each inquiry conditions and revises the other, and whether computation can become adequate to the Idea remains an open question investigated through the project itself. The *Science of Logic* is therefore also SOL's organizing principle: its logical divisions are to organize SOL's own modules, as a productive and revisable correspondence tested in the work ([SPECULATIVE](docs/SPECULATIVE.md)).
+SOL’s ambition is not only to investigate philosophical texts but also the computational organization of philosophical research. Therefore, a fully specified system environment
+is a methodological requirement. Each inquiry conditions and revises the other, and whether computation can become adequate to the Idea remains a positedness iterated immanently through the project itself.
 
 ## The three divisions
 
@@ -44,8 +45,7 @@ verified Neovim when needed. On other systems, supply the reported native tools
 with your package manager first. With those tools available, `pipx install .` or
 `pipx install git+https://github.com/dialectmaterial/SOL.git` also works.
 
-The single Neovim-backed reader runs in ordinary capable terminals; Kitty is not
-required. First interactive launch asks for the exact supported Cambridge /
+First interactive launch asks for the exact supported Cambridge /
 George di Giovanni PDF if no corpus exists, converts it locally once, then sets
 up an actor and workspace. An existing corpus can be selected with
 `sol --set-corpus /absolute/path/to/local-corpus`. The book is not bundled or

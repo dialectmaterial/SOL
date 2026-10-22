@@ -65,6 +65,31 @@ All Python checks used `/home/dima/Projects/code/sol/.venv/bin/python -B`.
 
 None reserved. Defaults: implement the reviewed E1–E4 placements as cohesive modules, retain E5–E7 at their present locations, and preserve historical evidence links and baseline inventories. Leave the PR open for Claude's review; do not merge.
 
+## Stage D, BEING lane: code moves into `sol.being` — 22 October 2026
+
+**Task:** [Claude Code: BEING relocation](https://github.com/dialectmaterial/SOL/blob/16703fc/docs/coordination/CURRENT_TASK.md#claude-code-being-relocation)
+**Branch / PR:** `claude/being-relocation` · pull request opened with this report; Codex reviews.
+**Last implementation commit:** `6c405b8d9b60a2a062b82eeb65efbbcc17885ae2` (this report is committed after it)
+
+### Changed files
+- `sol/being/neovim/` — from `sol/terminal/`: `neovim.py` → `host.py`, `neovim_reader.py` → `reader.py`, `reader_channel.py` → `channel.py`, `runtime`, `splash`, `window`, the ten Lua files and `fonts/`.
+- `sol/being/{actions,surface,render,shell}.py`, `sol/being/quantity/navigation.py`, `sol/being/quality/{search,structure,typography}.py`, `sol/being/workspace/` — from `sol/reader/` and `sol/workspace/`.
+- Every importer, string patch target and path in `sol/`, `tests/`, `scripts/`; `pyproject.toml` (`sol-window` target, package data); renamed modules are imported under their old local names (`from sol.being.neovim import host as neovim`) so no body changed.
+- `docs/ARCHITECTURE.md` (§2 packages, eight register rows → Implemented), `docs/BEING.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `CURRENT_TASK.md`.
+
+### Tests performed
+- `.venv/bin/python -B -m unittest discover -s tests` — 1,250 tests OK (7 skipped, 4 expected failures), including the wheel and sdist checks and headless Neovim runs of the moved Lua.
+- `.venv/bin/python -B scripts/check_docs.py` — passes.
+- `python -m sol --help`, `python -m sol essence --help`, `python -m sol.being.neovim.window --help` — work.
+- Grep for every old dotted and file path in code, tests, scripts, Lua and pyproject — none left. Historical coordination files keep old paths as snapshots.
+
+### Outstanding issues
+- Second PR after Codex B: the composition root (`sol/reader/{app,launch,options}.py`) and removal of the then-empty `sol/reader` and `sol/terminal`.
+- An editable install needs reinstalling for the new `sol-window` entry point.
+
+### Decisions requiring approval
+- None. Defaults: module renames inside `sol.being.neovim` (`host`, `reader`, `channel`); the CORE-only forbidden-import checks in `test_packaging.py` now forbid all of `sol.being`.
+
 ## Stage C: reading the Doctrine of Essence — 22 October 2026
 
 **Task:** [Codex: Reading the Doctrine of Essence](https://github.com/dialectmaterial/SOL/blob/0f5156aa511f8305abf3bf6fd7719a4e51515d8d/docs/coordination/CURRENT_TASK.md#codex-reading-the-doctrine-of-essence).

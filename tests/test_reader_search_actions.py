@@ -8,9 +8,9 @@ from unittest.mock import patch
 
 from sol.core.paths import display_path, resolve_path
 from sol.core.references import resolve_reference
-from sol.reader.actions import ReaderActions
-from sol.workspace.reader import WorkspaceReader
-from sol.workspace.store import Workspace, WorkspaceConflict, WorkspaceError
+from sol.being.actions import ReaderActions
+from sol.being.workspace.reader import WorkspaceReader
+from sol.being.workspace.store import Workspace, WorkspaceConflict, WorkspaceError
 from test_reader_actions import CORPUS_ID, IDS, RETIRED, invented_book
 
 
@@ -264,10 +264,10 @@ class ReaderSearchActionsTests(unittest.TestCase):
         self.assertEqual(self.actions.search_position(), (2, 4))
 
     def test_cached_occurrences_are_reused_but_text_replacement_invalidates(self):
-        from sol.reader.search import search_projection
+        from sol.being.quality.search import search_projection
         self.actions.search('ground', (), limit=None)
         self.actions.search_occurrences()
-        with patch('sol.reader.search.search_projection', wraps=search_projection) as project:
+        with patch('sol.being.quality.search.search_projection', wraps=search_projection) as project:
             self.actions.search_position()
             self.actions.search_occurrences()
             self.assertEqual(project.call_count, 0)

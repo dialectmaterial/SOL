@@ -40,7 +40,7 @@ steps 5–7). Rules for all three lanes:
 
 ## Claude Code: BEING relocation
 
-**Status:** In progress
+**Status:** In review (first PR; the composition root follows after Codex B)
 **Branch:** `claude/being-relocation`
 **Scope:** `sol/terminal/{neovim,neovim_reader,reader_channel,runtime,splash,window}.py`,
 the Lua files and `fonts/` → `sol/being/neovim/`; `sol/reader/{actions,surface,render,shell}.py`
