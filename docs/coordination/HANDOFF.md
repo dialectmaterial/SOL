@@ -60,6 +60,29 @@ Write "None." rather than deleting a heading.
 
 None reserved. Defaults are proposals only: keep the analytical engine groups cohesive under Reflection within Itself, retain qualified CORE/infrastructure exceptions, and defer classifications unsupported by the reading. Leave this PR open for Claude's review; do not merge.
 
+## Restructuring stage C: reading the Doctrine of Being — 22 October 2026
+
+**Task:** [Claude Code: Reading the Doctrine of Being](https://github.com/dialectmaterial/SOL/blob/582914b546e5b1675511ef8dce892552f41a2499/docs/coordination/CURRENT_TASK.md#claude-code-reading-the-doctrine-of-being)
+**Branch / PR:** `claude/reading-being` · pull request opened with this report; Codex reviews.
+**Last implementation commit:** `582914b546e5b1675511ef8dce892552f41a2499` (this report is committed after it)
+
+### Changed files
+- `docs/coordination/restructuring/READING_BEING.md` — what the division of being, Quality, Quantity and Measure say (pp. 56–336 of the Cambridge edition, sections listed), a working interpretation for reader code, placements with alternatives and confidence, answers to the inventory's stage C questions.
+- `docs/ARCHITECTURE.md` — twelve provisional rows in the §9 placement register.
+- `docs/coordination/CURRENT_TASK.md` — status In review.
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — passes. Documentation only; no code changed.
+- Every page cited was read in the local corpus with `sol read`; the sections not read in full are listed in the document.
+
+### Outstanding issues
+- *Real measure* (pp. 302–325) and the mathematical remarks are not read in full; no Measure placement should be implemented before they are.
+- `reader.search` and the word tokenizer are to be confirmed against Codex's reading of the determinations of reflection.
+- `INVENTORY_BEING.md` (#87) is referenced by name; it is still under review.
+
+### Decisions requiring approval
+- Workspace placement: decided by the maintainer on 22 October 2026, after review began. The workspace stays in BEING (root package) and moves to CORE only once ESSENCE shares it; recorded in READING_BEING §3.7, the register, ARCHITECTURE §2, CORE §1 and BEING §2.
+- Defaults: BEING-root placement for code that presents all three determinations (the Neovim reader, the session, the shell); the composition root, terminal escaping and themes outside the hierarchy.
 
 ## Restructuring stage A: BEING inventory — 22 October 2026
 
@@ -80,7 +103,6 @@ None reserved. Defaults are proposals only: keep the analytical engine groups co
 
 ### Decisions requiring approval
 - None. No placement is proposed.
-
 
 ## Restructuring stage A: ESSENCE and CORE inventory — 21 October 2026
 
@@ -133,7 +155,6 @@ None. Default: record syntactic imports separately from dynamic/runtime dependen
 
 ### Decisions requiring approval
 None reserved: the maintainer made SPECULATIVE leading. Default: SPECULATIVE is treated as maintainer-only (agents never edit it).
-
 
 ## Cleanup steps 1, 3 and `sol being` — 21 October 2026
 
@@ -230,7 +251,6 @@ None beyond the maintainer-approved cleanup. Default: reject retired term artifa
 ### Decisions requiring approval
 None reserved: the maintainer decided the removal on 21 October; Decision wording in ESSENCE §7 is unchanged apart from replacing a link to the removed proposal.
 
-
 ## ESSENCE Results in small windows — 21 October 2026
 
 **Task:** [Codex: ESSENCE Results in small windows](https://github.com/dialectmaterial/SOL/blob/a7827cf/docs/coordination/CURRENT_TASK.md#codex-essence-results-in-small-windows).
@@ -255,10 +275,6 @@ None reserved: the maintainer decided the removal on 21 October; Decision wordin
 
 ### Decisions requiring approval
 None reserved. Defaults: summary height cap 20%; word/occurrence tables share space; wrap rather than omit columns or shorten the engine's undefined-measure labels. Claude may revise these presentation defaults in review.
-
-
-
-
 
 ## Remove the experiments and the research-export mode — 21 October 2026
 
@@ -331,7 +347,6 @@ Counts are against `origin/main` at `d137627`. **31 complete files / 6,308 lines
 ### Decisions requiring approval
 None reserved. The removals implement the maintainer's approved step 2; no authority Decision statement, dependency set, public CORE/reference/corpus contract or workspace schema changes. Default: retain the internal integrated result writer and detached source-checking helpers needed by the installed reader and its tests.
 
-
 ## A faster full test suite — 21 October 2026
 
 **Task:** [Codex: A faster full test suite](https://github.com/dialectmaterial/SOL/blob/aba326e38eeacdb29ac41e6ce1e78d3670d4e053/docs/coordination/CURRENT_TASK.md#codex-a-faster-full-test-suite).
@@ -393,7 +408,6 @@ and the temporary profiler remain outside Git at `/tmp/sol-speed-*`,
 
 ### Decisions requiring approval
 None reserved. Default: run UI behavior checks in the application's normal loop mode, with debug diagnostics available explicitly. Existing tests and assertions remain intact; the reviewer can overrule this runner default.
-
 
 ## BEING describes the current reader — 21 October 2026
 
