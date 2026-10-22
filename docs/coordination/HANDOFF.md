@@ -63,6 +63,38 @@ The supplied checkout's `.git` is mounted read-only. Original publication used c
 
 None implemented or requested. E2 stays *Provisional* under Reflection; no module moves and no register edit. A stronger Measure claim needs a separate linguistic/philological argument and evidence, not a threshold crossing alone.
 
+## Source-check coverage and PDF setup diagnostic — 22 October 2026
+
+**Task:** [Codex B: source-check coverage](https://github.com/dialectmaterial/SOL/blob/dbf16fe3f550ed34350ed88e6e61364d9fa96397/docs/coordination/CURRENT_TASK.md#codex-b-source-check-coverage), requested directly by the maintainer.
+**Branch / PR:** `codex/source-check-coverage` · [#107](https://github.com/dialectmaterial/SOL/pull/107); author does not merge.
+**Last implementation commit:** `dbf16fe3f550ed34350ed88e6e61364d9fa96397` (this report is committed afterward).
+
+### Changed files
+
+- `tests/test_source_viewer.py` — 14 new tests using only the existing invented corpus/PDF/PNG fixtures. Direct `_verify_file` final-symlink, missing/directory, opened-file identity-race and open/read I/O refusal checks; 56 tamper subcases across page, region, open and follow consumers covering all generation binding fields, requested/target IDs, missing/reordered redirect chains, content/metadata digests, source ordering and PDF digest/page count. Version/missing-field checks, stale/corrupt follow refusal before companion polling/program lookup/D-Bus/launch, and late generation refusal on page/crop/whole-page fallback paths after PDF checking (cache misses/hits) and during rendering, with no completed artifact publication. Clearly named tests document the three known gaps below.
+- `sol/core/source.py` — the only production change removes the nonexistent shell `source set-pdf PATH` suggestion. The diagnostic now points solely to `sol --set-source-pdf PATH`, verified against `sol/app/options.py`, app dispatch and `sol/corpus/onboarding.py`, with an exact diagnostic regression test. No public API, schema, dependency or other behavior changes.
+- `CURRENT_TASK.md` — only lane B's slot, now In review. `HANDOFF.md` — this report. Branch starts at `origin/main` commit `7beab2449ccb1378349f6e4855c9f3e41776fe0a`; the proposal's inspected-baseline inventory is left historical, not rewritten as a new interface contract.
+
+### Tests performed
+
+All Python commands use `/home/dima/Projects/code/sol/.venv/bin/python -B`.
+
+- `-m unittest discover -s tests` — **1,273 tests OK (7 skipped, 4 existing expected failures)**, 117.494 s; log `/tmp/sol-source-check-full-suite.log`, uncommitted.
+- `-m unittest discover -s tests -p test_source_viewer.py` — **43 tests OK** (29 baseline plus 14 additions), 0.492 s after final test edits; all fixtures synthetic, new tests launch no external process and use no display/network. Existing optional real Poppler tests also pass.
+- `-m unittest discover -s tests -p test_architecture.py -v` — **5 tests OK**. `-m unittest discover -s tests -p test_reader_view_cli.py` — **18 tests OK**, including the supported source-PDF setup command.
+- `scripts/check_docs.py` and `git diff --check` — OK. External documentation URLs are not network-checked. No private corpus text, PDFs, crops, workspaces, exports or generated test artifacts are committed.
+
+### Outstanding issues
+
+- `test_known_gap_viewers_accept_corpus_change_during_pdf_check` pins that `open_pdf` and `follow_pdf` proceed after a corpus change during PDF verification: neither has a final generation check. Both viewer effects are mocked. This gap is deliberately **not fixed**.
+- `test_known_gap_bad_requested_ids_leak_builtin_exceptions` pins plain `ValueError` for empty/unresolved IDs and `AttributeError` for nonstring IDs across all four consumers. `test_known_gap_region_reads_malformed_sources_before_request_validation` pins region's early `KeyError`/`AttributeError`. These are clearly named passing characterization tests, not claims of normalized `SourceError` behavior; no new expected failures are added.
+- Other limits in [SOURCE_VALIDATION](restructuring/SOURCE_VALIDATION.md) remain: asynchronous highlighting retains a mutable request without independent revalidation, and request checks do not establish cache membership or protect a detached viewer's future pathname opens. This task implements no proposed public validation interface or stricter type/containment policy.
+- The checkout's mounted `.git` is read-only. Fetch/branch/commit/push use copied metadata at `/tmp/sol-source-check-coverage-git` via `git --git-dir=/tmp/sol-source-check-coverage-git --work-tree=/home/dima/Projects/code/sol-codex-b …`; edits and tests stay in this checkout. Original mounted metadata remains on main; the pushed branch and PR contain the work.
+
+### Decisions requiring approval
+
+None. Any public validation contract remains a separate maintainer decision under the existing proposal.
+
 
 ## Word-unit study — 22 October 2026
 

@@ -50,7 +50,7 @@ done: #95, #99.
 
 ## Codex A: stage F E2 sensitivity
 
-**Status:** In review
+**Status:** Done (#108)
 **Branch:** `codex/e2-sensitivity`
 **Requested:** 22 October 2026, by the maintainer
 **Scope:** [E2 sensitivity study](restructuring/E2_SENSITIVITY.md), following
@@ -66,37 +66,38 @@ READING_BEING §9 and HANDOFF; commit, push and open a PR against main. Do not
 merge. Previous word-unit study is done (#105); stage E re-evaluation is
 done (#102).
 
-## Codex B: source-validation proposal
+## Codex B: source-check coverage
 
-**Status:** Done (#104)
-**Branch:** `codex/source-validation-proposal`
+**Status:** Done (#107)
+**Branch:** `codex/source-check-coverage`
 **Requested:** 22 October 2026, by the maintainer
 
 ### Goal
 
-Design a public CORE source-request validation interface to replace BEING's
-private `_request_current` / `_verify_file` imports, following
-[REEVALUATION §3.6](restructuring/REEVALUATION.md#36-the-source-viewer-imports-private-core-helpers).
+Pin existing source-request validation behavior and correct the missing-PDF
+setup diagnostic, following [SOURCE_VALIDATION §2](restructuring/SOURCE_VALIDATION.md#2-existing-tests-and-uncovered-cases).
 
 ### Scope
 
-`restructuring/SOURCE_VALIDATION.md`, linked from REEVALUATION and HANDOFF;
-coordination status. Inventory every helper/source-pipeline caller, existing
-guarantees/error types/tests; propose signatures, immutable results, exceptions,
-lazy facade/version compatibility and exact tests (architecture and must-not-load
-guards included). Compare alternatives. Authority: Architecture §§2/9,
-CORE §§4/8, SPECULATIVE §5.3 and REEVALUATION §3.6.
+`tests/test_source_viewer.py`: synthetic coverage of PDF final symlinks,
+non-files/read races, stale/corrupt follow refusal before companion access,
+post-PDF-check render freshness and generation/chain/digest tampering.
+`sol/core/source.py`: replace the nonexistent shell setup command with the
+supported app option, checked against app options and onboarding.
+Coordination status and HANDOFF. Authority: Architecture §§2/9, CORE §§4/8.
 
 ### Constraints
 
-Design proposal only: no code, tests, public API, Decision, dependency or schema
-change. Interface choice is a maintainer decision (reserved: public contract).
-Never commit corpus, PDFs, workspaces or generated test artifacts.
+Tests plus one diagnostic fix only; no public API, schema or other behavior
+change. Record known validation gaps in clearly named tests or expected failures
+and HANDOFF; do not fix them. Synthetic fixtures only, no corpus text, display,
+network or committed generated artifacts. Other lanes' slots are unchanged.
 
 ### Acceptance
 
-Docs check and full test suite pass; HANDOFF records evidence, proposal limits
-and reserved decisions. Commit, push and open a PR against main; do not merge.
+Full suite, `tests/test_architecture.py`, `scripts/check_docs.py`; HANDOFF lists
+known gaps and evidence. Commit, push and open a PR against main; do not merge.
+Prior source-validation proposal completed in #104.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.

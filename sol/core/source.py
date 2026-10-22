@@ -244,8 +244,7 @@ class SourceService:
         for candidate in candidates:
             if candidate.is_file():
                 return candidate.resolve()
-        raise SourceError("Source PDF not found. Remember it once with sol --set-source-pdf PATH "
-                          "(in the shell: source set-pdf PATH).")
+        raise SourceError("Source PDF not found. Remember it once with sol --set-source-pdf PATH.")
 
     def _snapshot_pdf(self, path):
         digest = self._source()["sha256"]

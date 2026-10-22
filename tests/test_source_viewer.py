@@ -12,11 +12,12 @@ import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, mock_open, patch
 import zlib
 
 from sol.corpus.contract import load_snapshot, render_record
 from sol.being import source_view as source_module
+from sol.core import source as core_source
 from sol.core.source import SourceError, SourceService, render_page, render_region
 from sol.being.source_view import open_pdf, open_viewer
 
@@ -133,6 +134,231 @@ class SourceViewerTests(unittest.TestCase):
         with patch("sol.core.source.shutil.which", return_value="/invented/pdftoppm"), \
                 patch("sol.core.source.subprocess.run", side_effect=self.renderer):
             return render_page(request, index, cache_dir=self.cache)
+
+    def request_consumers(self):
+        return (("page", lambda request: render_page(request, 0, cache_dir=self.cache)),
+                ("region", lambda request: render_region(request, 0, cache_dir=self.cache)),
+                ("open", lambda request: open_pdf(request, 0)),
+                ("follow", source_module.follow_pdf))
+
+    def change_generation(self):
+        attribution = self.records[1]["attribution"]
+        attribution["status"] = "unresolved" if attribution["status"] == "confirmed" else "confirmed"
+        self.write_generation()
+
+    def verify_then_change_generation(self):
+        verify = core_source._verify_file
+
+        def changed(path, expected):
+            verify(path, expected)
+            self.change_generation()
+
+        return changed
+
+    def test_missing_pdf_diagnostic_names_the_supported_app_option(self):
+        self.pdf.unlink()
+        with self.assertRaises(SourceError) as caught:
+            self.service.capture(PASSAGE)
+        self.assertEqual(str(caught.exception),
+                         "Source PDF not found. Remember it once with sol --set-source-pdf PATH.")
+        self.assertFalse(self.cache.exists())
+        self.assertFalse((self.directory / "config").exists())
+
+    def test_verified_file_rejects_final_symlink_even_to_matching_pdf(self):
+        link = self.directory / "linked.pdf"
+        link.symlink_to(self.pdf)
+        with self.assertRaisesRegex(SourceError, "must not be a symbolic link"):
+            core_source._verify_file(link, self.digest)
+
+    def test_verified_file_rejects_missing_path_and_directory(self):
+        for path in (self.directory / "missing.pdf", self.directory):
+            with self.subTest(path=path), self.assertRaisesRegex(SourceError, "Cannot read verified PDF snapshot"):
+                core_source._verify_file(path, self.digest)
+
+    def test_verified_file_rejects_opened_file_identity_race_with_matching_digest(self):
+        # Hash real matching bytes, but simulate an identity change during that read.
+        with patch("sol.core.source._stat_identity", side_effect=[(1,), (2,)]) as identity:
+            with self.assertRaisesRegex(SourceError, "Verified PDF snapshot changed"):
+                core_source._verify_file(self.pdf, self.digest)
+        self.assertEqual(identity.call_count, 2)
+        self.assertEqual(hashlib.sha256(self.pdf.read_bytes()).hexdigest(), self.digest)
+
+    def test_verified_file_wraps_open_and_read_oserrors(self):
+        error = OSError("synthetic PDF I/O failure")
+        with patch.object(Path, "open", side_effect=error):
+            with self.assertRaisesRegex(SourceError, "Cannot read verified PDF snapshot") as caught:
+                core_source._verify_file(self.pdf, self.digest)
+        self.assertIs(caught.exception.__cause__, error)
+        opened = mock_open()
+        opened.return_value.read.side_effect = error
+        with patch.object(Path, "open", opened), patch("sol.core.source.os.fstat", return_value=self.pdf.stat()):
+            with self.assertRaisesRegex(SourceError, "Cannot read verified PDF snapshot") as caught:
+                core_source._verify_file(self.pdf, self.digest)
+        self.assertIs(caught.exception.__cause__, error)
+
+    def test_consumers_refuse_generation_chain_and_digest_tampering_before_external_access(self):
+        original = self.service.capture(RETIRED)
+        cases = [
+            (("corpus", "id"), ROOT, "generation changed"),
+            (("corpus", "directory"), str(self.corpus) + "/.", "generation changed"),
+            *((("corpus", field), "0" * 64, "generation changed")
+              for field in ("manifest_sha256", "index_sha256", "index_metadata_sha256")),
+            (("requested_id",), PASSAGE, "record or its page metadata changed"),
+            (("target_id",), ROOT, "record or its page metadata changed"),
+            (("redirect_chain",), [PASSAGE], "record or its page metadata changed"),
+            (("redirect_chain",), [PASSAGE, RETIRED], "record or its page metadata changed"),
+            (("metadata_sha256",), "0" * 64, "record or its page metadata changed"),
+            (("content_sha256",), "0" * 64, "record or its page metadata changed"),
+            (("sources",), list(reversed(original["sources"])), "record or its page metadata changed"),
+            (("source", "sha256"), "0" * 64, "PDF source binding changed"),
+            (("source", "pdf_pages"), 4, "PDF source binding changed"),
+        ]
+        for keys, value, message in cases:
+            for name, consume in self.request_consumers():
+                request = deepcopy(original)
+                field = request
+                for key in keys[:-1]:
+                    field = field[key]
+                field[keys[-1]] = value
+                with self.subTest(field=keys, value=value, consumer=name), \
+                        patch("sol.core.source._verify_file") as verify, \
+                        patch("sol.being.source_view._show_on_companion") as companion, \
+                        patch("sol.core.source.shutil.which") as which, \
+                        patch("sol.core.source.subprocess.run") as run, \
+                        patch("sol.being.source_view.subprocess.Popen") as popen:
+                    with self.assertRaisesRegex(SourceError, message):
+                        consume(request)
+                    verify.assert_not_called()
+                    companion.assert_not_called()
+                    which.assert_not_called()
+                    run.assert_not_called()
+                    popen.assert_not_called()
+        self.assertFalse((self.cache / "renders").exists())
+
+    def test_request_validation_refuses_bad_versions_and_missing_owned_fields(self):
+        original = self.service.capture(RETIRED)
+        invalid = [None, [], {}, *({**original, "version": value} for value in (True, False, 0, 2, "1", None))]
+        for key in original:
+            if key in {"version", "corpus", "requested_id", "target_id", "redirect_chain",
+                       "metadata_sha256", "content_sha256", "sources", "source"}:
+                request = deepcopy(original)
+                del request[key]
+                invalid.append(request)
+        for container, keys in (("corpus", ("id", "directory", "manifest_sha256", "index_sha256",
+                                            "index_metadata_sha256")),
+                                ("source", ("sha256", "pdf_pages"))):
+            for key in keys:
+                request = deepcopy(original)
+                del request[container][key]
+                invalid.append(request)
+        for index, request in enumerate(invalid):
+            with self.subTest(case=index), self.assertRaises(SourceError):
+                core_source._request_current(request)
+
+    def test_known_gap_bad_requested_ids_leak_builtin_exceptions(self):
+        original = self.service.capture(PASSAGE)
+        for value, error in (("", ValueError), ("unknown-synthetic-id", ValueError),
+                             (None, AttributeError), (42, AttributeError), ({}, AttributeError)):
+            for name, consume in self.request_consumers():
+                request = {**original, "requested_id": value}
+                with self.subTest(value=value, consumer=name), self.assertRaises(error) as caught:
+                    consume(request)
+                # SourceError subclasses ValueError: pin the currently leaked plain type.
+                self.assertIs(type(caught.exception), error)
+
+    def test_known_gap_region_reads_malformed_sources_before_request_validation(self):
+        for request, error in (({}, KeyError), ({"sources": [None]}, AttributeError)):
+            with self.subTest(request=request), patch("sol.core.source._request_current") as validate:
+                with self.assertRaises(error):
+                    render_region(request, 0, cache_dir=self.cache)
+                validate.assert_not_called()
+
+    def test_follow_refuses_stale_request_before_companion_or_dbus_access(self):
+        request = self.service.capture(PASSAGE)
+        self.change_generation()
+        self.assert_follow_refused_before_external_access(request, "generation changed")
+
+    def test_follow_refuses_corrupt_pdf_before_companion_or_dbus_access(self):
+        request = self.service.capture(PASSAGE)
+        snapshot = Path(request["source"]["verified_pdf"])
+        snapshot.chmod(0o600)
+        snapshot.write_bytes(b"synthetic corrupt snapshot")
+        self.assert_follow_refused_before_external_access(request, "Verified PDF snapshot changed")
+
+    def assert_follow_refused_before_external_access(self, request, message):
+        process = Mock()
+        companion = (process, Path(request["source"]["verified_pdf"]))
+        with patch.object(source_module, "_companion", companion), \
+                patch("sol.being.source_view._show_on_companion") as show, \
+                patch("sol.being.source_view.shutil.which") as which, \
+                patch("sol.being.source_view.subprocess.run") as run, \
+                patch("sol.being.source_view.subprocess.Popen") as popen:
+            with self.assertRaisesRegex(SourceError, message):
+                source_module.follow_pdf(request)
+            self.assertIs(source_module._companion, companion)
+            self.assertEqual(process.mock_calls, [])
+            show.assert_not_called()
+            which.assert_not_called()
+            run.assert_not_called()
+            popen.assert_not_called()
+
+    def test_render_paths_refuse_corpus_change_after_pdf_check_on_miss_and_hit(self):
+        for render, index in ((render_page, 0), (render_region, 0), (render_region, 1)):
+            for cached in (False, True):
+                with self.subTest(render=render.__name__, index=index, cached=cached):
+                    shutil.rmtree(self.cache / "renders", ignore_errors=True)
+                    request = SourceService(self.load_book(), cache_dir=self.cache).capture(PASSAGE)
+                    self.rendered = []
+                    with patch("sol.core.source.shutil.which", return_value="/invented/pdftoppm"), \
+                            patch("sol.core.source.subprocess.run", side_effect=self.renderer):
+                        if cached:
+                            render(request, index, cache_dir=self.cache)
+                        before = {p.name: p.read_bytes() for p in (self.cache / "renders").glob("*")}
+                        with patch("sol.core.source._verify_file", side_effect=self.verify_then_change_generation()):
+                            with self.assertRaisesRegex(SourceError, "generation changed"):
+                                render(request, index, cache_dir=self.cache)
+                    after = {p.name: p.read_bytes() for p in (self.cache / "renders").glob("*")}
+                    self.assertEqual(after, before)  # No stale PNG/sidecar publication or temporary files.
+
+    def test_render_paths_refuse_corpus_change_during_render_before_publication(self):
+        for render, index in ((render_page, 0), (render_region, 0), (render_region, 1)):
+            with self.subTest(render=render.__name__, index=index):
+                shutil.rmtree(self.cache / "renders", ignore_errors=True)
+                request = SourceService(self.load_book(), cache_dir=self.cache).capture(PASSAGE)
+                self.rendered = []
+
+                def changed(arguments, **kwargs):
+                    result = self.renderer(arguments, **kwargs)
+                    if arguments[-1] != "-v":
+                        self.change_generation()
+                    return result
+
+                with patch("sol.core.source.shutil.which", return_value="/invented/pdftoppm"), \
+                        patch("sol.core.source.subprocess.run", side_effect=changed):
+                    with self.assertRaisesRegex(SourceError, "generation changed"):
+                        render(request, index, cache_dir=self.cache)
+                self.assertEqual(len(self.rendered), 1)
+                self.assertEqual(list((self.cache / "renders").iterdir()), [])
+
+    def test_known_gap_viewers_accept_corpus_change_during_pdf_check(self):
+        # These paths currently have no final generation check after PDF hashing.
+        for follow in (False, True):
+            with self.subTest(follow=follow):
+                request = SourceService(self.load_book(), cache_dir=self.cache).capture(PASSAGE)
+                with patch("sol.being.source_view._verify_file", side_effect=self.verify_then_change_generation()), \
+                        patch.dict(os.environ, {"SOL_PDF_VIEWER": "invented-pdf"}), \
+                        patch("sol.being.source_view.shutil.which", return_value="/invented/viewer"), \
+                        patch("sol.being.source_view.subprocess.Popen") as popen, \
+                        patch("sol.being.source_view._show_on_companion", return_value=True) as show:
+                    if follow:
+                        self.assertTrue(source_module.follow_pdf(request))
+                        show.assert_called_once_with(request, 0)
+                        popen.assert_not_called()
+                    else:
+                        self.assertEqual(open_pdf(request, 0), "invented-pdf")
+                        popen.assert_called_once()
+                with self.assertRaisesRegex(SourceError, "generation changed"):
+                    core_source._request_current(request)
 
     def test_capture_preserves_uuid_redirect_metadata_and_exact_sources(self):
         request = self.service.capture(RETIRED[:12])
