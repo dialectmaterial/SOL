@@ -45,7 +45,7 @@ class PackageBoundaryTests(unittest.TestCase):
     def test_reader_import_does_not_load_pdf_conversion_or_optional_ui(self):
         modules = self.imported_modules("from sol.reader import app; app.build_parser()")
         for name in ("sol.corpus.layout", "sol.corpus.convert", "sol.reader.shell",
-                     "sol.terminal.source", "markdown_it", "textual"):
+                     "sol.core.source", "markdown_it", "textual"):
             with self.subTest(module=name):
                 self.assertNotIn(name, modules)
 

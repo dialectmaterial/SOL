@@ -57,7 +57,7 @@ class WorkspaceExportRoutingTests(unittest.TestCase):
         original_import = builtins.__import__
         def guard(name, *arguments, **options):
             if (name.split('.')[0] in {'pypdf', 'pdfplumber', 'markdown_it'}
-                    or name == 'sol.terminal.source'):
+                    or name == 'sol.core.source'):
                 raise AssertionError('Export must not import ' + name)
             return original_import(name, *arguments, **options)
         with patch('builtins.__import__', side_effect=guard):

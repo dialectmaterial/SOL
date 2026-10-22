@@ -16,8 +16,9 @@ from unittest.mock import patch
 import zlib
 
 from sol.corpus.contract import load_snapshot, render_record
-from sol.terminal import source as source_module
-from sol.terminal.source import SourceError, SourceService, open_pdf, open_viewer, render_page, render_region
+from sol.being import source_view as source_module
+from sol.core.source import SourceError, SourceService, render_page, render_region
+from sol.being.source_view import open_pdf, open_viewer
 
 
 ROOT = "aaaaaaaa-0000-4000-8000-000000000001"
@@ -129,8 +130,8 @@ class SourceViewerTests(unittest.TestCase):
 
     def mock_render(self, request, index=0):
         self.rendered = []
-        with patch("sol.terminal.source.shutil.which", return_value="/invented/pdftoppm"), \
-                patch("sol.terminal.source.subprocess.run", side_effect=self.renderer):
+        with patch("sol.core.source.shutil.which", return_value="/invented/pdftoppm"), \
+                patch("sol.core.source.subprocess.run", side_effect=self.renderer):
             return render_page(request, index, cache_dir=self.cache)
 
     def test_capture_preserves_uuid_redirect_metadata_and_exact_sources(self):
@@ -271,7 +272,7 @@ class SourceViewerTests(unittest.TestCase):
             SourceService(self.book)
 
     def test_pdf_modified_during_copy_never_becomes_completed_snapshot(self):
-        with patch("sol.terminal.source._stat_identity", side_effect=[(1,), (2,)]):
+        with patch("sol.core.source._stat_identity", side_effect=[(1,), (2,)]):
             with self.assertRaisesRegex(SourceError, "changed while being verified"):
                 self.service.capture(PASSAGE)
         self.assertEqual(list((self.cache / "pdf").iterdir()), [])
@@ -282,8 +283,8 @@ class SourceViewerTests(unittest.TestCase):
             if arguments[-1] == "-v":
                 return subprocess.CompletedProcess(arguments, 0, b"", b"synthetic renderer")
             return subprocess.CompletedProcess(arguments, 1, b"", b"bad source page")
-        with patch("sol.terminal.source.shutil.which", return_value="/invented/pdftoppm"), \
-                patch("sol.terminal.source.subprocess.run", side_effect=failed):
+        with patch("sol.core.source.shutil.which", return_value="/invented/pdftoppm"), \
+                patch("sol.core.source.subprocess.run", side_effect=failed):
             with self.assertRaisesRegex(SourceError, "could not render physical PDF page"):
                 render_page(request, 0, cache_dir=self.cache)
         self.assertEqual(list((self.cache / "renders").iterdir()), [])
@@ -302,8 +303,8 @@ class SourceViewerTests(unittest.TestCase):
     def test_region_crops_recorded_box_and_falls_back_to_the_whole_page(self):
         request = self.service.capture(PASSAGE)
         self.rendered = []
-        with patch("sol.terminal.source.shutil.which", return_value="/invented/pdftoppm"), \
-                patch("sol.terminal.source.subprocess.run", side_effect=self.renderer):
+        with patch("sol.core.source.shutil.which", return_value="/invented/pdftoppm"), \
+                patch("sol.core.source.subprocess.run", side_effect=self.renderer):
             crop, cropped = render_region(request, 0, cache_dir=self.cache)
             page, whole = render_region(request, 1, cache_dir=self.cache)
             full = render_page(request, 0, cache_dir=self.cache)
@@ -329,8 +330,8 @@ class SourceViewerTests(unittest.TestCase):
 
     def test_viewer_is_detached_and_configurable(self):
         with patch.dict(os.environ, {"SOL_IMAGE_VIEWER": "invented-viewer --fit"}), \
-                patch("sol.terminal.source.shutil.which", return_value="/bin/invented-viewer"), \
-                patch("sol.terminal.source.subprocess.Popen") as popen:
+                patch("sol.being.source_view.shutil.which", return_value="/bin/invented-viewer"), \
+                patch("sol.being.source_view.subprocess.Popen") as popen:
             self.assertEqual(open_viewer(Path("/cache/crop.png")), "invented-viewer")
         self.assertEqual(popen.call_args.args[0], ["/bin/invented-viewer", "--fit", "/cache/crop.png"])
         options = popen.call_args.kwargs
@@ -338,12 +339,12 @@ class SourceViewerTests(unittest.TestCase):
         self.assertTrue(all(options[name] is subprocess.DEVNULL for name in ("stdin", "stdout", "stderr")))
 
     def test_viewer_is_not_guessed_without_a_display_or_program(self):
-        with patch("sol.terminal.source.sys.platform", "linux"), \
-                patch("sol.terminal.source.subprocess.Popen") as popen:
+        with patch("sol.being.source_view.sys.platform", "linux"), \
+                patch("sol.being.source_view.subprocess.Popen") as popen:
             # setUp cleared DISPLAY and WAYLAND_DISPLAY: no text-mode fallback.
             self.assertIsNone(open_viewer(Path("/cache/crop.png")))
             with patch.dict(os.environ, {"DISPLAY": ":0"}), \
-                    patch("sol.terminal.source.shutil.which", return_value=None):
+                    patch("sol.being.source_view.shutil.which", return_value=None):
                 self.assertIsNone(open_viewer(Path("/cache/crop.png")))
         popen.assert_not_called()
 
@@ -353,9 +354,9 @@ class SourceViewerTests(unittest.TestCase):
         self.addCleanup(setattr, source_module, "_companion", None)
         found = {"zathura": "/bin/zathura", "gdbus": "/bin/gdbus"}
         with patch.dict(os.environ, {"WAYLAND_DISPLAY": "wayland-1"}), \
-                patch("sol.terminal.source.shutil.which", side_effect=found.get), \
-                patch("sol.terminal.source.threading.Thread") as thread, \
-                patch("sol.terminal.source.subprocess.Popen") as popen:
+                patch("sol.being.source_view.shutil.which", side_effect=found.get), \
+                patch("sol.being.source_view.threading.Thread") as thread, \
+                patch("sol.being.source_view.subprocess.Popen") as popen:
             self.assertEqual(open_pdf(request, 1), "zathura")
             self.assertEqual(popen.call_args.args[0], ["/bin/zathura", "--page=3", snapshot])
             self.assertTrue(popen.call_args.kwargs["start_new_session"])
@@ -365,7 +366,7 @@ class SourceViewerTests(unittest.TestCase):
             # The window SOL opened is turned to the next page instead of duplicated.
             popen.return_value.poll.return_value = None
             popen.return_value.pid = 4242
-            with patch("sol.terminal.source.subprocess.run",
+            with patch("sol.being.source_view.subprocess.run",
                        return_value=SimpleNamespace(returncode=0, stdout=b"(true,)\n")) as run:
                 self.assertEqual(open_pdf(request, 0), "zathura")
             self.assertEqual(popen.call_count, 1)
@@ -396,9 +397,9 @@ class SourceViewerTests(unittest.TestCase):
         self.addCleanup(setattr, source_module, "_companion", None)
         found = {"gdbus": "/bin/gdbus"}
         ok = SimpleNamespace(returncode=0, stdout=b"(true,)\n")
-        with patch("sol.terminal.source.shutil.which", side_effect=found.get), \
-                patch("sol.terminal.source.subprocess.Popen") as popen, \
-                patch("sol.terminal.source.subprocess.run", return_value=ok) as run:
+        with patch("sol.being.source_view.shutil.which", side_effect=found.get), \
+                patch("sol.being.source_view.subprocess.Popen") as popen, \
+                patch("sol.being.source_view.subprocess.run", return_value=ok) as run:
             source_module._companion = None
             self.assertFalse(source_module.follow_pdf(request))
             window = SimpleNamespace(pid=77, poll=lambda: None)
@@ -413,15 +414,15 @@ class SourceViewerTests(unittest.TestCase):
 
     def test_pdf_viewer_is_configurable_and_never_guessed_without_a_display(self):
         request = self.service.capture(PASSAGE)
-        with patch("sol.terminal.source.sys.platform", "linux"), \
-                patch("sol.terminal.source.subprocess.Popen") as popen:
+        with patch("sol.being.source_view.sys.platform", "linux"), \
+                patch("sol.being.source_view.subprocess.Popen") as popen:
             self.assertIsNone(open_pdf(request, 0))
             with patch.dict(os.environ, {"DISPLAY": ":0"}), \
-                    patch("sol.terminal.source.shutil.which", return_value=None):
+                    patch("sol.being.source_view.shutil.which", return_value=None):
                 self.assertIsNone(open_pdf(request, 0))
             popen.assert_not_called()
             with patch.dict(os.environ, {"SOL_PDF_VIEWER": "invented-pdf -p {page} {file} --zoom"}), \
-                    patch("sol.terminal.source.shutil.which", return_value="/bin/invented-pdf"):
+                    patch("sol.being.source_view.shutil.which", return_value="/bin/invented-pdf"):
                 self.assertEqual(open_pdf(request, 1), "invented-pdf")
             self.assertEqual(popen.call_args.args[0],
                              ["/bin/invented-pdf", "-p", "3", request["source"]["verified_pdf"], "--zoom"])
@@ -434,7 +435,7 @@ class SourceViewerTests(unittest.TestCase):
         snapshot.chmod(0o600)
         snapshot.write_bytes(b"%PDF-1.4 altered")
         with patch.dict(os.environ, {"SOL_PDF_VIEWER": "invented-pdf"}), \
-                patch("sol.terminal.source.subprocess.Popen") as popen, self.assertRaises(SourceError):
+                patch("sol.being.source_view.subprocess.Popen") as popen, self.assertRaises(SourceError):
             open_pdf(request, 0)
         popen.assert_not_called()
 

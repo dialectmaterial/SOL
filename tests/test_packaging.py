@@ -972,7 +972,7 @@ urllib.request.OpenerDirector.open = block_network
 original_import = builtins.__import__
 def block_optional(name, *args, **kwargs):
     if (name.split('.')[0] in {'markdown_it', 'rich', 'textual', 'opendataloader_pdf', 'requests', 'httpx'}
-            or name in {'sol.workspace.profiles', 'sol.workspace.catalog', 'sol.terminal.source'}):
+            or name in {'sol.workspace.profiles', 'sol.workspace.catalog', 'sol.core.source'}):
         raise AssertionError('Inquiry export imported unrelated dependency ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional

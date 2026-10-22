@@ -219,10 +219,10 @@ def main(argv: list[str] | None = None) -> int:
         from sol.essence.cli import main as analyze_main
         return analyze_main(arguments[1:])
     if arguments and arguments[0] == "reference":
-        from sol.terminal.reference import main as reference_main
+        from sol.core.reference_cli import main as reference_main
         return reference_main(arguments[1:])
     if arguments and arguments[0] == "read":
-        from sol.terminal.commands import main as command_main
+        from sol.reader.commands import main as command_main
         return command_main(arguments)
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -281,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
                     print("\nAbbreviated outline. Select a corpus with --set-corpus DIRECTORY for subdivisions.")
                 return 0
             if mode.interactive:
-                from sol.reader.onboarding import prepare_first_corpus
+                from sol.corpus.onboarding import prepare_first_corpus
                 _close_splash()
                 book = prepare_first_corpus()
             else:
@@ -292,7 +292,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.workspace is not None:
             return run_workspace_cli(book, args, width, color)
         if mode is ExecutionMode.SET_SOURCE_PDF:
-            from sol.terminal.source import SourceService
+            from sol.core.source import SourceService
             location = SourceService(book).set_pdf(args.set_source_pdf)
             if args.json:
                 emit_json({"source_pdf": str(location)})
