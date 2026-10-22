@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### SPECULATIVE leads the documentation — 21 October 2026
+
+The maintainer's *Speculative Architecture and Methodology* is now
+`docs/SPECULATIVE.md`, the leading of five governing documents. SOL is described
+as a computational investigation of philosophy and a philosophical investigation
+of computation, to be restructured under BEING, ESSENCE, a reserved CONCEPT and a
+separate CORE. The other documents, the README and the agent rules were aligned
+with it; no code changed.
+
 ### A smaller SOL: one reader, a minimal shell, no Kitty — 21 October 2026
 
 - `sol being` names the reader; bare `sol` still opens it. `--reader` is gone.
