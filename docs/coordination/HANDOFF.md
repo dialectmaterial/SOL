@@ -33,6 +33,39 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## Private source-request hardening — 23 October 2026
+
+**Task:** [Codex B: private source-request hardening](https://github.com/dialectmaterial/SOL/blob/5c2e657b4d2865f8b91e3308de2fda245a0681a7/docs/coordination/CURRENT_TASK.md#codex-b-private-source-request-hardening).
+**Branch / PR:** `codex/source-gap-fixes` · [#110](https://github.com/dialectmaterial/SOL/pull/110); author does not merge.
+**Last implementation commit:** `5c2e657b4d2865f8b91e3308de2fda245a0681a7` (this report is committed afterward).
+
+### Changed files
+
+- `sol/core/source.py` — privately type-check owned request fields, normalize expected resolver/shape/path failures to chained `SourceError`, validate regions before source/bbox access while reusing the checked snapshot, and translate final corpus freshness failures through a private wrapper.
+- `sol/being/source_view.py` — retain the freshly loaded snapshot and verify it after PDF hashing, before viewer discovery, launching, companion access or D-Bus.
+- `tests/test_source_viewer.py` — convert all three #107 known-gap tests to fixed-behavior assertions; add regressions for malformed/missing fields across all four consumers, ambiguous IDs, bbox/path errors, index refusals, generation changes during and after PDF hashing, and final-check snapshot identity/order.
+- `docs/coordination/restructuring/SOURCE_VALIDATION.md`, `docs/coordination/CURRENT_TASK.md`, `CHANGELOG.md` — record the private fixes, unchanged public boundary and this lane's review status.
+
+### Tests performed
+
+Interpreter: `/home/dima/Projects/code/sol-codex/.venv/bin/python`, from isolated checkout `/tmp/sol-source-gap-fixes` (the supplied checkout's Git metadata is read-only).
+
+- `-B -m unittest discover -s tests` — **1,277 tests OK (7 skipped, 4 existing expected failures)**, 94.776 s; log `/tmp/sol-source-gap-full-suite.log` remains uncommitted.
+- `-B -m unittest discover -s tests -p test_source_viewer.py` — **47 tests OK**, including real Poppler page/crop checks and all prior cache/freshness regressions.
+- `-B -m unittest discover -s tests -p test_architecture.py` — **5 tests OK**.
+- `-B scripts/check_docs.py`, `-B -m sol --help`, `git diff --check` — pass. Documentation external URLs are not network-checked.
+- Synthetic fixtures only; no private corpus, PDF, live viewer, D-Bus session or committed generated artifact used.
+
+### Outstanding issues
+
+- None for the assigned three gaps. Capture output, identifier-prefix resolution, render/cache settings, viewer launch policy, request version, lazy facade exports and `API_VERSION` remain unchanged.
+- Detached viewers can still reopen a changed pathname later; mutable asynchronous highlight ownership and the proposed immutable validation result remain outside this private fix.
+
+### Decisions requiring approval
+
+- **(reserved, existing #104):** the public source validator/interface, strict full-UUID/absolute-path contract, immutable result and facade/version interpretation remain pending. This branch introduces no public name and depends on none of those decisions.
+
+
 ## Word units documented — 23 October 2026
 
 **Task:** [Claude Code: document word units](CURRENT_TASK.md#claude-code-document-word-units).
