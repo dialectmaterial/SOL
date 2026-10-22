@@ -17,7 +17,7 @@ BEING is the place to **read Hegel's *Science of Logic***, locate source evidenc
 
 `sol` invokes a **single native Neovim 0.11+ reader** with a private SOL configuration. Personal Neovim/LazyVim settings are neither loaded nor changed. The reader uses only its integrated mode; checkout surface experiments and the separate research-export mode have been removed. `sol` and `sol being` open it; there is no other engine.
 
-Python/CORE owns source verification, IDs, lineage, actions and workspace persistence. Neovim owns disposable buffers, layout, input, motions and visual styling. A view contains **at most 64 canonical paragraphs**, divided into bounded reading sections; the reading position is a UUID plus source-codepoint offset, *never* a Neovim buffer address or screen row. Reloading a section in the same native Neovim process preserves the semantic contract. The reader can display adjacent passages continuously or one passage at a time. The book is **not** one unbounded editor buffer.
+Python owns source verification and IDs (CORE), lineage, actions and workspace persistence (BEING). Neovim owns disposable buffers, layout, input, motions and visual styling. A view contains **at most 64 canonical paragraphs**, divided into bounded reading sections; the reading position is a UUID plus source-codepoint offset, *never* a Neovim buffer address or screen row. Reloading a section in the same native Neovim process preserves the semantic contract. The reader can display adjacent passages continuously or one passage at a time. The book is **not** one unbounded editor buffer.
 
 The Lua implementation is split into package-local modules behind the small
 `sol/terminal/neovim.lua` entry: `neovim_text.lua` validates Unicode/spans,

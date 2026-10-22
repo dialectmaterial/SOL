@@ -32,6 +32,30 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Restructuring stage C: reading the Doctrine of Being — 22 October 2026
+
+**Task:** [Claude Code: Reading the Doctrine of Being](https://github.com/dialectmaterial/SOL/blob/582914b546e5b1675511ef8dce892552f41a2499/docs/coordination/CURRENT_TASK.md#claude-code-reading-the-doctrine-of-being)
+**Branch / PR:** `claude/reading-being` · pull request opened with this report; Codex reviews.
+**Last implementation commit:** `582914b546e5b1675511ef8dce892552f41a2499` (this report is committed after it)
+
+### Changed files
+- `docs/coordination/restructuring/READING_BEING.md` — what the division of being, Quality, Quantity and Measure say (pp. 56–336 of the Cambridge edition, sections listed), a working interpretation for reader code, placements with alternatives and confidence, answers to the inventory's stage C questions.
+- `docs/ARCHITECTURE.md` — twelve provisional rows in the §9 placement register.
+- `docs/coordination/CURRENT_TASK.md` — status In review.
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — passes. Documentation only; no code changed.
+- Every page cited was read in the local corpus with `sol read`; the sections not read in full are listed in the document.
+
+### Outstanding issues
+- *Real measure* (pp. 302–325) and the mathematical remarks are not read in full; no Measure placement should be implemented before they are.
+- `reader.search` and the word tokenizer are to be confirmed against Codex's reading of the determinations of reflection.
+- `INVENTORY_BEING.md` (#87) is referenced by name; it is still under review.
+
+### Decisions requiring approval
+- Workspace placement: decided by the maintainer on 22 October 2026, after review began. The workspace stays in BEING (root package) and moves to CORE only once ESSENCE shares it; recorded in READING_BEING §3.7, the register, ARCHITECTURE §2, CORE §1 and BEING §2.
+- Defaults: BEING-root placement for code that presents all three determinations (the Neovim reader, the session, the shell); the composition root, terminal escaping and themes outside the hierarchy.
+
 ## Restructuring stage A: BEING inventory — 22 October 2026
 
 **Task:** [Claude Code: Restructuring stage A — BEING inventory](https://github.com/dialectmaterial/SOL/blob/3a995af8f2015ade1fa5b2b57c4b6df58460a3e6/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer. Its slot in `CURRENT_TASK.md` has since been replaced by stage C (#89), so the status is recorded here rather than set to *In review*.

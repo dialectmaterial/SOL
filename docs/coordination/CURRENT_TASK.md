@@ -37,7 +37,7 @@ divisions) are done. Stage C reads before anything moves
 
 ## Claude Code: Reading the Doctrine of Being
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `claude/reading-being`
 **Scope:** the Doctrine of Being (its division; Quality, Quantity, Measure);
 the BEING-side groups of `INVENTORY_BEING.md`; output
