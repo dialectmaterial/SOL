@@ -234,6 +234,12 @@ letter runs with combining marks and internal straight/curly apostrophes,
 NFC then case folding then curly-to-straight apostrophes; punctuation and
 digits excluded, hyphens split. The artifact records the runtime Unicode
 version. These are ordinary word tokens, not morphological or model subwords.
+They are not the reader's search unit: whole-word search in BEING bounds a
+literal match by Unicode letters, digits and underscore, so it finds numbers
+and the parts of `can’t`, and it keeps the source's curly apostrophe. On the
+book's 1,757 analysed passages the two differ at 633 places, almost all curly
+apostrophes and numbers ([WORD_UNIT](coordination/restructuring/WORD_UNIT.md)).
+Both are kept for now; whether to align them is a maintainer decision.
 
 The interface-facing function is
 `sol.essence.essence_as_reflection_within_itself.words.analyze_words(target, *, reference=None) -> dict`.

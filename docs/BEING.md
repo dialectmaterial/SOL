@@ -97,6 +97,8 @@ source text values agree; opening results still verifies the canonical source
 and stages the destination before saving. Automated controller and headless
 Neovim checks cover these behaviors; sustained manual reading remains untested. marks hidden with `Esc` stay hidden through `p`, `f`, `b/n`, resizing and `T`; opening another search result marks its matches again. Nothing about this is saved.
 
+**Whole words in search, and how ESSENCE counts words.** `/` in the reader always matches substrings. `sol --search QUERY --word` and the shell's `search QUERY --word` match whole words: the match must not be preceded or followed by a Unicode letter, digit or underscore. That rule is not ESSENCE's word unit. ESSENCE's tokenizer keeps an internal apostrophe in a word, ignores numbers and splits at digits. So in an invented line `The concept’s 2nd`, whole-word search finds `concept`, `2nd` and the literal `concept’s`, while ESSENCE counts `concept's` and `nd`. ESSENCE also writes the curly apostrophe as `'`, which reader search does not do: searching `concept's` with a straight apostrophe will not find text printed with a curly one. Both rules are kept on purpose for now: the reader finds literal occurrences, ESSENCE declares an analytical unit. The measured differences on the book and the options are in [WORD_UNIT](coordination/restructuring/WORD_UNIT.md); which rule the reader should follow is an open maintainer decision.
+
 **Navigation latency:** `Ctrl-N` / `Ctrl-P` within the passage
 already shown sends a checked position and search-mark update, keeping the
 Neovim buffer, layout, typography and callouts. It works in both reading modes;

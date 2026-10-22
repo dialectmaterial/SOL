@@ -33,6 +33,27 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## Word units documented — 23 October 2026
+
+**Task:** [Claude Code: document word units](CURRENT_TASK.md#claude-code-document-word-units).
+**Branch / PR:** `claude/word-unit-docs` · pull request from this branch.
+**Last implementation commit:** the commit before this report.
+
+### Changed files
+- `docs/BEING.md` — paragraph after *Complete book search*: `/` is substring-only; `--word` bounds by letter/digit/underscore; how this differs from ESSENCE (invented example), the straight/curly apostrophe trap, link to WORD_UNIT.
+- `docs/ESSENCE.md` — stage 2 tokenizer paragraph names the difference and the 633 measured locations.
+- `sol/app/options.py` — `--word` help text. `CHANGELOG.md` — entry.
+
+### Tests performed
+- Probe on an invented line through `search_projection` and `word_tokens` confirms every example in the docs.
+- `scripts/check_docs.py` — OK. Full suite — 1,273 tests OK (7 skipped, 4 expected failures).
+
+### Outstanding issues
+- None.
+
+### Decisions requiring approval
+- Whether whole-word search should follow the tokenizer (WORD_UNIT §3) remains open; these docs describe the status quo only.
+
 ## Stage F: E2 sensitivity — 22 October 2026
 
 **Task:** [Codex A: stage F E2 sensitivity](https://github.com/dialectmaterial/SOL/blob/82b4477ea2fca9a1ce7469788aea522a1e9f146d/docs/coordination/CURRENT_TASK.md#codex-a-stage-f-e2-sensitivity).
