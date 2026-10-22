@@ -315,8 +315,43 @@ def _request_current(request):
     try:
         if (not isinstance(request, dict) or type(request.get("version")) is not int
                 or request["version"] != 1):
-            raise SourceError("Unrecognized source-view request")
+            raise ValueError("Unrecognized source-view request")
         binding = request["corpus"]
+        source = request["source"]
+        if not isinstance(binding, dict) or not isinstance(source, dict):
+            raise TypeError("corpus and source must be dictionaries")
+        if binding["id"] is not None and not isinstance(binding["id"], str):
+            raise TypeError("corpus id must be a string or null")
+        for value in (binding["directory"], source["verified_pdf"]):
+            if not isinstance(value, str):
+                raise TypeError("source-view paths must be strings")
+            if not value or "\0" in value:
+                raise ValueError("source-view paths must be nonempty and NUL-free")
+        for field in ("requested_id", "target_id"):
+            if not isinstance(request[field], str):
+                raise TypeError(f"{field} must be a string")
+        if (not isinstance(request["redirect_chain"], list)
+                or not all(isinstance(value, str) for value in request["redirect_chain"])):
+            raise TypeError("redirect_chain must be a list of strings")
+        for value in (binding["manifest_sha256"], binding["index_sha256"],
+                      binding["index_metadata_sha256"], request["metadata_sha256"],
+                      request["content_sha256"], source["sha256"]):
+            if not isinstance(value, str) or not _SHA.fullmatch(value):
+                raise ValueError("source-view fingerprints must be SHA-256 strings")
+        try:
+            _validate_sources(request["sources"], source["pdf_pages"])
+        except SourceError as error:
+            raise SourceError(f"Cannot validate source-view request: {error}") from error
+        for item in request["sources"]:
+            # Canonical source entries always carry a label, including null.
+            item["printed_page"]
+            if "bbox" in item:
+                box = item["bbox"]
+                if (not isinstance(box, list) or len(box) != 4
+                        or not all(type(n) in (int, float) and math.isfinite(n) for n in box)):
+                    raise ValueError("bbox must contain four finite PDF-point coordinates")
+                if box[0] < 0 or box[1] < 0 or box[2] < box[0] or box[3] < box[1]:
+                    raise ValueError("bbox coordinates must form a nonnegative rectangle")
         snapshot = load_snapshot(binding["directory"])
         actual = {"id": snapshot.corpus_id, "directory": str(snapshot.corpus_directory),
                   "manifest_sha256": snapshot.manifest_sha256, "index_sha256": snapshot.index_sha256,
@@ -336,8 +371,17 @@ def _request_current(request):
             raise SourceError("The captured PDF source binding changed")
         _validate_sources(request["sources"], source["pdf_pages"])
         return snapshot
-    except (KeyError, TypeError, CorpusError, OSError) as error:
+    except SourceError:
+        raise
+    except (KeyError, TypeError, ValueError, OverflowError, CorpusError, OSError) as error:
         raise SourceError(f"Cannot validate source-view request: {error}; reopen SOL and capture again") from error
+
+
+def _verify_snapshot_current(snapshot):
+    try:
+        verify_snapshot_current(snapshot)
+    except CorpusError as error:
+        raise SourceError(f"The canonical corpus generation changed; reopen SOL and capture again: {error}") from error
 
 
 def _crop_arguments(settings):
@@ -393,16 +437,18 @@ def render_region(request, page_index, cache_dir=None):
     them. A page entry without a box falls back to the whole page; the second
     value says which was rendered so callers never present a page as a crop.
     """
+    snapshot = _request_current(request)
     if type(page_index) is not int or not 0 <= page_index < len(request["sources"]):
         raise SourceError("Choose a source page index within this record's captured page list")
     box = request["sources"][page_index].get("bbox")
     if box is None:
-        return _render(request, page_index, cache_dir, _SETTINGS), False
-    return _render(request, page_index, cache_dir, {**_CROP, "region": list(box)}), True
+        return _render(request, page_index, cache_dir, _SETTINGS, snapshot=snapshot), False
+    return _render(request, page_index, cache_dir, {**_CROP, "region": list(box)}, snapshot=snapshot), True
 
 
-def _render(request, page_index, cache_dir, settings):
-    snapshot = _request_current(request)
+def _render(request, page_index, cache_dir, settings, *, snapshot=None):
+    if snapshot is None:
+        snapshot = _request_current(request)
     if type(page_index) is not int or not 0 <= page_index < len(request["sources"]):
         raise SourceError("Choose a source page index within this record's captured page list")
     page = request["sources"][page_index]["pdf_page"]

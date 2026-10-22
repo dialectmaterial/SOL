@@ -15,7 +15,7 @@ import unittest
 from unittest.mock import Mock, mock_open, patch
 import zlib
 
-from sol.corpus.contract import load_snapshot, render_record
+from sol.corpus.contract import CorpusError, load_snapshot, render_record
 from sol.being import source_view as source_module
 from sol.core import source as core_source
 from sol.core.source import SourceError, SourceService, render_page, render_region
@@ -135,11 +135,11 @@ class SourceViewerTests(unittest.TestCase):
                 patch("sol.core.source.subprocess.run", side_effect=self.renderer):
             return render_page(request, index, cache_dir=self.cache)
 
-    def request_consumers(self):
-        return (("page", lambda request: render_page(request, 0, cache_dir=self.cache)),
-                ("region", lambda request: render_region(request, 0, cache_dir=self.cache)),
-                ("open", lambda request: open_pdf(request, 0)),
-                ("follow", source_module.follow_pdf))
+    def request_consumers(self, page_index=0):
+        return (("page", lambda request: render_page(request, page_index, cache_dir=self.cache)),
+                ("region", lambda request: render_region(request, page_index, cache_dir=self.cache)),
+                ("open", lambda request: open_pdf(request, page_index)),
+                ("follow", lambda request: source_module.follow_pdf(request, page_index)))
 
     def change_generation(self):
         attribution = self.records[1]["attribution"]
@@ -246,32 +246,107 @@ class SourceViewerTests(unittest.TestCase):
                 invalid.append(request)
         for container, keys in (("corpus", ("id", "directory", "manifest_sha256", "index_sha256",
                                             "index_metadata_sha256")),
-                                ("source", ("sha256", "pdf_pages"))):
+                                ("source", ("sha256", "pdf_pages", "verified_pdf"))):
             for key in keys:
                 request = deepcopy(original)
                 del request[container][key]
                 invalid.append(request)
         for index, request in enumerate(invalid):
-            with self.subTest(case=index), self.assertRaises(SourceError):
-                core_source._request_current(request)
+            for name, consume in (("private", core_source._request_current), *self.request_consumers()):
+                with self.subTest(case=index, consumer=name), self.assertRaises(SourceError) as caught:
+                    consume(request)
+                self.assertIsNotNone(caught.exception.__cause__)
 
-    def test_known_gap_bad_requested_ids_leak_builtin_exceptions(self):
+    def test_bad_requested_ids_raise_source_errors_with_chained_causes(self):
         original = self.service.capture(PASSAGE)
-        for value, error in (("", ValueError), ("unknown-synthetic-id", ValueError),
-                             (None, AttributeError), (42, AttributeError), ({}, AttributeError)):
+        for value in ("", "unknown-synthetic-id", None, 42, {}, [], True):
             for name, consume in self.request_consumers():
                 request = {**original, "requested_id": value}
-                with self.subTest(value=value, consumer=name), self.assertRaises(error) as caught:
+                with self.subTest(value=value, consumer=name), self.assertRaises(SourceError) as caught:
                     consume(request)
-                # SourceError subclasses ValueError: pin the currently leaked plain type.
-                self.assertIs(type(caught.exception), error)
+                self.assertIs(type(caught.exception), SourceError)
+                self.assertIsInstance(caught.exception.__cause__, (TypeError, ValueError))
 
-    def test_known_gap_region_reads_malformed_sources_before_request_validation(self):
-        for request, error in (({}, KeyError), ({"sources": [None]}, AttributeError)):
-            with self.subTest(request=request), patch("sol.core.source._request_current") as validate:
-                with self.assertRaises(error):
+    def test_ambiguous_requested_id_is_wrapped_without_changing_prefix_resolution(self):
+        original = self.service.capture(PASSAGE)
+        request = {**original, "requested_id": PASSAGE[:12]}
+        self.assertIsNotNone(core_source._request_current(request))
+        # A second canonical ID shares this prefix; all four consumers must wrap
+        # the resolver's ambiguity rather than exposing its plain ValueError.
+        self.records[0]["id"] = PASSAGE[:8] + ROOT[8:]
+        for record in self.records[1:]:
+            record["parent_id"] = self.records[0]["id"]
+        self.write_generation()
+        original = SourceService(self.load_book(), cache_dir=self.cache).capture(PASSAGE)
+        for name, consume in self.request_consumers():
+            with self.subTest(consumer=name), self.assertRaisesRegex(SourceError, "ambiguous") as caught:
+                consume({**original, "requested_id": PASSAGE[:8]})
+            self.assertIs(type(caught.exception.__cause__), ValueError)
+
+    def test_region_validates_request_before_reading_sources_or_bbox(self):
+        for request in ({}, {"sources": [None]}):
+            error = SourceError("synthetic invalid request")
+            with self.subTest(request=request), \
+                    patch("sol.core.source._request_current", side_effect=error) as validate, \
+                    patch("sol.core.source._render") as render:
+                with self.assertRaises(SourceError) as caught:
                     render_region(request, 0, cache_dir=self.cache)
-                validate.assert_not_called()
+                self.assertIs(caught.exception, error)
+                validate.assert_called_once_with(request)
+                render.assert_not_called()
+
+    def test_malformed_request_shapes_are_refused_before_pdf_or_external_access(self):
+        original = self.service.capture(PASSAGE)
+        invalid = [None, [], {}, {"sources": [None]}]
+        cases = [
+            (("corpus",), None), (("corpus",), []),
+            (("corpus", "id"), []), (("corpus", "directory"), None), (("corpus", "directory"), "bad\0path"),
+            (("source",), None), (("source",), []),
+            (("source", "verified_pdf"), None), (("source", "verified_pdf"), []),
+            (("source", "verified_pdf"), ""), (("source", "verified_pdf"), "bad\0path"),
+            (("source", "pdf_pages"), True), (("source", "sha256"), None),
+            (("sources",), None), (("sources",), {}), (("sources",), []),
+            (("sources",), [None]), (("sources",), [{"pdf_page": 1}]),
+            (("sources",), [{"pdf_page": True, "printed_page": None}]),
+            (("sources",), [{"pdf_page": 1, "printed_page": 3}]),
+            (("target_id",), []), (("redirect_chain",), None), (("redirect_chain",), [None]),
+            (("metadata_sha256",), []), (("content_sha256",), "bad-digest"),
+        ]
+        for keys, value in cases:
+            request = deepcopy(original)
+            field = request
+            for key in keys[:-1]:
+                field = field[key]
+            field[keys[-1]] = value
+            invalid.append(request)
+        missing_pdf = deepcopy(original)
+        del missing_pdf["source"]["verified_pdf"]
+        invalid.append(missing_pdf)
+        for box in (None, 42, {}, [1, 2, 3], [True, 20, 140, 140],
+                    [20, 20, float("inf"), 140], [20, 20, float("nan"), 140],
+                    [-1, 20, 140, 140], [140, 20, 20, 140], [0, 0, 10**1000, 140]):
+            request = deepcopy(original)
+            request["sources"][0]["bbox"] = box
+            invalid.append(request)
+        for index, request in enumerate(invalid):
+            for name, consume in self.request_consumers():
+                with self.subTest(case=index, consumer=name), \
+                        patch("sol.core.source._verify_file") as core_verify, \
+                        patch("sol.being.source_view._verify_file") as viewer_verify, \
+                        patch("sol.being.source_view._show_on_companion") as show, \
+                        patch("sol.core.source.shutil.which") as which, \
+                        patch("sol.core.source.subprocess.run") as run, \
+                        patch("sol.being.source_view.subprocess.Popen") as popen:
+                    with self.assertRaises(SourceError) as caught:
+                        consume(request)
+                    self.assertIsNotNone(caught.exception.__cause__)
+                    core_verify.assert_not_called()
+                    viewer_verify.assert_not_called()
+                    show.assert_not_called()
+                    which.assert_not_called()
+                    run.assert_not_called()
+                    popen.assert_not_called()
+        self.assertFalse((self.cache / "renders").exists())
 
     def test_follow_refuses_stale_request_before_companion_or_dbus_access(self):
         request = self.service.capture(PASSAGE)
@@ -340,25 +415,86 @@ class SourceViewerTests(unittest.TestCase):
                 self.assertEqual(len(self.rendered), 1)
                 self.assertEqual(list((self.cache / "renders").iterdir()), [])
 
-    def test_known_gap_viewers_accept_corpus_change_during_pdf_check(self):
-        # These paths currently have no final generation check after PDF hashing.
+    def test_viewers_refuse_corpus_change_after_pdf_check_before_external_access(self):
         for follow in (False, True):
             with self.subTest(follow=follow):
                 request = SourceService(self.load_book(), cache_dir=self.cache).capture(PASSAGE)
+                process = Mock()
+                companion = (process, Path(request["source"]["verified_pdf"]))
                 with patch("sol.being.source_view._verify_file", side_effect=self.verify_then_change_generation()), \
+                        patch.object(source_module, "_companion", companion), \
                         patch.dict(os.environ, {"SOL_PDF_VIEWER": "invented-pdf"}), \
-                        patch("sol.being.source_view.shutil.which", return_value="/invented/viewer"), \
+                        patch("sol.being.source_view.shutil.which") as which, \
+                        patch("sol.being.source_view.subprocess.run") as run, \
                         patch("sol.being.source_view.subprocess.Popen") as popen, \
-                        patch("sol.being.source_view._show_on_companion", return_value=True) as show:
-                    if follow:
-                        self.assertTrue(source_module.follow_pdf(request))
-                        show.assert_called_once_with(request, 0)
-                        popen.assert_not_called()
-                    else:
-                        self.assertEqual(open_pdf(request, 0), "invented-pdf")
-                        popen.assert_called_once()
-                with self.assertRaisesRegex(SourceError, "generation changed"):
-                    core_source._request_current(request)
+                        patch("sol.being.source_view._show_on_companion") as show:
+                    with self.assertRaisesRegex(SourceError, "generation changed") as caught:
+                        (source_module.follow_pdf if follow else open_pdf)(request, 0)
+                    self.assertIsInstance(caught.exception.__cause__, CorpusError)
+                    self.assertIs(source_module._companion, companion)
+                    self.assertEqual(process.mock_calls, [])
+                    which.assert_not_called()
+                    run.assert_not_called()
+                    popen.assert_not_called()
+                    show.assert_not_called()
+
+    def test_viewers_refuse_corpus_change_while_pdf_bytes_are_hashed(self):
+        for follow in (False, True):
+            with self.subTest(follow=follow):
+                request = SourceService(self.load_book(), cache_dir=self.cache).capture(PASSAGE)
+                identity = core_source._stat_identity
+                calls = []
+
+                def changed(stat):
+                    calls.append(stat)
+                    if len(calls) == 2:
+                        self.change_generation()
+                    return identity(stat)
+
+                with patch("sol.core.source._stat_identity", side_effect=changed), \
+                        patch("sol.core.source.verify_snapshot_current", wraps=core_source.verify_snapshot_current) as final, \
+                        patch("sol.being.source_view._show_on_companion") as show, \
+                        patch("sol.being.source_view.shutil.which") as which, \
+                        patch("sol.being.source_view.subprocess.Popen") as popen:
+                    with self.assertRaisesRegex(SourceError, "generation changed") as caught:
+                        (source_module.follow_pdf if follow else open_pdf)(request, 0)
+                    self.assertIsInstance(caught.exception.__cause__, CorpusError)
+                    final.assert_called_once()
+                    self.assertEqual(len(calls), 2)
+                    show.assert_not_called()
+                    which.assert_not_called()
+                    popen.assert_not_called()
+
+    def test_viewers_final_check_uses_the_fresh_snapshot_after_pdf_hashing(self):
+        request = self.service.capture(PASSAGE)
+        for follow in (False, True):
+            with self.subTest(follow=follow):
+                order = []
+                current = core_source._request_current
+                verify = core_source._verify_file
+                final = core_source.verify_snapshot_current
+                snapshots = []
+
+                def load(value):
+                    snapshots.append(current(value))
+                    order.append("request")
+                    return snapshots[-1]
+
+                def hashed(path, digest):
+                    verify(path, digest)
+                    order.append("pdf")
+
+                def checked(snapshot):
+                    self.assertIs(snapshot, snapshots[-1])
+                    order.append("final")
+                    final(snapshot)
+
+                with patch("sol.being.source_view._request_current", side_effect=load), \
+                        patch("sol.being.source_view._verify_file", side_effect=hashed), \
+                        patch("sol.core.source.verify_snapshot_current", side_effect=checked):
+                    result = (source_module.follow_pdf if follow else open_pdf)(request, 0)
+                self.assertEqual(result, False if follow else None)
+                self.assertEqual(order, ["request", "pdf", "final"])
 
     def test_capture_preserves_uuid_redirect_metadata_and_exact_sources(self):
         request = self.service.capture(RETIRED[:12])
@@ -443,8 +579,14 @@ class SourceViewerTests(unittest.TestCase):
     def test_bool_and_out_of_bounds_indexes_are_rejected(self):
         request = self.service.capture(PASSAGE)
         for index in (True, -1, 2, "1"):
-            with self.subTest(index=index), self.assertRaisesRegex(SourceError, "source page index"):
-                self.mock_render(request, index)
+            for name, consume in self.request_consumers(index):
+                with self.subTest(index=index, consumer=name), \
+                        patch("sol.core.source._verify_file") as core_verify, \
+                        patch("sol.being.source_view._verify_file") as viewer_verify:
+                    with self.assertRaisesRegex(SourceError, "source page index"):
+                        consume(request)
+                    core_verify.assert_not_called()
+                    viewer_verify.assert_not_called()
 
     def test_declared_physical_page_bounds_are_checked_on_capture(self):
         self.book.canonical_records[PASSAGE]["sources"][1]["pdf_page"] = 4
