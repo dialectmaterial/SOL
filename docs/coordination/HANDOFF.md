@@ -32,6 +32,36 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+
+## Restructuring stage A: ESSENCE and CORE inventory — 21 October 2026
+
+**Task:** [Codex: Restructuring stage A — ESSENCE and CORE inventory](https://github.com/dialectmaterial/SOL/blob/3a995af8f2015ade1fa5b2b57c4b6df58460a3e6/docs/coordination/CURRENT_TASK.md#codex-restructuring-stage-a--essence-and-core-inventory), assigned directly by the maintainer.
+**Branch / PR:** `codex/inventory-essence-core` · [branch pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Finventory-essence-core); Claude reviews; author does not merge.
+**Last implementation commit:** `3a995af8f2015ade1fa5b2b57c4b6df58460a3e6` (this report is committed afterward).
+
+### Changed files
+
+- `docs/coordination/restructuring/INVENTORY_ESSENCE_CORE.md` — all 49 Python modules (24 ESSENCE, 14 corpus, 8 CORE, 3 scripts) and both JSON catalogs: actual responsibilities, present boundaries, execution routes, protecting tests, complete AST import/reverse-import ledger, reproducible scan, dynamic/resource/process edges, cohesive change groups and Stage C reading questions. No logical subdivision placements or product changes.
+- `docs/coordination/CURRENT_TASK.md` — replace only Codex's completed cleanup slot with this directly assigned inventory task, `In review`. Claude's task and parallel `INVENTORY_BEING.md` are untouched.
+- Baseline `origin/main`: `c0f469780ac09a3ea832e4e3b3b0fecb303d4399`. Read CLAUDE.md and SPECULATIVE from PR #86's `origin/claude/speculative-docs` at `1424aae9ec3e16cc8c9a0c3aaea64a67782b7fd6`, especially §§4 and 7; that leading document was not yet on main. Do not copy or amend the maintainer's document in this PR.
+- Publication checkout: `/tmp/sol-inventory-essence-core`, cloned/fetched from origin because the supplied checkout's Git metadata is read-only.
+
+### Tests performed
+
+- `/home/dima/Projects/code/sol/.venv/bin/python -B scripts/check_docs.py` — OK: baseline four-authority layout and local links/anchors; external URLs not network-checked. PR #86 owns the separate five-document checker update.
+- `/home/dima/Projects/code/sol/.venv/bin/python -B -m unittest discover -s tests` — **1,249 tests, OK (7 skipped, 4 expected failures)**, 105.423 s. Existing expected failures document sentence segmentation limits; no accuracy claim added.
+- Executed the inventory's embedded AST scan and compared all **49 ledger rows** byte-for-byte with the document; checked every scoped Python file has a narrative row and both catalogs are recorded. All agree. Scan includes function-local/relative imports; lazy exports, subprocess strings, Lua and package data are reviewed separately in the inventory.
+- `git diff --check` — OK. Changed-file audit: only inventory, Codex's task slot and this report; no product/test/config changes or edits to Claude's inventory.
+
+### Outstanding issues
+
+- Stage C primary-text reading and placement rationale remain future work; no quotations or logical-category assignments are fabricated here. Existing analysis scope, snapshot mutability, sentence-rule limits and reader/UI/persistence couplings are recorded as questions, not changed.
+- No private-corpus, real extraction engine or manual reading/visual acceptance trial is claimed; this is a documentation inventory.
+
+### Decisions requiring approval
+
+None. Default: record syntactic imports separately from dynamic/runtime dependencies and protecting behavior tests. No reserved decision, contract, dependency, workspace schema or corpus-write policy change. Leave this PR open for Claude's review; do not merge.
+
 ## SPECULATIVE leads the documentation — 21 October 2026
 
 **Task:** maintainer request (21 October 2026): make the speculative architecture document leading and align all documentation with it.

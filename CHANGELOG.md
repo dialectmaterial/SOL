@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### The logical divisions exist — 22 October 2026
+
+Restructuring stage B: empty packages for BEING (Quality, Quantity, Measure),
+ESSENCE (Essence as Reflection within Itself, Appearance, Actuality) and a
+reserved CONCEPT. Nothing has moved into them yet; behaviour is unchanged.
+
 ### SPECULATIVE leads the documentation — 21 October 2026
 
 The maintainer's *Speculative Architecture and Methodology* is now
