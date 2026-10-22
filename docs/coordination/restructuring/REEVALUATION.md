@@ -564,6 +564,14 @@ BEING concern. A second projection or a contract proposal that can state how
 compatibility is preserved would make a split actionable. The C3 status is revised to
 record that direction; the API/contract design remains reserved if changed.
 
+**Follow-up proposal (23 October 2026):**
+[PROJECTION_BOUNDARY](PROJECTION_BOUNDARY.md) inventories the edition assumptions
+and consumers, separates verified graph custody from reader/analytical views,
+and proposes a package-owned description behind the existing CORE loader.
+It specifies unchanged paths, IDs, workspace positions and versions, compares
+alternatives and names exact compatibility tests. The recommendation remains a
+**maintainer decision (reserved: public contract)**; this is documentation only.
+
 ### 3.6 The source viewer imports private CORE helpers
 
 **Code facts.** `sol/being/source_view.py:13` imports `_request_current` and

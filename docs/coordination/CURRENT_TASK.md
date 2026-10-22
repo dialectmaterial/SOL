@@ -47,23 +47,25 @@ ESSENCE's tokenizer in BEING.md, ESSENCE.md and the `--word` help, from
 [WORD_UNIT](restructuring/WORD_UNIT.md). No behaviour change; which rule the
 reader follows stays a maintainer decision. Previous task (stage F reading) done: #103.
 
-## Codex A: stage F E2 sensitivity
+## Codex A: C3 projection-boundary proposal
 
-**Status:** Done (#108)
-**Branch:** `codex/e2-sensitivity`
-**Requested:** 22 October 2026, by the maintainer
-**Scope:** [E2 sensitivity study](restructuring/E2_SENSITIVITY.md), following
-READING_BEING §§8.2/9 and REEVALUATION §3.3: vary supported document units,
-reference populations and TF-IDF top_n on the real private corpus through
-existing public providers. State screening thresholds before results; report
-isolated words, counts and statistics only, including negative evidence.
-**Constraints:** research only; no ESSENCE method, schema, register or placement
-change. Corpus remains read-only; no private text, PDFs, workspaces or exports
-are committed. Task-specific analysis scripts stay outside Git.
-**Acceptance:** full suite and `scripts/check_docs.py`; study linked from
-READING_BEING §9 and HANDOFF; commit, push and open a PR against main. Do not
-merge. Previous word-unit study is done (#105); stage E re-evaluation is
-done (#102).
+**Status:** In review
+**Branch:** `codex/c3-projection-proposal`
+**Requested:** 23 October 2026, by the maintainer
+**Scope:** [Projection boundary](restructuring/PROJECTION_BOUNDARY.md), following
+[REEVALUATION §3.5](restructuring/REEVALUATION.md#35-cores-edition-shaped-projection-c3)
+and [Architecture §9 C3](../ARCHITECTURE.md#9-placement-register): inventory
+edition assumptions and consumers, distinguish verified corpus custody from
+reader projection, propose an explicit description and compatibility seam,
+compare alternatives and state exact migration tests. Link from REEVALUATION
+and HANDOFF; update only Codex A's slot.
+**Constraints:** design and documentation only; no runtime, API, version,
+corpus-contract, workspace-schema or reference-protocol change. No private
+corpus text, PDFs, workspaces or generated exports. Hegel-placement remarks
+use existing READING documents only; recommendation is a maintainer decision
+(reserved: public contract).
+**Acceptance:** `scripts/check_docs.py` and full suite; commit, push and open a
+PR against main; report its URL and do not merge. Previous E2 study done (#108).
 
 ## Codex B: source-check coverage
 
