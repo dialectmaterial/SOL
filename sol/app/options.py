@@ -85,7 +85,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="canonical corpus for this run (otherwise discover a local or saved corpus)")
     printing = parser.add_argument_group("One-shot output and outline options")
     printing.add_argument("--within", metavar="PATH", help="restrict --search to this subtree")
-    printing.add_argument("--word", action="store_true", help="whole-word --search rather than substring")
+    printing.add_argument("--word", action="store_true", help="whole-word --search: no letter, digit or _ on either side (not ESSENCE's word unit)")
     printing.add_argument("--limit", type=int, metavar="N", help="maximum search results (1–1000; default 20)")
     printing.add_argument("--context", type=int, metavar="N", help="neighbors around --passage (0–10 on each side)")
     printing.add_argument("--depth", type=int, metavar="N", help="outline depth (0–32; guide default 1)")

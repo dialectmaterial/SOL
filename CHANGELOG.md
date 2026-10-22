@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Word units documented — 23 October 2026
+
+`--word` help and BEING/ESSENCE docs now say what whole-word search matches
+(no Unicode letter, digit or underscore on either side) and that ESSENCE's word
+unit differs (internal apostrophes kept, numbers ignored, curly apostrophes
+written as `'`). No search or tokenizer behaviour changed.
+
 ### Decouple the ESSENCE launch — 22 October 2026
 
 BEING and ESSENCE share the private launch-file format through

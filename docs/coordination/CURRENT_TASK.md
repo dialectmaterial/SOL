@@ -38,15 +38,14 @@ steps 5–7). Rules for all three lanes:
    the PR, update module paths in ARCHITECTURE §2 and the component document,
    and add a CHANGELOG line.
 
-## Claude Code: stage F, comparison and Measure
+## Claude Code: document word units
 
-**Status:** Done (#103)
-**Branch:** `claude/measure-comparison`
-**Scope:** read *Measure as a series* (p. 305), *Elective affinity* (p. 308) and
-*Diversity* (pp. 362–365) against the two E2 engines, answering the question
-READING_BEING §8.2 left for stage E. Docs only: [READING_BEING §9](restructuring/READING_BEING.md#9-comparison-series-and-elective-affinity-stage-f-22-october-2026).
-No register, Decision or code change. The previous task (BEING relocation) is
-done: #95, #99.
+**Status:** In review
+**Branch:** `claude/word-unit-docs`
+**Scope:** describe the current difference between whole-word search and
+ESSENCE's tokenizer in BEING.md, ESSENCE.md and the `--word` help, from
+[WORD_UNIT](restructuring/WORD_UNIT.md). No behaviour change; which rule the
+reader follows stays a maintainer decision. Previous task (stage F reading) done: #103.
 
 ## Codex A: stage F E2 sensitivity
 
