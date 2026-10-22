@@ -33,6 +33,35 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## Stage F: E2 sensitivity — 22 October 2026
+
+**Task:** [Codex A: stage F E2 sensitivity](https://github.com/dialectmaterial/SOL/blob/82b4477ea2fca9a1ce7469788aea522a1e9f146d/docs/coordination/CURRENT_TASK.md#codex-a-stage-f-e2-sensitivity).
+**Branch / PR:** `codex/e2-sensitivity` · [#108](https://github.com/dialectmaterial/SOL/pull/108); author does not merge.
+**Last implementation commit:** `82b4477ea2fca9a1ce7469788aea522a1e9f146d` (integrates current main after study commit `30ef3d8`; this report is committed afterward).
+
+### Changed files
+
+- [E2 sensitivity](restructuring/E2_SENSITIVITY.md) — prospective thresholds committed in `fe1aeef` before corpus statistics/rankings; public-provider study over 1,757 private-corpus paragraphs, 312,481 tokens and 7,317 types. Ten exact-count unit controls, seven TF-IDF populations, 5,271 matched-paragraph contrasts at five depths, twelve doctrine comparisons, every integer top_n 5–100, 178 one-paragraph perturbations and adjacent-section references. All 27 local abrupt flags are located, including sub-1% token increments; none meets the full declared plateau/persistence nodal screen. TF-IDF has 174 stable local steps, four intermediate and zero abrupt; top_n has zero prefix/rank/score failures. Large contexts flag 64 five-term passage profiles. Zero-domain changes, ties, supported-unit limits and the bounded Reflection/Measure interpretation are explicit.
+- `READING_BEING.md` §9 links the study; `CURRENT_TASK.md` updates only Codex A's slot against current main; this file records the handoff. E2 methods, schemas, register, placements, runtime code, tests and dependencies are unchanged. No private sentences/passages, corpus files, PDFs, workspaces, study exports or analysis scripts enter Git; only isolated words, counts/statistics and provenance.
+
+### Tests performed
+
+- `/home/dima/Projects/code/sol/.venv/bin/python -B -m unittest discover -s tests` — **1,259 tests OK (7 skipped, 4 expected failures)**, 119.882 s, isolated XDG config/data/state/cache paths; log `/tmp/sol-e2-full-suite.log` stays local. Final integration through `origin/main` at `7beab24` changes only coordination docs; product/test/script trees are byte-identical to tested baseline `729ff24`.
+- Same interpreter, `scripts/check_docs.py` — OK after final edits; external URLs are not network-checked. `git diff --check` — OK.
+- Read-only corpus runs through public CORE/ESSENCE APIs; ten complete count-map equality controls; 288 actual top_n sweep calls check 288 overall and 4,704 document lists. Eleven synthetic research-metric/screen assertions pass. Independent repeated population-depth calculation and final numeric consistency audit agree; final public snapshot verification confirms unchanged manifest/index/index-metadata binding.
+- Research program, numeric intermediates and logs remain in `/tmp/sol-e2-*`. The task-specific main script SHA-256 is `a7ab95339c1d0e638c6ef06722b1000f9cde5f42f09c4c39f51dc760c91ecf79`; the report gives the complete public-call recipe, formulas, deterministic selections and corpus digests for independent reproduction.
+
+### Outstanding issues
+
+The negative nodal screen is conditional, not a denial of abrupt numerical changes or proof against Measure. No independent linguistic quality labels were tested. Public providers support passage rows or a single whole-file document; genuine multi-section/chapter document populations remain untested. One edition, three sampled chapters, one lexical policy and canonical prefix order limit generalization. Detailed limits and all positive/negative screens are in the study.
+
+This checkout's `.git` is mounted read-only. Git branch/fetch/commit/push use copied metadata: `git --git-dir=/tmp/sol-e2-git --work-tree=/home/dima/Projects/code/sol-codex-a …`. Original metadata remains on its original main; review the published topic branch. No private corpus or workspace was copied into Git metadata.
+
+### Decisions requiring approval
+
+None implemented or requested. E2 stays *Provisional* under Reflection; no module moves and no register edit. A stronger Measure claim needs a separate linguistic/philological argument and evidence, not a threshold crossing alone.
+
+
 ## Word-unit study — 22 October 2026
 
 **Task:** [Codex A: word-unit study](https://github.com/dialectmaterial/SOL/blob/bc2e8025e6b14a2b50a34c779802a394cee2614f/docs/coordination/CURRENT_TASK.md#codex-a-word-unit-study), requested directly by the maintainer.
