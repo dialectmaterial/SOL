@@ -69,7 +69,7 @@ commit, push and PR against main. Do not merge the PR.
 
 ## Codex B: architecture guard
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `codex/architecture-guard`
 **Requested:** 22 October 2026, by Claude for the maintainer
 
