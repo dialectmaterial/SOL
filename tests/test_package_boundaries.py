@@ -68,6 +68,12 @@ class PackageBoundaryTests(unittest.TestCase):
         self.assertNotIn("sol.core.corpus", modules)
         self.assertFalse(any(name.startswith("sol.terminal.") for name in modules))
 
+    def test_essence_theme_selection_does_not_import_reader_options(self):
+        modules = self.imported_modules("import sol.essence.tui.__main__")
+        self.assertIn("sol.presentation.theme", modules)
+        for prefix in ("sol.reader", "sol.terminal", "sol.workspace", "sol.being"):
+            self.assertFalse(any(name == prefix or name.startswith(prefix + ".") for name in modules))
+
 
 class SourceCheckoutDiscoveryTests(unittest.TestCase):
     def setUp(self):
