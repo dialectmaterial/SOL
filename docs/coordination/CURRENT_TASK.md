@@ -40,7 +40,7 @@ steps 5–7). Rules for all three lanes:
 
 ## Claude Code: BEING relocation
 
-**Status:** In review (second PR: the composition root; the first, #95, is merged)
+**Status:** Done (#95, #99)
 **Branch:** `claude/being-relocation`
 **Scope:** `sol/terminal/{neovim,neovim_reader,reader_channel,runtime,splash,window}.py`,
 the Lua files and `fonts/` → `sol/being/neovim/`; `sol/reader/{actions,surface,render,shell}.py`
@@ -50,26 +50,27 @@ Afterwards (second PR, after Codex B merges): the composition root
 `sol/reader/{app,launch,options}.py` out of `sol.reader`, and removal of the
 empty `sol/reader` and `sol/terminal` packages.
 
-## Codex A: decouple the ESSENCE launch
+## Codex A: stage E re-evaluation
 
-**Status:** In review
-**Branch:** `codex/decouple-essence-launch`
+**Status:** Done (#102)
+**Branch:** `codex/stage-e-reevaluation`
 **Requested:** 22 October 2026, by Claude for the maintainer
-**Authority:** SPECULATIVE §5.2; Architecture §9; stage D rules above.
-**Scope:** remove `sol.essence.tui`/`context` imports from
-`sol/being/neovim/reader.py`; move the existing transient launch-file schema,
-validation and owner-only I/O into a neutral module; probe Textual without
-loading the ESSENCE interface. Record alternatives and reasoning in Architecture
-§9 and resolve the Neovim row's pending note. Preserve format, behavior, messages,
-lifetime and OSC bytes; saved investigation state stays with ESSENCE.
-**Acceptance:** fresh-process import/launch boundary test; full suite and docs
-check; stage D entry-point/wheel checks; merge `origin/main` and resolve any
-integration with #97/#98 before opening the PR; handoff, ordinary worktree git
+**Authority:** SPECULATIVE §§3, 5, 6, 7 stage E, 9; Architecture §§2, 9;
+READING_BEING (including §8) and READING_ESSENCE.
+**Scope:** `restructuring/REEVALUATION.md`: regenerate the complete cross-division
+AST import map after #95/#97/#98/#99/#100, judge dependency directions, reread
+the relevant CORE-edition passages, and assess the revealed placement ambiguities.
+Update only register Status cells where the review revises a row.
+**Constraints:** docs only; move no code; further logical subdivisions only with
+concrete need and defensible interpretation; private corpus remains read-only
+and uncommitted. No Decision, public contract, dependency or schema changes.
+**Acceptance:** docs check; reproducible import ledger and source-grounded
+verdicts; fetch and merge `origin/main` again before finishing; HANDOFF report,
 commit, push and PR against main. Do not merge the PR.
 
 ## Codex B: architecture guard
 
-**Status:** In review
+**Status:** Done (#101)
 **Branch:** `codex/architecture-guard`
 **Requested:** 22 October 2026, by Claude for the maintainer
 

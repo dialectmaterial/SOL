@@ -33,6 +33,37 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## Stage E re-evaluation — 22 October 2026
+
+**Task:** [Codex A: stage E re-evaluation](https://github.com/dialectmaterial/SOL/blob/549a965288b7b0ac5795da034fe6e43e1a0b66aa/docs/coordination/CURRENT_TASK.md#codex-a-stage-e-re-evaluation).
+**Branch / PR:** `codex/stage-e-reevaluation` · [stage E pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fstage-e-reevaluation); author does not merge.
+**Last implementation commit:** `549a965288b7b0ac5795da034fe6e43e1a0b66aa` (this report is committed afterward).
+
+### Changed files
+
+- `docs/coordination/restructuring/REEVALUATION.md` — complete AST ledger (139 crossing module pairs, 177 Python files), per-edge dependency judgments, executable reproduction script and explicit dynamic/process/Lua limits. Nine source-grounded reviews cover the requested placement tensions; further logical subdivisions: none. Primary CORE-edition passages reread with `sol read … --corpus /home/dima/Projects/code/sol/local-corpus --plain`; section paths and printed-page evidence included, with paraphrase separated from interpretation. No private text is committed.
+- `docs/ARCHITECTURE.md` — exactly four **Status** cells changed: complete search's Reflection cross-reading; close source-viewer Measure and flag private validation coupling; retain E2 Reflection after the Real-measure review; mark C3's edition-projection boundary for later revision. All other cells and Decision statements are unchanged.
+- `docs/coordination/CURRENT_TASK.md` — replace Codex A's completed launch task with stage E, **In review**. `HANDOFF.md` — this report and a commit-pinned link to the preceding task, preserving its address after the slot replacement.
+- Fetched and merged `origin/main` including #99 and #100; final code baseline `fd9b6b160f4a6294df05185d199e542f04d98fd5`. Final fetch/merge before the implementation commit: already up to date. Diff against that main contains docs only; no code, test, dependency, schema or public contract change.
+
+### Tests performed
+
+All Python commands used `/home/dima/Projects/code/sol/.venv/bin/python -B`.
+
+- `-m unittest discover -s tests` on the final #99/#100-integrated tree — **1,254 tests OK (7 skipped, 4 expected failures)**, 114.009 s, isolated XDG paths. Includes existing packaging, CORE-only/file-only boundaries and headless reader coverage; log `/tmp/sol-stage-e-final-suite.log` is local only.
+- `scripts/check_docs.py` — OK, including local links/anchors; external URLs are not network-checked. `git diff --check`, `python -m sol --help` and `python -m sol essence --help` — OK.
+- Executed the report's embedded AST script; its 139 rows exactly reproduce the committed ledger and the crossing-pair set obtained from the original INVENTORY_ESSENCE_CORE §10 script. No unreviewed direction remains. Programmatic register audit confirms only four final Status cells differ from main.
+- Synthetic `can't 123` probe confirms distinct units: ESSENCE emits only `can't` (0–5); reader whole-word search matches `can` (0–3) and `123` (6–9). Recorded as an open behavioral/interpretive question, without changing either algorithm.
+
+### Outstanding issues
+
+- Later design work: CORE's edition-specific projection boundary and source viewer's private validation imports. Measure/Reflection and the tokenizer unit remain research questions; the empty divisions remain intentional. Static edges do not establish runtime reachability or philosophical adequacy; no new transcription, linguistic or human reading acceptance is claimed.
+- The sandbox mounts this clone's `.git` read-only despite the task's ordinary-Git authorization. All edits/checks stayed here; branch/fetch/commit/push use copied metadata at `/tmp/sol-stage-e-git`: `git --git-dir=/tmp/sol-stage-e-git --work-tree=/home/dima/Projects/code/sol-codex-a …`. Original metadata remains at its original main; review the published topic branch. No private corpus or workspace was copied into Git metadata or committed.
+
+### Decisions requiring approval
+
+None implemented or requested. Defaults: retain the reviewed placements and bounded outside-hierarchy exceptions; propose no deeper subdivisions. Any later public CORE API or corpus/workspace contract change still needs the maintainer's reserved decision; this review implements none.
+
 ## Architecture guard — 22 October 2026
 
 **Task:** [Codex B: architecture guard](https://github.com/dialectmaterial/SOL/blob/005853f49af948a7c9f8cd70da95bfbecf7bd9c0/docs/coordination/CURRENT_TASK.md#codex-b-architecture-guard).
@@ -64,7 +95,7 @@ None reserved. Explicit default: reserved CONCEPT gets the same CORE/shared-serv
 
 ## Decouple the ESSENCE launch — 22 October 2026
 
-**Task:** [Codex A: decouple the ESSENCE launch](CURRENT_TASK.md#codex-a-decouple-the-essence-launch) (new task, currently uncommitted).
+**Task:** [Codex A: decouple the ESSENCE launch](https://github.com/dialectmaterial/SOL/blob/fd9b6b160f4a6294df05185d199e542f04d98fd5/docs/coordination/CURRENT_TASK.md#codex-a-decouple-the-essence-launch) (task snapshot at the stage D merge).
 **Branch / PR:** intended `codex/decouple-essence-launch` · not opened: this worktree's metadata is mounted read-only, despite the task's authorization; ordinary `git fetch` and `git add` fail. Work remains in the supplied worktree, at detached `332b3df`.
 **Last implementation commit:** None yet: cannot create `index.lock` under `/home/dima/Projects/code/sol/.git/worktrees/sol-codex-perf`. This report must be finalized and committed last after an implementation commit and integration checks.
 
