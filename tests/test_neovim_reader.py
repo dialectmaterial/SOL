@@ -3,6 +3,7 @@ from copy import deepcopy
 from dataclasses import replace
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 import unittest
@@ -25,6 +26,56 @@ RETIRED = "dddddddd-0000-4000-8000-000000000004"
 
 
 class NeovimReaderTests(CorpusFixture, unittest.TestCase):
+    def test_import_and_essence_launch_do_not_load_the_essence_interface(self):
+        program = """
+import importlib.abc
+from pathlib import Path
+import sys
+from unittest.mock import patch
+
+class NoEssenceInterface(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == 'sol.essence.tui' or fullname.startswith('sol.essence.tui.'):
+            raise AssertionError('BEING imported ESSENCE interface: ' + fullname)
+
+sys.meta_path.insert(0, NoEssenceInterface())
+from sol.being.neovim import reader
+assert not any(name == 'sol.essence.tui' or name.startswith('sol.essence.tui.')
+               for name in sys.modules)
+
+from sol.core.corpus import load_corpus_book
+from sol.interchange.essence import TEXTUAL_HINT, read_context
+
+def native(payload, _, on_request):
+    request = {'op': 'essence_open', 'packet': payload['restore'], 'mode': 'continuous'}
+    with patch('importlib.util.find_spec', return_value=None) as probe:
+        try:
+            on_request(request)
+        except ValueError as error:
+            assert str(error) == TEXTUAL_HINT
+        else:
+            raise AssertionError('missing Textual was not refused')
+        probe.assert_called_once_with('textual')
+    with patch('importlib.util.find_spec', return_value=object()) as probe:
+        launch = on_request(request)['essence']
+        probe.assert_called_once_with('textual')
+    assert launch['command'][:4] == [sys.executable, '-m', 'sol.essence.tui', '--context']
+    context = Path(launch['command'][4])
+    assert read_context(context)['state_file'] is None
+    assert context.stat().st_mode & 0o777 == 0o600
+    return 0, None
+
+with patch.object(reader.neovim, 'validate_environment', return_value='/invented/nvim'), \\
+        patch.object(reader.neovim, 'launch_payload', side_effect=native):
+    assert reader.run_reader(load_corpus_book(sys.argv[1])) == 0
+assert not any(name == 'sol.essence.tui' or name.startswith('sol.essence.tui.')
+               for name in sys.modules)
+assert 'textual' not in sys.modules
+"""
+        result = subprocess.run([sys.executable, "-B", "-c", program, str(self.corpus)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def rows(self):
         return [json.loads(line) for line in (self.corpus / "index.jsonl").read_text().split("\n") if line]
 
@@ -1209,7 +1260,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             self.assertEqual(self.run_view(service), 1)
 
     def test_essence_open_writes_a_private_context_without_book_text(self):
-        from sol.essence.tui.context import read_context
+        from sol.interchange.essence import read_context
 
         self.extend(3)
         service = self.service()
@@ -1244,13 +1295,13 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             self.assertEqual(context["selection"]["start"], 3)
             self.assertEqual(context["state_file"], str(state_home / "sol" / "essence" / "investigation.json"))
             self.assertNotIn(self.book.passages[0].text[3:14], path.read_text())
-            with patch("sol.essence.tui.textual_available", return_value=False), \
+            with patch("sol.interchange.essence.textual_available", return_value=False), \
                     self.assertRaisesRegex(ValueError, "essence"):
                 on_request({"op": "essence_open", "packet": packet, "mode": "continuous"})
             return 0, {"action": "quit", "packet": payload["restore"]}
 
         with patch.dict(os.environ, XDG_STATE_HOME=str(state_home)), \
-                patch("sol.essence.tui.textual_available", return_value=True), \
+                patch("sol.interchange.essence.textual_available", return_value=True), \
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 0)
         # Opening ESSENCE moved nothing and saved nothing.
@@ -1294,7 +1345,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
         self.assertEqual(service.store.get_state()["current_id"], self.book.passages[0].identifier)
 
     def test_temporary_session_gives_essence_no_state_file(self):
-        from sol.essence.tui.context import read_context
+        from sol.interchange.essence import read_context
 
         def native(payload, _, on_request):
             launch = on_request({"op": "essence_open", "packet": payload["restore"], "mode": "continuous"})
@@ -1302,7 +1353,7 @@ class NeovimReaderTests(CorpusFixture, unittest.TestCase):
             self.assertIn("TMPDIR", launch["essence"]["env"])
             return 0, None
 
-        with patch("sol.essence.tui.textual_available", return_value=True), \
+        with patch("sol.interchange.essence.textual_available", return_value=True), \
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(), 0)
 

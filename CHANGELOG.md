@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Decouple the ESSENCE launch — 22 October 2026
+
+BEING and ESSENCE share the private launch-file format through
+`sol.interchange.essence`, outside the logical hierarchy. The reader probes
+Textual without importing ESSENCE's interface. Context bytes, validation,
+permissions, lifetime, install hint and the OSC source-return path are unchanged;
+ESSENCE still owns its saved investigation state.
+
 ### The composition root leaves the reader — 22 October 2026
 
 Stage D, last BEING-lane step: `sol.reader.app` is `sol.app.main`, with

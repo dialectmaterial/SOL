@@ -32,6 +32,37 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+
+## Decouple the ESSENCE launch — 22 October 2026
+
+**Task:** [Codex A: decouple the ESSENCE launch](CURRENT_TASK.md#codex-a-decouple-the-essence-launch) (new task, currently uncommitted).
+**Branch / PR:** intended `codex/decouple-essence-launch` · not opened: this worktree's metadata is mounted read-only, despite the task's authorization; ordinary `git fetch` and `git add` fail. Work remains in the supplied worktree, at detached `332b3df`.
+**Last implementation commit:** None yet: cannot create `index.lock` under `/home/dima/Projects/code/sol/.git/worktrees/sol-codex-perf`. This report must be finalized and committed last after an implementation commit and integration checks.
+
+### Changed files
+
+- `sol/interchange/{__init__,essence}.py` — neutral, stdlib-only launch exchange; unchanged context schema, validators, writer/reader, Textual hint and `find_spec` probe moved from ESSENCE's interface.
+- `sol/being/neovim/reader.py`, `sol/essence/tui/{__init__,__main__,context}.py` — both interfaces import the exchange; saved investigation-state functions stay in ESSENCE. Context directory lifetime and OSC emitter/receiver are untouched.
+- `tests/test_neovim_reader.py` — fresh-process import guard covers reader import and successful/refused launches without loading ESSENCE's interface or Textual. Context/probe imports and patch targets updated here, in `test_essence_tui.py` and `test_encyclopedia.py`.
+- `docs/ARCHITECTURE.md` §§2/9, `docs/{BEING,ESSENCE}.md`, `CHANGELOG.md`, `CURRENT_TASK.md` — I1 placement rationale, alternatives, lifetime and resolved Neovim pending note. CORE edition read through `sol read`: di Giovanni (Cambridge 2010), transition into essence pp. 333–335 and Essence opening pp. 337–339; paraphrase and architectural interpretation separated. No private text or workspace committed.
+
+### Tests performed
+
+- Existing main-checkout interpreter (`.venv/bin/python` via temporary local symlink), `-B -m unittest discover -s tests` — **1,251 tests OK (7 skipped, 4 expected failures)**, 110.069 s; isolated XDG/Neovim paths, packaging and headless checks included. This is the pre-#97 integration tree.
+- Focused Neovim controller: 54 tests OK; ESSENCE TUI: 36 tests OK. `scripts/check_docs.py` and `git diff --check` pass; external URLs not network-checked.
+- `python -m sol --help`, `python -m sol essence --help`, installed `sol essence --help` — OK. Built/extracted wheel imports `sol.interchange`, `sol.interchange.essence`, TUI package/state/entry point without loading Textual.
+- All five original context/state function bodies, availability probe and hint compare verbatim with the originals. Synthetic Unicode old/new writer bytes, cross-reads and 0600 modes agree. Grep finds no ESSENCE interface imports in BEING; historical inventories retain their old paths, and `tui.context` remains a valid saved-state module.
+
+### Outstanding issues
+
+- **Publication blocked:** the sandbox mounts this worktree's metadata directory read-only. `git fetch origin` cannot write `FETCH_HEAD`; `git add` cannot create `index.lock`. No implementation commit, branch switch, push or PR has occurred; no merge has been attempted.
+- `git fetch --no-write-fetch-head origin` succeeds in updating common remote refs: #97 has merged, `origin/main` is `0d76c3e7e4da653cefa5d73684eb28d3cecec095`. Merge it and any subsequently merged #98 changes, preserve both agents' reports/rows, resolve the task-slot conflict in favor of this new task, and rerun the full suite/docs/entry-point/wheel checks before publication.
+- After writable metadata is restored, ordinary worktree git must create `codex/decouple-essence-launch`, commit the explicit task files (including new `sol/interchange/`), and merge `origin/main`. Finalize this report with the implementation SHA and final test evidence; commit it last as `Record handoff: decouple the ESSENCE launch`. Then `git push -u origin codex/decouple-essence-launch` and `gh pr create --base main`, linking this entry. Do not merge.
+
+### Decisions requiring approval
+
+None reserved. Provisional default: `sol.interchange.essence` outside the logical hierarchy; CORE's wire protocol remains the verified-reference service, while ESSENCE retains its saved investigation state. The maintainer may revise this placement. Filesystem permissions, rather than a design approval, block publication.
+
 ## Stage D, BEING lane (2): the composition root — 22 October 2026
 
 **Task:** [Claude Code: BEING relocation](https://github.com/dialectmaterial/SOL/blob/16703fc/docs/coordination/CURRENT_TASK.md#claude-code-being-relocation), second PR
