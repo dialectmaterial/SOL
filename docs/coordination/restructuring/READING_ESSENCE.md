@@ -3,7 +3,7 @@
 **Date:** 22 October 2026. **Owner:** Codex. **Status:** provisional proposals for Claude's review; nothing relocated.
 
 Code baseline: `origin/main` at `0f5156aa511f8305abf3bf6fd7719a4e51515d8d`.
-Scope: [the Codex stage C task](../CURRENT_TASK.md#codex-reading-the-doctrine-of-essence)
+Scope: [the Codex stage C task](https://github.com/dialectmaterial/SOL/blob/35e3a704148572be04da30a39fdbe35ffb32776c/docs/coordination/CURRENT_TASK.md#codex-reading-the-doctrine-of-essence)
 and all twelve cohesive groups in [the stage A inventory §8](INVENTORY_ESSENCE_CORE.md#8-cohesive-groups-and-questions-for-stage-c).
 The register rows below are for later transfer by Claude to
 [Architecture §9](../../ARCHITECTURE.md#9-placement-register). They propose destinations,

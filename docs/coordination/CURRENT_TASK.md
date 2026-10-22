@@ -12,54 +12,76 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Restructuring, stage C: interpretive mapping
+## Restructuring, stage D: relocation
 
-Stages A (inventories in `docs/coordination/restructuring/`) and B (the empty
-divisions) are done. Stage C reads before anything moves
-([SPECULATIVE §§5, 7](../SPECULATIVE.md#52-required-reasoning-protocol)):
+Stage C is done: the placements are in the
+[placement register](../ARCHITECTURE.md#9-placement-register), argued in
+`restructuring/READING_BEING.md` and `READING_ESSENCE.md`. Stage D moves code
+to them ([SPECULATIVE §5.2](../SPECULATIVE.md#52-required-reasoning-protocol),
+steps 5–7). Rules for all three lanes:
 
-1. **Read** in the primary CORE edition (the local corpus; use `sol read`,
-   `sol --info` or the reader) the doctrine's opening division and the openings
-   and transitions of its three first-level divisions. German and other
-   translations may be consulted as aids; name them.
-2. **Write reading notes** in your file below: for each determination, its
-   location (section path and printed pages) and what it is, in relation to its
-   neighbours, in your own words. Separate the text from your interpretation.
-   Quote at most a short phrase, attributed with its location: the translation
-   is copyrighted. **No fabricated quotations, pages or evidence.**
-3. **Propose** provisional placements for your side's cohesive groups from the
-   stage A inventory, each with the alternatives considered, as rows for the
-   [placement register](../ARCHITECTURE.md#9-placement-register) (status:
-   provisional). Groups that belong to no determination (infrastructure,
-   CORE's practical boundary) say so and why. Leave unresolved what the reading
-   does not settle.
-4. Move nothing yet: relocation is stage D.
+1. **Move, do not rewrite.** Keep function bodies, names and behaviour; change
+   imports, string patch targets in tests, package data and entry-point targets.
+   Renaming a module is allowed only where its new package makes the old name
+   redundant (for example `neovim_reader` inside a `neovim` package).
+2. **No compatibility shims** at old paths, unless a path is a public contract
+   (the `sol.core` API, `python -m sol.essence.cli`, installed commands
+   `sol`, `sol-window`, `sol-corpus`, `sol-corpus-check`): those keep working.
+3. **Imports in another lane's files:** you may edit only the import lines and
+   string patch targets that point at modules you move. Whoever merges second
+   resolves the conflict.
+4. **Verify:** full suite, docs check, `python -m sol --help`, `sol essence --help`
+   and an import of every moved module from an installed wheel
+   (`tests/test_packaging.py` covers package data). Grep for every old dotted
+   path and file path (tests, scripts, docs, Lua, pyproject) before the PR.
+5. **Record:** set your register rows' status to *Implemented (stage D)* with
+   the PR, update module paths in ARCHITECTURE §2 and the component document,
+   and add a CHANGELOG line.
 
-## Claude Code: Reading the Doctrine of Being
+## Claude Code: BEING relocation
 
-**Status:** In review
-**Branch:** `claude/reading-being`
-**Scope:** the Doctrine of Being (its division; Quality, Quantity, Measure);
-the BEING-side groups of `INVENTORY_BEING.md`; output
-`docs/coordination/restructuring/READING_BEING.md` and proposed register rows
-in `docs/ARCHITECTURE.md` §9 (Claude's rows only).
+**Status:** In progress
+**Branch:** `claude/being-relocation`
+**Scope:** `sol/terminal/{neovim,neovim_reader,reader_channel,runtime,splash,window}.py`,
+the Lua files and `fonts/` → `sol/being/neovim/`; `sol/reader/{actions,surface,render,shell}.py`
+→ `sol/being/`; `navigation` → `sol/being/quantity/`; `search`, `structure`,
+`typography` → `sol/being/quality/`; `sol/workspace/` → `sol/being/workspace/`.
+Afterwards (second PR, after Codex B merges): the composition root
+`sol/reader/{app,launch,options}.py` out of `sol.reader`, and removal of the
+empty `sol/reader` and `sol/terminal` packages.
 
-## Codex: Reading the Doctrine of Essence
+## Codex A: ESSENCE relocation
 
-**Status:** In review
-**Branch:** `codex/reading-essence`
-**Scope:** the Doctrine of Essence (its division; Essence as Reflection within
-Itself, Appearance, Actuality); the ESSENCE-side groups of
-`INVENTORY_ESSENCE_CORE.md`, and whether CORE's practical exception holds for
-each CORE group; output `docs/coordination/restructuring/READING_ESSENCE.md`.
-Put proposed register rows in that file; Claude adds them to ARCHITECTURE §9
-when merging, so the two branches never edit the same section.
+**Status:** Ready
+**Branch:** `codex/essence-relocation`
+**Scope:** register rows E1–E4: `sol/essence/{tokenization,word_inputs,corpus_inputs,words,validation,comparison,tfidf,sentences,sentence_inputs,prose}.py`
+→ `sol/essence/essence_as_reflection_within_itself/`, as cohesive modules.
+E5–E7 stay where they are; update their imports. Keep the lazy public facade in
+`sol/essence/__init__.py` exporting the same names, `python -m sol.essence.cli`,
+the TUI's lazy imports, receipts' method names and versions, and the four
+expected failures. Files: `sol/essence/**`, ESSENCE tests, `docs/ESSENCE.md`,
+your register rows.
 
-### Acceptance (both)
+## Codex B: CORE and shared relocation
 
-Every claim about the text carries a location in the CORE edition; each
-proposal names alternatives; documentation check passes; the other agent
-reviews.
+**Status:** Ready
+**Branch:** `codex/core-shared-relocation`
+**Scope:** register rows for `terminal.commands`, `terminal.reference`,
+`reader.onboarding`, `terminal.source`, `terminal.text` and the themes:
+- `sol/terminal/reference.py` → CORE (the `sol reference` command face);
+- the path resolver of `sol/terminal/commands.py` (`resolve_file_path` and its
+  helpers) → CORE; the printing of `sol read` stays with the CLI, in `sol/reader/`
+  for now;
+- `sol/reader/onboarding.py` → CORE's corpus maintenance (`sol/corpus/`);
+- `sol/terminal/source.py` split: verified snapshot, page capture and crops →
+  CORE; the PDF viewer (Zathura open, highlight, follow) → `sol/being/source_view.py`;
+- `sol/terminal/text.py` and the theme data (`sol/terminal/theme.py` plus the theme
+  list, default theme and width constants now in `sol/reader/options.py`) → a
+  shared presentation package outside the logical hierarchy, `sol/presentation/`,
+  so that `sol.essence.tui` no longer imports the reader's option parser.
+CORE must stay importable without a terminal, workspace or reader
+([CORE §8](../CORE.md#8-scope-and-integrity-checklist)). Files: those modules,
+their tests, `docs/CORE.md`, your register rows.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
