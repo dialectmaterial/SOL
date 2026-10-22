@@ -201,6 +201,8 @@ class ArchitectureTests(unittest.TestCase):
         self.assertIn((7, "sol.being.neovim", True), edges)
         for _, target, lazy in edges[:3]:
             self.assertFalse(allowed("sol.being.neovim.reader", target, lazy))
+        package_edges = import_edges("from .. import being\n", "sol.essence", package=True)
+        self.assertEqual(package_edges, [(1, "sol.being", False)])
 
     def test_dynamic_imports_and_lazy_facade_tables_are_inspected(self):
         edges = import_edges("from importlib import import_module as load\n"
@@ -209,6 +211,7 @@ class ArchitectureTests(unittest.TestCase):
         self.assertFalse(allowed("sol.core.example", edges[0][1], True))
         edges = import_edges("_EXPORTS = {'bad': 'sol.app.main'}\n", "sol.core", package=True)
         self.assertIn((1, "sol.app.main", False), edges)
+        self.assertFalse(allowed("sol.core", edges[0][1], False))
         with self.assertRaisesRegex(SyntaxError, "computed dynamic import"):
             import_edges("__import__(module_name)", "sol.being.example")
 
@@ -234,6 +237,9 @@ class ArchitectureTests(unittest.TestCase):
             self.assertTrue(allowed(source, target, False))
         self.assertTrue(allowed("sol", "sol.app.main", True))
         self.assertFalse(allowed("sol", "sol.app.main", False))
+        edges = import_edges("def launch(value=__import__('sol.app.main')):\n    pass\n",
+                             "sol", package=True)
+        self.assertEqual(edges, [(1, "sol.app.main", False)])
         self.assertFalse(allowed("sol.core.example", "sol.cli", True))
         self.assertFalse(allowed("sol.being.example", "sol", True))
         self.assertFalse(allowed("sol.being.other", "sol.__version__", False))
