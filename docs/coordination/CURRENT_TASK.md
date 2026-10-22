@@ -67,26 +67,37 @@ check; stage D entry-point/wheel checks; merge `origin/main` and resolve any
 integration with #97/#98 before opening the PR; handoff, ordinary worktree git
 commit, push and PR against main. Do not merge the PR.
 
-## Codex B: CORE and shared relocation
+## Codex B: architecture guard
 
 **Status:** In review
-**Branch:** `codex/core-shared-relocation`
-**Scope:** register rows for `terminal.commands`, `terminal.reference`,
-`reader.onboarding`, `terminal.source`, `terminal.text` and the themes:
-- `sol/terminal/reference.py` → CORE (the `sol reference` command face);
-- the path resolver of `sol/terminal/commands.py` (`resolve_file_path` and its
-  helpers) → CORE; the printing of `sol read` stays with the CLI, in `sol/reader/`
-  for now;
-- `sol/reader/onboarding.py` → CORE's corpus maintenance (`sol/corpus/`);
-- `sol/terminal/source.py` split: verified snapshot, page capture and crops →
-  CORE; the PDF viewer (Zathura open, highlight, follow) → `sol/being/source_view.py`;
-- `sol/terminal/text.py` and the theme data (`sol/terminal/theme.py` plus the theme
-  list, default theme and width constants now in `sol/reader/options.py`) → a
-  shared presentation package outside the logical hierarchy, `sol/presentation/`,
-  so that `sol.essence.tui` no longer imports the reader's option parser.
-CORE must stay importable without a terminal, workspace or reader
-([CORE §8](../CORE.md#8-scope-and-integrity-checklist)). Files: those modules,
-their tests, `docs/CORE.md`, your register rows.
+**Branch:** `codex/architecture-guard`
+**Requested:** 22 October 2026, by Claude for the maintainer
+
+### Goal
+
+Protect stage D's dependency directions with a static AST test, so new edges
+cannot silently couple the divisions or restore removed packages.
+
+### Scope
+
+`tests/test_architecture.py`, a short pointer in [Architecture §2](../ARCHITECTURE.md#2-logical-divisions-and-component-responsibilities),
+and coordination reports. Authority: Architecture §§2/9, CORE §§4/8 and the
+stage D rules above. CORE includes `sol.core` and `sol.corpus`; composition,
+presentation and interchange stay outside the logical hierarchy.
+
+### Constraints
+
+Execute no inspected imports. Include function-local imports, document exact
+justified exceptions, and report actual rule violations. Poll #99 and #100;
+after both merge, merge `origin/main` and verify against the real relocated code.
+Do not change runtime behavior, public contracts or private corpus material.
+
+### Acceptance
+
+Readable file:line failures for forbidden imports; assert `sol.reader` and
+`sol.terminal` are absent. Full suite and docs check pass; HANDOFF records the
+rules, exceptions, evidence and limits. Commit, push and open a PR against main;
+the author does not merge.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.

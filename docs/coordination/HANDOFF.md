@@ -33,6 +33,35 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## Architecture guard — 22 October 2026
+
+**Task:** [Codex B: architecture guard](https://github.com/dialectmaterial/SOL/blob/005853f49af948a7c9f8cd70da95bfbecf7bd9c0/docs/coordination/CURRENT_TASK.md#codex-b-architecture-guard).
+**Branch / PR:** `codex/architecture-guard` · [pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Farchitecture-guard); author does not merge.
+**Last implementation commit:** `005853f49af948a7c9f8cd70da95bfbecf7bd9c0` (this report is committed afterward).
+
+### Changed files
+
+- `tests/test_architecture.py` — AST-only scan of all 96 product Python files, including local/conditional/relative imports, root aliases, literal dynamic imports and existing lazy facade tables. CORE includes corpus; divisions consume CORE and neutral services without importing each other or app; presentation/interchange import no divisions. Unknown packages require review; removed reader/terminal directories and module shims are forbidden. Failures identify file:line and edge.
+- Three exact root-attribute exceptions, each citing Architecture §9: renderer/options version display and `sol.__main__` delegation to `sol.cli`. Unused exceptions fail; no division edge is grandfathered in. No ordering is imposed within logical subdivisions.
+- `docs/ARCHITECTURE.md` §2 points to the guard; `CURRENT_TASK.md` records the assignment as `In review`. No product code, behavior, contract, dependency or private corpus changes.
+- Polled #99/#100 while drafting; initial failures named the legacy packages and BEING's two ESSENCE imports. After both merged, merged real `origin/main` at `fd9b6b1` (integration commit `3f0564e`); all those failures disappeared without exceptions.
+- Sandbox mounts this clone's `.git` read-only: Git metadata for commits/push lives in `/tmp/sol-architecture-guard-git`. From this checkout use `GIT_DIR=/tmp/sol-architecture-guard-git git …`; original metadata stays untouched.
+
+### Tests performed
+
+- `/home/dima/Projects/code/sol/.venv/bin/python -B -m unittest discover -s tests` — **1,259 tests OK (7 skipped, 4 expected failures)**, 115.712 s. Log: `/tmp/sol-architecture-full-suite.log` (local only).
+- Same interpreter, focused architecture suite — **5 tests OK**, including negative synthetic imports and a source that would raise if executed. Guard source also parses with Python 3.10 grammar.
+- Same interpreter, `scripts/check_docs.py`, `python -m sol --help`, `python -m sol essence --help`; `git diff --check` — OK. Full suite includes packaging/wheel checks. External documentation URLs are not network-checked.
+
+### Outstanding issues
+
+Static import guard, not arbitrary Python data-flow or subprocess-command analysis; external-library dependencies are outside its scope. No new private-corpus or visual acceptance trial is needed for this test-only change.
+
+### Decisions requiring approval
+
+None reserved. Explicit default: reserved CONCEPT gets the same CORE/shared-service permissions as other divisions, with no cross-division coupling; revise with documented active requirements. Existing register placements and public contracts are unchanged.
+
+
 ## Decouple the ESSENCE launch — 22 October 2026
 
 **Task:** [Codex A: decouple the ESSENCE launch](CURRENT_TASK.md#codex-a-decouple-the-essence-launch) (new task, currently uncommitted).
