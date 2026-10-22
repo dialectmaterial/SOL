@@ -66,38 +66,39 @@ READING_BEING §9 and HANDOFF; commit, push and open a PR against main. Do not
 merge. Previous word-unit study is done (#105); stage E re-evaluation is
 done (#102).
 
-## Codex B: source-check coverage
+## Codex B: private source-request hardening
 
-**Status:** Done (#107)
-**Branch:** `codex/source-check-coverage`
-**Requested:** 22 October 2026, by the maintainer
+**Status:** In review
+**Branch:** `codex/source-gap-fixes`
+**Requested:** 23 October 2026, by the maintainer
 
 ### Goal
 
-Pin existing source-request validation behavior and correct the missing-PDF
-setup diagnostic, following [SOURCE_VALIDATION §2](restructuring/SOURCE_VALIDATION.md#2-existing-tests-and-uncovered-cases).
+Close the three known gaps pinned in #107, applying
+[SOURCE_VALIDATION §3.2](restructuring/SOURCE_VALIDATION.md#32-required-behavior-and-ordering)
+inside CORE's private source implementation. Authority: Architecture §§2/9,
+CORE §§4/8; the public-interface decision in #104 stays pending.
 
 ### Scope
 
-`tests/test_source_viewer.py`: synthetic coverage of PDF final symlinks,
-non-files/read races, stale/corrupt follow refusal before companion access,
-post-PDF-check render freshness and generation/chain/digest tampering.
-`sol/core/source.py`: replace the nonexistent shell setup command with the
-supported app option, checked against app options and onboarding.
-Coordination status and HANDOFF. Authority: Architecture §§2/9, CORE §§4/8.
+Normalize malformed requested IDs and request shapes to chained `SourceError`;
+validate `render_region` before source/bbox access; refuse corpus changes during
+or after viewer PDF hashing with a final `verify_snapshot_current` check before
+viewer/companion/D-Bus access. Convert the three known-gap tests and add
+synthetic regressions for every consumer. Update SOURCE_VALIDATION and HANDOFF.
 
 ### Constraints
 
-Tests plus one diagnostic fix only; no public API, schema or other behavior
-change. Record known validation gaps in clearly named tests or expected failures
-and HANDOFF; do not fix them. Synthetic fixtures only, no corpus text, display,
-network or committed generated artifacts. Other lanes' slots are unchanged.
+No new public names, validator, facade/API_VERSION or request-format changes.
+Preserve capture output, rendering, caching and viewer launching. Existing
+private CORE imports in `source_view` may remain. No private corpus or generated
+artifacts; other lanes' slots stay unchanged. Do not merge.
 
 ### Acceptance
 
-Full suite, `tests/test_architecture.py`, `scripts/check_docs.py`; HANDOFF lists
-known gaps and evidence. Commit, push and open a PR against main; do not merge.
-Prior source-validation proposal completed in #104.
+Full suite, `tests/test_architecture.py`, `scripts/check_docs.py`; commit, push
+and open a PR against main. Prior source-check coverage completed in #107;
+the source-validation public proposal remains pending in #104.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
