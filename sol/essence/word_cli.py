@@ -4,8 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
-from sol.essence.word_inputs import CoreProvider, FileProvider, WordStudyError, _read_file
-from sol.essence.words import MAX_RESULT_BYTES, analyze_words, check_word_result, decode_word_result, encode_word_result
+from sol.essence.essence_as_reflection_within_itself.word_inputs import CoreProvider, FileProvider, WordStudyError, _read_file
+from sol.essence.essence_as_reflection_within_itself.words import MAX_RESULT_BYTES, analyze_words, check_word_result, decode_word_result, encode_word_result
 
 
 def add_input_arguments(parser, *, words=False, unit="tokens"):
@@ -138,7 +138,7 @@ def _providers(options, result=None):
 
 def run_export(options):
     """Decode before opening sources, then strictly verify before tabular output."""
-    from sol.essence.comparison import export_word_comparison
+    from sol.essence.essence_as_reflection_within_itself.comparison import export_word_comparison
 
     result = decode_word_result(read_artifact(options.file))
     target, reference = _providers(options, result)

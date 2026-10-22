@@ -1,9 +1,9 @@
 """Sentence provider CLI; file execution and verification never import CORE."""
 from __future__ import annotations
 
-from sol.essence.sentences import SentenceStudyError, analyze_sentences, check_sentence_result, encode_sentence_result
+from sol.essence.essence_as_reflection_within_itself.sentences import SentenceStudyError, analyze_sentences, check_sentence_result, encode_sentence_result
 from sol.essence.word_cli import _provider, read_artifact
-from sol.essence.word_inputs import FileProvider
+from sol.essence.essence_as_reflection_within_itself.word_inputs import FileProvider
 
 
 def render_sentences(result):

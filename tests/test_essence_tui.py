@@ -343,7 +343,7 @@ class WordScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
 
 def _engine_installed():
     from importlib.util import find_spec
-    return find_spec("sol.essence.words") is not None
+    return find_spec("sol.essence.essence_as_reflection_within_itself.words") is not None
 
 
 @unittest.skipUnless(_engine_installed(), "the ESSENCE stage 2 engine is not merged yet")
@@ -638,7 +638,7 @@ class RealComparisonTests(unittest.TestCase):
         self.assertNotEqual(tui_words.export(count, "csv", data_home=data_home), exported)
         # A source changed since the count is refused, not exported.
         reference_file.write_text("Something else entirely.", encoding="utf-8")
-        from sol.essence.word_inputs import WordStudyError
+        from sol.essence.essence_as_reflection_within_itself.word_inputs import WordStudyError
         with self.assertRaises(WordStudyError) as caught:
             tui_words.export(count, "tsv", data_home=data_home)
         self.assertEqual(caught.exception.status, "stale")
@@ -721,7 +721,7 @@ class SentenceStudyTests(unittest.TestCase):
 
     def test_corpus_targets_measure_open_and_save(self):
         from sol import core
-        from sol.essence import sentences as engine
+        from sol.essence.essence_as_reflection_within_itself import sentences as engine
         from sol.essence.tui import sentences as tui_sentences
 
         text = next(p for p in core.load_corpus_book(Path(self.context["corpus"])).passages

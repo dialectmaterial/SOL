@@ -10,7 +10,7 @@ import tempfile
 import unittest
 
 from sol.corpus import contract
-from sol.essence.sentences import (
+from sol.essence.essence_as_reflection_within_itself.sentences import (
     SentenceStudyError, analyze_sentences, check_sentence_result, decode_sentence_result,
     encode_sentence_result, segment,
 )

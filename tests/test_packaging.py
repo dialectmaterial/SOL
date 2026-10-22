@@ -98,6 +98,36 @@ class PackagingTests(unittest.TestCase):
         self.assertTrue(all(name in PACKAGE_FILES | PACKAGE_ASSETS
                             or ".dist-info/" in name for name in names))
 
+    def test_installed_reflection_engines_and_lazy_public_facade(self):
+        installed = Path(self.temporary.name) / "reflection-wheel"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        program = """
+import importlib, importlib.util, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import sol.essence as essence
+import sol.essence.tui.words, sol.essence.tui.sentences, sol.essence.tui.tfidf
+prefix = 'sol.essence.essence_as_reflection_within_itself'
+assert not any(name.startswith(prefix + '.') for name in sys.modules)
+assert 'textual' not in sys.modules
+for name in ('tokenization', 'word_inputs', 'corpus_inputs', 'words', 'validation',
+             'comparison', 'tfidf', 'sentences', 'sentence_inputs', 'prose'):
+    assert importlib.util.find_spec('sol.essence.' + name) is None, name
+    module = importlib.import_module(prefix + '.' + name)
+    assert Path(sys.argv[1]) in Path(module.__file__).parents, module.__file__
+for name in essence.__all__:
+    value = getattr(essence, name)
+    module = importlib.import_module(value.__module__)
+    assert module.__name__.startswith(prefix + '.'), name
+    assert value is getattr(module, name), name
+assert essence.WordStudyError is importlib.import_module(prefix + '.word_inputs').WordStudyError
+assert essence.SentenceStudyError is importlib.import_module(prefix + '.sentences').SentenceStudyError
+"""
+        result = subprocess.run([sys.executable, "-I", "-B", "-c", program, str(installed)],
+                                cwd=self.temporary.name, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_installed_encyclopedia_loads_offline_without_optional_dependencies(self):
         installed = Path(self.temporary.name) / "installed-encyclopedia"
         with zipfile.ZipFile(self.wheel) as archive:
@@ -508,7 +538,7 @@ def guard(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
 from sol.essence.cli import main
-from sol.essence.sentences import check_sentence_result
+from sol.essence.essence_as_reflection_within_itself.sentences import check_sentence_result
 from sol.core import load_snapshot
 output = io.StringIO()
 with contextlib.redirect_stdout(output):

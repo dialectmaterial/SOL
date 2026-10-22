@@ -122,7 +122,7 @@ def main(arguments: list[str] | None = None) -> int:
             return run(options)
         if options.action == "check":
             from sol.essence.word_cli import read_artifact, run
-            from sol.essence.words import decode_word_result
+            from sol.essence.essence_as_reflection_within_itself.words import decode_word_result
             raw = read_artifact(options.file)
             data = raw.encode("utf-8") if isinstance(raw, str) else raw
             # Decode JSON for dispatch: whitespace and escaped protocol names
@@ -132,19 +132,19 @@ def main(arguments: list[str] | None = None) -> int:
             except (ValueError, UnicodeError, RecursionError):
                 header = None
             if isinstance(header, dict) and header.get("protocol") == "sol.tfidf":
-                from sol.essence.tfidf import decode_tfidf_result
+                from sol.essence.essence_as_reflection_within_itself.tfidf import decode_tfidf_result
                 from sol.essence.tfidf_cli import run as run_tfidf
                 return run_tfidf(options, decode_tfidf_result(data))
             if isinstance(header, dict) and header.get("protocol") == "sol.word-frequencies":
                 return run(options, decode_word_result(data))
             if isinstance(header, dict) and header.get("protocol") == "sol.sentence-study":
-                from sol.essence.sentences import decode_sentence_result
+                from sol.essence.essence_as_reflection_within_itself.sentences import decode_sentence_result
                 from sol.essence.sentence_cli import run as run_sentences
                 return run_sentences(options, decode_sentence_result(data))
             raise ValueError("Unsupported ESSENCE artifact protocol")
         from sol.core import MAX_REFERENCE_BYTES, decode_reference, discover_corpus, load_snapshot
         from sol.core.wire import read_json_input
-        from sol.essence import sentences as sentence_study
+        from sol.essence.essence_as_reflection_within_itself import sentences as sentence_study
 
         origin = None
         # Reject unsafe references before discovery.
@@ -155,7 +155,7 @@ def main(arguments: list[str] | None = None) -> int:
             raise ValueError("No canonical corpus configured; use --corpus DIRECTORY or sol --set-corpus DIRECTORY")
         snapshot = load_snapshot(directory)
         if options.action == "prose":
-            from sol.essence.prose import export_prose
+            from sol.essence.essence_as_reflection_within_itself.prose import export_prose
             result = export_prose(snapshot)
             print(_json(result) if options.json else (
                 f"{len(result['passages'])} prose passages ready for analysis; "
