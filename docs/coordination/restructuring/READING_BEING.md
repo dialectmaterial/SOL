@@ -228,3 +228,27 @@ Each cited section, its section-start page, and its virtual path in the local co
    - *Where it applies:* many ESSENCE methods have parameters (segmentation rules, frequency cut-offs, the top-N of TF-IDF) where a small quantitative change produces a qualitatively different result.
    - *What Hegel's warning implies:* reporting such a change as a gradual drift would miss the point. A parameter sweep that looks for the leaps, the points where the result's character changes, would be a method grounded in this section.
    - *Status:* recorded as an idea for ESSENCE, not a task.
+
+## 9. Comparison, series and elective affinity (stage F, 22 October 2026)
+
+§8.2 left one question for stage E: would a principled reference population move ESSENCE's word comparisons from external comparing towards real measure? [REEVALUATION §3.3](REEVALUATION.md) kept E2 under Reflection and left the question open. This addendum reads three more sections against the two E2 engines separately: *Measure as a series of measure-relations* (p. 305), *Elective affinity* (p. 308, `/BEING/iii-measure/2-real-measure/a-the-relation-of-independent-measures/c-elective-affinity/`) and *Diversity* (pp. 362–365, `/ESSENCE/i-essence-as-reflection-within/2-the-essentialities-or-the-determinations-of-reflection/b-difference/2-diversity/`).
+
+### 9.1 What the text says
+
+- **One ratio is not a measure's quality (p. 305).** An independent measure has its exponent only in comparison with other measures. As one quantum, the exponent expresses only "one single relation". The measure differentiates itself in the *characteristic series* it forms with many others, and the relation of such series constitutes its qualitative side.
+- **Reciprocity of the series (p. 305).** Each member of one series is a unit for the opposite series and an exponent for each member of it, so both sides are series of each other. Comparing two independent measures needs a unit common to both, found only in the constant ratio of their series.
+- **Elective affinity (p. 308).** Such affinity turns quantitative relating into an exclusive, qualitative one. Converting extensive magnitude into intensive magnitude alone "changes nothing" and establishes no exclusion. Where the principle of measure for such affinities lies is a question for the concrete sciences, not for the Logic.
+- **Comparing (pp. 362–365).** Likeness and unlikeness of the diverse depend on "the point of view of a third", the comparing reflection. It keeps them apart by "in so far", "from this side or that". The negativity of this comparing at first belongs to the one who compares.
+
+### 9.2 Consequences for E2
+
+1. **Word comparison (`comparison.py`) is Reflection, and not even formally a Measure candidate.** It relates one target to one reference by a rate difference and a log ratio: exactly the "one single relation" that p. 305 says does not yet differentiate an independent measure. The reference is chosen by the analyst, and the result holds only "in so far" as that reference is taken. That is the comparing of Diversity. A more principled reference population changes the argument for the scope, as REEVALUATION says, but not this structure.
+2. **TF-IDF (`tfidf.py`) has the formal shape of p. 305, but the series is posited.**
+   - *Shape:* each document's weights are determined by its relation to every document in the set (document frequency), and each document is in turn a term of every other's series.
+   - *Why it is still Reflection:* the set, the document unit and the L2 norm are posited by the analyst, not found in the texts. The common unit p. 305 asks for is stipulated by the normalization, as REEVALUATION also notes.
+   - *Top-N:* the cut-off looks like the exclusion of elective affinity, but it is a quantitative threshold applied from outside. By p. 308 such a conversion establishes no exclusion.
+3. **What would justify a move.** p. 308 leaves the principle of measure for affinities to the concrete sciences. By analogy, E2 would move to Measure only if a linguistic or philological argument, not SOL's mapping, showed that a text's lexical profile is constituted by its relations to a given population. This sharpens REEVALUATION's revisit condition; it does not replace it.
+4. **The placement fits the transition.** Measure ends by demoting qualities to states of one substrate, and that indifference becomes essence (§1.4, §8.1). E2 works on exactly that: texts as states of a verified corpus, related by a positing standpoint. Reflection is therefore the right division for E2, not a fallback. The empty `sol/being/measure/` stays empty.
+5. **An empirical next step: sensitivity.** The nodal-line idea of §8.2 and REEVALUATION's evidence condition point to the same study. Vary the document unit, the reference population and top-N over the real corpus, and look for leaps: points where the top terms or rankings change character rather than drift. This would be research output, not a new ESSENCE method, and would not by itself move any module.
+
+The register is unchanged: E2 stays *Provisional* under Reflection.
