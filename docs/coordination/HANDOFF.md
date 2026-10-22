@@ -32,6 +32,34 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Stage C: reading the Doctrine of Essence — 22 October 2026
+
+**Task:** [Codex: Reading the Doctrine of Essence](https://github.com/dialectmaterial/SOL/blob/0f5156aa511f8305abf3bf6fd7719a4e51515d8d/docs/coordination/CURRENT_TASK.md#codex-reading-the-doctrine-of-essence).
+**Branch / PR:** `codex/reading-essence` · [branch pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Freading-essence); Claude reviews; author does not merge.
+**Last implementation commit:** `db4304333386fcf345ee4223cee4ce4a29edbabb` (this report is committed afterward).
+
+### Changed files
+
+- `docs/coordination/restructuring/READING_ESSENCE.md` — primary CORE edition identified (di Giovanni, Cambridge 2010); doctrine division, three section openings and transitions paraphrased separately from architectural interpretation. Source ledger supplies logical/document paths, printed pages and stable UUIDs. Seventeen provisional register rows cover all twelve inventory groups, each with alternatives, technical consequences and deferrals. Proposed engine placement is Reflection within Itself; UI/catalog subdivisions, study-state ownership and edition-shaped reader projection remain open. CORE/runtime and corpus-maintenance exceptions are justified separately; no positive Appearance/Actuality placement is forced. Claude transfers reviewed rows to Architecture later.
+- `docs/coordination/CURRENT_TASK.md` — only Codex's status becomes `In review`; this handoff is the third changed file. No moves, code, tests, authority-document, contract, dependency, schema or corpus changes.
+- Work/publication uses `/tmp/sol-reading-essence` because the supplied checkout's Git metadata is read-only. Branched from `origin/main` at `0f5156a`; rebased onto `6f4de9e` after #87 merged, preserving Claude's handoff. The intervening changes contain only the BEING inventory and handoff, with no product/test changes.
+
+### Tests performed
+
+- `/home/dima/Projects/code/sol/.venv/bin/python -B scripts/check_docs.py` — OK, including the integrated branch and final handoff; external URLs not network-checked. `git diff --check` — OK.
+- Same interpreter, `-B -m unittest discover -s tests` — **1,250 tests, OK (7 skipped, 4 expected failures)**, 110.880 s. Run before the documentation-only rebase; product/test tree unchanged afterward. No new tests or acceptance claim.
+- Read-only local CORE text via `sol read` and index: all **42 cited UUIDs** resolve, all **12 document addresses** exist, and cited page labels agree with indexed `sources`. No alternative translation or secondary commentary used. No PDF extraction, reindexing or personal workspace access.
+- Private-content audit: own-word notes and source addresses/titles, no copied passages; no contiguous 12-word match with indexed Essence paragraph text. All **211 corpus file hashes** agree across the final verification interval. Temporary fingerprint/test data stays outside Git.
+
+### Outstanding issues
+
+- These are contested, provisional analogies, not proof of philosophical adequacy. The reading leaves several subdivisions and shared-state/projection boundaries unresolved; stage D must preserve the listed behavior and tests. No full transcription proofreading or new visual/linguistic acceptance is claimed.
+- Architecture §9 and Claude's BEING reading/inventory are untouched. Claude must retain the source-ledger/edition context when transferring rows; bare L-keys are not standalone citations.
+
+### Decisions requiring approval
+
+None reserved. Defaults are proposals only: keep the analytical engine groups cohesive under Reflection within Itself, retain qualified CORE/infrastructure exceptions, and defer classifications unsupported by the reading. Leave this PR open for Claude's review; do not merge.
+
 ## Restructuring stage C: reading the Doctrine of Being — 22 October 2026
 
 **Task:** [Claude Code: Reading the Doctrine of Being](https://github.com/dialectmaterial/SOL/blob/582914b546e5b1675511ef8dce892552f41a2499/docs/coordination/CURRENT_TASK.md#claude-code-reading-the-doctrine-of-being)
@@ -75,7 +103,6 @@ Write "None." rather than deleting a heading.
 
 ### Decisions requiring approval
 - None. No placement is proposed.
-
 
 ## Restructuring stage A: ESSENCE and CORE inventory — 21 October 2026
 
@@ -128,7 +155,6 @@ None. Default: record syntactic imports separately from dynamic/runtime dependen
 
 ### Decisions requiring approval
 None reserved: the maintainer made SPECULATIVE leading. Default: SPECULATIVE is treated as maintainer-only (agents never edit it).
-
 
 ## Cleanup steps 1, 3 and `sol being` — 21 October 2026
 
@@ -225,7 +251,6 @@ None beyond the maintainer-approved cleanup. Default: reject retired term artifa
 ### Decisions requiring approval
 None reserved: the maintainer decided the removal on 21 October; Decision wording in ESSENCE §7 is unchanged apart from replacing a link to the removed proposal.
 
-
 ## ESSENCE Results in small windows — 21 October 2026
 
 **Task:** [Codex: ESSENCE Results in small windows](https://github.com/dialectmaterial/SOL/blob/a7827cf/docs/coordination/CURRENT_TASK.md#codex-essence-results-in-small-windows).
@@ -250,10 +275,6 @@ None reserved: the maintainer decided the removal on 21 October; Decision wordin
 
 ### Decisions requiring approval
 None reserved. Defaults: summary height cap 20%; word/occurrence tables share space; wrap rather than omit columns or shorten the engine's undefined-measure labels. Claude may revise these presentation defaults in review.
-
-
-
-
 
 ## Remove the experiments and the research-export mode — 21 October 2026
 
@@ -326,7 +347,6 @@ Counts are against `origin/main` at `d137627`. **31 complete files / 6,308 lines
 ### Decisions requiring approval
 None reserved. The removals implement the maintainer's approved step 2; no authority Decision statement, dependency set, public CORE/reference/corpus contract or workspace schema changes. Default: retain the internal integrated result writer and detached source-checking helpers needed by the installed reader and its tests.
 
-
 ## A faster full test suite — 21 October 2026
 
 **Task:** [Codex: A faster full test suite](https://github.com/dialectmaterial/SOL/blob/aba326e38eeacdb29ac41e6ce1e78d3670d4e053/docs/coordination/CURRENT_TASK.md#codex-a-faster-full-test-suite).
@@ -388,7 +408,6 @@ and the temporary profiler remain outside Git at `/tmp/sol-speed-*`,
 
 ### Decisions requiring approval
 None reserved. Default: run UI behavior checks in the application's normal loop mode, with debug diagnostics available explicitly. Existing tests and assertions remain intact; the reviewer can overrule this runner default.
-
 
 ## BEING describes the current reader — 21 October 2026
 
