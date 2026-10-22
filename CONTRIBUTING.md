@@ -56,14 +56,13 @@ task, reviewed before merging.
 | Reader theme presets (presentation only) | `sol/terminal/theme.py`; names in `sol/reader/options.py` |
 | Complete checkout installation | `scripts/install.py` |
 | Checked read-only surface projections | `sol/reader/surface.py` |
-| Generic terminal escaping and POSIX utilities | `sol/terminal/text.py`, `sol/terminal/tty.py` |
+| Generic terminal escaping | `sol/terminal/text.py` |
 | Workspace operations and persistence guards | `sol/workspace/reader.py`, `sol/workspace/store.py` |
-| Workspace command syntax and summaries | `sol/workspace/commands.py` |
 | Verified corpus and portable references | `sol.core`, backed by `sol/corpus/contract.py` |
 | Shared CommonMark visibility and plain-text projection | `sol/corpus/markdown.py` |
 
-New interfaces should call workspace service methods rather than constructing
-book-shell commands or writing workspace tables directly. Domain operations
+New interfaces should call workspace service methods (`WorkspaceReader`) rather
+than writing workspace tables directly. Domain operations
 retain author checks, source freshness and optimistic revision checks. Keep
 source-codepoint positions separate from wrapped rows and UTF-8 byte columns.
 
@@ -77,10 +76,10 @@ Tests share corpus builders through `tests/fixtures_corpus.py`. Do not borrow a
 different TestCase's setup methods. Patch the module that owns an operation;
 historical re-exports from `reader.app` do not own those operations.
 
-## Archives and optional experiments
+## Archives
 
 The installed wheel contains `sol` and its subpackages. The source archive also
-includes public documentation, tests and the reader experiments they exercise.
+includes public documentation, scripts and tests.
 Packaging checks copy the actual source tree into a temporary build directory,
 add synthetic private sentinels, inspect both archives and run checks from the
 unpacked source archive. They do not copy the local book or personal databases.
@@ -93,9 +92,10 @@ for workspace boundaries, bounded section transitions, controls and acceptance c
 
 ## Scope of the cleanup
 
-This pass preserves canonical identifiers, the reference protocol, workspace
-schemas and installed commands. The redundant `shell`, `corpus` and `extraction` extras remain
-compatibility aliases; the PDF compatibility reader remains explicit.
+The 21 October cleanup preserved canonical identifiers, the reference protocol
+and workspace schemas; it removed `sol-kitty`, `sol compare`, the legacy PDF
+reader and the empty `shell`, `corpus` and `extraction` extras (see CHANGELOG).
+The only optional extra is `essence`.
 
 The deeper state-model work still needs a deliberate compatibility design:
 `Book` and `CorpusSnapshot` expose caller-owned mutable collections. A frozen

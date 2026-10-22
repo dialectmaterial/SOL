@@ -15,7 +15,7 @@ BEING is the place to **read Hegel's *Science of Logic***, locate source evidenc
 
 ## 2. What is implemented
 
-`sol` invokes a **single native Neovim 0.11+ reader** with a private SOL configuration. Personal Neovim/LazyVim settings are neither loaded nor changed. The reader uses only its integrated mode; checkout surface experiments and the separate research-export mode have been removed. `sol --engine neovim` remains compatible syntax, not a distinct engine.
+`sol` invokes a **single native Neovim 0.11+ reader** with a private SOL configuration. Personal Neovim/LazyVim settings are neither loaded nor changed. The reader uses only its integrated mode; checkout surface experiments and the separate research-export mode have been removed. `sol` and `sol being` open it; there is no other engine.
 
 Python/CORE owns source verification, IDs, lineage, actions and workspace persistence. Neovim owns disposable buffers, layout, input, motions and visual styling. A view contains **at most 64 canonical paragraphs**, divided into bounded reading sections; the reading position is a UUID plus source-codepoint offset, *never* a Neovim buffer address or screen row. Reloading a section in the same native Neovim process preserves the semantic contract. The reader can display adjacent passages continuously or one passage at a time. The book is **not** one unbounded editor buffer.
 
@@ -217,7 +217,7 @@ Earlier continuous-terminal and offline HTML proofs are retained in Git history.
 
 ## 5. Mathematical notation and source fidelity
 
-The corpus contract supports separate `formula` records and prose passages with `contains_math: true`; this does not mean every supported type is present in the imported book. Mathematical passages remain addressable and navigable; the Kitty source-view integration remains available. Faithful native Neovim rendering of arbitrary 2-D mathematical notation and a verified general LaTeX conversion pipeline are unimplemented.
+The corpus contract supports separate `formula` records and prose passages with `contains_math: true`; this does not mean every supported type is present in the imported book. Mathematical passages remain addressable and navigable. Faithful native Neovim rendering of arbitrary 2-D mathematical notation and a verified general LaTeX conversion pipeline are unimplemented.
 
 **Near-term decision:** prioritize a **source-faithful formula preview**. From the current formula or mixed passage, offer a single action that displays the correct original crop/page (or a reviewed typed formula where available) and returns without losing passage and cursor position. For Alacritty, a separate local image/PDF/browser viewer is legitimate. Kitty can optionally offer enhanced panes, but formula access must not depend on Kitty. Avoid OCR hallucination: generated LaTeX is an unreviewed candidate, not authoritative source. Preserve exponent/fraction placement, printed/PDF page labels, transcription status, attribution, image provenance, and warning flags. Never replace ambiguous formula content with a guessed linear string. A linear transcription made by reading the printed crop (as on 17 October) is not a guess, but it is also not reviewed: it keeps the record's pending status, its audit lists the old and new text, and only a person's comparison against `s` may set `transcription_status` to `reviewed` (a canonical Markdown correction followed by reindexing, not workspace testimony).
 
