@@ -40,7 +40,7 @@ steps 5–7). Rules for all three lanes:
 
 ## Claude Code: stage F, comparison and Measure
 
-**Status:** In review
+**Status:** Done (#103)
 **Branch:** `claude/measure-comparison`
 **Scope:** read *Measure as a series* (p. 305), *Elective affinity* (p. 308) and
 *Diversity* (pp. 362–365) against the two E2 engines, answering the question
@@ -50,7 +50,7 @@ done: #95, #99.
 
 ## Codex A: word-unit study
 
-**Status:** In review
+**Status:** Done (#105)
 **Branch:** `codex/word-unit-study`
 **Requested:** 22 October 2026, by the maintainer
 **Authority:** [REEVALUATION §3.9](restructuring/REEVALUATION.md#39-the-tokenizers-unit-limit-discrete-magnitude-or-reflection),
@@ -67,7 +67,7 @@ push and PR against main. Do not merge. Prior stage E task completed in #102.
 
 ## Codex B: source-validation proposal
 
-**Status:** In review
+**Status:** Done (#104)
 **Branch:** `codex/source-validation-proposal`
 **Requested:** 22 October 2026, by the maintainer
 
