@@ -32,6 +32,37 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## CORE and shared relocation — 22 October 2026
+
+**Task:** [Codex B: CORE and shared relocation](https://github.com/dialectmaterial/SOL/blob/16703fc/docs/coordination/CURRENT_TASK.md#codex-b-core-and-shared-relocation).
+**Branch / PR:** `codex/core-shared-relocation` · [#98](https://github.com/dialectmaterial/SOL/pull/98); Claude reviews; author does not merge.
+**Last implementation commit:** `20f9c42733f47d29700838411428b91019764e1f` (this report is committed afterward).
+
+### Changed files
+
+- `sol/core/{files,reference_cli,source}.py` — canonical-file resolution and its shell-path helper, the reference command face, and verified PDF snapshot/capture/page/crop services. `sol/reader/commands.py` retains `sol read` printing; `sol/corpus/onboarding.py` owns explicit first-run corpus import.
+- `sol/being/source_view.py` — detached image/PDF viewer launch, Zathura highlighting and follow; imports CORE's existing verification helpers. CORE never imports the viewer, reader, workspace or terminal. All 53 moved function/class definitions retain their original ASTs after excluding import statements; no behavior rewrite, public API/version, dependency, schema, receipt or corpus change.
+- `sol/presentation/{__init__,text,theme}.py` — shared escaping, palettes, theme names/defaults and width constants outside the logical hierarchy. ESSENCE imports presentation data directly. Old internal modules are removed without shims; `sol`, `sol-window`, `sol-corpus`, `sol-corpus-check`, `python -m sol.essence.cli` and the lazy public `sol.core` facade retain their targets/contracts.
+- Importers, source/reference/path/onboarding tests and patch targets; `tests/test_packaging.py` adds a real wheel install and imports every moved module outside the checkout under import/data-I/O guards. The CORE-only wheel exercises relocated CORE imports and canonical-file resolution. Another boundary check protects ESSENCE theme selection from reader imports. Claude's product files have only import changes; its tests have only moved imports/patch targets.
+- Architecture §2 and the three assigned register rows, CORE §4, live BEING/contributor/backlog path references and CHANGELOG — record the stage C placements as implemented in #98. The task status becomes `In review` with this report; no changes to SPECULATIVE or Decision statements.
+- Work stayed in the supplied worktree. Its shared Git metadata is read-only, so commit/publication metadata lives in `/tmp/sol-core-shared-git` (`GIT_DIR=/tmp/sol-core-shared-git git …` from this worktree). Branched from `origin/main` at `16703fc`; main remained there at the final fetch. No private corpus, PDF, workspace, synced project material or local `AGENTS.md` is committed.
+
+### Tests performed
+
+- `/home/dima/Projects/code/sol/.venv/bin/python -B -m unittest discover -s tests` — **1,252 tests, OK (7 skipped, 4 expected failures)**, 116.093 s, Python 3.14.8; isolated XDG/Neovim paths. Full log: `/tmp/sol-core-full-suite.log` (local only).
+- Same interpreter, `-B -m unittest discover -s tests -p test_packaging.py` — **21 tests, OK**, including wheel/sdist privacy and package-data checks, real pip wheel installation, installed command help, all relocated imports, CORE-only fixture and packaged headless Neovim. No package assets or installed entry-point targets move in this lane; pyproject/MANIFEST changes are unnecessary.
+- Focused source viewer (29), path resolver (5), first-run (7), reference CLI (22), Neovim controller (53), theme (14), terminal escaping (2) and native commands (7, one skipped) — OK.
+- Same interpreter, `-B scripts/check_docs.py`, `-B -m sol --help` and `-B -m sol essence --help` — OK. Installed wheel also exercises `sol`, `sol essence`, `sol reference` and `sol read` help. External documentation URLs are not network-checked. `git diff --check` — OK.
+- Exhaustive old dotted/file-path search across `sol/` (including Lua), `tests/`, `scripts/`, `docs/`, pyproject and contributor/root documentation: no stale executable paths or patch targets. Remaining old names are the assignment's before-paths, register provenance labels, dated inventories/reading notes and historical handoffs; retained as historical evidence. Live paths are updated.
+
+### Outstanding issues
+
+- No new physical-terminal, GUI viewer or private-corpus acceptance trial; existing visual and source-review limits remain. The tests use synthetic corpus/PDF fixtures. Claude's concurrent relocation must retain these import changes if it merges second; its composition-root move remains a separate task.
+
+### Decisions requiring approval
+
+None reserved. Implemented the stage C defaults: retrieval/provenance in CORE, viewer interaction at the BEING root, shared presentation outside the logical hierarchy. Measure remains unresolved as the register already records; no new philosophical placement is claimed.
+
 ## Stage C: reading the Doctrine of Essence — 22 October 2026
 
 **Task:** [Codex: Reading the Doctrine of Essence](https://github.com/dialectmaterial/SOL/blob/0f5156aa511f8305abf3bf6fd7719a4e51515d8d/docs/coordination/CURRENT_TASK.md#codex-reading-the-doctrine-of-essence).

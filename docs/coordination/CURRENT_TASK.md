@@ -64,7 +64,7 @@ your register rows.
 
 ## Codex B: CORE and shared relocation
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/core-shared-relocation`
 **Scope:** register rows for `terminal.commands`, `terminal.reference`,
 `reader.onboarding`, `terminal.source`, `terminal.text` and the themes:
