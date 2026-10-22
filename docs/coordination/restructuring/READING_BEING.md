@@ -174,7 +174,7 @@ These are added to [ARCHITECTURE §9](../../ARCHITECTURE.md#9-placement-register
 
 ## 6. Open points
 
-- **Re-reading.** Read *Real measure* (pp. 302–325) and the mathematical remarks before implementing 3.4 or any placement under Measure. Today no module's placement under Measure rests on a full reading of that division.
+- **Re-reading.** *Real measure* is read (§8); the mathematical remarks (pp. 155–280) are not.
 - **Search and the tokenizer.** Confirm the search and tokenizer questions with READING_ESSENCE (identity and difference).
 - **Order for stage D.** Proposed order: the Neovim reader package to the BEING root; `navigation` to Quantity; `typography` and `structure` to Quality; then the CORE-side moves; the workspace with the reader package. Nothing goes under Measure on this pass. Each move gets its own pull request, with tests and the register status updated.
 
@@ -202,3 +202,29 @@ Each cited section, its section-start page, and its virtual path in the local co
 | Nodal lines of measure-relations | p. 318 | `/BEING/iii-measure/2-real-measure/b-nodal-lines-of-measure-relations/00-introduction.txt` |
 | Absolute indifference | p. 326 | `/BEING/iii-measure/3-the-becoming-of-essence/a-absolute-indifference.txt` |
 | Transition into essence | p. 333 | `/BEING/iii-measure/3-the-becoming-of-essence/c-transition-into-essence.txt` |
+
+## 8. *Real measure*, read in full (addendum, 22 October 2026)
+
+§6 left *Real measure* (pp. 302–325) unread and kept the Measure hypothesis for the printed source open. It has now been read through `sol read` (paths in §7, plus `/BEING/iii-measure/2-real-measure/a-the-relation-of-independent-measures/{a-combination-of-two-measures,b-measure-as-a-series-of-measure-relations}.txt` and `/BEING/iii-measure/2-real-measure/c-the-measureless.txt`, pp. 303, 305, 323).
+
+### 8.1 What the text says
+
+- **Sides that are themselves measures (p. 302).** Real measure is a relation of measures that make up the quality of self-subsisting things. Hegel's examples are physical and chemical: specific gravity, chemical affinity, sound.
+- **Combination of two measures (p. 303).** A material something is qualitatively what it is through a ratio (weight to volume). When two such things combine, each keeps itself only by altering the ratio. Hegel's example is that weights add up but volumes do not.
+- **A series of measure-relations (p. 305).** An independent measure has its qualitative character not in one ratio but in the *series* of ratios it forms with many other measures. Comparing two such measures needs a common unit, which is found only in the ratio between their series.
+- **Nodal lines (p. 318).** A measure-relation has a margin in which quantitative change leaves its quality alone. At a certain point the change turns into a new quality, a "leap". Hegel criticises explaining such a change by its gradualness, which only describes the indifferent, quantitative side.
+- **The measureless (p. 323).** Through the nodal series, the qualities are demoted to *states* of one persisting substrate, which prepares the indifference that becomes essence (§1.4).
+
+### 8.2 Consequences
+
+1. **The source viewer is not Measure; the hypothesis of §3.4 is closed.** The printed page and the canonical record are not two measures whose ratio makes up what either is. Neither side is altered by the relation, and the coordinates only locate a record that CORE has already identified. The stage D placement (capture to CORE, viewer to the BEING root) stands.
+2. **No BEING-side module meets the criterion of §2, point 3.** `sol/being/measure/` stays empty. Nothing in the reader has a quality that a quantitative relation constitutes; its thresholds (the 64-paragraph view, the compact splash on small terminals) are engineering limits, the external rule of p. 291.
+3. **The strongest Measure candidate in SOL is on the ESSENCE side, and stays an alternative for stage E.**
+   - *The case for Measure:* a word comparison or a TF-IDF weight gives a text a specific profile only through the *series* of its ratios to a reference population. Against another population the same text has another profile, which is close to p. 305. Normalization supplies the common unit p. 305 requires.
+   - *The case against, and for Codex's Reflection placement (READING_ESSENCE, E2):* Hegel's real measure belongs to things themselves, while SOL's reference population and document unit are *chosen* by the analyst. That chosen standpoint is the comparing reflection of Diversity (pp. 362–365), or at most the external rule (p. 291).
+   - *For now:* E2 stays under Reflection, as Codex A is implementing it.
+   - *For stage E:* does a comparison whose reference population is itself principled, for example the whole corpus of a doctrine or an author's work, move from external comparing towards real measure?
+4. **Nodal lines give the reciprocal investigation a question** ([SPECULATIVE §2.1](../../SPECULATIVE.md#21-the-reciprocal-investigation)).
+   - *Where it applies:* many ESSENCE methods have parameters (segmentation rules, frequency cut-offs, the top-N of TF-IDF) where a small quantitative change produces a qualitatively different result.
+   - *What Hegel's warning implies:* reporting such a change as a gradual drift would miss the point. A parameter sweep that looks for the leaps, the points where the result's character changes, would be a method grounded in this section.
+   - *Status:* recorded as an idea for ESSENCE, not a task.
