@@ -53,9 +53,15 @@ def run_native(command, *, cwd, env, handler):
         os.set_blocking(responses, False)
         selector.register(requests, selectors.EVENT_READ)
         incoming, outgoing = b"", b""
+        # A handler may offer idle(): one bounded unit of work, run only when
+        # no request is waiting and every response has been written.
+        idle = getattr(handler, "idle", None)
         try:
             while process.poll() is None:
-                for key, _ in selector.select(.1):
+                events = selector.select(.1)
+                if not events and not outgoing and idle is not None:
+                    idle()
+                for key, _ in events:
                     if key.fd == responses:
                         try:
                             outgoing = outgoing[os.write(responses, outgoing):]

@@ -38,14 +38,14 @@ steps 5–7). Rules for all three lanes:
    the PR, update module paths in ARCHITECTURE §2 and the component document,
    and add a CHANGELOG line.
 
-## Claude Code: document word units
+## Claude Code: prepare reader sections ahead
 
 **Status:** In review
-**Branch:** `claude/word-unit-docs`
-**Scope:** describe the current difference between whole-word search and
-ESSENCE's tokenizer in BEING.md, ESSENCE.md and the `--word` help, from
-[WORD_UNIT](restructuring/WORD_UNIT.md). No behaviour change; which rule the
-reader follows stays a maintainer decision. Previous task (stage F reading) done: #103.
+**Branch:** `claude/prepare-sections-ahead`
+**Scope:** maintainer request (23 October): make section crossings faster by
+doing more work on the opening screen. The reader prepares neighbouring
+sections at startup and while idle; CORE's checks are unchanged. Previous task
+(word-unit docs) done: #109.
 
 ## Codex A: stage F E2 sensitivity
 

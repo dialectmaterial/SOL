@@ -118,6 +118,15 @@ occurrences, section changes, paragraph moves across a section boundary and an
 outline jump against an explicit local corpus, using temporary workspaces and
 text-free reports. Its controller times exclude Neovim IPC and terminal painting;
 headless checks separately verify cursor updates without rebuilding the buffer.
+**Sections prepared ahead:** while the opening screen shows, the reader also
+builds the sections before and after the first one, and after each section
+change it builds the new neighbours one at a time while no request is waiting.
+A prepared section is used only for the same section, width, emphasis and
+theme, and only inside an action whose fresh CORE capture rechecks the corpus
+files and must equal the prepared record's checked reference; otherwise the
+section is built as before. On the book (23 October) this cut a section change
+from about 430 to 275 ms of Python time, for about 0.3 s more opening screen.
+The rest is CORE's per-check file verification (CORE §5), unchanged.
 
 **Book footnote reading:** Footnotes are the edition's own notes, separate from personal notes. Each number is a dim superscript (`⁹⁵`, or `[k]` for lettered notes) at its canonical Markdown callout. The number is display only, absent from `plain_text`, so search, selection and offsets ignore it. `c` works from a cursor or a passage-local visual selection. Its book notes, personal notes and technical source context have separate headings. Enter on a book-note row opens only that note, with its canonical `note_paragraph` children ordered by `order`, original emphasis, per-paragraph attribution, review warnings and display-only callouts. Enter on a listed further footnote follows that link. Backspace returns to the preceding note at its earlier panel cursor, or to `c`; Esc or `q` returns directly to the exact passage cursor and selection in the same reading mode. Resizing closes the panel and restores the passage. Opening or following a note checks the source again and saves no reading visit or workspace data. A refused request leaves the preceding panel available; a reply received after that panel closes is ignored.
 

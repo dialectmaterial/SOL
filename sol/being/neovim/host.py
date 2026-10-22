@@ -264,6 +264,17 @@ def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None,
     return payload
 
 
+def adopt_restore(sample: Sample, payload: dict, restore: dict) -> None:
+    """Give a payload built without a position the checks build_payload runs on one.
+
+    The restore's reference must be freshly captured by the caller and equal the
+    prepared record's checked reference, so stale prepared text is refused.
+    """
+    _check_sample_packet(sample, restore)
+    _check_sample_packet(sample, restore, payload["records"])
+    payload["restore"] = deepcopy(restore)
+
+
 def _unique_fields(pairs):
     result = {}
     for key, value in pairs:

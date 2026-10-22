@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Sections prepared ahead — 23 October 2026
+
+The reader builds the neighbouring sections during the opening screen and,
+after each section change, while idle, so `n`, `b` and section moves across a
+boundary no longer wait for a full section build (about 430 → 275 ms of Python
+time on the book; the opening screen is about 0.3 s longer). Prepared sections
+are reused only when a fresh CORE capture still matches them.
+
 ### Word units documented — 23 October 2026
 
 `--word` help and BEING/ESSENCE docs now say what whole-word search matches

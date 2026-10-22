@@ -232,6 +232,41 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     # export; neither references nor source trust are retained here.
     typography = lru_cache(maxsize=256)(neovim.map_typography)
 
+    # Neighbouring sections prepared ahead, so crossing a section boundary
+    # need not wait for a whole section's checks and typography. Each is built
+    # from this session's one verified snapshot, keyed by everything that
+    # shapes it, and used once, inside an action whose fresh CORE capture
+    # rechecks the files and must equal the prepared record's reference.
+    ahead = {}
+
+    def section_key(extent):
+        return extent.first, extent.last, width, emphasis, theme
+
+    def neighbours():
+        around = []
+        if extent.last + 1 < len(book.passages):
+            around.append(reading_section(book, book.passages[extent.last + 1].identifier))
+        if extent.first > 0:
+            around.append(reading_section(book, book.passages[extent.first - 1].identifier))
+        return around
+
+    def prepare_ahead():
+        # One section per call, so a key pressed meanwhile waits for at most one build.
+        wanted = {section_key(around): around for around in neighbours()}
+        for key in set(ahead) - set(wanted):
+            del ahead[key]
+        for key, around in wanted.items():
+            if key not in ahead:
+                passages = tuple(book.passages[around.first:around.last + 1])
+                try:
+                    with single_action(book.corpus_snapshot):
+                        ahead[key] = neovim.build_payload(Sample(book, passages, ReaderActions(book)), width,
+                                                          emphasis=emphasis, theme=theme, _typography=typography)
+                except Exception:
+                    # Never ends reading: the move itself builds and reports the section as before.
+                    ahead[key] = None
+                return
+
     def prepare():
         state = actions.snapshot()
         extent = reading_section(book, state.current.identifier)
@@ -242,9 +277,16 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         restored = {"reference": capture_reference(book.corpus_snapshot, state.requested_id),
                     "selection": None if state.selection is None else asdict(state.selection),
                     "cursor_offset": state.cursor_offset}
-        payload = neovim.build_payload(sample, width, restored,
-                                      requested_ids=requested_ids, emphasis=emphasis, theme=theme,
-                                      _typography=typography)
+        payload = ahead.pop(section_key(extent), None) if state.requested_id == state.current.identifier else None
+        if payload is not None:
+            try:
+                neovim.adopt_restore(sample, payload, restored)
+            except ValueError:
+                payload = None
+        if payload is None:
+            payload = neovim.build_payload(sample, width, restored,
+                                          requested_ids=requested_ids, emphasis=emphasis, theme=theme,
+                                          _typography=typography)
         navigation = {"previous": extent.first > 0, "next": extent.last + 1 < len(book.passages)}
         structure = structure_payload(book, state.current)
         structure["depth"] = tree_depth
@@ -274,6 +316,9 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
 
     with single_action(book.corpus_snapshot):
         payload, sample, extent = prepare()
+    # While the opening screen still shows, prepare both neighbouring sections.
+    for _ in range(2):
+        prepare_ahead()
 
     # Each action's extra fields, their checks and the refusals shown in Neovim.
     # Actions without an entry take no extra field.
@@ -482,6 +527,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         # corpus once for it and still checks the files on every reference.
         with single_action(book.corpus_snapshot):
             return handle_action(request)
+    handle.idle = prepare_ahead
 
     def handle_action(request):
         nonlocal payload, sample, extent, mode, start_tree, notice, focused, theme, search_marks

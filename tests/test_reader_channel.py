@@ -38,6 +38,27 @@ for number in range(1, 4):
         self.assertEqual(status, 0)
         self.assertEqual(len(observed), 3)
 
+    def test_idle_work_runs_on_the_launching_thread_only_between_requests(self):
+        owner, events = threading.get_ident(), []
+        def handle(request):
+            events.append("request")
+            return {"ok": True}
+        def idle():
+            self.assertEqual(threading.get_ident(), owner)
+            events.append("idle")
+        handle.idle = idle
+        status = self.run_child("""
+import time
+time.sleep(.35)
+assert request(b'{"id":1,"op":"marker_set"}')['ok'] is True
+time.sleep(.35)
+""", handle)
+        self.assertEqual(status, 0)
+        self.assertEqual(events.count("request"), 1)
+        at = events.index("request")
+        self.assertIn("idle", events[:at])
+        self.assertIn("idle", events[at + 1:])
+
     def test_invalid_json_duplicate_fields_and_invalid_ids_never_call_handler(self):
         def refuse(request):
             self.fail("invalid request reached workspace handler")
