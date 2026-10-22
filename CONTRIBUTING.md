@@ -46,17 +46,17 @@ task, reviewed before merging.
 | --- | --- |
 | Command syntax and execution mode | `sol/reader/options.py` |
 | Startup and dispatch | `sol/reader/app.py` |
-| First-run PDF import and actor/workspace selection | `sol/reader/onboarding.py`, `sol/reader/launch.py` |
+| First-run PDF import and actor/workspace selection | `sol/corpus/onboarding.py`, `sol/reader/launch.py` |
 | Optional book command interface | `sol/reader/shell.py` |
 | One-shot and book-shell text rendering | `sol/reader/render.py` |
 | Semantic reading cursor, selection and history | `sol/reader/actions.py` |
 | Single fullscreen reader | `sol/terminal/neovim_reader.py`, `sol/terminal/neovim.py`, `sol/terminal/neovim.lua` |
 | Reader outline | `sol/reader/structure.py`, `sol/terminal/neovim_tree.lua` |
-| Verified source pages and formula crops | `sol/terminal/source.py` |
-| Reader theme presets (presentation only) | `sol/terminal/theme.py`; names in `sol/reader/options.py` |
+| Verified source pages and formula crops | `sol/core/source.py` (capture/render); `sol/being/source_view.py` (viewers) |
+| Reader theme presets (presentation only) | `sol/presentation/theme.py` (palettes, names and defaults) |
 | Complete checkout installation | `scripts/install.py` |
 | Checked read-only surface projections | `sol/reader/surface.py` |
-| Generic terminal escaping | `sol/terminal/text.py` |
+| Generic terminal escaping | `sol/presentation/text.py` |
 | Workspace operations and persistence guards | `sol/workspace/reader.py`, `sol/workspace/store.py` |
 | Verified corpus and portable references | `sol.core`, backed by `sol/corpus/contract.py` |
 | Shared CommonMark visibility and plain-text projection | `sol/corpus/markdown.py` |
