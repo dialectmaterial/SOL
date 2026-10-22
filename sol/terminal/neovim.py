@@ -19,9 +19,9 @@ import tempfile
 import unicodedata
 
 from sol.reader.typography import map_typography
-from sol.terminal.text import emphasis_style
+from sol.presentation.text import emphasis_style
 from sol.terminal.runtime import managed_neovim
-from sol.terminal.theme import theme_payload
+from sol.presentation.theme import theme_payload
 
 from sol.reader.surface import (CaptureExport, Sample, FOOTNOTE_DEPTH, FOOTNOTE_LINKS,
                                 footnote_links, footnote_scope, note_paragraph_ids, record_payload, validate_packet)

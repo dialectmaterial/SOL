@@ -6,7 +6,7 @@ import sys
 
 from sol.essence.tui import TEXTUAL_HINT, textual_available
 from sol.essence.tui.context import read_context
-from sol.reader.options import DEFAULT_READER_THEME, READER_THEMES
+from sol.presentation.theme import DEFAULT_READER_THEME, READER_THEMES
 
 
 def main(arguments=None):

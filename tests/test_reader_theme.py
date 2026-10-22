@@ -12,8 +12,8 @@ from fixtures_corpus import write_runtime_corpus
 from sol.core import config
 from sol.corpus import contract
 from sol.reader import app
-from sol.reader.options import LEGACY_READER_THEMES, READER_THEMES
-from sol.terminal import theme
+from sol.presentation.theme import LEGACY_READER_THEMES, READER_THEMES
+from sol.presentation import theme
 
 
 TRUECOLOR = {"COLORTERM": "truecolor", "TERM": "alacritty"}

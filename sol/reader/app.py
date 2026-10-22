@@ -24,12 +24,13 @@ from sol.core.config import (
 from sol.core.models import Book, Node, Passage, node_path, presentation_text
 from sol.core.paths import alias, child_by_name, display_path
 from sol.core.paths import resolve_path as resolve_book_path
-from sol.reader.options import (DEFAULT_READER_THEME, DEFAULT_READER_WIDTH, LEGACY_READER_THEMES, READER_THEMES,
-                                ExecutionMode, build_parser, validate_options,
+from sol.presentation.theme import (DEFAULT_READER_THEME, DEFAULT_READER_WIDTH,
+                                    LEGACY_READER_THEMES, READER_THEMES)
+from sol.reader.options import (ExecutionMode, build_parser, validate_options,
                                 validate_workspace_management)
 from sol.reader.actions import ReaderActions, ReadingSession, context_passages
 from sol.reader.launch import interactive_input_available, shell_identity
-from sol.terminal.text import display_text, safe_output
+from sol.presentation.text import display_text, safe_output
 from sol.reader.render import (    sensible_width, page_range, source_line, fold_path, fold_body, render_passage,
     passage_data, render_context, render_search_results, location_data, render_info,
     render_listing, render_tree, render_guide)

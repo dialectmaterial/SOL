@@ -23,7 +23,7 @@ from sol.essence.encyclopedia import entry_markdown, genealogy_rows, load_catalo
 from sol.essence.methods import load_methods, method_markdown
 from sol.essence.tui import sentences, tfidf, words
 from sol.essence.tui.context import load_state, save_state
-from sol.reader.options import DEFAULT_READER_THEME
+from sol.presentation.theme import DEFAULT_READER_THEME
 
 TEXTUAL_THEMES = {"mocha": "catppuccin-mocha", "latte": "catppuccin-latte", "paper": "sol-paper",
                   "night": "sol-night", "terminal": "ansi-dark"}

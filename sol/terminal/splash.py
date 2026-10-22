@@ -19,7 +19,7 @@ import sys
 import threading
 import time
 
-from sol.terminal.theme import _PALETTES
+from sol.presentation.theme import _PALETTES
 
 # The maintainer's screensaver title, SOL's recursive name: SOL / ORGANIZES / LOGIC.
 _BLOCKS = (

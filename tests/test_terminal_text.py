@@ -5,7 +5,7 @@ import unittest
 
 from sol.core.models import Node, Passage
 from sol.reader.render import render_passage, render_search_results
-from sol.terminal.text import display_text, safe_label, safe_output
+from sol.presentation.text import display_text, safe_label, safe_output
 
 
 class TTYOutput(StringIO):

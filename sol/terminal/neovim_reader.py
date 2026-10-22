@@ -17,8 +17,8 @@ from sol.reader.actions import ReaderActions
 from sol.reader.surface import Sample
 from sol.reader.structure import structure_payload
 from sol.terminal import neovim
-from sol.terminal.text import safe_label, safe_output
-from sol.terminal.theme import DEFAULT_THEME, THEMES
+from sol.presentation.text import safe_label, safe_output
+from sol.presentation.theme import DEFAULT_THEME, THEMES
 
 
 SECTION_BUDGET = 64

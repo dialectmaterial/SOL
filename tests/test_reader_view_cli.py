@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
-from sol.reader.options import DEFAULT_READER_WIDTH
+from sol.presentation.theme import DEFAULT_READER_WIDTH
 from unittest.mock import patch
 
 from sol.corpus import contract

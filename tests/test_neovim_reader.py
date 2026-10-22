@@ -15,7 +15,7 @@ from sol.core.paths import display_path, resolve_path
 from sol.reader import app
 from sol.reader.actions import ReaderActions
 from sol.terminal import neovim, neovim_reader
-from sol.terminal.theme import THEMES
+from sol.presentation.theme import THEMES
 from sol.workspace.reader import WorkspaceReader
 from sol.workspace.store import Workspace, WorkspaceConflict
 

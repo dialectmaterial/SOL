@@ -12,7 +12,7 @@ import shlex
 from sol.core.models import Book, Node
 from sol.core.paths import display_path, resolve_path
 from sol.reader.actions import ReaderActions, ReadingSession
-from sol.terminal.text import display_text, safe_output
+from sol.presentation.text import display_text, safe_output
 from sol.reader.render import (render_guide, render_info, render_listing, render_passage,
                                render_search_results, render_tree, sensible_width)
 

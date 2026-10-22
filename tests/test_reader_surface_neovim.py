@@ -113,7 +113,7 @@ class ReaderSurfaceNeovimTests(unittest.TestCase):
 
     def run_lua(self, scenario, *, restore=None, automatic_quit=True, theme=None):
         from sol.terminal.neovim import build_payload
-        from sol.terminal.theme import theme_payload
+        from sol.presentation.theme import theme_payload
 
         self.payload = build_payload(self.sample, width=72, restore=restore)
         if theme is not None:
