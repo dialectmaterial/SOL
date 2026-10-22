@@ -36,7 +36,7 @@ Write "None." rather than deleting a heading.
 
 **Task:** maintainer request (21 October 2026): make the speculative architecture document leading and align all documentation with it.
 **Branch / PR:** `claude/speculative-docs` · PR #86
-**Last implementation commit:** `aaf0bbf8c8be4716452652e06786e96969417330` (this report is committed after it)
+**Last implementation commit:** `d93cc1af60f863af7268703d2fb17b41baba3c2c` (this report is committed after it)
 
 ### Changed files
 - `docs/SPECULATIVE.md` — the maintainer's document, verbatim (front matter dropped).
@@ -47,6 +47,7 @@ Write "None." rather than deleting a heading.
 
 ### Tests performed
 - Documentation check (every link into SPECULATIVE resolves) and full suite: OK.
+- Codex's review: README divisions, ESSENCE status lines, stale BEING/CONTRIBUTING claims and two ARCHITECTURE caveats fixed; dead `sol/terminal/tty.py` removed.
 
 ### Outstanding issues
 - Restructuring has not begun; the placement register is empty.
