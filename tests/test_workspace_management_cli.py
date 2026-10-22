@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from sol.reader import app
+from sol.app import main as app
 from sol.being.workspace.launch import read_launch_preferences, remember_launch
 from sol.being.workspace.profiles import profile_path, register_actor
 from sol.being.workspace.store import Workspace

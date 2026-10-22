@@ -176,7 +176,7 @@ class ReaderActionsTests(unittest.TestCase):
                 self.assertIs(session.current(), self.book.selection(path)[cursor])
 
     def test_legacy_application_symbols_remain_reexports(self):
-        from sol.reader import app
+        from sol.app import main as app
         self.assertIs(app.ReadingSession, ReadingSession)
         self.assertIs(app.context_passages, context_passages)
 
@@ -211,7 +211,7 @@ print(json.dumps(sorted(sys.modules)))
                                 cwd=Path(__file__).resolve().parents[1],
                                 text=True, capture_output=True, check=True)
         modules = set(json.loads(result.stdout))
-        for prefix in ('sol.reader.app', 'sol.being.workspace', 'sol.terminal', 'sol.corpus',
+        for prefix in ('sol.app.main', 'sol.being.workspace', 'sol.being.neovim', 'sol.presentation', 'sol.corpus',
                        'prompt_toolkit', 'markdown_it', 'openai'):
             with self.subTest(prefix=prefix):
                 self.assertFalse(any(name == prefix or name.startswith(prefix + '.')

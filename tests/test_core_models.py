@@ -40,9 +40,9 @@ class CoreModelTests(unittest.TestCase):
             "import json, sys; "
             "import sol.core.models, sol.core.paths, sol.core.references; "
             "print(json.dumps(sorted(name for name in sys.modules "
-            "if name == 'sol.reader' or name.startswith('sol.reader.') "
-            "or name == 'sol.being.workspace' or name.startswith('sol.being.workspace.') "
-            "or name == 'sol.terminal' or name.startswith('sol.terminal.'))))"
+            "if name == 'sol.app' or name.startswith('sol.app.') "
+            "or name == 'sol.being' or name.startswith('sol.being.') "
+            "or name == 'sol.presentation' or name.startswith('sol.presentation.'))))"
         )
         result = subprocess.run([sys.executable, "-B", "-c", probe], cwd=checkout,
                                 check=True, capture_output=True, text=True)

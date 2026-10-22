@@ -13,7 +13,7 @@ from uuid import UUID
 from fixtures_corpus import CorpusFixture
 from sol import core
 from sol.core.paths import display_path, resolve_path
-from sol.reader import app
+from sol.app import main as app
 from sol.being.actions import ReaderActions
 from sol.being.neovim import host as neovim
 from sol.being.neovim import reader as neovim_reader

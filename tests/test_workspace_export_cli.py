@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import sol.reader.app as sol
+import sol.app.main as sol
 from sol.being.workspace.store import Workspace
 from sol.being.workspace.reader import WorkspaceReader
 from test_workspace_reader import invented_book, CORPUS_ID, IDS
@@ -35,10 +35,10 @@ class WorkspaceExportRoutingTests(unittest.TestCase):
     def invoke(self, arguments):
         output, errors = StringIO(), StringIO()
         with redirect_stdout(output), redirect_stderr(errors), \
-                patch('sol.reader.app.discover_corpus', return_value=self.book.corpus_directory), \
-                patch('sol.reader.app.load_corpus_book', return_value=self.book), \
+                patch('sol.app.main.discover_corpus', return_value=self.book.corpus_directory), \
+                patch('sol.app.main.load_corpus_book', return_value=self.book), \
                 nullcontext(), \
-                patch('sol.reader.app.shell_identity', side_effect=AssertionError('No onboarding')), \
+                patch('sol.app.main.shell_identity', side_effect=AssertionError('No onboarding')), \
                 patch('builtins.input', side_effect=AssertionError('No prompts')):
             status = sol.main(arguments)
         return status, output.getvalue(), errors.getvalue()

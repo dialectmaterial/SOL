@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import sol.reader.app as sol
+import sol.app.main as sol
 from sol.being.workspace.catalog import discover_workspaces
 from sol.being.workspace.reader import WorkspaceReader
 from sol.being.workspace.store import (APPLICATION_ID, Workspace, WorkspaceConflict, WorkspaceError,

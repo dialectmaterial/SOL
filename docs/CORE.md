@@ -107,7 +107,7 @@ CORE exposes shared `Book`, `Node`, `Passage`, corpus discovery, verified `Corpu
 
 **Stage D module locations (22 October 2026).** `sol.core.files` resolves
 canonical Markdown or virtual text paths to ordered record IDs; it imports no
-reader or terminal. `sol.reader.commands` retains `sol read`'s printing, while
+reader or terminal. `sol.app.commands` retains `sol read`'s printing, while
 `sol.core.reference_cli` supplies the `sol reference capture/check` command face.
 `sol.corpus.onboarding` is the explicit first-run corpus-maintenance workflow,
 not part of ordinary runtime loading. `sol.core.source` owns verified private

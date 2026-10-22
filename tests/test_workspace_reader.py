@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import sol.reader.app as sol
+import sol.app.main as sol
 from sol.being.workspace.store import Workspace, WorkspaceConflict
 from sol.being.workspace.reader import WorkspaceReader, resolve_reference, safe_output, workspace_path
 
@@ -71,8 +71,8 @@ class WorkspaceReaderTests(unittest.TestCase):
     def main(self, arguments):
         stdout, stderr = StringIO(), StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr), \
-                patch('sol.reader.app.discover_corpus', return_value=Path('/invented/corpus')), \
-                patch('sol.reader.app.load_corpus_book', return_value=self.book), \
+                patch('sol.app.main.discover_corpus', return_value=Path('/invented/corpus')), \
+                patch('sol.app.main.load_corpus_book', return_value=self.book), \
                 nullcontext():
             status = sol.main(arguments)
         return status, stdout.getvalue(), stderr.getvalue()

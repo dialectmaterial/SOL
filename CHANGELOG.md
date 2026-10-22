@@ -10,6 +10,13 @@ Textual without importing ESSENCE's interface. Context bytes, validation,
 permissions, lifetime, install hint and the OSC source-return path are unchanged;
 ESSENCE still owns its saved investigation state.
 
+### The composition root leaves the reader — 22 October 2026
+
+Stage D, last BEING-lane step: `sol.reader.app` is `sol.app.main`, with
+`options`, `launch` and `sol read`'s printing (`commands`) beside it in
+`sol.app`, outside the logical divisions. The emptied `sol.reader` and
+`sol.terminal` packages are removed. Commands and behaviour are unchanged.
+
 ### CORE and shared presentation relocation — 22 October 2026
 
 Move canonical-file resolution and the reference command face into `sol.core`,
