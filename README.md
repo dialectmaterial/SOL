@@ -2,7 +2,7 @@
 
 SOL is a recursive acronym that stands for SOL Organizes Logic. It is a reader and research workspace centered on Hegel’s *Science of Logic*. Its larger ambition is to become an encyclopedic system for studying how texts, concepts, and the Idea are organized, bringing philosophical science into conversation with computational linguistics, machine learning, deep learning and operating systems.
 
-The organizing concern is the Idea in Hegel’s technical sense: the articulation and derivation of logical determinations through Being, Essence, and Concept. SOL makes this movement accessible for reading and investigation. The interfaces and classifications are the instruments which themselves are also subject to the inquiry.
+The organizing concern is the Idea in Hegel’s technical sense: the articulation and derivation of logical determinations through Being, Essence, and Concept. SOL makes this movement accessible for reading, investigation and computation. The interfaces and classifications are the instruments which themselves are also subject to the inquiry.
 
 SOL’s ambition is not only to investigate philosophical texts but also the computational organization of philosophical research. Therefore, a fully specified system environment
 is a methodological requirement. Each inquiry conditions and revises the other, and whether computation can become adequate to the Idea remains a positedness iterated immanently through the project itself.
