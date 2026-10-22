@@ -48,26 +48,27 @@ READING_BEING §8.2 left for stage E. Docs only: [READING_BEING §9](restructuri
 No register, Decision or code change. The previous task (BEING relocation) is
 done: #95, #99.
 
-## Codex A: word-unit study
+## Codex A: stage F E2 sensitivity
 
-**Status:** Done (#105)
-**Branch:** `codex/word-unit-study`
+**Status:** Done (#108)
+**Branch:** `codex/e2-sensitivity`
 **Requested:** 22 October 2026, by the maintainer
-**Authority:** [REEVALUATION §3.9](restructuring/REEVALUATION.md#39-the-tokenizers-unit-limit-discrete-magnitude-or-reflection),
-READING_BEING, READING_ESSENCE; Architecture §2 dependency direction.
-**Scope:** [WORD_UNIT](restructuring/WORD_UNIT.md): exact reader and tokenizer
-definitions; read-only real-corpus disagreement counts by cause and individual
-forms; user effects, tests, performance and ownership for four alternatives;
-recommendation marked as a maintainer decision. Link from REEVALUATION and HANDOFF.
-**Constraints:** research only, no behavior change. Throwaway script stays
-outside Git; never commit private corpus, PDFs, workspaces or exports. No
-fabricated quotations/page evidence or public-contract changes.
-**Acceptance:** full test suite and `scripts/check_docs.py`; HANDOFF, commit,
-push and PR against main. Do not merge. Prior stage E task completed in #102.
+**Scope:** [E2 sensitivity study](restructuring/E2_SENSITIVITY.md), following
+READING_BEING §§8.2/9 and REEVALUATION §3.3: vary supported document units,
+reference populations and TF-IDF top_n on the real private corpus through
+existing public providers. State screening thresholds before results; report
+isolated words, counts and statistics only, including negative evidence.
+**Constraints:** research only; no ESSENCE method, schema, register or placement
+change. Corpus remains read-only; no private text, PDFs, workspaces or exports
+are committed. Task-specific analysis scripts stay outside Git.
+**Acceptance:** full suite and `scripts/check_docs.py`; study linked from
+READING_BEING §9 and HANDOFF; commit, push and open a PR against main. Do not
+merge. Previous word-unit study is done (#105); stage E re-evaluation is
+done (#102).
 
 ## Codex B: source-check coverage
 
-**Status:** In review
+**Status:** Done (#107)
 **Branch:** `codex/source-check-coverage`
 **Requested:** 22 October 2026, by the maintainer
 

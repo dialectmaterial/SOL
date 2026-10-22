@@ -251,4 +251,8 @@ Each cited section, its section-start page, and its virtual path in the local co
 4. **The placement fits the transition.** Measure ends by demoting qualities to states of one substrate, and that indifference becomes essence (§1.4, §8.1). E2 works on exactly that: texts as states of a verified corpus, related by a positing standpoint. Reflection is therefore the right division for E2, not a fallback. The empty `sol/being/measure/` stays empty.
 5. **An empirical next step: sensitivity.** The nodal-line idea of §8.2 and REEVALUATION's evidence condition point to the same study. Vary the document unit, the reference population and top-N over the real corpus, and look for leaps: points where the top terms or rankings change character rather than drift. This would be research output, not a new ESSENCE method, and would not by itself move any module.
 
+The empirical follow-up is [E2 sensitivity](E2_SENSITIVITY.md): the
+prospective thresholds, supported-unit limits, real-corpus results and their
+bearing on Reflection versus Measure. It is research output only.
+
 The register is unchanged: E2 stays *Provisional* under Reflection.
