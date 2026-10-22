@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### ESSENCE engines relocated — 22 October 2026
+
+Restructuring stage D: move the ten analytical engine modules to
+`sol.essence.essence_as_reflection_within_itself` (register E1–E4). Keep the
+lazy `sol.essence` exports, commands, method receipts and behavior unchanged;
+update CLI/UI imports and test patch targets without old-path shims.
+
 ### The logical divisions exist — 22 October 2026
 
 Restructuring stage B: empty packages for BEING (Quality, Quantity, Measure),
