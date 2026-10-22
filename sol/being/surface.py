@@ -14,7 +14,7 @@ from sol.corpus.contract import CorpusSnapshot, verify_snapshot_current
 from sol.core.models import Book, Passage
 from sol.core.protocol import capture_reference, capture_references, check_reference, decode_reference, encode_reference
 from sol.core.references import resolve_record_reference, resolve_reference
-from sol.reader.actions import ReaderActions, TextSelection, selection_source
+from sol.being.actions import ReaderActions, TextSelection, selection_source
 
 
 @dataclass(frozen=True)

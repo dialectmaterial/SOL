@@ -9,9 +9,9 @@ import unittest
 from unittest.mock import patch
 
 from sol.reader import app
-from sol.workspace.launch import read_launch_preferences, remember_launch
-from sol.workspace.profiles import profile_path, register_actor
-from sol.workspace.store import Workspace
+from sol.being.workspace.launch import read_launch_preferences, remember_launch
+from sol.being.workspace.profiles import profile_path, register_actor
+from sol.being.workspace.store import Workspace
 
 
 CORPUS = "aaaaaaaa-0000-4000-8000-000000000001"
@@ -34,7 +34,7 @@ class WorkspaceManagementCLITests(unittest.TestCase):
         with redirect_stdout(output), redirect_stderr(error), \
                 patch.object(app, "discover_corpus", side_effect=AssertionError("No corpus discovery")), \
                 patch.object(app, "shell_identity", side_effect=AssertionError("No onboarding")), \
-                patch("sol.terminal.neovim.validate_environment", side_effect=AssertionError("No terminal needed")):
+                patch("sol.being.neovim.host.validate_environment", side_effect=AssertionError("No terminal needed")):
             status = app.main(list(arguments))
         return status, output.getvalue(), error.getvalue()
 
@@ -102,7 +102,7 @@ class WorkspaceManagementCLITests(unittest.TestCase):
                      ("--workspace", "reading"), ("--width", "0"),
                      ("--corpus", "missing"), ("--plain",), ("--depth", "1")):
             with self.subTest(flag=flag), \
-                    patch("sol.workspace.lifecycle.list_workspaces", side_effect=AssertionError("No storage")):
+                    patch("sol.being.workspace.lifecycle.list_workspaces", side_effect=AssertionError("No storage")):
                 status, output, error = self.call("--workspace-list", *flag)
                 self.assertEqual(status, 2)
                 self.assertFalse(output)
@@ -121,7 +121,7 @@ class WorkspaceManagementCLITests(unittest.TestCase):
 
     def test_removed_workspace_recovery_is_reported_even_if_preferences_are_damaged(self):
         path = self.workspace()
-        with patch("sol.workspace.launch.forget_workspace", side_effect=ValueError("Invented damaged preference")):
+        with patch("sol.being.workspace.launch.forget_workspace", side_effect=ValueError("Invented damaged preference")):
             status, output, error = self.call("--workspace-delete", "reading", "--json")
         self.assertEqual(status, 0)
         self.assertFalse(path.exists())

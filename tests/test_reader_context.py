@@ -11,9 +11,9 @@ import unittest
 from unittest.mock import patch
 
 from sol.core.paths import display_path, resolve_path
-from sol.reader.actions import ReaderActions, ReaderState, TextSelection
-from sol.workspace.reader import WorkspaceReader
-from sol.workspace.store import Workspace, WorkspaceConflict, WorkspaceError
+from sol.being.actions import ReaderActions, ReaderState, TextSelection
+from sol.being.workspace.reader import WorkspaceReader
+from sol.being.workspace.store import Workspace, WorkspaceConflict, WorkspaceError
 from test_reader_actions import CORPUS_ID, IDS, RETIRED, invented_book
 
 
@@ -415,7 +415,7 @@ class ReaderContextImportTests(unittest.TestCase):
 import hashlib
 import sys
 from sol.core.models import Book, Node, Passage
-from sol.reader.actions import ReaderActions, ReaderState, TextSelection
+from sol.being.actions import ReaderActions, ReaderState, TextSelection
 root = Node('', 'Invented', 1)
 leaf = Node('invented.txt', 'Invented', 1, parent=root)
 root.children = (leaf,)
@@ -437,7 +437,7 @@ actions.select_span(0, 8)
 assert actions.snapshot().selection.text == 'Invented'
 actions.search('text')
 actions.clear_selection()
-for name in ('sol.reader.app', 'sol.reader.view', 'sol.workspace', 'sqlite3',
+for name in ('sol.reader.app', 'sol.reader.view', 'sol.being.workspace', 'sqlite3',
              'prompt_toolkit', 'markdown_it', 'fitz', 'sol.corpus.contract'):
     assert name not in sys.modules, name
 '''

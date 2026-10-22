@@ -14,8 +14,8 @@ from pathlib import Path
 import re
 import sqlite3
 
-from sol.workspace.store import Workspace, WorkspaceError, _hash, _string, _timestamp, _uuid
-from sol.workspace.time import parse_utc_timestamp
+from sol.being.workspace.store import Workspace, WorkspaceError, _hash, _string, _timestamp, _uuid
+from sol.being.workspace.time import parse_utc_timestamp
 
 
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")

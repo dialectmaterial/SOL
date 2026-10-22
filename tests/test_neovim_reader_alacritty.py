@@ -15,8 +15,8 @@ import time
 import unittest
 
 from fixtures_corpus import CorpusFixture
-from sol.reader.actions import ReaderActions
-from sol.workspace.store import Workspace
+from sol.being.actions import ReaderActions
+from sol.being.workspace.store import Workspace
 
 
 _LAUNCH = r'''
@@ -24,8 +24,8 @@ import os, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 from sol.reader import app
-from sol.terminal import neovim
-from sol.terminal import reader_channel
+from sol.being.neovim import host as neovim
+from sol.being.neovim import channel as reader_channel
 original = reader_channel.subprocess.Popen
 def native(command, **options):
     if command[-1] == neovim._LOAD_ADAPTER:
@@ -215,7 +215,7 @@ class InstalledNeovimAlacrittyTests(CorpusFixture, unittest.TestCase):
             finally:
                 if process.poll() is None:
                     process.terminate(); process.communicate(timeout=5)
-        from sol.workspace.reader import WorkspaceReader
+        from sol.being.workspace.reader import WorkspaceReader
         from sol.reader import app
         from sol.core.paths import display_path, resolve_path
         with Workspace(workspace_dir / "reading.sqlite3", self.book.corpus_manifest["corpus_id"],

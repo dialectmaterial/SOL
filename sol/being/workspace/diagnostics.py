@@ -10,7 +10,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 
 from sol.core.references import resolve_reference
-from sol.workspace.time import parse_utc_timestamp
+from sol.being.workspace.time import parse_utc_timestamp
 
 
 _COLLECTIONS = ("bookmarks", "annotations", "comparisons", "reviews", "relations", "history")

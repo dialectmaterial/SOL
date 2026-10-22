@@ -7,7 +7,7 @@ import tempfile
 import threading
 import unittest
 
-from sol.terminal.reader_channel import run_native
+from sol.being.neovim.channel import run_native
 
 
 class ReaderChannelTests(unittest.TestCase):

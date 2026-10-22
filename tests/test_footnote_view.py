@@ -7,10 +7,11 @@ from unittest.mock import patch
 from fixtures_corpus import CorpusFixture
 from fixtures_footnotes import footnote_records
 from sol import core
-from sol.reader.surface import FOOTNOTE_DEPTH, footnote_scope, sample_from_book
-from sol.terminal import neovim, neovim_reader
-from sol.workspace.reader import WorkspaceReader
-from sol.workspace.store import Workspace
+from sol.being.surface import FOOTNOTE_DEPTH, footnote_scope, sample_from_book
+from sol.being.neovim import host as neovim
+from sol.being.neovim import reader as neovim_reader
+from sol.being.workspace.reader import WorkspaceReader
+from sol.being.workspace.store import Workspace
 from sol.core.paths import display_path, resolve_path
 from sol.reader import app
 
@@ -90,7 +91,7 @@ class FootnoteViewTests(CorpusFixture, unittest.TestCase):
             self.panel()
 
     def test_body_and_text_budgets_refuse_without_truncating_source(self):
-        from sol.reader import surface
+        from sol.being import surface
         with patch.object(surface, "FOOTNOTE_PARAGRAPHS", 1), self.assertRaisesRegex(ValueError, "body paragraphs"):
             self.panel()
         with patch.object(neovim, "MAX_PACKET_BYTES", 4), self.assertRaisesRegex(ValueError, "view limit"):
@@ -109,7 +110,7 @@ class FootnoteViewTests(CorpusFixture, unittest.TestCase):
         self.addCleanup(store.close)
         service = WorkspaceReader(self.book, store, "Invented reader", resolve_path, display_path,
                                   app.render_passage, 72, False, False)
-        from sol.reader.actions import ReaderActions
+        from sol.being.actions import ReaderActions
         actions = ReaderActions(self.book, service)
         actions.read((), first=True)
         actions.select_span(3, 14)

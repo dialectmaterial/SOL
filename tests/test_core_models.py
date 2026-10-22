@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import Mock
 
 from sol.core import models, paths, references
-from sol.workspace import reader as workspace_reader
+from sol.being.workspace import reader as workspace_reader
 
 
 def invented_tree():
@@ -41,7 +41,7 @@ class CoreModelTests(unittest.TestCase):
             "import sol.core.models, sol.core.paths, sol.core.references; "
             "print(json.dumps(sorted(name for name in sys.modules "
             "if name == 'sol.reader' or name.startswith('sol.reader.') "
-            "or name == 'sol.workspace' or name.startswith('sol.workspace.') "
+            "or name == 'sol.being.workspace' or name.startswith('sol.being.workspace.') "
             "or name == 'sol.terminal' or name.startswith('sol.terminal.'))))"
         )
         result = subprocess.run([sys.executable, "-B", "-c", probe], cwd=checkout,

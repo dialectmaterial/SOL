@@ -14,8 +14,8 @@ import unittest
 from unittest.mock import patch
 from uuid import UUID
 
-from sol.workspace.lifecycle import delete_workspace, list_workspaces
-from sol.workspace.store import APPLICATION_ID, Workspace, WorkspaceError, _SCHEMA, fcntl
+from sol.being.workspace.lifecycle import delete_workspace, list_workspaces
+from sol.being.workspace.store import APPLICATION_ID, Workspace, WorkspaceError, _SCHEMA, fcntl
 
 
 CORPUS = "dddddddd-0000-4000-8000-000000000004"
@@ -122,7 +122,7 @@ class WorkspaceLifecycleTests(unittest.TestCase):
         for error in (PermissionError("directory denied"), FileNotFoundError("directory changed")):
             for operation in (lambda: list_workspaces(self.directory), lambda: self.remove()):
                 with self.subTest(error=type(error).__name__), \
-                        patch("sol.workspace.lifecycle._root", side_effect=error):
+                        patch("sol.being.workspace.lifecycle._root", side_effect=error):
                     with self.assertRaisesRegex(WorkspaceError, "cannot (list|prepare)"):
                         operation()
         self.assert_intact(path, digest)
@@ -133,7 +133,7 @@ class WorkspaceLifecycleTests(unittest.TestCase):
         digest = self.fingerprint(path)
         for error in (PermissionError("file denied"), FileNotFoundError("file changed")):
             with self.subTest(error=type(error).__name__), \
-                    patch("sol.workspace.lifecycle.os.open", side_effect=error):
+                    patch("sol.being.workspace.lifecycle.os.open", side_effect=error):
                 with self.assertRaisesRegex(WorkspaceError, "cannot prepare workspace removal"):
                     self.remove()
                 # An unreadable candidate remains omitted from the read-only
@@ -259,7 +259,7 @@ class WorkspaceLifecycleTests(unittest.TestCase):
         path = self.v1()
         digest = self.fingerprint(path)
         with Workspace(path, CORPUS, {"source_sha256": SOURCE}) as active:
-            with patch("sol.workspace.lifecycle._refuse_open_inode"):
+            with patch("sol.being.workspace.lifecycle._refuse_open_inode"):
                 with self.assertRaisesRegex(WorkspaceError, "open in SOL"):
                     self.remove()
             self.assertIsNone(active.get_state())
@@ -282,7 +282,7 @@ class WorkspaceLifecycleTests(unittest.TestCase):
         digest = self.fingerprint(path)
         with closing(sqlite3.connect(path, isolation_level=None)) as active:
             active.execute("BEGIN IMMEDIATE")
-            with patch("sol.workspace.lifecycle._refuse_open_inode"):
+            with patch("sol.being.workspace.lifecycle._refuse_open_inode"):
                 with self.assertRaisesRegex(WorkspaceError, "locked"):
                     self.remove()
             active.rollback()
@@ -314,7 +314,7 @@ class WorkspaceLifecycleTests(unittest.TestCase):
     def test_unsupported_host_refuses_removal_without_touching_data(self):
         path = self.v1()
         digest = self.fingerprint(path)
-        with patch("sol.workspace.lifecycle.fcntl", None):
+        with patch("sol.being.workspace.lifecycle.fcntl", None):
             with self.assertRaisesRegex(WorkspaceError, "POSIX file locking"):
                 self.remove()
         self.assert_intact(path, digest)
@@ -352,9 +352,9 @@ class WorkspaceLifecycleTests(unittest.TestCase):
         occupied.mkdir(mode=0o700)
         prior = occupied / "reading.sqlite3"
         prior.write_bytes(b"prior recovery must remain")
-        with patch("sol.workspace.lifecycle.datetime") as clock:
+        with patch("sol.being.workspace.lifecycle.datetime") as clock:
             clock.now.return_value = moment
-            with patch("sol.workspace.lifecycle.uuid4", return_value=identifier):
+            with patch("sol.being.workspace.lifecycle.uuid4", return_value=identifier):
                 with self.assertRaisesRegex(WorkspaceError, "cannot complete workspace removal"):
                     self.remove()
         self.assertEqual(prior.read_bytes(), b"prior recovery must remain")
@@ -364,7 +364,7 @@ class WorkspaceLifecycleTests(unittest.TestCase):
     def test_failed_archive_link_keeps_original_and_removes_only_empty_attempt(self):
         path = self.v1()
         digest = self.fingerprint(path)
-        with patch("sol.workspace.lifecycle.os.link", side_effect=OSError("injected link failure")):
+        with patch("sol.being.workspace.lifecycle.os.link", side_effect=OSError("injected link failure")):
             with self.assertRaisesRegex(WorkspaceError, "cannot complete workspace removal"):
                 self.remove()
         self.assert_intact(path, digest)
@@ -374,7 +374,7 @@ class WorkspaceLifecycleTests(unittest.TestCase):
     def test_failed_recovery_flush_retains_both_names_instead_of_removing_data(self):
         path = self.v1()
         digest = self.fingerprint(path)
-        with patch("sol.workspace.lifecycle._sync_directory", side_effect=OSError("injected fsync failure")):
+        with patch("sol.being.workspace.lifecycle._sync_directory", side_effect=OSError("injected fsync failure")):
             with self.assertRaisesRegex(WorkspaceError, "recovery retained at"):
                 self.remove()
         self.assert_intact(path, digest)
@@ -392,7 +392,7 @@ class WorkspaceLifecycleTests(unittest.TestCase):
                 Workspace(path, CORPUS, {"source_sha256": SOURCE})
             return link(*arguments, **keywords)
 
-        with patch("sol.workspace.lifecycle.os.link", side_effect=attempt_open_then_link):
+        with patch("sol.being.workspace.lifecycle.os.link", side_effect=attempt_open_then_link):
             result = self.remove()
         self.assertFalse(path.exists())
         self.assertTrue(Path(result["recovery_path"]).is_file())

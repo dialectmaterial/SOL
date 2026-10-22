@@ -4,7 +4,7 @@ import unicodedata
 import unittest
 
 from sol.core.models import Book, Node, Passage, presentation_text
-from sol.reader.search import SearchProjection, search_projection
+from sol.being.quality.search import SearchProjection, search_projection
 
 
 class ReaderSearchProjectionTests(unittest.TestCase):
