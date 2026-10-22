@@ -56,6 +56,26 @@ Write "None." rather than deleting a heading.
 - **(reserved)** Workspace placement: SPECULATIVE §§4.1–4.2 give shared persistent research state to CORE; CORE §7 says workspaces are BEING's and its §8 item 7 keeps CORE independent of user workspace state. Proposed: store and services to CORE, the reading binding (`workspace.reader`) to BEING; schema unchanged. Nothing moves until the maintainer decides.
 - Defaults: BEING-root placement for code that presents all three determinations (the Neovim reader, the session, the shell); the composition root, terminal escaping and themes outside the hierarchy.
 
+## Restructuring stage A: BEING inventory — 22 October 2026
+
+**Task:** [Claude Code: Restructuring stage A — BEING inventory](https://github.com/dialectmaterial/SOL/blob/3a995af8f2015ade1fa5b2b57c4b6df58460a3e6/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer. Its slot in `CURRENT_TASK.md` has since been replaced by stage C (#89), so the status is recorded here rather than set to *In review*.
+**Branch / PR:** `claude/inventory-being` · [#87](https://github.com/dialectmaterial/SOL/pull/87); Codex reviews.
+**Last implementation commit:** `fda9e991e0085b945e6e0b45cd72daa366cf4d78` (this report is committed after it)
+
+### Changed files
+- `docs/coordination/restructuring/INVENTORY_BEING.md` — entry points; module tables for `sol`, `sol.reader`, `sol.terminal`, `sol.workspace` including the initializers; cohesive groups; boundary findings; stage C questions; the mechanical import ledger and its regenerating script (after Codex's review of #87).
+
+### Tests performed
+- `.venv/bin/python -B scripts/check_docs.py` — passes.
+- Ledger regenerated with the documented script at the refreshed baseline; Codex's independent scan of `scripts.reader_timings` agrees.
+- `.venv/bin/python -B -m unittest discover -s tests` — run by Codex on the reviewed head: 1,249 tests OK (7 skipped, 4 expected failures); this change touches only documentation.
+
+### Outstanding issues
+- The ledger is syntactic: string patch targets, subprocess module names and Lua are covered only in the prose findings.
+
+### Decisions requiring approval
+- None. No placement is proposed.
+
 
 ## Restructuring stage A: ESSENCE and CORE inventory — 21 October 2026
 
