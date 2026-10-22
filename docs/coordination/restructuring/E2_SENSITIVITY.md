@@ -2,10 +2,14 @@
 
 Research only. E2 methods, schemas and the placement register are unchanged.
 
-**Result:** no candidate meets the prospective local nodal screen. This is not
-uniform drift: 178 one-paragraph transitions yield 27 abrupt comparison flags
-(7 rate differences, 20 log ratios), including increments below 1% in tokens;
-none has the required stable lead-in and persistence evidence. TF-IDF has no
+**Result:** no candidate meets the local nodal screen under either missing-rank
+convention described below. Under the amended capped-rank convention, 178
+one-paragraph transitions yield 27 abrupt comparison flags (7 rate differences,
+20 log ratios), including increments below 1% in tokens. Six are self-comparison
+endpoints; 21 remain without them. None has the required stable lead-in; all 16
+with enough following observations pass persistence, while 11 lack enough
+following observations. This negative nodal result is not absence of persistent
+abrupt change. The original average-rank reading yields 28 flags. TF-IDF has no
 local abrupt flag, and all 288 top_n sweep calls preserve existing prefixes
 and scores. Large context changes also flag 64 five-term passage profiles.
 These results support sensitivity to a comparing standpoint, not a demonstrated
@@ -14,10 +18,16 @@ sensitivity results below are essential to that conclusion.
 
 ## Prospective protocol
 
-Written on 22 October 2026 before reading corpus statistics or rankings; code
-baseline `729ff24475e0743c86491efe14e1b2e6a4dd35f5`. The thresholds below are
-operational screening conventions, not definitions of philosophical quality or
-statistical significance. Negative screens will be reported.
+First committed on 22 October 2026 in `fe1aeef`, before the results commit
+`30ef3d8`; code baseline `729ff24475e0743c86491efe14e1b2e6a4dd35f5`. Git history
+establishes declaration before the results commit, not before the first private
+corpus read. The numerical cutoffs, selections, primary depth and requirements for
+preceding/following observations were retained. The missing-rank convention was amended
+after `fe1aeef`, from “tied at k+1 (average ranks for that tie)” to capped rank
+k+1 in `30ef3d8`. The protocol below contains that amendment; its numerical effect
+is reported under Results. These are operational screening conventions, not
+definitions of philosophical quality or statistical significance. Negative
+screens are reported.
 
 - Source: the existing private `/home/dima/Projects/code/sol/local-corpus`, read
   only through public CORE snapshots and ESSENCE providers/functions. Retain
@@ -54,8 +64,11 @@ statistical significance. Negative screens will be reported.
   Jaccard = intersection/union; Spearman-style rho = Pearson correlation of
   ranks on the union, missing words all assigned capped rank k+1;
   RBO with p=0.9 = (1-p) sum[d=1..k] p^(d-1) A_d + p^k A_k,
-  A_d = prefix intersection/d. Use common available depth for short lists;
-  empty/constant-rank rho is undefined. Lexical tie-break is deterministic,
+  A_d = prefix intersection/d. For threshold decisions use exact rational
+  p=9/10 and A_d, including the finite extrapolation term; equality satisfies
+  the inclusive cutoff (in particular RBO=9/10 passes the stable RBO test).
+  This boundary arithmetic was made explicit on review. Use common available
+  depth for short lists; empty/constant-rank rho is undefined. Lexical tie-break is deterministic,
   not evidence of substantive separation. Rho is a union-rank convention,
   not Spearman restricted to the surviving intersection.
 - Primary screen: k=20. An abrupt-change flag requires Jaccard <=0.50,
@@ -76,12 +89,20 @@ statistical significance. Negative screens will be reported.
 
 ## Results
 
-The report below uses the screen unchanged. Rho uses capped rank k+1 for
-all missing items; it is explicitly a modified rank correlation, rather than
-ordinary full-vocabulary Spearman. RBO is the finite extrapolated statistic in
-the protocol, with equal common depth, not a claim about unseen ranking tails.
-“Stable”, “intermediate” and “abrupt” below mean only the operational screen.
-Large contrasts labeled abrupt are not local nodal candidates.
+The report below retains the numerical cutoffs and uses the amended capped
+rank k+1 for all missing items, except where the original average-rank reading
+is explicitly compared. This is a modified rank correlation, rather than
+ordinary full-vocabulary Spearman. The amendment is numerically consequential.
+For a common list depth k and union size U, the original average-rank reading assigns missing words the mean
+of positions k+1 through U, namely (k+1+U)/2, rather than k+1.
+
+RBO is the finite extrapolated statistic in the protocol, with equal common
+depth, not a claim about unseen ranking tails. “Stable”, “intermediate” and
+“abrupt” below mean only the operational screen. Large contrasts labeled abrupt
+are not local nodal candidates. The review recomputation uses exact rational
+Jaccard/RBO arithmetic and exact comparisons of rank correlation to the cutoffs
+(by comparing squared integer covariance and variances, with signs retained);
+display rounding does not decide classes.
 
 ### Source and execution
 
@@ -299,16 +320,37 @@ below avoids treating short lists as full-depth evidence.
 | Requested k | Full-depth n | Stable | Intermediate | Abrupt | Median J | Median ρ | Median R | Shorter n | Undefined ρ, all n |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 5 | 5238 | 2013 | 3161 | 64 | 1.0000 | 0.8857 | 0.8818 | 33 | 9 |
-| 10 | 5193 | 2178 | 3015 | 0 | 0.8182 | 0.9152 | 0.9062 | 78 | 9 |
+| 10 | 5193 | 2194 | 2999 | 0 | 0.8182 | 0.9152 | 0.9062 | 78 | 9 |
 | 20 | 5040 | 2412 | 2628 | 0 | 0.9048 | 0.9414 | 0.9119 | 231 | 9 |
 | 50 | 3972 | 2257 | 1715 | 0 | 0.9231 | 0.9668 | 0.9140 | 1299 | 9 |
 | 100 | 1500 | 992 | 508 | 0 | 0.9608 | 0.9776 | 0.9225 | 3771 | 9 |
+
+The k=10 stable/intermediate totals correct the earlier 2,178/3,015 to
+**2,194/2,999**. All 16 reclassified cases have RBO exactly 9/10. The earlier
+floating evaluation of the displayed formula returned 0.8999999999999999,
+placing them below the inclusive stable boundary. Exact rational arithmetic
+puts equality on the stable side when J and rho also pass. No primary k=20
+class or headline local count changes from this arithmetic correction.
 
 At k=5, 64 full-depth matched-passage contrasts meet the abrupt thresholds;
 none do at k=10, 20, 50 or 100. Thus the negative primary screen does not
 establish stability of a five-word display. These are large population
 contrasts, not local nodal candidates. Repeated observations of the same
 paragraphs are not independent trials or a statistical significance test.
+
+Under the original average-rank reading, full-depth k=5 abrupt flags are
+**98 rather than 64**, and k=10 has **one rather than zero**; k=20, 50 and 100
+still have no abrupt flags. These convention comparisons use the same exact
+boundary arithmetic as the corrected table. Full-depth class totals under the
+original average-rank reading are:
+
+| Requested k | Full-depth n | Stable | Intermediate | Abrupt |
+| --- | --- | --- | --- | --- |
+| 5 | 5238 | 2013 | 3127 | 98 |
+| 10 | 5193 | 2194 | 2998 | 1 |
+| 20 | 5040 | 2400 | 2640 | 0 |
+| 50 | 3972 | 2248 | 1724 | 0 |
+| 100 | 1500 | 991 | 509 | 0 |
 
 The 64 k=5 flags concern 42 distinct paragraphs. Counts by own-doctrine
 baseline and changed context are:
@@ -413,7 +455,7 @@ All have twenty available terms. This is not uniformly small in token size:
 | ESSENCE | 30 | 0.4731% | 5.8721% | 16.5394% | 1 | 10 |
 
 The percentage bins are descriptive follow-up summaries, not additional
-criteria for the preregistered screen. Full step distributions are summarized
+criteria for the declared screen. Full step distributions are summarized
 below; medians alone must not hide the abrupt flags.
 
 | Chapter | Ranking | Steps | Stable | Intermediate | Abrupt | Median O | Median J | Median ρ | Median R | Min R | Nodal candidates |
@@ -464,20 +506,33 @@ following results with the pre-boundary result, not just with each other.
 | ESSENCE | ratio | 33 → 34 | 423 | 6.0231% | 0.3500 | 0.2121 | 0.0611 | 0.3846 | no | — |
 | ESSENCE | ratio | 34 → 35 | 258 | 3.4649% | 0.0000 | 0.0000 | -0.6238 | 0.0000 | no | — |
 
-There are 27 abrupt flags, including interior changes as well as
-endpoints. **Zero** meets the complete plateau-plus-persistence nodal screen.
-The positive abrupt flags must not be summarized as gradual drift; conversely,
-the missing prior stable plateau and/or unavailable following observations
-prevent calling them nodal candidates under the declared rule. The rule is
-deliberately demanding and its negative result is conditional on that rule.
+There are 27 abrupt flags, including interior changes as well as endpoints.
+**Zero** meets the complete plateau-plus-persistence nodal screen: 25 fail the
+three-step stable lead-in and two lack enough preceding observations. All 16
+flags with two following observations pass persistence; 11 lack enough following
+observations. The negative nodal result therefore is not absence of persistent
+abrupt change. The rule is deliberately demanding and its negative result is
+conditional on that rule.
+
+Under the original average-rank reading, there are **28 local flags** (7 rate
+differences, 21 log ratios), still zero nodal candidates. BEING log ratio
+56 → 57 additionally passes: rho changes from 0.5593 (capped) to 0.4472
+(average ranks). Its stable/intermediate/abrupt totals become 12/36/9 rather
+than 12/37/8. Two CONCEPT steps change from stable to intermediate: rate
+difference 64 → 65 and log ratio 40 → 41, each with rho 0.9076 → 0.8989.
+The corresponding CONCEPT totals become 32/57/2 and 27/56/8 rather than
+33/56/2 and 28/55/8. All other local class totals are unchanged. This checks
+the original reading without hiding the effect of amending the convention.
 
 #### Endpoint mechanism
 
 At the last step, reference and target become identical. All returned rate
 differences and log ratios become zero, leaving one giant alphabetical tie.
 The following post-result diagnostic confirms the mechanism; it is not a
-new screen. A small final input increment can therefore change the displayed
-ranking sharply while reducing every measured lexical difference to zero.
+new screen. **Six of the 27 flags** are final self-comparison endpoints (two
+per chapter); **21 flags remain** when they are excluded. A small final input
+increment can therefore change the displayed ranking sharply while reducing
+every measured lexical difference to zero.
 
 | Chapter | Final added tokens | Added % | Rate distinct scores before → after | Log distinct scores before → after | Words tied at zero after |
 | --- | --- | --- | --- | --- | --- |
@@ -487,7 +542,9 @@ ranking sharply while reducing every measured lexical difference to zero.
 
 Five flagged ranking comparisons occur across three increments of at most 1%
 in reference tokens; fourteen flags occur across nine increments of at most
-5%. The smallest is CONCEPT log-ratio 94 → 95: 127 added tokens on 15,998
+5%. Two of the five ≤1% flags are endpoints; three remain across two
+nonterminal increments. The smallest is CONCEPT log-ratio 94 → 95: 127 added
+tokens on 15,998
 (0.7938%), J=0.4815, ρ=0.4695, R=0.6038. It lacks the preceding stable plateau
 and enough following states. Small input changes can therefore cause marked
 rank changes here; the stronger nodal claim remains unestablished.
@@ -656,12 +713,15 @@ this checkout. The public API call recipe is:
    verifies sources for each study. Compute no prose similarity and emit only
    isolated words, counts, numerical summaries and provenance.
 
-Thresholds were first committed in `fe1aeef` before the first corpus read.
-The final script clarifies missing ranks as the common capped rank k+1;
-no threshold was adjusted after results. The k=5 example, whole-book tie
-explanation, expanded sibling window and token-increment/endpoint diagnostics
-are explanatory follow-ups,
-not changes to the primary screen. The task-specific script stays out of Git
+The declaration in `fe1aeef` precedes results commit `30ef3d8`; Git history
+does not establish that it precedes the first private corpus read. The
+numerical cutoffs were not adjusted, but `30ef3d8` amended the missing-rank
+convention from the original average-rank wording to capped rank k+1. The
+review-response recomputation reports both readings and corrects the RBO
+equality boundary using exact rational arithmetic, as specified above. The k=5
+example, whole-book tie explanation, expanded sibling window and token-increment/
+endpoint diagnostics are explanatory follow-ups, not changes to the primary
+cutoffs or nodal requirements. The task-specific script stays out of Git
 as requested; these public calls, complete formulas, selection rules and corpus
 binding support independent reproduction without distributing private inputs.
 
@@ -672,5 +732,14 @@ binding support independent reproduction without distributing private inputs.
   identical/disjoint/reversed rankings, the finite RBO value 0.55 for a known
   two-word pair, missing-rank rho 0.5, and plateau/persistence versus boundary
   cases. These are checks on the research program, not new product tests.
+- Review response (23 October 2026): fresh public-provider computations verify
+  all 178 local transitions / 534 screens and all 5,271 matched-passage
+  contrasts at each of five depths under both rank conventions. Exact rational
+  Jaccard/RBO and signed covariance/variance threshold comparisons verify the
+  convention effects and inclusive boundary correction reported above. Corpus
+  bindings match the original run and final snapshot verification passes.
+  Full suite repeated: **1,259 tests OK**, 7 skipped, 4 expected failures,
+  118.279 s, with isolated XDG paths. Verification code and numeric outputs
+  remain under `/tmp/sol-e2-revision-*`, outside Git.
 - `scripts/check_docs.py` and `git diff --check` — results recorded in HANDOFF
   after the final report edit. External links are not network-checked.
