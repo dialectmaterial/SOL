@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import sol.reader.app as sol
+import sol.app.main as sol
 import sol.being.workspace.profiles as sol_profiles
 from sol.being.workspace.store import Workspace
 from test_workspace_reader import invented_book, CORPUS_ID, IDS
@@ -37,12 +37,12 @@ class ShellEntryTests(unittest.TestCase):
     def main(self, arguments, commands=(), interactive=True):
         stdout, stderr = StringIO(), StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr), \
-                patch('sol.reader.app.discover_corpus', return_value=Path('/invented/corpus')), \
-                patch('sol.reader.app.load_corpus_book', return_value=self.book), \
+                patch('sol.app.main.discover_corpus', return_value=Path('/invented/corpus')), \
+                patch('sol.app.main.load_corpus_book', return_value=self.book), \
                 nullcontext(), \
-                patch('sol.reader.launch.interactive_input_available', return_value=interactive), \
+                patch('sol.app.launch.interactive_input_available', return_value=interactive), \
                 patch('sol.being.neovim.host.validate_environment'), \
-                patch('sol.reader.app.run_reader', side_effect=self.launch_reader), \
+                patch('sol.app.main.run_reader', side_effect=self.launch_reader), \
                 patch('sol.being.shell.install_completion', return_value=lambda: None), \
                 patch('builtins.input', side_effect=commands):
             status = sol.main(arguments)

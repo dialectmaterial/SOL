@@ -23,7 +23,7 @@ _LAUNCH = r'''
 import os, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
-from sol.reader import app
+from sol.app import main as app
 from sol.being.neovim import host as neovim
 from sol.being.neovim import channel as reader_channel
 original = reader_channel.subprocess.Popen
@@ -216,7 +216,7 @@ class InstalledNeovimAlacrittyTests(CorpusFixture, unittest.TestCase):
                 if process.poll() is None:
                     process.terminate(); process.communicate(timeout=5)
         from sol.being.workspace.reader import WorkspaceReader
-        from sol.reader import app
+        from sol.app import main as app
         from sol.core.paths import display_path, resolve_path
         with Workspace(workspace_dir / "reading.sqlite3", self.book.corpus_manifest["corpus_id"],
                        self.book.corpus_manifest, read_only=True) as store:

@@ -5,7 +5,7 @@ from unittest.mock import patch
 from contextlib import nullcontext
 import unittest
 
-import sol.reader.app as sol
+import sol.app.main as sol
 
 
 def synthetic_book():
@@ -101,7 +101,7 @@ class GuideTests(unittest.TestCase):
         self.assertIn("Kitty is not required", text)
 
     def test_source_free_guide_explains_configuration_without_loading_or_conversion(self):
-        with patch("sol.reader.app.load_corpus_book", side_effect=AssertionError("No corpus load")), \
+        with patch("sol.app.main.load_corpus_book", side_effect=AssertionError("No corpus load")), \
                 nullcontext(), \
                 patch("builtins.open", side_effect=AssertionError("No file I/O")):
             text = sol.render_guide()

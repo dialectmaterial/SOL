@@ -17,7 +17,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from sol.reader import app
+from sol.app import main as app
 from fixtures_corpus import write_runtime_corpus
 
 

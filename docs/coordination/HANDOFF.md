@@ -32,6 +32,28 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
+## Stage D, BEING lane (2): the composition root — 22 October 2026
+
+**Task:** [Claude Code: BEING relocation](https://github.com/dialectmaterial/SOL/blob/16703fc/docs/coordination/CURRENT_TASK.md#claude-code-being-relocation), second PR
+**Branch / PR:** `claude/composition-root` · pull request opened with this report; Codex reviews.
+**Last implementation commit:** `cbe8203eb25f39f3afb33d7304baa9c810644a2e` (this report is committed after it)
+
+### Changed files
+- `sol/app/` — from `sol/reader/`: `app.py` → `main.py`, `options.py`, `launch.py`, `commands.py`; `sol/__init__.py` delegates to `sol.app.main`.
+- `sol/reader/` and `sol/terminal/` — removed (only their docstring `__init__.py` remained).
+- Tests: importers and patch targets; must-not-load prefix lists now name `sol.app`, `sol.being`, `sol.presentation` (the old names would pass vacuously); the installed-wheel test asserts `sol.reader` and `sol.terminal` no longer exist.
+- `docs/ARCHITECTURE.md` (§2, composition-root row → Implemented), `docs/CORE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`.
+
+### Tests performed
+- Full suite — 1,253 tests OK (7 skipped, 4 expected failures); docs check passes.
+- `python -m sol --help`, `sol read …` — work.
+
+### Outstanding issues
+- None for stage D's BEING lane. Codex A's decoupling of the ESSENCE launch is in progress separately.
+
+### Decisions requiring approval
+- None. Default: the composition root is `sol.app` (a `sol.cli` package would shadow the `sol:cli` entry-point function).
+
 ## CORE and shared relocation — 22 October 2026
 
 **Task:** [Codex B: CORE and shared relocation](https://github.com/dialectmaterial/SOL/blob/16703fc/docs/coordination/CURRENT_TASK.md#codex-b-core-and-shared-relocation).

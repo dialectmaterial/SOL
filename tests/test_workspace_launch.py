@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from sol.reader import app
+from sol.app import main as app
 from sol.being.workspace.launch import (forget_workspace, launch_path, read_launch_preferences,
                                   remember_launch)
 from sol.being.workspace.profiles import list_actors, register_actor
@@ -142,7 +142,7 @@ class ReaderStartupMemoryTests(unittest.TestCase):
         with redirect_stdout(output), redirect_stderr(errors), \
                 patch.object(app, "discover_corpus", return_value=Path("/invented/corpus")), \
                 patch.object(app, "load_corpus_book", return_value=self.book), \
-                patch("sol.reader.launch.interactive_input_available", return_value=interactive), \
+                patch("sol.app.launch.interactive_input_available", return_value=interactive), \
                 patch("sol.being.neovim.host.validate_environment"), \
                 patch.object(app, "run_reader", side_effect=launch), \
                 patch("builtins.input", side_effect=responses) as prompt:

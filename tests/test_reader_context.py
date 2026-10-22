@@ -437,9 +437,10 @@ actions.select_span(0, 8)
 assert actions.snapshot().selection.text == 'Invented'
 actions.search('text')
 actions.clear_selection()
-for name in ('sol.reader.app', 'sol.reader.view', 'sol.being.workspace', 'sqlite3',
+for name in ('sol.app.main', 'sol.being.workspace', 'sqlite3',
              'prompt_toolkit', 'markdown_it', 'fitz', 'sol.corpus.contract'):
     assert name not in sys.modules, name
+assert not any(name.startswith(('sol.being.neovim', 'sol.presentation')) for name in sys.modules)
 '''
         result = subprocess.run([sys.executable, '-B', '-c', script],
                                 capture_output=True, text=True, check=False)

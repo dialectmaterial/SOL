@@ -138,7 +138,7 @@ class AnalysisCLITests(unittest.TestCase):
         self.assertEqual(json.loads(output)["status"], "invalid")
 
     def test_essence_help_dispatch_is_independent_of_onboarding(self):
-        from sol.reader import app
+        from sol.app import main as app
         for args in (["essence", "--help"], ["essence", "words", "--help"],
                      ["essence", "check", "--help"]):
             output = StringIO()
@@ -150,7 +150,7 @@ class AnalysisCLITests(unittest.TestCase):
             self.assertIn("sol essence", output.getvalue())
 
     def test_old_namespace_and_removed_commands_are_rejected(self):
-        from sol.reader import app
+        from sol.app import main as app
         with redirect_stderr(StringIO()), self.assertRaises(SystemExit) as caught:
             app.main(["analyze", "--help"])
         self.assertEqual(caught.exception.code, 2)

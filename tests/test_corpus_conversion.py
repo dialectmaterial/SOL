@@ -45,7 +45,7 @@ class PDFNamingTests(unittest.TestCase):
                 if selected.parent == root:
                     selected.write_bytes(b"Synthetic working fixture")
                 with self.subTest(selected=selected), \
-                        patch("sol.reader.app.Path.cwd", return_value=root), \
+                        patch("sol.app.main.Path.cwd", return_value=root), \
                         patch.object(converter, "convert", return_value={}) as convert, \
                         contextlib.redirect_stdout(io.StringIO()):
                     converter.main(["convert"])

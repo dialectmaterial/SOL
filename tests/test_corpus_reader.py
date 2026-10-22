@@ -12,7 +12,7 @@ from contextlib import nullcontext
 import unittest
 from unittest.mock import patch
 
-import sol.reader.app as sol
+import sol.app.main as sol
 import sol.corpus.contract as contract
 from sol.core import config
 
@@ -76,7 +76,7 @@ class CorpusReaderTests(unittest.TestCase):
 
     def run_main(self, arguments: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
         stdout, stderr = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr), patch("sol.reader.app.Path.cwd", return_value=cwd or self.cwd):
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr), patch("sol.app.main.Path.cwd", return_value=cwd or self.cwd):
             status = sol.main(arguments)
         return status, stdout.getvalue(), stderr.getvalue()
 
@@ -282,7 +282,7 @@ class CorpusReaderTests(unittest.TestCase):
                 self.assertEqual(status, 0, stderr)
 
     def test_configuration_write_error_is_actionable(self) -> None:
-        with patch("sol.reader.app.Path.mkdir", side_effect=PermissionError("Synthetic permission failure")):
+        with patch("sol.app.main.Path.mkdir", side_effect=PermissionError("Synthetic permission failure")):
             status, _, stderr = self.run_main(["--set-corpus", str(self.corpus)])
         self.assertEqual(status, 2)
         self.assertIn("Cannot save SOL configuration", stderr)
