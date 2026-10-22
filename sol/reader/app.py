@@ -24,12 +24,13 @@ from sol.core.config import (
 from sol.core.models import Book, Node, Passage, node_path, presentation_text
 from sol.core.paths import alias, child_by_name, display_path
 from sol.core.paths import resolve_path as resolve_book_path
-from sol.reader.options import (DEFAULT_READER_THEME, DEFAULT_READER_WIDTH, LEGACY_READER_THEMES, READER_THEMES,
-                                ExecutionMode, build_parser, validate_options,
+from sol.presentation.theme import (DEFAULT_READER_THEME, DEFAULT_READER_WIDTH,
+                                    LEGACY_READER_THEMES, READER_THEMES)
+from sol.reader.options import (ExecutionMode, build_parser, validate_options,
                                 validate_workspace_management)
 from sol.being.actions import ReaderActions, ReadingSession, context_passages
 from sol.reader.launch import interactive_input_available, shell_identity
-from sol.terminal.text import display_text, safe_output
+from sol.presentation.text import display_text, safe_output
 from sol.being.render import (    sensible_width, page_range, source_line, fold_path, fold_body, render_passage,
     passage_data, render_context, render_search_results, location_data, render_info,
     render_listing, render_tree, render_guide)
@@ -218,10 +219,10 @@ def main(argv: list[str] | None = None) -> int:
         from sol.essence.cli import main as analyze_main
         return analyze_main(arguments[1:])
     if arguments and arguments[0] == "reference":
-        from sol.terminal.reference import main as reference_main
+        from sol.core.reference_cli import main as reference_main
         return reference_main(arguments[1:])
     if arguments and arguments[0] == "read":
-        from sol.terminal.commands import main as command_main
+        from sol.reader.commands import main as command_main
         return command_main(arguments)
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -280,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
                     print("\nAbbreviated outline. Select a corpus with --set-corpus DIRECTORY for subdivisions.")
                 return 0
             if mode.interactive:
-                from sol.reader.onboarding import prepare_first_corpus
+                from sol.corpus.onboarding import prepare_first_corpus
                 _close_splash()
                 book = prepare_first_corpus()
             else:
@@ -291,7 +292,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.workspace is not None:
             return run_workspace_cli(book, args, width, color)
         if mode is ExecutionMode.SET_SOURCE_PDF:
-            from sol.terminal.source import SourceService
+            from sol.core.source import SourceService
             location = SourceService(book).set_pdf(args.set_source_pdf)
             if args.json:
                 emit_json({"source_pdf": str(location)})

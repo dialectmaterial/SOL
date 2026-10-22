@@ -17,8 +17,8 @@ from sol.being.actions import ReaderActions
 from sol.being.surface import Sample
 from sol.being.quality.structure import structure_payload
 from sol.being.neovim import host as neovim
-from sol.terminal.text import safe_label, safe_output
-from sol.terminal.theme import DEFAULT_THEME, THEMES
+from sol.presentation.text import safe_label, safe_output
+from sol.presentation.theme import DEFAULT_THEME, THEMES
 
 
 SECTION_BUDGET = 64
@@ -87,7 +87,8 @@ def source_preview(request, page):
     The crop comes from the verified PDF snapshot, never from a corpus image
     or a generated transcription. No reading position or workspace changes.
     """
-    from sol.terminal.source import open_viewer, render_region
+    from sol.being.source_view import open_viewer
+    from sol.core.source import render_region
 
     if not 1 <= page <= len(request["sources"]):
         raise ValueError(f"this passage has {len(request['sources'])} source page(s)")
@@ -106,7 +107,7 @@ def source_preview(request, page):
 
 def source_pdf(request, page):
     """Open the verified PDF at one source page of a captured record, for zooming in context."""
-    from sol.terminal.source import open_pdf
+    from sol.being.source_view import open_pdf
 
     if not 1 <= page <= len(request["sources"]):
         raise ValueError(f"this passage has {len(request['sources'])} source page(s)")
@@ -322,7 +323,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     def source_panel(request, identifier):
         # Viewing evidence keeps the cursor, selection and saved position.
         nonlocal source_service
-        from sol.terminal.source import SourceError, SourceService
+        from sol.core.source import SourceError, SourceService
         target = request["packet"]["reference"]["reference"]["target_id"]
         if source_service is None:
             source_service = SourceService(book)
@@ -331,7 +332,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         try:
             if request["op"] == "source_follow":
                 # Turns only a Zathura window S opened; never opens one or moves the reader.
-                from sol.terminal.source import follow_pdf
+                from sol.being.source_view import follow_pdf
                 return {"follow": {"active": follow_pdf(source_requests[target], 0)}}
             if request["op"] == "source_pdf":
                 opened = source_pdf(source_requests[target], request["page"])

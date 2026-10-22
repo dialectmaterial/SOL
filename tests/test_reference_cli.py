@@ -17,7 +17,7 @@ import unittest
 from unittest.mock import patch
 
 from sol.corpus import contract
-from sol.terminal import reference
+from sol.core import reference_cli as reference
 
 
 class ReferenceCLITests(unittest.TestCase):
@@ -375,7 +375,7 @@ def guarded(name, *args, **kwargs):
     if name.startswith(('markdown_it', 'prompt_toolkit', 'textual', 'rich', 'fitz',
                         'pypdf', 'pdfplumber', 'opendataloader', 'torch', 'tensorflow',
                         'sol.being.workspace', 'sol.reader.legacy_pdf', 'sol.corpus.extraction',
-                        'sol.terminal.prompt', 'sol.terminal.comparison', 'sol.terminal.source')):
+                        'sol.terminal.prompt', 'sol.terminal.comparison', 'sol.core.source')):
         raise AssertionError('Unexpected reference dependency: ' + name)
     return original(name, *args, **kwargs)
 builtins.__import__ = guarded

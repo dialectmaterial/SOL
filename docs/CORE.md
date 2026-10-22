@@ -105,6 +105,21 @@ snapshot = load_snapshot(Path('local-corpus'))
 
 CORE exposes shared `Book`, `Node`, `Passage`, corpus discovery, verified `CorpusSnapshot`, passage/record resolution, reference capture/check and bounded serialization. The convenient `Book.passages` is the reader's selected projection of canonical records; it does **not** contain all editorial/front-matter/note/index material. Applications studying all source types must use the full verified canonical graph with explicit filtering. Importing CORE does not start Neovim, an editor, a workspace, source extraction or a model.
 
+**Stage D module locations (22 October 2026).** `sol.core.files` resolves
+canonical Markdown or virtual text paths to ordered record IDs; it imports no
+reader or terminal. `sol.reader.commands` retains `sol read`'s printing, while
+`sol.core.reference_cli` supplies the `sol reference capture/check` command face.
+`sol.corpus.onboarding` is the explicit first-run corpus-maintenance workflow,
+not part of ordinary runtime loading. `sol.core.source` owns verified private
+PDF snapshots, source-request capture, page rendering and recorded-region crops;
+`sol.being.source_view` consumes those checks to open detached viewers and follow
+or highlight the source. CORE never imports that viewer. The lazy `sol.core`
+public facade and API version remain unchanged. Shared terminal escaping and
+presentation defaults live outside CORE in `sol.presentation`; ESSENCE obtains
+theme data there without importing the reader's option parser. These are the
+practical boundaries already argued in the [placement register](ARCHITECTURE.md#9-placement-register),
+not new logical classifications.
+
 **Implementation caveat:** read-only describes the consumer contract, not deep immutability. `Book` and `CorpusSnapshot` still expose caller-mutable collections. Clients must not mutate or cache trust over them; generation/reference verification remains necessary.
 
 Canonical Markdown changes must be deliberate and followed by regeneration/verification. An unchanged source filename or stable page number is not enough to assume the same generation. Retired IDs retain their requested identity and disclosed redirect chain; absent IDs stay unresolved, never automatically mapped by similar wording.

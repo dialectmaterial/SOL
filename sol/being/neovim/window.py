@@ -17,8 +17,8 @@ import shutil
 import subprocess
 import sys
 
-from sol.reader.options import READER_THEMES
-from sol.terminal.theme import _PALETTES
+from sol.presentation.theme import READER_THEMES
+from sol.presentation.theme import _PALETTES
 
 FONT = "Libertinus Mono"
 FONT_DIRECTORY = Path(__file__).resolve().parent / "fonts"

@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
-from sol.reader.options import DEFAULT_READER_WIDTH
+from sol.presentation.theme import DEFAULT_READER_WIDTH
 from unittest.mock import patch
 
 from sol.corpus import contract
@@ -47,7 +47,7 @@ class ReaderViewCLITests(unittest.TestCase):
             self.assertEqual(args.none, temporary)
 
     def test_set_source_pdf_verifies_through_the_source_service(self):
-        with patch("sol.terminal.source.SourceService.set_pdf", return_value=Path("/invented/book.pdf")) as remember:
+        with patch("sol.core.source.SourceService.set_pdf", return_value=Path("/invented/book.pdf")) as remember:
             status, output, error = self.call(["--set-source-pdf", "~/book.pdf"])
             self.assertEqual((status, error), (0, ""))
             self.assertIn("Source PDF verified and remembered: /invented/book.pdf", output)
@@ -165,7 +165,7 @@ class ReaderViewCLITests(unittest.TestCase):
         book = app.load_corpus_book(self.corpus)
         with patch("sol.being.neovim.host.validate_environment"), \
                 patch.object(app, "discover_corpus", return_value=None), \
-                patch("sol.reader.onboarding.prepare_first_corpus", return_value=book) as setup, \
+                patch("sol.corpus.onboarding.prepare_first_corpus", return_value=book) as setup, \
                 patch.object(app, "run_reader", return_value=0) as reader:
             status, _, error = self.call(["-n"])
         self.assertEqual(status, 0, error)
@@ -174,7 +174,7 @@ class ReaderViewCLITests(unittest.TestCase):
 
     def test_missing_corpus_in_one_shot_output_never_starts_import(self):
         with patch.object(app, "discover_corpus", return_value=None), \
-                patch("sol.reader.onboarding.prepare_first_corpus", side_effect=AssertionError("No import")):
+                patch("sol.corpus.onboarding.prepare_first_corpus", side_effect=AssertionError("No import")):
             status, _, error = self.call(["-r"])
         self.assertEqual(status, 2)
         self.assertIn("import the supported Hegel-SOL.pdf", error)
