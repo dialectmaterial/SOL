@@ -649,6 +649,11 @@ adds no competing placement row.
 
 ### 3.9 The tokenizer's unit: limit, discrete magnitude or reflection?
 
+**Follow-up research:** [WORD_UNIT](WORD_UNIT.md) specifies both current
+definitions, measures their disagreement on the read-only private corpus, and
+compares the four policy/ownership options. It recommends keeping and explaining
+the distinction, explicitly for a maintainer decision; no behavior is changed.
+
 **Code facts.**
 `sol/essence/essence_as_reflection_within_itself/tokenization.py:10–32` starts
 on a Unicode letter, admits letters/marks and internal apostrophes, and returns

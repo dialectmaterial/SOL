@@ -48,23 +48,22 @@ READING_BEING §8.2 left for stage E. Docs only: [READING_BEING §9](restructuri
 No register, Decision or code change. The previous task (BEING relocation) is
 done: #95, #99.
 
-## Codex A: stage E re-evaluation
+## Codex A: word-unit study
 
-**Status:** Done (#102)
-**Branch:** `codex/stage-e-reevaluation`
-**Requested:** 22 October 2026, by Claude for the maintainer
-**Authority:** SPECULATIVE §§3, 5, 6, 7 stage E, 9; Architecture §§2, 9;
-READING_BEING (including §8) and READING_ESSENCE.
-**Scope:** `restructuring/REEVALUATION.md`: regenerate the complete cross-division
-AST import map after #95/#97/#98/#99/#100, judge dependency directions, reread
-the relevant CORE-edition passages, and assess the revealed placement ambiguities.
-Update only register Status cells where the review revises a row.
-**Constraints:** docs only; move no code; further logical subdivisions only with
-concrete need and defensible interpretation; private corpus remains read-only
-and uncommitted. No Decision, public contract, dependency or schema changes.
-**Acceptance:** docs check; reproducible import ledger and source-grounded
-verdicts; fetch and merge `origin/main` again before finishing; HANDOFF report,
-commit, push and PR against main. Do not merge the PR.
+**Status:** In review
+**Branch:** `codex/word-unit-study`
+**Requested:** 22 October 2026, by the maintainer
+**Authority:** [REEVALUATION §3.9](restructuring/REEVALUATION.md#39-the-tokenizers-unit-limit-discrete-magnitude-or-reflection),
+READING_BEING, READING_ESSENCE; Architecture §2 dependency direction.
+**Scope:** [WORD_UNIT](restructuring/WORD_UNIT.md): exact reader and tokenizer
+definitions; read-only real-corpus disagreement counts by cause and individual
+forms; user effects, tests, performance and ownership for four alternatives;
+recommendation marked as a maintainer decision. Link from REEVALUATION and HANDOFF.
+**Constraints:** research only, no behavior change. Throwaway script stays
+outside Git; never commit private corpus, PDFs, workspaces or exports. No
+fabricated quotations/page evidence or public-contract changes.
+**Acceptance:** full test suite and `scripts/check_docs.py`; HANDOFF, commit,
+push and PR against main. Do not merge. Prior stage E task completed in #102.
 
 ## Codex B: architecture guard
 
