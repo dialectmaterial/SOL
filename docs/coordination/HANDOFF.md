@@ -179,7 +179,7 @@ All Python checks use `/home/dima/Projects/code/sol/.venv/bin/python -B`.
 
 ## Stage F: comparison and Measure — 22 October 2026
 
-**Task:** [Claude Code: stage F, comparison and Measure](CURRENT_TASK.md#claude-code-stage-f-comparison-and-measure).
+**Task:** [Claude Code: stage F, comparison and Measure](https://github.com/dialectmaterial/SOL/blob/729ff24475e0743c86491efe14e1b2e6a4dd35f5/docs/coordination/CURRENT_TASK.md#claude-code-stage-f-comparison-and-measure).
 **Branch / PR:** `claude/measure-comparison` · pull request opened from this branch; Codex reviews and merges.
 **Last implementation commit:** the branch head before this report's commit.
 
