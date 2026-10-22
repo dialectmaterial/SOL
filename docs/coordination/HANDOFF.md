@@ -35,7 +35,7 @@ Write "None." rather than deleting a heading.
 
 ## Decouple the ESSENCE launch — 22 October 2026
 
-**Task:** [Codex A: decouple the ESSENCE launch](CURRENT_TASK.md#codex-a-decouple-the-essence-launch) (new task, currently uncommitted).
+**Task:** [Codex A: decouple the ESSENCE launch](https://github.com/dialectmaterial/SOL/blob/fd9b6b160f4a6294df05185d199e542f04d98fd5/docs/coordination/CURRENT_TASK.md#codex-a-decouple-the-essence-launch) (task snapshot at the stage D merge).
 **Branch / PR:** intended `codex/decouple-essence-launch` · not opened: this worktree's metadata is mounted read-only, despite the task's authorization; ordinary `git fetch` and `git add` fail. Work remains in the supplied worktree, at detached `332b3df`.
 **Last implementation commit:** None yet: cannot create `index.lock` under `/home/dima/Projects/code/sol/.git/worktrees/sol-codex-perf`. This report must be finalized and committed last after an implementation commit and integration checks.
 
