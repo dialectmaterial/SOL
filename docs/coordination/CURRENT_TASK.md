@@ -40,7 +40,7 @@ steps 5–7). Rules for all three lanes:
 
 ## Claude Code: BEING relocation
 
-**Status:** In review (second PR: the composition root; the first, #95, is merged)
+**Status:** Done (#95, #99)
 **Branch:** `claude/being-relocation`
 **Scope:** `sol/terminal/{neovim,neovim_reader,reader_channel,runtime,splash,window}.py`,
 the Lua files and `fonts/` → `sol/being/neovim/`; `sol/reader/{actions,surface,render,shell}.py`
@@ -52,7 +52,7 @@ empty `sol/reader` and `sol/terminal` packages.
 
 ## Codex A: stage E re-evaluation
 
-**Status:** In review
+**Status:** Done (#102)
 **Branch:** `codex/stage-e-reevaluation`
 **Requested:** 22 October 2026, by Claude for the maintainer
 **Authority:** SPECULATIVE §§3, 5, 6, 7 stage E, 9; Architecture §§2, 9;
@@ -68,26 +68,37 @@ and uncommitted. No Decision, public contract, dependency or schema changes.
 verdicts; fetch and merge `origin/main` again before finishing; HANDOFF report,
 commit, push and PR against main. Do not merge the PR.
 
-## Codex B: CORE and shared relocation
+## Codex B: architecture guard
 
-**Status:** In review
-**Branch:** `codex/core-shared-relocation`
-**Scope:** register rows for `terminal.commands`, `terminal.reference`,
-`reader.onboarding`, `terminal.source`, `terminal.text` and the themes:
-- `sol/terminal/reference.py` → CORE (the `sol reference` command face);
-- the path resolver of `sol/terminal/commands.py` (`resolve_file_path` and its
-  helpers) → CORE; the printing of `sol read` stays with the CLI, in `sol/reader/`
-  for now;
-- `sol/reader/onboarding.py` → CORE's corpus maintenance (`sol/corpus/`);
-- `sol/terminal/source.py` split: verified snapshot, page capture and crops →
-  CORE; the PDF viewer (Zathura open, highlight, follow) → `sol/being/source_view.py`;
-- `sol/terminal/text.py` and the theme data (`sol/terminal/theme.py` plus the theme
-  list, default theme and width constants now in `sol/reader/options.py`) → a
-  shared presentation package outside the logical hierarchy, `sol/presentation/`,
-  so that `sol.essence.tui` no longer imports the reader's option parser.
-CORE must stay importable without a terminal, workspace or reader
-([CORE §8](../CORE.md#8-scope-and-integrity-checklist)). Files: those modules,
-their tests, `docs/CORE.md`, your register rows.
+**Status:** Done (#101)
+**Branch:** `codex/architecture-guard`
+**Requested:** 22 October 2026, by Claude for the maintainer
+
+### Goal
+
+Protect stage D's dependency directions with a static AST test, so new edges
+cannot silently couple the divisions or restore removed packages.
+
+### Scope
+
+`tests/test_architecture.py`, a short pointer in [Architecture §2](../ARCHITECTURE.md#2-logical-divisions-and-component-responsibilities),
+and coordination reports. Authority: Architecture §§2/9, CORE §§4/8 and the
+stage D rules above. CORE includes `sol.core` and `sol.corpus`; composition,
+presentation and interchange stay outside the logical hierarchy.
+
+### Constraints
+
+Execute no inspected imports. Include function-local imports, document exact
+justified exceptions, and report actual rule violations. Poll #99 and #100;
+after both merge, merge `origin/main` and verify against the real relocated code.
+Do not change runtime behavior, public contracts or private corpus material.
+
+### Acceptance
+
+Readable file:line failures for forbidden imports; assert `sol.reader` and
+`sol.terminal` are absent. Full suite and docs check pass; HANDOFF records the
+rules, exceptions, evidence and limits. Commit, push and open a PR against main;
+the author does not merge.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
