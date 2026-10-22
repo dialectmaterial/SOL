@@ -221,7 +221,7 @@ class ComparisonTests(unittest.TestCase):
 import importlib.abc, sys
 class Block(importlib.abc.MetaPathFinder):
     def find_spec(self, name, *args):
-        if name.startswith(('sol.core','sol.corpus','sol.app','sol.presentation','sol.essence.tui','textual')):
+        if name.startswith(('sol.core','sol.corpus','sol.app','sol.being','sol.presentation','sol.essence.tui','textual')):
             raise AssertionError('Forbidden import: ' + name)
 sys.meta_path.insert(0, Block())
 from sol.essence import FileProvider, compare_words, export_word_comparison

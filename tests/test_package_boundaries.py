@@ -52,7 +52,6 @@ class PackageBoundaryTests(unittest.TestCase):
     def test_converter_does_not_import_the_reader_application(self):
         modules = self.imported_modules("import sol.corpus.convert")
         self.assertNotIn("sol.app.main", modules)
-        self.assertNotIn("sol.reader.legacy_pdf", modules)
         self.assertFalse(any(name.startswith(("sol.being.", "sol.presentation.")) for name in modules))
 
     def test_config_import_has_no_reader_corpus_or_interface_dependency(self):
