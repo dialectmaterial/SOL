@@ -46,7 +46,7 @@ in `docs/ARCHITECTURE.md` §9 (Claude's rows only).
 
 ## Codex: Reading the Doctrine of Essence
 
-**Status:** Ready
+**Status:** In review
 **Branch:** `codex/reading-essence`
 **Scope:** the Doctrine of Essence (its division; Essence as Reflection within
 Itself, Appearance, Actuality); the ESSENCE-side groups of
