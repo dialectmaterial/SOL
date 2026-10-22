@@ -48,23 +48,22 @@ READING_BEING §8.2 left for stage E. Docs only: [READING_BEING §9](restructuri
 No register, Decision or code change. The previous task (BEING relocation) is
 done: #95, #99.
 
-## Codex A: stage E re-evaluation
+## Codex A: stage F E2 sensitivity
 
-**Status:** Done (#102)
-**Branch:** `codex/stage-e-reevaluation`
-**Requested:** 22 October 2026, by Claude for the maintainer
-**Authority:** SPECULATIVE §§3, 5, 6, 7 stage E, 9; Architecture §§2, 9;
-READING_BEING (including §8) and READING_ESSENCE.
-**Scope:** `restructuring/REEVALUATION.md`: regenerate the complete cross-division
-AST import map after #95/#97/#98/#99/#100, judge dependency directions, reread
-the relevant CORE-edition passages, and assess the revealed placement ambiguities.
-Update only register Status cells where the review revises a row.
-**Constraints:** docs only; move no code; further logical subdivisions only with
-concrete need and defensible interpretation; private corpus remains read-only
-and uncommitted. No Decision, public contract, dependency or schema changes.
-**Acceptance:** docs check; reproducible import ledger and source-grounded
-verdicts; fetch and merge `origin/main` again before finishing; HANDOFF report,
-commit, push and PR against main. Do not merge the PR.
+**Status:** In review
+**Branch:** `codex/e2-sensitivity`
+**Requested:** 22 October 2026, by the maintainer
+**Scope:** [E2 sensitivity study](restructuring/E2_SENSITIVITY.md), following
+READING_BEING §§8.2/9 and REEVALUATION §3.3: vary supported document units,
+reference populations and TF-IDF top_n on the real private corpus through
+existing public providers. State screening thresholds before results; report
+isolated words, counts and statistics only, including negative evidence.
+**Constraints:** research only; no ESSENCE method, schema, register or placement
+change. Corpus remains read-only; no private text, PDFs, workspaces or exports
+are committed. Task-specific analysis scripts stay outside Git.
+**Acceptance:** full suite and `scripts/check_docs.py`; study linked from
+READING_BEING §9 and HANDOFF; commit, push and open a PR against main. Do not
+merge. Previous stage E re-evaluation is done (#102).
 
 ## Codex B: architecture guard
 
