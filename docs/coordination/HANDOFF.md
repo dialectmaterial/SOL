@@ -33,6 +33,66 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## Word-unit study — 22 October 2026
+
+**Task:** [Codex A: word-unit study](https://github.com/dialectmaterial/SOL/blob/bc2e8025e6b14a2b50a34c779802a394cee2614f/docs/coordination/CURRENT_TASK.md#codex-a-word-unit-study), requested directly by the maintainer.
+**Branch / PR:** `codex/word-unit-study` · [word-unit study pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fword-unit-study); author does not merge.
+**Last implementation commit:** `bc2e8025e6b14a2b50a34c779802a394cee2614f` (this report is committed afterward).
+
+### Changed files
+
+- [WORD_UNIT](restructuring/WORD_UNIT.md) — exact folding, boundary/scanner, apostrophe, hyphen, numeric, Unicode, source-offset, facsimile and admission policies; read-only corpus study with generation hashes, explicit metrics, cause counts and isolated forms. Four alternatives cover user effects, tests/contracts, performance and ownership against READING_BEING/READING_ESSENCE. Recommendation: keep and explain both policies, explicitly for a maintainer decision.
+- `restructuring/REEVALUATION.md` §3.9 links the study; `CURRENT_TASK.md` replaces Codex A's completed stage E slot with this research task. No product, test, governing document, dependency or behavior changes.
+- Working clone: `/tmp/sol-word-unit-study`, branched from `origin/main` at `9beb586` because the supplied checkout's Git metadata is read-only. Rebased onto `729ff24` (#103) before final checks, preserving Claude's task/report/reading additions; product source is unchanged between those main commits.
+
+### Tests performed
+
+All Python checks used `/home/dima/Projects/code/sol/.venv/bin/python -B`.
+
+- Full `-m unittest discover -s tests` — **1,259 tests OK (7 skipped, 4 expected failures)**. Initial baseline run: 116.598 s; final integrated-tree run: 119.094 s. Packaging, architecture and headless coverage included; local log `/tmp/sol-word-unit-final-suite.log`.
+- `scripts/check_docs.py` and `git diff --check` — OK. External URLs are not network-checked.
+- Throwaway `/tmp/sol-word-unit-probe.py` — 14 synthetic input cases plus product projection/facsimile checks pass. All 4,629 canonical records audited read-only; primary comparison on the same 1,757 admitted reader passages finds 633 differing locations (980 unmatched search runs, 374 unmatched ESSENCE tokens), 1,266 boundary positions. Actual product projection independently confirms all 374 local normalized-token self-query misses. Snapshot generation reverified after measurement.
+- Script, aggregate JSON, timing aids and logs stay outside Git. No corpus text sequences, PDFs, workspaces or exports are committed; report examples are synthetic or isolated individual forms.
+
+### Outstanding issues
+
+- Current admitted text has no original combining marks or non-Latin letter tokens; synthetic Unicode checks delimit those cases. Search permits literals beyond maximal `\w+` runs, so diagnostic token counts are not search-result counts. Broader raw audit includes material excluded from both actual study and reader populations. Temporary aids are local, not repository tools.
+- No user-facing help or matching behavior is changed; the study describes a documentation follow-up for the maintainer to choose.
+
+### Decisions requiring approval
+
+**Maintainer decision:** retain and document both (recommended), make search follow the tokenizer, make the tokenizer follow search, or commission a policy-explicit shared CORE primitive. No option is implemented. Public CORE API or artifact/offset contract changes would be **reserved** and need a separate compatibility decision.
+
+## Source-validation proposal — 22 October 2026
+
+**Task:** [Codex B: source-validation proposal](https://github.com/dialectmaterial/SOL/blob/18f15a93bb757e32e1f0aff61ef3570a91120fd2/docs/coordination/CURRENT_TASK.md#codex-b-source-validation-proposal).
+**Branch / PR:** `codex/source-validation-proposal` · [#104](https://github.com/dialectmaterial/SOL/pull/104); author does not merge.
+**Last implementation commit:** `18f15a93bb757e32e1f0aff61ef3570a91120fd2` (this report is committed afterward).
+
+### Changed files
+
+- [SOURCE_VALIDATION](restructuring/SOURCE_VALIDATION.md) — every direct helper call site, complete source capture/render/viewer call graph, exact current freshness/hash/path/error guarantees and gaps, existing tests and proposed acceptance tests. Recommends `validate_source_request(request, page_index) -> ValidatedSourceRequest`, immutable `SourcePage` locations and the existing `SourceError`; defines lazy facade exports, version/compatibility choices and private internals. Alternatives include a precise private-import exception, internal CORE consolidation, separate public checks, service methods and a descriptor/lifetime API.
+- `restructuring/REEVALUATION.md` — links the proposal from §3.6 and marks the public contract reserved. `CURRENT_TASK.md` — replaces Codex B's completed architecture-guard slot with this proposal, In review. `HANDOFF.md` — this report. No code, tests, governing Decision statements, public API, versions, dependencies or schemas changed.
+- Audited source at `9beb586073d2247c852f7640bd4e660167d5cc90`; rebased onto main `729ff24475e0743c86491efe14e1b2e6a4dd35f5` including #103, preserving the other lane's task and report. That integration is documentation-only; inspected source is unchanged.
+
+### Tests performed
+
+All Python checks use `/home/dima/Projects/code/sol/.venv/bin/python -B`.
+
+- `scripts/check_docs.py` — OK: five governing documents and local links/anchors; external URLs are not network-checked.
+- `-m unittest discover -s tests` — **1,259 tests OK (7 skipped, 4 expected failures)**, 117.352 s on the final source (unchanged by the docs-only rebase); earlier full run also passed, 115.739 s. Final log: `/tmp/sol-source-validation-final-suite.log`, uncommitted.
+- AST/read-only audit confirms exactly five `_request_current` and three `_verify_file` call sites, no direct helper callers/patches in tests/scripts, and every existing `test_source_viewer.py` test name represented in the inventory. Existing architecture guard permits private imports today; the proposed private-symbol guard and all new tests are explicitly future work.
+- `git diff --check` and explicit changed-file review — OK; only coordination Markdown is included. No corpus, PDF, source image, workspace or generated artifact is staged.
+
+### Outstanding issues
+
+- Public interface is designed, not implemented; proposed tests are not claimed as passing tests. Validation does not authenticate local data, establish PDF-cache membership, or guarantee a detached viewer's future file opens. The contract choices below remain open.
+- This checkout's `.git` mount is read-only. Branch/fetch/rebase/commit/push use copied metadata at `/tmp/sol-source-validation-git` with `git --git-dir=/tmp/sol-source-validation-git --work-tree=/home/dima/Projects/code/sol-codex-b …`. Edits/checks stay in this checkout; original mounted metadata remains on main. The GitHub connector could not create a PR under the session approval policy; authenticated `gh pr create --repo dialectmaterial/SOL --base main --head codex/source-validation-proposal --body-file …` succeeded. No publication blocker remains.
+
+### Decisions requiring approval
+
+- **(reserved: maintainer decision, public CORE contract)** Choose the combined validator/value types or an alternative in proposal §4. The recommended contract includes owned local dict fields, uniform `SourceError` failures, strict types/full IDs/absolute paths, immutable results, a final generation check after PDF hashing and no stronger cache-containment/lifetime claim. Recommend retaining API_VERSION 1 for an additive extension; an exact-export-set version interpretation would require a deliberate bump and updated assertions. No such choice is implemented or presumed approved by this PR.
+
 ## Stage F: comparison and Measure — 22 October 2026
 
 **Task:** [Claude Code: stage F, comparison and Measure](CURRENT_TASK.md#claude-code-stage-f-comparison-and-measure).

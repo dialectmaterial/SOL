@@ -590,6 +590,14 @@ rationale cell is provenance, not a reopening of that hypothesis. Existing
 `tests/test_source_viewer.py` protects stale requests, PDF binding and viewer
 behavior; new interfaces would have to retain those checks.
 
+**Follow-up proposal (22 October 2026):**
+[SOURCE_VALIDATION](SOURCE_VALIDATION.md) inventories the complete capture,
+validation and viewer call chain, distinguishes existing guarantees from gaps,
+and proposes a combined public CORE validator with immutable page locations.
+It includes alternatives and an exact test/guard plan. The interface and
+API-version interpretation are **maintainer decisions (reserved: public
+contract)**; the proposal implements no code or API change.
+
 ### 3.7 Composition root and reserved CONCEPT
 
 **Code facts.** `sol/__init__.py:6–10` delegates lazily to `sol.app.main`.
@@ -648,6 +656,11 @@ The register's existing I1 and presentation rows remain provisional; this review
 adds no competing placement row.
 
 ### 3.9 The tokenizer's unit: limit, discrete magnitude or reflection?
+
+**Follow-up research:** [WORD_UNIT](WORD_UNIT.md) specifies both current
+definitions, measures their disagreement on the read-only private corpus, and
+compares the four policy/ownership options. It recommends keeping and explaining
+the distinction, explicitly for a maintainer decision; no behavior is changed.
 
 **Code facts.**
 `sol/essence/essence_as_reflection_within_itself/tokenization.py:10–32` starts

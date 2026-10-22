@@ -40,7 +40,7 @@ steps 5–7). Rules for all three lanes:
 
 ## Claude Code: stage F, comparison and Measure
 
-**Status:** In review
+**Status:** Done (#103)
 **Branch:** `claude/measure-comparison`
 **Scope:** read *Measure as a series* (p. 305), *Elective affinity* (p. 308) and
 *Diversity* (pp. 362–365) against the two E2 engines, answering the question
@@ -63,39 +63,40 @@ change. Corpus remains read-only; no private text, PDFs, workspaces or exports
 are committed. Task-specific analysis scripts stay outside Git.
 **Acceptance:** full suite and `scripts/check_docs.py`; study linked from
 READING_BEING §9 and HANDOFF; commit, push and open a PR against main. Do not
-merge. Previous stage E re-evaluation is done (#102).
+merge. Previous word-unit study is done (#105); stage E re-evaluation is
+done (#102).
 
-## Codex B: architecture guard
+## Codex B: source-validation proposal
 
-**Status:** Done (#101)
-**Branch:** `codex/architecture-guard`
-**Requested:** 22 October 2026, by Claude for the maintainer
+**Status:** Done (#104)
+**Branch:** `codex/source-validation-proposal`
+**Requested:** 22 October 2026, by the maintainer
 
 ### Goal
 
-Protect stage D's dependency directions with a static AST test, so new edges
-cannot silently couple the divisions or restore removed packages.
+Design a public CORE source-request validation interface to replace BEING's
+private `_request_current` / `_verify_file` imports, following
+[REEVALUATION §3.6](restructuring/REEVALUATION.md#36-the-source-viewer-imports-private-core-helpers).
 
 ### Scope
 
-`tests/test_architecture.py`, a short pointer in [Architecture §2](../ARCHITECTURE.md#2-logical-divisions-and-component-responsibilities),
-and coordination reports. Authority: Architecture §§2/9, CORE §§4/8 and the
-stage D rules above. CORE includes `sol.core` and `sol.corpus`; composition,
-presentation and interchange stay outside the logical hierarchy.
+`restructuring/SOURCE_VALIDATION.md`, linked from REEVALUATION and HANDOFF;
+coordination status. Inventory every helper/source-pipeline caller, existing
+guarantees/error types/tests; propose signatures, immutable results, exceptions,
+lazy facade/version compatibility and exact tests (architecture and must-not-load
+guards included). Compare alternatives. Authority: Architecture §§2/9,
+CORE §§4/8, SPECULATIVE §5.3 and REEVALUATION §3.6.
 
 ### Constraints
 
-Execute no inspected imports. Include function-local imports, document exact
-justified exceptions, and report actual rule violations. Poll #99 and #100;
-after both merge, merge `origin/main` and verify against the real relocated code.
-Do not change runtime behavior, public contracts or private corpus material.
+Design proposal only: no code, tests, public API, Decision, dependency or schema
+change. Interface choice is a maintainer decision (reserved: public contract).
+Never commit corpus, PDFs, workspaces or generated test artifacts.
 
 ### Acceptance
 
-Readable file:line failures for forbidden imports; assert `sol.reader` and
-`sol.terminal` are absent. Full suite and docs check pass; HANDOFF records the
-rules, exceptions, evidence and limits. Commit, push and open a PR against main;
-the author does not merge.
+Docs check and full test suite pass; HANDOFF records evidence, proposal limits
+and reserved decisions. Commit, push and open a PR against main; do not merge.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
