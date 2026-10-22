@@ -65,37 +65,37 @@ fabricated quotations/page evidence or public-contract changes.
 **Acceptance:** full test suite and `scripts/check_docs.py`; HANDOFF, commit,
 push and PR against main. Do not merge. Prior stage E task completed in #102.
 
-## Codex B: architecture guard
+## Codex B: source-validation proposal
 
-**Status:** Done (#101)
-**Branch:** `codex/architecture-guard`
-**Requested:** 22 October 2026, by Claude for the maintainer
+**Status:** In review
+**Branch:** `codex/source-validation-proposal`
+**Requested:** 22 October 2026, by the maintainer
 
 ### Goal
 
-Protect stage D's dependency directions with a static AST test, so new edges
-cannot silently couple the divisions or restore removed packages.
+Design a public CORE source-request validation interface to replace BEING's
+private `_request_current` / `_verify_file` imports, following
+[REEVALUATION §3.6](restructuring/REEVALUATION.md#36-the-source-viewer-imports-private-core-helpers).
 
 ### Scope
 
-`tests/test_architecture.py`, a short pointer in [Architecture §2](../ARCHITECTURE.md#2-logical-divisions-and-component-responsibilities),
-and coordination reports. Authority: Architecture §§2/9, CORE §§4/8 and the
-stage D rules above. CORE includes `sol.core` and `sol.corpus`; composition,
-presentation and interchange stay outside the logical hierarchy.
+`restructuring/SOURCE_VALIDATION.md`, linked from REEVALUATION and HANDOFF;
+coordination status. Inventory every helper/source-pipeline caller, existing
+guarantees/error types/tests; propose signatures, immutable results, exceptions,
+lazy facade/version compatibility and exact tests (architecture and must-not-load
+guards included). Compare alternatives. Authority: Architecture §§2/9,
+CORE §§4/8, SPECULATIVE §5.3 and REEVALUATION §3.6.
 
 ### Constraints
 
-Execute no inspected imports. Include function-local imports, document exact
-justified exceptions, and report actual rule violations. Poll #99 and #100;
-after both merge, merge `origin/main` and verify against the real relocated code.
-Do not change runtime behavior, public contracts or private corpus material.
+Design proposal only: no code, tests, public API, Decision, dependency or schema
+change. Interface choice is a maintainer decision (reserved: public contract).
+Never commit corpus, PDFs, workspaces or generated test artifacts.
 
 ### Acceptance
 
-Readable file:line failures for forbidden imports; assert `sol.reader` and
-`sol.terminal` are absent. Full suite and docs check pass; HANDOFF records the
-rules, exceptions, evidence and limits. Commit, push and open a PR against main;
-the author does not merge.
+Docs check and full test suite pass; HANDOFF records evidence, proposal limits
+and reserved decisions. Commit, push and open a PR against main; do not merge.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.

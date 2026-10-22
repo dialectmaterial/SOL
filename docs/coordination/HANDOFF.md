@@ -63,6 +63,36 @@ All Python checks used `/home/dima/Projects/code/sol/.venv/bin/python -B`.
 
 **Maintainer decision:** retain and document both (recommended), make search follow the tokenizer, make the tokenizer follow search, or commission a policy-explicit shared CORE primitive. No option is implemented. Public CORE API or artifact/offset contract changes would be **reserved** and need a separate compatibility decision.
 
+## Source-validation proposal — 22 October 2026
+
+**Task:** [Codex B: source-validation proposal](https://github.com/dialectmaterial/SOL/blob/18f15a93bb757e32e1f0aff61ef3570a91120fd2/docs/coordination/CURRENT_TASK.md#codex-b-source-validation-proposal).
+**Branch / PR:** `codex/source-validation-proposal` · [#104](https://github.com/dialectmaterial/SOL/pull/104); author does not merge.
+**Last implementation commit:** `18f15a93bb757e32e1f0aff61ef3570a91120fd2` (this report is committed afterward).
+
+### Changed files
+
+- [SOURCE_VALIDATION](restructuring/SOURCE_VALIDATION.md) — every direct helper call site, complete source capture/render/viewer call graph, exact current freshness/hash/path/error guarantees and gaps, existing tests and proposed acceptance tests. Recommends `validate_source_request(request, page_index) -> ValidatedSourceRequest`, immutable `SourcePage` locations and the existing `SourceError`; defines lazy facade exports, version/compatibility choices and private internals. Alternatives include a precise private-import exception, internal CORE consolidation, separate public checks, service methods and a descriptor/lifetime API.
+- `restructuring/REEVALUATION.md` — links the proposal from §3.6 and marks the public contract reserved. `CURRENT_TASK.md` — replaces Codex B's completed architecture-guard slot with this proposal, In review. `HANDOFF.md` — this report. No code, tests, governing Decision statements, public API, versions, dependencies or schemas changed.
+- Audited source at `9beb586073d2247c852f7640bd4e660167d5cc90`; rebased onto main `729ff24475e0743c86491efe14e1b2e6a4dd35f5` including #103, preserving the other lane's task and report. That integration is documentation-only; inspected source is unchanged.
+
+### Tests performed
+
+All Python checks use `/home/dima/Projects/code/sol/.venv/bin/python -B`.
+
+- `scripts/check_docs.py` — OK: five governing documents and local links/anchors; external URLs are not network-checked.
+- `-m unittest discover -s tests` — **1,259 tests OK (7 skipped, 4 expected failures)**, 117.352 s on the final source (unchanged by the docs-only rebase); earlier full run also passed, 115.739 s. Final log: `/tmp/sol-source-validation-final-suite.log`, uncommitted.
+- AST/read-only audit confirms exactly five `_request_current` and three `_verify_file` call sites, no direct helper callers/patches in tests/scripts, and every existing `test_source_viewer.py` test name represented in the inventory. Existing architecture guard permits private imports today; the proposed private-symbol guard and all new tests are explicitly future work.
+- `git diff --check` and explicit changed-file review — OK; only coordination Markdown is included. No corpus, PDF, source image, workspace or generated artifact is staged.
+
+### Outstanding issues
+
+- Public interface is designed, not implemented; proposed tests are not claimed as passing tests. Validation does not authenticate local data, establish PDF-cache membership, or guarantee a detached viewer's future file opens. The contract choices below remain open.
+- This checkout's `.git` mount is read-only. Branch/fetch/rebase/commit/push use copied metadata at `/tmp/sol-source-validation-git` with `git --git-dir=/tmp/sol-source-validation-git --work-tree=/home/dima/Projects/code/sol-codex-b …`. Edits/checks stay in this checkout; original mounted metadata remains on main. The GitHub connector could not create a PR under the session approval policy; authenticated `gh pr create --repo dialectmaterial/SOL --base main --head codex/source-validation-proposal --body-file …` succeeded. No publication blocker remains.
+
+### Decisions requiring approval
+
+- **(reserved: maintainer decision, public CORE contract)** Choose the combined validator/value types or an alternative in proposal §4. The recommended contract includes owned local dict fields, uniform `SourceError` failures, strict types/full IDs/absolute paths, immutable results, a final generation check after PDF hashing and no stronger cache-containment/lifetime claim. Recommend retaining API_VERSION 1 for an additive extension; an exact-export-set version interpretation would require a deliberate bump and updated assertions. No such choice is implemented or presumed approved by this PR.
+
 ## Stage F: comparison and Measure — 22 October 2026
 
 **Task:** [Claude Code: stage F, comparison and Measure](CURRENT_TASK.md#claude-code-stage-f-comparison-and-measure).
