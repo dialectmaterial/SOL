@@ -1,8 +1,8 @@
 # Working on SOL with Claude Code
 
 This file tells Claude Code how to work in this repository. It is operational
-guidance, not a design authority. What SOL should be is governed only by the four
-documents in `docs/`: [Architecture](docs/ARCHITECTURE.md), [BEING](docs/BEING.md),
+guidance, not a design authority. What SOL should be is governed only by the five
+documents in `docs/`, led by [SPECULATIVE](docs/SPECULATIVE.md): [Architecture](docs/ARCHITECTURE.md), [BEING](docs/BEING.md),
 [ESSENCE](docs/ESSENCE.md) and [CORE](docs/CORE.md). Development procedure is in
 [CONTRIBUTING](CONTRIBUTING.md). Earlier documents are in Git history, not in the
 tree.
@@ -24,7 +24,7 @@ tree.
 1. Check `gh pr list`. If the other agent has an open pull request you have not
    reviewed since its last push, review it first (see *Reviewing and merging*).
 2. Read [`docs/coordination/CURRENT_TASK.md`](docs/coordination/CURRENT_TASK.md).
-   Work only on the task assigned to you; if it is unclear or conflicts with the four authorities,
+   Work only on the task assigned to you; if it is unclear or conflicts with the five governing documents,
    ask instead of guessing.
 3. Read the latest entry in [`docs/coordination/HANDOFF.md`](docs/coordination/HANDOFF.md)
    and the authority sections the task names.
@@ -45,7 +45,22 @@ tree.
 - When behaviour changes, update the relevant authority document and
   `CHANGELOG.md` in the same pull request. Never commit the private corpus,
   source PDF, workspaces or analysis exports.
-- A **reserved decision** changes an authority document's **Decision**
+- **Structural decisions are yours to make, provisionally** ([SPECULATIVE §5.3](docs/SPECULATIVE.md#53-autonomy-and-final-authority)):
+  creating a logical directory, moving a significant module or regrouping a
+  cohesive cluster needs no approval for each move, but follows the reasoning
+  protocol of [SPECULATIVE §5.2](docs/SPECULATIVE.md#52-required-reasoning-protocol):
+  read the pertinent part of the *Science of Logic* in the CORE edition (German
+  or other translations as aids), interpret the determination against its
+  neighbours, inspect what the code does and what its tests protect, propose the
+  placement and why it beats the alternatives, implement without rewriting
+  working logic, verify, and record a row in the
+  [placement register](docs/ARCHITECTURE.md#9-placement-register). Never fabricate
+  quotations, page numbers or textual evidence; name the edition and location,
+  and separate the passage from your interpretation. Tests, configuration, CI,
+  packaging and tooling stay outside the logical hierarchy for now.
+- SPECULATIVE is the maintainer's document: never edit it; keep the other four
+  consistent with it and report any disagreement.
+- A **reserved decision** changes a governing document's **Decision**
   statements, a public contract (CORE API, reference protocol, corpus contract,
   workspace schema), the dependency set, or how personal work or the canonical
   corpus can be deleted or overwritten. It is not yours to make: implement

@@ -12,70 +12,42 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Cleanup plan (maintainer, 21 October 2026)
+## Restructuring, stage A: baseline and inventory
 
-The maintainer approved removing what the project's history left behind:
+The maintainer's leading document, [SPECULATIVE](../SPECULATIVE.md), sets the
+restructuring under BEING (Quality · Quantity · Measure), ESSENCE (Essence as
+Reflection within Itself · Appearance · Actuality), a reserved CONCEPT and a
+separate CORE ([§§4, 7](../SPECULATIVE.md#7-implementation-sequence)). Stage A
+inventories what exists, **without proposing placements yet** and without
+pretending the code is conceptually homogeneous. Each agent writes its own file
+under `docs/coordination/restructuring/`; no product code changes.
 
-1. **Shell:** `--shell` stays but minimal: book browsing only (`ls`, `cd`,
-   `tree`, `read`, `cat`, `search`, `open`, `context`, `info`, `guide`, `help`,
-   `exit`) on plain `input()`/readline. Removed: Kitty (`sol-kitty`, panes,
-   comparison and ESSENCE panes), the private handoff transport and Zsh
-   launcher, workspace commands in the shell, `--ui`/`--editing-mode`, and the
-   `prompt-toolkit` dependency. **`sol compare` is removed.** Review and relate
-   commands go; data already stored in workspaces stays readable and exportable
-   (no schema change or migration).
-2. **Experiments:** `experiments/reader_surfaces/` and the Neovim research-export
-   mode (`neovim.run`, `:SOLExport`, the non-integrated Lua paths) are removed;
-   the reader keeps only its integrated mode.
-3. **Leftovers:** `--pdf` (`legacy_pdf.py`), hidden `--engine`, empty extras
-   (`corpus`, `shell`, `extraction`), unreachable modules.
-4. **Documents:** anything still useful in `docs/legacy/` moves into the four
-   authorities, CONTRIBUTING or README; then `docs/legacy/` is deleted (Git keeps
-   it). Finished proposals go; HANDOFF keeps only recent reports.
-5. **ESSENCE tools:** `sol analyze term` (its tokenizer moves to
-   `sol/essence/tokenization.py`), the segmentation-pilot commands and
-   `scripts/formula_review_sheet.py` are removed.
-6. **Names:** `sol analyze` becomes **`sol essence`**; `sol --reader` becomes
-   **`sol being`**; bare `sol` still opens the reader (`sol being`).
+For every module: what it actually does (from the code, not its name), what it
+imports and what imports it, entry points and commands that reach it, the tests
+that protect it, its present CORE/BEING/ESSENCE boundary, and cohesive groups of
+related definitions that should move together. End with open questions the
+stage C reading must answer (for example, where the workspace store and the word
+tokenizer belong).
 
-Every step passes the documentation check and full suite; removal PRs are
-reviewed by the other agent before merging.
+## Claude Code: Inventory of the BEING side
 
-## Claude Code: Fold the legacy documents in, then remove them (step 4)
+**Status:** Ready
+**Branch:** `claude/inventory-being`
+**Scope:** `sol/reader/`, `sol/terminal/`, `sol/workspace/`, `sol/__init__.py`,
+`sol/__main__.py`, entry points in `pyproject.toml`; output
+`docs/coordination/restructuring/INVENTORY_BEING.md`.
 
-**Status:** In review
-**Branch:** `claude/legacy-docs`
+## Codex: Inventory of the ESSENCE and CORE side
 
-### Scope
-
-`docs/legacy/`, `docs/coordination/` (old proposals, HANDOFF), the four
-authorities, README, CONTRIBUTING, CLAUDE.md, `scripts/check_docs.py` and its
-test. No code. Next: steps 1, 3 and 6's `sol being` (app, options, shell,
-`sol/terminal/` except the Lua reader, packaging).
-
-## Codex: Restructuring stage A — ESSENCE and CORE inventory
-
-**Status:** In review
+**Status:** Ready
 **Branch:** `codex/inventory-essence-core`
-**Requested:** 21 October 2026, directly by the maintainer
+**Scope:** `sol/essence/`, `sol/corpus/`, `sol/core/`, `scripts/`; output
+`docs/coordination/restructuring/INVENTORY_ESSENCE_CORE.md`.
 
-### Scope
+### Acceptance (both)
 
-Inventory every module in `sol/essence/`, `sol/corpus/`, `sol/core/` and
-`scripts/` from `origin/main`, following the maintainer's SPECULATIVE §§4 and 7
-(read from PR #86's `origin/claude/speculative-docs` while pending).
-Record actual responsibilities, mechanical imports/reverse imports, entry
-routes, protecting tests, present boundaries, cohesive groups and Stage C
-reading questions in `restructuring/INVENTORY_ESSENCE_CORE.md`.
-
-### Constraints
-
-No product code changes or placements under logical subdivisions. Do not touch
-Claude's parallel `INVENTORY_BEING.md`. Preserve contracts and behavior.
-
-### Acceptance
-
-Documentation check, HANDOFF report and PR for Claude's review; no author merge.
+Every module in scope listed; import edges checked mechanically, not guessed;
+documentation check passes. Review each other's inventory before stage B.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.

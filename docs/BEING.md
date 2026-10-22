@@ -1,12 +1,13 @@
 # SOL BEING — Reading, Presentation, and Scholarly Workspace
 
-**Status:** current implementation + explicitly marked decisions; 18 October 2026.  
-**Repository baseline:** `main` at `1d200e4fcbff1ca69f48b5dc96c55765f215f303`.  
-**Companions:** [Architecture](ARCHITECTURE.md) · [CORE](CORE.md) · [ESSENCE](ESSENCE.md).
-
-**Implementation reviewed through:** `577166b` (17 October 2026). The baseline above is the original adoption snapshot; the implemented theme, source-preview, note, footnote, search-mark and sentence-study features below were added afterward.
+**Status:** current implementation and explicitly marked decisions; framed by the leading [SPECULATIVE](SPECULATIVE.md) document on 21 October 2026.  
+**Companions:** [SPECULATIVE](SPECULATIVE.md) (leading) · [Architecture](ARCHITECTURE.md) · [CORE](CORE.md) · [ESSENCE](ESSENCE.md).  
+**Original adoption:** 17 October 2026 at `main` `1d200e4`; features since then are recorded below with their dates.
 
 ## 1. Purpose and non-negotiable experience
+
+**BEING as a logical division ([SPECULATIVE §4](SPECULATIVE.md#4-initial-repository-hierarchy)).** BEING is the reading environment and the immediate encounter with texts, including the Neovim reader. Its first-level divisions are **Quality, Quantity and Measure**. Which of today's reader, terminal and workspace modules belongs under which, if any, is to be argued from the text in the restructuring, never from word associations, and recorded in the [placement register](ARCHITECTURE.md#9-placement-register); nothing below presupposes a placement. SPECULATIVE's own example ([§6](SPECULATIVE.md#6-limits-of-the-logical-hierarchy)) notes that even the word tokenizer, used by ESSENCE today, might belong under a BEING determination once justified.
+
 
 BEING is the place to **read Hegel's *Science of Logic***, locate source evidence, think, mark, question, annotate, compare, and depart for/return from computation. It is not an ebook format, a terminal emulator, or merely a virtual filesystem. Its primary use case is a comfortable sustained reading session. A working structure tree, extensive keybindings and correct UUID handling are only foundations; an unpleasant reading surface is an unresolved product defect even when automated tests pass.
 
@@ -14,7 +15,7 @@ BEING is the place to **read Hegel's *Science of Logic***, locate source evidenc
 
 ## 2. What is implemented
 
-`sol` invokes a **single native Neovim 0.11+ reader** with a private SOL configuration. Personal Neovim/LazyVim settings are neither loaded nor changed. The reader uses only its integrated mode; checkout surface experiments and the separate research-export mode have been removed. `sol --engine neovim` remains compatible syntax, not a distinct engine.
+`sol` invokes a **single native Neovim 0.11+ reader** with a private SOL configuration. Personal Neovim/LazyVim settings are neither loaded nor changed. The reader uses only its integrated mode; checkout surface experiments and the separate research-export mode have been removed. `sol` and `sol being` open it; there is no other engine.
 
 Python/CORE owns source verification, IDs, lineage, actions and workspace persistence. Neovim owns disposable buffers, layout, input, motions and visual styling. A view contains **at most 64 canonical paragraphs**, divided into bounded reading sections; the reading position is a UUID plus source-codepoint offset, *never* a Neovim buffer address or screen row. Reloading a section in the same native Neovim process preserves the semantic contract. The reader can display adjacent passages continuously or one passage at a time. The book is **not** one unbounded editor buffer.
 
@@ -216,7 +217,7 @@ Earlier continuous-terminal and offline HTML proofs are retained in Git history.
 
 ## 5. Mathematical notation and source fidelity
 
-The corpus contract supports separate `formula` records and prose passages with `contains_math: true`; this does not mean every supported type is present in the imported book. Mathematical passages remain addressable and navigable; the Kitty source-view integration remains available. Faithful native Neovim rendering of arbitrary 2-D mathematical notation and a verified general LaTeX conversion pipeline are unimplemented.
+The corpus contract supports separate `formula` records and prose passages with `contains_math: true`; this does not mean every supported type is present in the imported book. Mathematical passages remain addressable and navigable. Faithful native Neovim rendering of arbitrary 2-D mathematical notation and a verified general LaTeX conversion pipeline are unimplemented.
 
 **Near-term decision:** prioritize a **source-faithful formula preview**. From the current formula or mixed passage, offer a single action that displays the correct original crop/page (or a reviewed typed formula where available) and returns without losing passage and cursor position. For Alacritty, a separate local image/PDF/browser viewer is legitimate. Kitty can optionally offer enhanced panes, but formula access must not depend on Kitty. Avoid OCR hallucination: generated LaTeX is an unreviewed candidate, not authoritative source. Preserve exponent/fraction placement, printed/PDF page labels, transcription status, attribution, image provenance, and warning flags. Never replace ambiguous formula content with a guessed linear string. A linear transcription made by reading the printed crop (as on 17 October) is not a guess, but it is also not reviewed: it keeps the record's pending status, its audit lists the old and new text, and only a person's comparison against `s` may set `transcription_status` to `reviewed` (a canonical Markdown correction followed by reindexing, not workspace testimony).
 
