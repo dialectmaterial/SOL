@@ -12,10 +12,10 @@ from unittest.mock import patch
 
 from fixtures_async import UIEventLoop
 
-from sol.essence import tui
+from sol.interchange import essence as essence_launch
 from sol.essence.tui import words as tui_words
 from sol.essence.tui import __main__ as entry
-from sol.essence.tui.context import check_context, read_context, write_context
+from sol.interchange.essence import check_context, read_context, write_context
 
 TARGET = "bbbbbbbb-0000-4000-8000-000000000002"
 
@@ -46,7 +46,7 @@ class ContextTests(unittest.TestCase):
                 check_context({**context(), **change})
 
     def test_importing_the_package_does_not_import_textual(self):
-        code = "import sys; import sol.essence.tui, sol.essence.tui.context; print('textual' in sys.modules)"
+        code = "import sys; import sol.essence.tui, sol.interchange.essence; print('textual' in sys.modules)"
         import subprocess
         import sys
         result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
@@ -59,10 +59,10 @@ class ContextTests(unittest.TestCase):
                 patch("sys.stderr") as stderr:
             self.assertEqual(entry.main(["--context", str(path)]), 2)
         self.assertIn("essence", "".join(call.args[0] for call in stderr.write.call_args_list))
-        self.assertIn("pipx inject", tui.TEXTUAL_HINT)
+        self.assertIn("pipx inject", essence_launch.TEXTUAL_HINT)
 
 
-@unittest.skipUnless(tui.textual_available(), "the essence extra (Textual) is not installed")
+@unittest.skipUnless(essence_launch.textual_available(), "the essence extra (Textual) is not installed")
 class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         await super().asyncSetUp()
@@ -305,7 +305,7 @@ class WordChoiceTests(unittest.TestCase):
                 tui_words.run(context(), "passage", "none")
 
 
-@unittest.skipUnless(tui.textual_available(), "the essence extra (Textual) is not installed")
+@unittest.skipUnless(essence_launch.textual_available(), "the essence extra (Textual) is not installed")
 class WordScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def test_count_fills_results_and_failures_stay_on_the_experiment_screen(self):
         from sol.essence.tui.app import EssenceApp
@@ -401,7 +401,7 @@ class StaleContextTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, "generation_changed")
 
 
-@unittest.skipUnless(tui.textual_available(), "the essence extra (Textual) is not installed")
+@unittest.skipUnless(essence_launch.textual_available(), "the essence extra (Textual) is not installed")
 class CountOrderTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def test_an_older_count_never_replaces_a_newer_one(self):
         # Reported by Codex's review of PR #25: delayed A, fast B.
@@ -465,7 +465,7 @@ def comparison_count():
     return tui_words.Count(study, comparison, object(), object()), digest
 
 
-@unittest.skipUnless(tui.textual_available(), "the essence extra (Textual) is not installed")
+@unittest.skipUnless(essence_launch.textual_available(), "the essence extra (Textual) is not installed")
 class ComparisonScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def counted(self, app, pilot):
         await pilot.press("3")
@@ -798,7 +798,7 @@ class SentenceStudyTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "generation_changed")
 
 
-@unittest.skipUnless(tui.textual_available() and _engine_installed(), "needs Textual and the ESSENCE engines")
+@unittest.skipUnless(essence_launch.textual_available() and _engine_installed(), "needs Textual and the ESSENCE engines")
 class SentenceScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def test_sentence_results_list_the_longest_and_open_one_in_the_reader(self):
         from sol.essence.tui import sentences as tui_sentences
@@ -853,7 +853,7 @@ class SentenceScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 app.exit()
 
 
-@unittest.skipUnless(tui.textual_available(), "needs Textual")
+@unittest.skipUnless(essence_launch.textual_available(), "needs Textual")
 class RefinedLayoutTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def test_conditional_fields_and_reference_free_columns(self):
         from sol.essence.tui.app import EssenceApp, BROWSERS
@@ -916,7 +916,7 @@ class RefinedLayoutTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             self.assertLessEqual(sum(c.width + 2 for c in columns), 70)
 
 
-@unittest.skipUnless(tui.textual_available() and _engine_installed(), "needs Textual and engines")
+@unittest.skipUnless(essence_launch.textual_available() and _engine_installed(), "needs Textual and engines")
 class TfidfStudyTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def test_tfidf_engine_save_passage_navigation_and_file_switch(self):
         from fixtures_corpus import write_runtime_corpus
@@ -996,7 +996,7 @@ class PresentationHelperTests(unittest.TestCase):
         self.assertEqual(tui_words.scope_name(book, {"scope": {"kind": "corpus"}}), "corpus")
 
 
-@unittest.skipUnless(tui.textual_available() and _engine_installed(), "needs Textual and engines")
+@unittest.skipUnless(essence_launch.textual_available() and _engine_installed(), "needs Textual and engines")
 class SmallResultsTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def test_each_study_fits_and_opens_sources_at_both_sizes(self):
         from fixtures_corpus import write_runtime_corpus

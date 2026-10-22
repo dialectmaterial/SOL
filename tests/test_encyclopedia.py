@@ -6,7 +6,7 @@ import unittest
 from fixtures_async import UIEventLoop
 
 from sol.essence.encyclopedia import entry_markdown, load_catalog
-from sol.essence.tui import textual_available
+from sol.interchange.essence import textual_available
 
 
 class CatalogTests(unittest.TestCase):

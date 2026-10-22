@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Decouple the ESSENCE launch — 22 October 2026
+
+BEING and ESSENCE share the private launch-file format through
+`sol.interchange.essence`, outside the logical hierarchy. The reader probes
+Textual without importing ESSENCE's interface. Context bytes, validation,
+permissions, lifetime, install hint and the OSC source-return path are unchanged;
+ESSENCE still owns its saved investigation state.
+
 ### BEING's code moves into its divisions — 22 October 2026
 
 Restructuring stage D, BEING lane: the Neovim reader is `sol.being.neovim`

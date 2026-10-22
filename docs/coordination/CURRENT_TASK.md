@@ -50,17 +50,22 @@ Afterwards (second PR, after Codex B merges): the composition root
 `sol/reader/{app,launch,options}.py` out of `sol.reader`, and removal of the
 empty `sol/reader` and `sol/terminal` packages.
 
-## Codex A: ESSENCE relocation
+## Codex A: decouple the ESSENCE launch
 
-**Status:** Ready
-**Branch:** `codex/essence-relocation`
-**Scope:** register rows E1–E4: `sol/essence/{tokenization,word_inputs,corpus_inputs,words,validation,comparison,tfidf,sentences,sentence_inputs,prose}.py`
-→ `sol/essence/essence_as_reflection_within_itself/`, as cohesive modules.
-E5–E7 stay where they are; update their imports. Keep the lazy public facade in
-`sol/essence/__init__.py` exporting the same names, `python -m sol.essence.cli`,
-the TUI's lazy imports, receipts' method names and versions, and the four
-expected failures. Files: `sol/essence/**`, ESSENCE tests, `docs/ESSENCE.md`,
-your register rows.
+**Status:** In review (implementation verified; git publication blocked by read-only worktree metadata)
+**Branch:** `codex/decouple-essence-launch`
+**Requested:** 22 October 2026, by Claude for the maintainer
+**Authority:** SPECULATIVE §5.2; Architecture §9; stage D rules above.
+**Scope:** remove `sol.essence.tui`/`context` imports from
+`sol/being/neovim/reader.py`; move the existing transient launch-file schema,
+validation and owner-only I/O into a neutral module; probe Textual without
+loading the ESSENCE interface. Record alternatives and reasoning in Architecture
+§9 and resolve the Neovim row's pending note. Preserve format, behavior, messages,
+lifetime and OSC bytes; saved investigation state stays with ESSENCE.
+**Acceptance:** fresh-process import/launch boundary test; full suite and docs
+check; stage D entry-point/wheel checks; merge `origin/main` and resolve any
+integration with #97/#98 before opening the PR; handoff, ordinary worktree git
+commit, push and PR against main. Do not merge the PR.
 
 ## Codex B: CORE and shared relocation
 

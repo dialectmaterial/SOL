@@ -432,8 +432,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         # reference, cursor and selection. The context file holds no book text;
         # nothing here moves the cursor or writes the workspace.
         nonlocal essence_directory
-        from sol.essence.tui import TEXTUAL_HINT, textual_available
-        from sol.essence.tui.context import write_context
+        from sol.interchange.essence import TEXTUAL_HINT, textual_available, write_context
         if not textual_available():
             raise ValueError(TEXTUAL_HINT)
         origin = request["packet"]["reference"]

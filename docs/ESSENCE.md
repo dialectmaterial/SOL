@@ -123,6 +123,13 @@ In particular, avoid these errors:
 
 ## 4. Interaction model and inquiry contract
 
+**Implemented (stage D):** the private launch-file schema, validation, owner-only
+I/O and Textual availability probe live in `sol.interchange.essence`, outside
+the logical hierarchy ([Architecture §9, I1](ARCHITECTURE.md#launch-exchange-outside-the-logical-hierarchy-i1)).
+BEING writes it and the TUI entry point reads it; the reader removes its private
+context directory at exit. Saved investigation state remains owned by
+`sol.essence.tui.context`. The format, lifetime and source-return OSC are unchanged.
+
 **Decisions (maintainer, 18 October 2026)**, from the [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf). They direct the work; how far each is implemented is recorded below and in the dated sections that follow.
 
 1. **Hybrid surfaces.** Neovim remains the persistent BEING reader. ESSENCE gets its own interactive application, built with **Textual**, launched only when ESSENCE is requested. **Textual is an optional extra** (`sol-organizes-logic[essence]`, decided 18 October 2026): the reader installs and runs without it, and ESSENCE explains how to install it when it is missing.
