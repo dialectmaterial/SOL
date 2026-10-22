@@ -25,7 +25,7 @@ import sys
 sys.path.insert(0, sys.argv[1])
 from sol.being.neovim import host as neovim
 from sol.being.neovim import channel as reader_channel
-from sol.reader import app
+from sol.app import main as app
 original = reader_channel.subprocess.Popen
 def launch(command, **options):
     if command[-1] == neovim._LOAD_ADAPTER:

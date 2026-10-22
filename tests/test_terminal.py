@@ -15,7 +15,7 @@ import unittest
 from sol.corpus.edition import default_pdf
 from unittest.mock import Mock, patch
 
-import sol.reader.app as sol
+import sol.app.main as sol
 from sol import __version__
 
 
@@ -52,9 +52,9 @@ class TerminalTests(unittest.TestCase):
         stdout, stderr = io.StringIO(), io.StringIO()
         effect = None if allow_source else AssertionError('No source should load')
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr), \
-                patch('sol.reader.app.Path.cwd', return_value=Path('/synthetic-missing-directory')), \
-                patch('sol.reader.app.discover_corpus', side_effect=lambda explicit=None: explicit), \
-                patch('sol.reader.app.load_corpus_book', return_value=self.book, side_effect=effect), \
+                patch('sol.app.main.Path.cwd', return_value=Path('/synthetic-missing-directory')), \
+                patch('sol.app.main.discover_corpus', side_effect=lambda explicit=None: explicit), \
+                patch('sol.app.main.load_corpus_book', return_value=self.book, side_effect=effect), \
                 nullcontext():
             try:
                 status = sol.main(arguments)
@@ -116,7 +116,7 @@ class TerminalTests(unittest.TestCase):
             source.write_bytes(b'Synthetic source fixture')
             direct = root / 'Hegel-SOL.pdf'
             direct.write_bytes(b'Synthetic working fixture')
-            with patch('sol.reader.app.Path.cwd', return_value=root):
+            with patch('sol.app.main.Path.cwd', return_value=root):
                 self.assertEqual(default_pdf(), direct)
 
     def test_pdf_discovery_uses_short_name_in_sources(self):
@@ -125,7 +125,7 @@ class TerminalTests(unittest.TestCase):
             source = root / 'sources' / 'Hegel-SOL.pdf'
             source.parent.mkdir()
             source.write_bytes(b'Synthetic source fixture')
-            with patch('sol.reader.app.Path.cwd', return_value=root):
+            with patch('sol.app.main.Path.cwd', return_value=root):
                 self.assertEqual(default_pdf(), source)
 
     def test_missing_pdf_diagnostic_uses_short_name(self):

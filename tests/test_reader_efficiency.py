@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from sol.core import models
-from sol.reader import app
+from sol.app import main as app
 
 
 def invented_book():

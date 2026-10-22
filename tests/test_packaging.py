@@ -260,10 +260,10 @@ print(catalog['license'])
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         program = """
-import builtins, importlib, pathlib, sys
+import builtins, importlib, importlib.util, pathlib, sys
 original_import = builtins.__import__
 def guard(name, *args, **kwargs):
-    if name.startswith(('sol.reader', 'sol.terminal', 'sol.being.workspace', 'sol.being',
+    if name.startswith(('sol.app', 'sol.presentation', 'sol.being',
                         'markdown_it', 'opendataloader_pdf', 'textual')):
         raise AssertionError('CORE imported an interface or extraction engine: ' + name)
     return original_import(name, *args, **kwargs)
@@ -278,15 +278,15 @@ for name in ('sol.core', 'sol.core.files', 'sol.core.reference_cli', 'sol.core.s
     module = importlib.import_module(name)
     assert pathlib.Path(module.__file__).is_relative_to(pathlib.Path(sys.prefix)), name
 builtins.__import__ = original_import
-for name in ('sol.being.source_view', 'sol.reader.commands',
+for name in ('sol.being.source_view', 'sol.app.commands',
              'sol.presentation', 'sol.presentation.text', 'sol.presentation.theme'):
     module = importlib.import_module(name)
     assert pathlib.Path(module.__file__).is_relative_to(pathlib.Path(sys.prefix)), name
 from sol.presentation.theme import DEFAULT_READER_WIDTH, DEFAULT_READER_THEME, READER_THEMES
 assert DEFAULT_READER_WIDTH == 66 and DEFAULT_READER_THEME == 'mocha'
 assert READER_THEMES == ('mocha', 'latte', 'paper', 'night', 'terminal')
-assert 'sol.reader.options' not in sys.modules
-assert not any(name.startswith('sol.terminal') for name in sys.modules)
+assert 'sol.app.options' not in sys.modules
+assert importlib.util.find_spec('sol.terminal') is None and importlib.util.find_spec('sol.reader') is None
 """
         result = subprocess.run([str(python), "-I", "-B", "-c", program],
                                 cwd=directory, capture_output=True, text=True, timeout=30)
@@ -312,7 +312,7 @@ def guard(name, *args, **kwargs):
         raise AssertionError('Help imported a runtime reader component ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
-app = importlib.import_module('sol.reader.app')
+app = importlib.import_module('sol.app.main')
 app.discover_corpus = lambda *args, **kwargs: None
 raise SystemExit(app.cli(sys.argv[2:]))
 """
@@ -343,7 +343,7 @@ def guard(name, *args, **kwargs):
         raise AssertionError('Installed reader depends on checkout research code ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
-from sol.reader import app
+from sol.app import main as app
 from sol.being.neovim import host as neovim
 assert Path(neovim.__file__).with_name('neovim.lua').is_file()
 neovim.validate_environment = lambda width: '/invented/nvim'
@@ -457,7 +457,7 @@ def guard(name, *args, **kwargs):
         raise AssertionError('Routing fixture imported a live presentation dependency ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = guard
-app = importlib.import_module('sol.reader.app')
+app = importlib.import_module('sol.app.main')
 view = importlib.import_module('sol.being.neovim.host')
 events = []
 def validate(*args):
@@ -513,7 +513,7 @@ print(json.dumps(events))
         program = """
 import importlib, sys
 sys.path.insert(0, sys.argv[1])
-app = importlib.import_module('sol.reader.app')
+app = importlib.import_module('sol.app.main')
 view = importlib.import_module('sol.being.neovim.host')
 def unavailable(*args):
     raise ValueError('Invented unavailable terminal')
@@ -578,7 +578,7 @@ assert 'markdown_it' not in sys.modules
         program = """
 import builtins, contextlib, io, json, sys
 sys.path.insert(0, sys.argv[1])
-forbidden = ('sol.reader', 'sol.being', 'sol.terminal',
+forbidden = ('sol.app', 'sol.being', 'sol.presentation',
              'markdown_it', 'rich', 'textual', 'openai', 'pypdf', 'pdfplumber',
              'sol.corpus.convert', 'sol.corpus.extraction', 'opendataloader_pdf')
 original_import = builtins.__import__
@@ -664,7 +664,7 @@ print(json.dumps({'sentences': result['summary']['sentences']}))
 import builtins, json, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
-forbidden = ('sol.reader', 'sol.terminal', 'sol.being', 'markdown_it',
+forbidden = ('sol.app', 'sol.presentation', 'sol.being', 'markdown_it',
              'sol.corpus.extraction', 'sol.corpus.ingest', 'sol.corpus.backends', 'opendataloader_pdf',
              'rich', 'textual', 'pypdf', 'pdfplumber')
 original_import = builtins.__import__
@@ -747,7 +747,7 @@ def block_parser(name, *args, **kwargs):
         raise AssertionError("Installed reader must not import an extraction or Markdown backend")
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_parser
-sol = importlib.import_module("sol.reader.app")
+sol = importlib.import_module("sol.app.main")
 assert Path(sol.__file__).parents[2] == Path(sys.argv[1])
 assert not (Path(sys.argv[1]) / "local-corpus").exists()
 raise SystemExit(sol.cli(sys.argv[2:]))
@@ -796,7 +796,7 @@ def block_optional_and_profiles(name, *args, **kwargs):
         raise AssertionError('Temporary/one-shot reader imported ' + name)
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional_and_profiles
-sol = importlib.import_module('sol.reader.app')
+sol = importlib.import_module('sol.app.main')
 if sys.argv[2:] == ['guide']:
     def block_book(*args, **kwargs):
         raise AssertionError('Source-free guide must not load a corpus')
@@ -853,7 +853,7 @@ def block_optional(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional
 module = importlib.import_module(sys.argv[2])
-if sys.argv[2] == 'sol.reader.app':
+if sys.argv[2] == 'sol.app.main':
     entry = module.cli
 else:
     entry = module.main
@@ -905,12 +905,12 @@ with closing(sqlite3.connect(sys.argv[2])) as connection, connection:
         self.assertEqual(created.returncode, 0, created.stdout + created.stderr)
         before_digest = hashlib.sha256(legacy.read_bytes()).hexdigest()
         arguments = ["--corpus", str(corpus), "--workspace", "legacy", "--workspace-dir", str(storage)]
-        original = json.loads(run("sol.reader.app", [*arguments, "--workspace-export"]).stdout)
+        original = json.loads(run("sol.app.main", [*arguments, "--workspace-export"]).stdout)
         self.assertEqual(original["schema_version"], 1)
         self.assertNotIn("annotation_history", original)
         self.assertIsNone(original["annotations"][0]["revision"])
         upgraded = storage / "legacy-v3.sqlite3"
-        result = json.loads(run("sol.reader.app", [*arguments, "--workspace-upgrade", str(upgraded), "--json"]).stdout)
+        result = json.loads(run("sol.app.main", [*arguments, "--workspace-upgrade", str(upgraded), "--json"]).stdout)
         self.assertEqual(result["upgraded_copy"], str(upgraded))
         self.assertEqual(result["source_workspace"], str(legacy))
         self.assertEqual(result["schema_version"], 3)
@@ -918,7 +918,7 @@ with closing(sqlite3.connect(sys.argv[2])) as connection, connection:
         if os.name == "posix":
             self.assertEqual(upgraded.stat().st_mode & 0o777, 0o600)
         copy_arguments = ["--corpus", str(corpus), "--workspace", "legacy-v3", "--workspace-dir", str(storage)]
-        baseline = json.loads(run("sol.reader.app", [*copy_arguments, "--workspace-export"]).stdout)
+        baseline = json.loads(run("sol.app.main", [*copy_arguments, "--workspace-export"]).stdout)
         self.assertEqual(baseline["schema_version"], 3)
         self.assertEqual(len(baseline["annotation_history"]), 1)
         snapshot = baseline["annotation_history"][0]
@@ -931,7 +931,7 @@ with closing(sqlite3.connect(sys.argv[2])) as connection, connection:
         for key in ("id", "target_id", "body", "actor", "created_at", "updated_at", "content_sha256"):
             self.assertEqual(baseline["annotations"][0][key], original["annotations"][0][key])
         published_digest = hashlib.sha256(upgraded.read_bytes()).hexdigest()
-        run("sol.reader.app", [*arguments, "--workspace-upgrade", str(upgraded)], expected_status=2)
+        run("sol.app.main", [*arguments, "--workspace-upgrade", str(upgraded)], expected_status=2)
         self.assertEqual(hashlib.sha256(upgraded.read_bytes()).hexdigest(), published_digest)
         self.assertEqual(hashlib.sha256(legacy.read_bytes()).hexdigest(), before_digest)
 
@@ -960,7 +960,7 @@ def block_optional(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional
 module = importlib.import_module(sys.argv[2])
-if sys.argv[2] == "sol.reader.app":
+if sys.argv[2] == "sol.app.main":
     entry = module.cli
 else:
     entry = module.main
@@ -981,46 +981,46 @@ raise SystemExit(entry(sys.argv[3:]))
         identity = json.loads((corpus / "corpus.json").read_text(encoding="utf-8"))["corpus_id"]
         arguments = ["--corpus", str(corpus), "--workspace", "wheel-study",
                      "--workspace-dir", str(storage), "--actor", "Installed reader"]
-        first = json.loads(run("sol.reader.app", [*arguments, "--first", "/being", "--json"]))
+        first = json.loads(run("sol.app.main", [*arguments, "--first", "/being", "--json"]))
         self.assertEqual(first["id"], passage_id)
         self.assertEqual(first["workspace"]["corpus_id"], identity)
-        resumed = json.loads(run("sol.reader.app", [*arguments, "--resume", "--json"]))
+        resumed = json.loads(run("sol.app.main", [*arguments, "--resume", "--json"]))
         self.assertEqual(resumed["id"], passage_id)
         self.assertEqual(resumed["workspace"]["revision"], first["workspace"]["revision"])
-        plain = run("sol.reader.app", [*arguments, "--resume", "--plain"])
+        plain = run("sol.app.main", [*arguments, "--resume", "--plain"])
         self.assertEqual(" ".join(plain.split()), body)
-        second = json.loads(run("sol.reader.app", [*arguments, "--first", "/being", "--json"]))
-        historical = json.loads(run("sol.reader.app", [*arguments, "--resume", "--resume-revision",
+        second = json.loads(run("sol.app.main", [*arguments, "--first", "/being", "--json"]))
+        historical = json.loads(run("sol.app.main", [*arguments, "--resume", "--resume-revision",
                                              str(first["workspace"]["revision"]), "--json"]))
         self.assertEqual(historical["id"], passage_id)
         self.assertEqual(historical["workspace"]["revision"], second["workspace"]["revision"] + 1)
-        health = json.loads(run("sol.reader.app", [*arguments, "--workspace-check", "--json"]))
+        health = json.loads(run("sol.app.main", [*arguments, "--workspace-check", "--json"]))
         self.assertEqual(health["format"], "sol-workspace-health")
         self.assertEqual(health["status"], "no_workspace_issues_detected")
         self.assertEqual(health["corpus_freshness"]["state"], "current")
         self.assertEqual(health["counts"]["pending_source_review"], 1)
         self.assertEqual(health["review_provenance_binding"], "text_and_pdf_fingerprint_only")
         for scope in (["--corpus", str(corpus)], arguments):
-            queue = json.loads(run("sol.reader.app", [*scope, "--review-queue", "--within", "/being",
+            queue = json.loads(run("sol.app.main", [*scope, "--review-queue", "--within", "/being",
                                           "--limit", "1", "--json"]))
             self.assertEqual([record["id"] for record in queue], [passage_id])
             self.assertEqual(queue[0]["transcription_status"], "needs_review")
         backup = storage / "wheel-study-backup.sqlite3"
-        backed_up = json.loads(run("sol.reader.app", [*arguments, "--workspace-backup", str(backup), "--json"]))
+        backed_up = json.loads(run("sol.app.main", [*arguments, "--workspace-backup", str(backup), "--json"]))
         self.assertEqual(backed_up["backup"], str(backup))
         self.assertEqual(backed_up["corpus_id"], identity)
         if os.name == "posix":
             self.assertEqual(backup.stat().st_mode & 0o777, 0o600)
         backup_digest = hashlib.sha256(backup.read_bytes()).hexdigest()
-        run("sol.reader.app", [*arguments, "--workspace-backup", str(backup)], expected_status=2)
+        run("sol.app.main", [*arguments, "--workspace-backup", str(backup)], expected_status=2)
         self.assertEqual(hashlib.sha256(backup.read_bytes()).hexdigest(), backup_digest)
         backup_arguments = ["--corpus", str(corpus), "--workspace", "wheel-study-backup",
                             "--workspace-dir", str(storage)]
-        restored_backup = json.loads(run("sol.reader.app", [*backup_arguments, "--resume", "--json"]))
+        restored_backup = json.loads(run("sol.app.main", [*backup_arguments, "--resume", "--json"]))
         self.assertEqual(restored_backup["workspace"]["revision"], historical["workspace"]["revision"])
-        backup_export = json.loads(run("sol.reader.app", [*backup_arguments, "--workspace-export"]))
+        backup_export = json.loads(run("sol.app.main", [*backup_arguments, "--workspace-export"]))
         self.assertEqual(len(backup_export["history"]), 3)
-        exported = json.loads(run("sol.reader.app", [*arguments, "--workspace-export"]))
+        exported = json.loads(run("sol.app.main", [*arguments, "--workspace-export"]))
         self.assertEqual(exported["format"], "sol-workspace")
         self.assertEqual(exported["corpus_id"], identity)
         self.assertEqual(exported["state"]["current_id"], passage_id)
@@ -1061,7 +1061,7 @@ def block_optional(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 builtins.__import__ = block_optional
 module = importlib.import_module(sys.argv[2])
-if sys.argv[2] == 'sol.reader.app':
+if sys.argv[2] == 'sol.app.main':
     entry = module.cli
 else:
     entry = module.main
@@ -1109,20 +1109,20 @@ with Workspace(Path(sys.argv[3]), manifest['corpus_id'], provenance, actor='Inve
                          for path in corpus.iterdir() if path.is_file()}
         arguments = ["--corpus", str(corpus), "--workspace", "inquiry",
                      "--workspace-dir", str(storage), "--workspace-export"]
-        before_json = json.loads(run("sol.reader.app", arguments).stdout)
-        report = run("sol.reader.app", [*arguments, "--export-format", "markdown"]).stdout
+        before_json = json.loads(run("sol.app.main", arguments).stdout)
+        report = run("sol.app.main", [*arguments, "--export-format", "markdown"]).stdout
         self.assertTrue(report.startswith("# "))
         self.assertIn(passage_id, report)
         self.assertIn(original_note, report)
         self.assertIn(revised_note, report)
         self.assertNotIn(body, report, "Canonical text must be opt-in")
-        included = run("sol.reader.app", [*arguments, "--export-format", "markdown", "--include-passages"]).stdout
+        included = run("sol.app.main", [*arguments, "--export-format", "markdown", "--include-passages"]).stdout
         self.assertIn(body, included)
         self.assertIn("Invented reader", included)
         self.assertIn("How do they differ?", included)
         self.assertIn("No PDF was opened.", included)
         self.assertIn("A reader assertion.", included)
-        after_json = json.loads(run("sol.reader.app", [*arguments, "--export-format", "json"]).stdout)
+        after_json = json.loads(run("sol.app.main", [*arguments, "--export-format", "json"]).stdout)
         before_json.pop("exported_at")
         after_json.pop("exported_at")
         self.assertEqual(before_json, after_json, "Markdown inspection must preserve JSON export data")
@@ -1131,8 +1131,8 @@ with Workspace(Path(sys.argv[3]), manifest['corpus_id'], provenance, actor='Inve
                           for path in corpus.iterdir() if path.is_file()}, before_corpus)
         self.assertFalse(data.exists(), "Read-only export must create no actor registry or default workspace")
         self.assertFalse(list(elsewhere.glob("*.sol-workspace.*")), "No automatic report file may be created")
-        run("sol.reader.app", [*arguments, "--include-passages"], expected_status=2)
-        run("sol.reader.app", ["--corpus", str(corpus), "-r", "--export-format", "markdown"], expected_status=2)
+        run("sol.app.main", [*arguments, "--include-passages"], expected_status=2)
+        run("sol.app.main", ["--corpus", str(corpus), "-r", "--export-format", "markdown"], expected_status=2)
 
 
 if __name__ == "__main__":
