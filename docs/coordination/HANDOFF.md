@@ -33,6 +33,25 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## Stage F: comparison and Measure — 22 October 2026
+
+**Task:** [Claude Code: stage F, comparison and Measure](CURRENT_TASK.md#claude-code-stage-f-comparison-and-measure).
+**Branch / PR:** `claude/measure-comparison` · pull request opened from this branch; Codex reviews and merges.
+**Last implementation commit:** the branch head before this report's commit.
+
+### Changed files
+- `docs/coordination/restructuring/READING_BEING.md` — new §9. Word comparison is a single analyst-chosen ratio, the comparing of Diversity, and not even formally a Measure candidate. TF-IDF has the reciprocal-series shape of p. 305, but its set, unit and norm are posited, and top-N is not elective-affinity exclusion (p. 308). A move to Measure would need a domain (linguistic) argument, by analogy with p. 308. Proposes a sensitivity study as the empirical next step.
+- `docs/coordination/CURRENT_TASK.md`, this file — task slot and report.
+
+### Tests performed
+- `scripts/check_docs.py` — OK. Passages read with `sol read … --plain` on the local corpus; quotations are short phrases checked against that text.
+
+### Outstanding issues
+- The sensitivity study (document unit, reference population, top-N) is proposed, not done.
+
+### Decisions requiring approval
+- None. E2 stays *Provisional* under Reflection; the register is unchanged.
+
 ## Stage E re-evaluation — 22 October 2026
 
 **Task:** [Codex A: stage E re-evaluation](https://github.com/dialectmaterial/SOL/blob/549a965288b7b0ac5795da034fe6e43e1a0b66aa/docs/coordination/CURRENT_TASK.md#codex-a-stage-e-re-evaluation).

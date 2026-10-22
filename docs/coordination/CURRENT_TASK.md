@@ -38,17 +38,15 @@ steps 5–7). Rules for all three lanes:
    the PR, update module paths in ARCHITECTURE §2 and the component document,
    and add a CHANGELOG line.
 
-## Claude Code: BEING relocation
+## Claude Code: stage F, comparison and Measure
 
-**Status:** Done (#95, #99)
-**Branch:** `claude/being-relocation`
-**Scope:** `sol/terminal/{neovim,neovim_reader,reader_channel,runtime,splash,window}.py`,
-the Lua files and `fonts/` → `sol/being/neovim/`; `sol/reader/{actions,surface,render,shell}.py`
-→ `sol/being/`; `navigation` → `sol/being/quantity/`; `search`, `structure`,
-`typography` → `sol/being/quality/`; `sol/workspace/` → `sol/being/workspace/`.
-Afterwards (second PR, after Codex B merges): the composition root
-`sol/reader/{app,launch,options}.py` out of `sol.reader`, and removal of the
-empty `sol/reader` and `sol/terminal` packages.
+**Status:** In review
+**Branch:** `claude/measure-comparison`
+**Scope:** read *Measure as a series* (p. 305), *Elective affinity* (p. 308) and
+*Diversity* (pp. 362–365) against the two E2 engines, answering the question
+READING_BEING §8.2 left for stage E. Docs only: [READING_BEING §9](restructuring/READING_BEING.md#9-comparison-series-and-elective-affinity-stage-f-22-october-2026).
+No register, Decision or code change. The previous task (BEING relocation) is
+done: #95, #99.
 
 ## Codex A: stage E re-evaluation
 
