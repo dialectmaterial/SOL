@@ -45,8 +45,7 @@ verified Neovim when needed. On other systems, supply the reported native tools
 with your package manager first. With those tools available, `pipx install .` or
 `pipx install git+https://github.com/dialectmaterial/SOL.git` also works.
 
-The single Neovim-backed reader runs in ordinary capable terminals; Kitty is not
-required. First interactive launch asks for the exact supported Cambridge /
+First interactive launch asks for the exact supported Cambridge /
 George di Giovanni PDF if no corpus exists, converts it locally once, then sets
 up an actor and workspace. An existing corpus can be selected with
 `sol --set-corpus /absolute/path/to/local-corpus`. The book is not bundled or
