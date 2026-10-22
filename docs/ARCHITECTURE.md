@@ -50,6 +50,18 @@ Internal placement under Quality, Quantity and Measure, or Reflection, Appearanc
 
 CORE provides verified snapshots and references; reader actions mediate reading; terminal adapters adapt to a host; workspaces persist attributed work; ESSENCE uses CORE as an optional provider (studies accept ordinary text files without it). ESSENCE specifies the intended analysis and scope; CORE resolves and provides the material, preserving the distinction between **data organization** and **computational investigation** ([SPECULATIVE §4.1](SPECULATIVE.md#41-what-belongs-where)). CORE must be importable without starting a reader, shell, interactive prompt, workspace, model download or network request. Views do not invent IDs. ESSENCE does not import BEING's interface to obtain data. Reader adapters call the same actions rather than creating parallel navigation semantics. Shared research state survives transitions between BEING and ESSENCE without either interface owning the corpus.
 
+The static AST guard in [`tests/test_architecture.py`](../tests/test_architecture.py)
+protects these stage D boundaries, including function-local and relative imports
+and the existing lazy facades, without importing product code. CORE (`sol.core`
+and `sol.corpus`) depends only on CORE; BEING and ESSENCE may use CORE,
+presentation and interchange, but not each other or `sol.app`. Reserved CONCEPT
+has the same service permissions and no permission to couple the other divisions.
+Presentation and interchange import no divisions (register rows for shared
+terminal utilities and I1). Only the composition root `sol.app` and lazy
+`sol/__init__.py` delegation may reach every component. Exact, documented root
+metadata/entry-point exceptions live in the test; violations name the file and
+line. This guards package dependencies, not an ordering of logical subdivisions.
+
 ## 3. One book, not every PDF
 
 **Decision, 17 October:** narrow active development to the existing audited Cambridge/George di Giovanni *Science of Logic* corpus. Do not start an arbitrary-PDF importer, multi-book catalog or translation alignment project. Maintain the existing edition/source metadata and make no shortcuts that would obstruct later versions; design further ingestion only when the reader-and-inquiry loop justifies it.
