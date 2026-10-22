@@ -33,6 +33,15 @@ class PackageBoundaryTests(unittest.TestCase):
         modules = self.imported_modules("import sol.workspace.reader")
         self.assertNotIn("sol.workspace.commands", modules)
 
+    def test_logical_divisions_import_without_loading_any_component(self):
+        modules = self.imported_modules(
+            "import sol.being.quality, sol.being.quantity, sol.being.measure, sol.concept, "
+            "sol.essence.essence_as_reflection_within_itself, sol.essence.appearance, sol.essence.actuality")
+        for name in ("sol.reader.app", "sol.terminal.neovim", "sol.workspace.store", "sol.corpus.contract",
+                     "sol.essence.words", "textual"):
+            with self.subTest(module=name):
+                self.assertNotIn(name, modules)
+
     def test_reader_import_does_not_load_pdf_conversion_or_optional_ui(self):
         modules = self.imported_modules("from sol.reader import app; app.build_parser()")
         for name in ("sol.corpus.layout", "sol.corpus.convert", "sol.reader.shell",

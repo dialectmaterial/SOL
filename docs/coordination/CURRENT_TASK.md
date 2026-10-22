@@ -12,42 +12,54 @@ them rather than restating them. Backlog: the
 Status moves `Ready` → `In progress` → `In review` → `Done`. When a task is done,
 replace it with the agent's next one; Git history keeps the old ones.
 
-## Restructuring, stage A: baseline and inventory
+## Restructuring, stage C: interpretive mapping
 
-The maintainer's leading document, [SPECULATIVE](../SPECULATIVE.md), sets the
-restructuring under BEING (Quality · Quantity · Measure), ESSENCE (Essence as
-Reflection within Itself · Appearance · Actuality), a reserved CONCEPT and a
-separate CORE ([§§4, 7](../SPECULATIVE.md#7-implementation-sequence)). Stage A
-inventories what exists, **without proposing placements yet** and without
-pretending the code is conceptually homogeneous. Each agent writes its own file
-under `docs/coordination/restructuring/`; no product code changes.
+Stages A (inventories in `docs/coordination/restructuring/`) and B (the empty
+divisions) are done. Stage C reads before anything moves
+([SPECULATIVE §§5, 7](../SPECULATIVE.md#52-required-reasoning-protocol)):
 
-For every module: what it actually does (from the code, not its name), what it
-imports and what imports it, entry points and commands that reach it, the tests
-that protect it, its present CORE/BEING/ESSENCE boundary, and cohesive groups of
-related definitions that should move together. End with open questions the
-stage C reading must answer (for example, where the workspace store and the word
-tokenizer belong).
+1. **Read** in the primary CORE edition (the local corpus; use `sol read`,
+   `sol --info` or the reader) the doctrine's opening division and the openings
+   and transitions of its three first-level divisions. German and other
+   translations may be consulted as aids; name them.
+2. **Write reading notes** in your file below: for each determination, its
+   location (section path and printed pages) and what it is, in relation to its
+   neighbours, in your own words. Separate the text from your interpretation.
+   Quote at most a short phrase, attributed with its location: the translation
+   is copyrighted. **No fabricated quotations, pages or evidence.**
+3. **Propose** provisional placements for your side's cohesive groups from the
+   stage A inventory, each with the alternatives considered, as rows for the
+   [placement register](../ARCHITECTURE.md#9-placement-register) (status:
+   provisional). Groups that belong to no determination (infrastructure,
+   CORE's practical boundary) say so and why. Leave unresolved what the reading
+   does not settle.
+4. Move nothing yet: relocation is stage D.
 
-## Claude Code: Inventory of the BEING side
-
-**Status:** Ready
-**Branch:** `claude/inventory-being`
-**Scope:** `sol/reader/`, `sol/terminal/`, `sol/workspace/`, `sol/__init__.py`,
-`sol/__main__.py`, entry points in `pyproject.toml`; output
-`docs/coordination/restructuring/INVENTORY_BEING.md`.
-
-## Codex: Inventory of the ESSENCE and CORE side
+## Claude Code: Reading the Doctrine of Being
 
 **Status:** Ready
-**Branch:** `codex/inventory-essence-core`
-**Scope:** `sol/essence/`, `sol/corpus/`, `sol/core/`, `scripts/`; output
-`docs/coordination/restructuring/INVENTORY_ESSENCE_CORE.md`.
+**Branch:** `claude/reading-being`
+**Scope:** the Doctrine of Being (its division; Quality, Quantity, Measure);
+the BEING-side groups of `INVENTORY_BEING.md`; output
+`docs/coordination/restructuring/READING_BEING.md` and proposed register rows
+in `docs/ARCHITECTURE.md` §9 (Claude's rows only).
+
+## Codex: Reading the Doctrine of Essence
+
+**Status:** Ready
+**Branch:** `codex/reading-essence`
+**Scope:** the Doctrine of Essence (its division; Essence as Reflection within
+Itself, Appearance, Actuality); the ESSENCE-side groups of
+`INVENTORY_ESSENCE_CORE.md`, and whether CORE's practical exception holds for
+each CORE group; output `docs/coordination/restructuring/READING_ESSENCE.md`.
+Put proposed register rows in that file; Claude adds them to ARCHITECTURE §9
+when merging, so the two branches never edit the same section.
 
 ### Acceptance (both)
 
-Every module in scope listed; import edges checked mechanically, not guessed;
-documentation check passes. Review each other's inventory before stage B.
+Every claim about the text carries a location in the CORE edition; each
+proposal names alternatives; documentation check passes; the other agent
+reviews.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
