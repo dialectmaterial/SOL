@@ -33,6 +33,36 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## Word-unit study — 22 October 2026
+
+**Task:** [Codex A: word-unit study](https://github.com/dialectmaterial/SOL/blob/bc2e8025e6b14a2b50a34c779802a394cee2614f/docs/coordination/CURRENT_TASK.md#codex-a-word-unit-study), requested directly by the maintainer.
+**Branch / PR:** `codex/word-unit-study` · [word-unit study pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fword-unit-study); author does not merge.
+**Last implementation commit:** `bc2e8025e6b14a2b50a34c779802a394cee2614f` (this report is committed afterward).
+
+### Changed files
+
+- [WORD_UNIT](restructuring/WORD_UNIT.md) — exact folding, boundary/scanner, apostrophe, hyphen, numeric, Unicode, source-offset, facsimile and admission policies; read-only corpus study with generation hashes, explicit metrics, cause counts and isolated forms. Four alternatives cover user effects, tests/contracts, performance and ownership against READING_BEING/READING_ESSENCE. Recommendation: keep and explain both policies, explicitly for a maintainer decision.
+- `restructuring/REEVALUATION.md` §3.9 links the study; `CURRENT_TASK.md` replaces Codex A's completed stage E slot with this research task. No product, test, governing document, dependency or behavior changes.
+- Working clone: `/tmp/sol-word-unit-study`, branched from `origin/main` at `9beb586` because the supplied checkout's Git metadata is read-only. Rebased onto `729ff24` (#103) before final checks, preserving Claude's task/report/reading additions; product source is unchanged between those main commits.
+
+### Tests performed
+
+All Python checks used `/home/dima/Projects/code/sol/.venv/bin/python -B`.
+
+- Full `-m unittest discover -s tests` — **1,259 tests OK (7 skipped, 4 expected failures)**. Initial baseline run: 116.598 s; final integrated-tree run: 119.094 s. Packaging, architecture and headless coverage included; local log `/tmp/sol-word-unit-final-suite.log`.
+- `scripts/check_docs.py` and `git diff --check` — OK. External URLs are not network-checked.
+- Throwaway `/tmp/sol-word-unit-probe.py` — 14 synthetic input cases plus product projection/facsimile checks pass. All 4,629 canonical records audited read-only; primary comparison on the same 1,757 admitted reader passages finds 633 differing locations (980 unmatched search runs, 374 unmatched ESSENCE tokens), 1,266 boundary positions. Actual product projection independently confirms all 374 local normalized-token self-query misses. Snapshot generation reverified after measurement.
+- Script, aggregate JSON, timing aids and logs stay outside Git. No corpus text sequences, PDFs, workspaces or exports are committed; report examples are synthetic or isolated individual forms.
+
+### Outstanding issues
+
+- Current admitted text has no original combining marks or non-Latin letter tokens; synthetic Unicode checks delimit those cases. Search permits literals beyond maximal `\w+` runs, so diagnostic token counts are not search-result counts. Broader raw audit includes material excluded from both actual study and reader populations. Temporary aids are local, not repository tools.
+- No user-facing help or matching behavior is changed; the study describes a documentation follow-up for the maintainer to choose.
+
+### Decisions requiring approval
+
+**Maintainer decision:** retain and document both (recommended), make search follow the tokenizer, make the tokenizer follow search, or commission a policy-explicit shared CORE primitive. No option is implemented. Public CORE API or artifact/offset contract changes would be **reserved** and need a separate compatibility decision.
+
 ## Stage F: comparison and Measure — 22 October 2026
 
 **Task:** [Claude Code: stage F, comparison and Measure](CURRENT_TASK.md#claude-code-stage-f-comparison-and-measure).
