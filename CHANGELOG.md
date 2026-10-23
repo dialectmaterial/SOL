@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Opening profile and preparation regressions — 23 October 2026
+
+Record whole-opening stage measurements and the unimplemented idle-preparation
+tradeoff in BEING and HANDOFF. Keep both neighbour preparation calls during the
+opening screen, as chosen by the maintainer in #112; this change claims no
+opening speedup. The controller timing probe allows idle preparation after
+measuring startup and before navigation. Reader regressions cover preparation
+before launch, immediate adoption, idle failure recovery and guarded fresh and
+prepared destination refusals.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary

@@ -63,36 +63,37 @@ lanes' slots unchanged; do not merge own PR.
 **Acceptance:** `restructuring/SENTENCE_AUDIT.md`, ESSENCE and CHANGELOG; full
 suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 
-## Codex B: landmark management
+## Codex B: faster opening to readable text
 
-**Status:** Done (#113)
-**Branch:** `codex/landmark-management`
+**Status:** In review
+**Branch:** `codex/faster-opening`
 **Requested:** 23 October 2026, by the maintainer
 
 ### Goal
-
-Close the named-landmark rename and ordering limitation in
-[BEING §7](../BEING.md#7-boundaries-and-known-limitations).
+Reduce launch-to-readable-text latency on the real book, following the reader
+backlog's measured navigation latency and [BEING §2](../BEING.md#2-what-is-implemented)
+“Measured on screen” evidence.
 
 ### Scope
-
-Add atomic rename with the existing name rules to the Neovim reader's `L`
-panel; preserve the saved target and metadata on success, and the old landmark
-on failure. Add a session-only toggle between name and whole-book passage
-order, with unavailable passages last. Update panel hints, `?` help, BEING and
-CHANGELOG. Cover workspace transactions, conflicts and unavailable targets,
-controller behavior and headless Neovim controls.
+Profile the whole opening with `scripts/reader_timings.py --startup-only` and
+real-terminal tmux `sol --none` status-line polling. Measure imports, corpus and
+snapshot loads/verification, workspace, first payload, neighbour preparation,
+splash, Neovim startup and adapter. Retain the profiling and applicable timing
+and test improvements. Per review of #117, preserve the maintainer's #112 choice:
+prepare both neighbours during opening; document idle deferral only as a measured
+option for the maintainer. Update BEING and CHANGELOG without claiming an opening
+speedup.
 
 ### Constraints
-
-No workspace schema change or new persisted settings. Keep the three reader
-markers and other lanes' slots unchanged. Branch from `origin/main`; open a PR
-and do not merge it.
+Use `/home/dima/Projects/code/sol/local-corpus` read-only. Preserve all CORE §5
+verification, public contracts, schemas and dependencies. Quantify any reserved
+CORE cost in HANDOFF without changing it. Other lanes' slots stay unchanged.
+Do not merge own PR.
 
 ### Acceptance
-
-Full suite, `tests/test_architecture.py`, `scripts/check_docs.py`; commit, push,
-open a PR against main, and record a HANDOFF report and PR URL.
+Before/after evidence for each change; full suite, `tests/test_architecture.py`,
+`scripts/check_docs.py`; implementation commit, final HANDOFF commit, push,
+PR against main and report its URL.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.

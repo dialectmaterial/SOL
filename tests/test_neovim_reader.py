@@ -1127,22 +1127,25 @@ assert 'textual' not in sys.modules
             state = service.store.get_state()
             return state["current_id"], state["position"]["cursor_offset"]
 
-        for operation, (extra, setup) in routes.items():
-            with self.subTest(operation=operation):
-                service = self.service(self.root / f"refused-{operation}.sqlite3")
+        for operation, (extra, setup), prepared in (
+                (op, fields, ready) for op, fields in routes.items() for ready in (False, True)):
+            with self.subTest(operation=operation, prepared=prepared):
+                service = self.service(self.root / f"refused-{operation}-{prepared}.sqlite3")
                 self.position(service, 4, self.book.passages[1].identifier)
                 service.save_bookmark("sol:reader-marker:1", ReaderActions(self.book, service).session,
                                       self.book.passages[2].identifier, replace=True)
-                failing = []
+                failing, refused_paths = [], []
 
                 def build_or_fail(*args, **kwargs):
                     if failing:
+                        refused_paths.append("build")
                         raise RuntimeError("injected view preparation failure")
                     return build(*args, **kwargs)
 
                 # A neighbouring section prepared ahead is adopted, not built.
                 def adopt_or_fail(*args, **kwargs):
                     if failing:
+                        refused_paths.append("adopt")
                         raise RuntimeError("injected view preparation failure")
                     return adopt(*args, **kwargs)
 
@@ -1151,14 +1154,21 @@ assert 'textual' not in sys.modules
                     for step in ([] if setup is None else setup if isinstance(setup, list) else [setup]):
                         shown = on_request({**step, "packet": shown["restore"],
                                             "mode": "continuous"}).get("payload", shown)
+                    if prepared:
+                        on_request.idle()
+                        on_request.idle()
                     origin = deepcopy(shown["restore"])
                     origin["cursor_offset"] = 6
                     here = origin["reference"]["reference"]["target_id"], 6
                     request = {"op": operation, **extra, "packet": origin, "mode": "continuous"}
+                    if not prepared:
+                        # A different theme forces a fresh build despite opening preparation.
+                        request["theme"] = "latte"
                     failing.append(True)
                     with self.assertRaisesRegex(RuntimeError, "injected"):
                         on_request(deepcopy(request))
                     failing.clear()
+                    self.assertEqual(refused_paths, ["adopt" if prepared else "build"])
                     # The outgoing position the editor showed may be saved; the destination is not.
                     self.assertEqual(saved_at(service), here)
                     # The same request succeeds on retry, and history returns once to the origin.
@@ -1292,7 +1302,12 @@ assert 'textual' not in sys.modules
         def native(payload, _, on_request):
             def move(op, packet, **fields):
                 return on_request({"op": op, "packet": packet, "mode": "continuous", **fields})["payload"]
-            # The opening screen prepared both neighbours.
+            # Both neighbours of a resumed section are ready before launch.
+            self.assertEqual(calls, [self.book.passages[1].identifier,
+                                     self.book.passages[2].identifier, self.book.passages[0].identifier])
+            with patch.object(neovim, "build_payload", side_effect=AssertionError("no idle work needed")):
+                on_request.idle()
+            calls.clear()
             with patch.object(neovim, "build_payload", side_effect=AssertionError("prepared section rebuilt")):
                 moved = move("passage_next", payload["restore"])
             self.assertEqual(moved["records"][0]["id"], self.book.passages[2].identifier)
@@ -1315,6 +1330,49 @@ assert 'textual' not in sys.modules
             with patch.object(neovim, "build_payload", side_effect=counted):
                 move("passage_next", back["restore"], theme="latte")
             self.assertEqual(calls, [self.book.passages[2].identifier])
+            return 1, None
+
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "build_payload", side_effect=counted), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 1)
+
+    def test_navigation_before_first_idle_uses_opening_preparation(self):
+        self.extend(3)
+        service = self.service()
+
+        def native(payload, _, on_request):
+            with patch.object(neovim, "build_payload", side_effect=AssertionError("prepared section rebuilt")), \
+                    patch.object(neovim, "adopt_restore", wraps=neovim.adopt_restore) as destination:
+                moved = on_request({"op": "next", "packet": payload["restore"],
+                                    "mode": "continuous"})["payload"]
+            self.assertEqual(destination.call_count, 1)
+            self.assertEqual(moved["records"][0]["id"], self.book.passages[1].identifier)
+            return 1, None
+
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 1)
+
+    def test_failed_idle_preparation_keeps_the_view_and_navigation_retries_fresh(self):
+        self.extend(3)
+        service = self.service()
+        build = neovim.build_payload
+
+        def native(payload, _, on_request):
+            # Consume the opening neighbour so idle has new preparation to do.
+            payload = on_request({"op": "next", "packet": payload["restore"],
+                                  "mode": "continuous"})["payload"]
+            shown, saved = deepcopy(payload), service.store.get_state()
+            with patch.object(neovim, "build_payload", side_effect=RuntimeError("idle build failed")):
+                on_request.idle()
+            self.assertEqual(payload, shown)
+            self.assertEqual(service.store.get_state(), saved)
+            with patch.object(neovim, "build_payload", wraps=build) as destination:
+                moved = on_request({"op": "next", "packet": payload["restore"],
+                                    "mode": "continuous"})["payload"]
+            self.assertEqual(destination.call_count, 1)
+            self.assertEqual(moved["records"][0]["id"], self.book.passages[2].identifier)
             return 1, None
 
         with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
@@ -1341,6 +1399,7 @@ assert 'textual' not in sys.modules
                 outcome = []
 
                 def native(payload, _, on_request):
+                    on_request.idle()
                     edit(book)
                     request = {"op": "next", "packet": payload["restore"], "mode": "continuous"}
                     if refused:
@@ -1378,6 +1437,7 @@ assert 'textual' not in sys.modules
             return run
 
         def native(payload, _, on_request):
+            on_request.idle()
             request = {"op": "next", "packet": payload["restore"], "mode": "continuous"}
             # The destination view is built now or, prepared ahead, adopted now.
             with patch.object(neovim, "build_payload", side_effect=competing_save(build)), \
@@ -1440,6 +1500,7 @@ assert 'textual' not in sys.modules
             return run
 
         def native(payload, _, on_request):
+            on_request.idle()
             origin = deepcopy(payload["restore"])
             origin["cursor_offset"] = 6
             request = {"op": "next", "packet": origin, "mode": "continuous"}
