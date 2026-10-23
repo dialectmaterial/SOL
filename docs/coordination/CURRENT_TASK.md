@@ -67,7 +67,7 @@ invalid values, sorting/nulls/ties and unchanged export. Full suite and
 
 ## Codex B: faster opening to readable text
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `codex/faster-opening`
 **Requested:** 23 October 2026, by the maintainer
 
