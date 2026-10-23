@@ -46,25 +46,23 @@ steps 5–7). Rules for all three lanes:
 readable text in a real terminal. The measurement found `]c`/`[c` restarting
 Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
 
-## Codex A: ESSENCE workflow polish
+## Codex A: install verified SOL changes
 
 **Status:** In review (local; publication blocked by GitHub access)
-**Branch:** `codex/essence-workflow-polish`
-**Requested:** 24 October 2026, directly by the maintainer after accepting the redesigned appearance
-**Scope:** improve the rounded interface's usability: direct Methods-to-setup
-actions, compact totals and expandable details, presentation-only word filtering,
-selected-word context and narrow-window spacing. Follow
-[ESSENCE §4](../ESSENCE.md#4-interaction-model-and-inquiry-contract)
-and [Architecture §6](../ARCHITECTURE.md#6-development-order-and-acceptance-gates).
-**Constraints:** preserve analytical behavior, controls, source-return guards,
-artifact formats, persistence and dependencies; no private source text in Git;
-other lanes' slots unchanged; do not merge own PR.
-**Acceptance:** synthetic previews and pilot checks for filters, Unicode,
-sorting/source alignment, unchanged full exports, details/resize and method
-navigation; full suite and docs check; ESSENCE, CHANGELOG and HANDOFF updated.
-Stacked on local redesign `220c27b`; keep the accepted appearance. Commit and
-publish for review where access permits; the existing GitHub write restriction
-does not prevent local completion.
+**Branch:** `codex/install-verified-changes`
+**Requested:** 24 October 2026, directly by the maintainer after their installed ESSENCE still showed the old interface
+**Scope:** update the actual launcher environment with the tested redesign and
+workflow polish; record standing authorization to install future verified
+application changes automatically. This is the operational installation
+procedure in [CONTRIBUTING](../../CONTRIBUTING.md#install-verified-changes-for-the-maintainer),
+not a change to [ESSENCE](../ESSENCE.md) or the other governing documents.
+**Constraints:** preserve dependencies, optional features and personal data;
+leave active sessions intact; other lanes' slots unchanged; do not merge own PR.
+**Acceptance:** build and install the tested wheel, verify installed files and
+UI behavior with isolated Python outside the checkout, check dependencies and
+launcher entry points; document the earlier incorrect import check and the
+standing installation workflow. Stacked on local polish `37f7fd4`; publication
+remains subject to the existing GitHub access restriction.
 
 ## Codex B: landmark management
 

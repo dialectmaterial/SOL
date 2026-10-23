@@ -69,13 +69,17 @@ tree.
 
 ## Finishing a task
 
-1. Add a report at the top of `docs/coordination/HANDOFF.md` using its template.
+1. For application changes, install the verified checkout into the maintainer's
+   existing launcher environment and verify the installed package from outside
+   the checkout. This is standing authorization, not a per-task approval step;
+   follow [the local installation procedure](CONTRIBUTING.md#install-verified-changes-for-the-maintainer).
+2. Add a report at the top of `docs/coordination/HANDOFF.md` using its template.
    The report names the last implementation commit; commit the report itself
    last, as `Record handoff: <task>`.
-2. Set your task's status in `CURRENT_TASK.md` to `In review`. If `main` moved
+3. Set your task's status in `CURRENT_TASK.md` to `In review`. If `main` moved
    meanwhile (the other agent's pull request merged), rebase onto it; conflicts
    at the top of `HANDOFF.md` are resolved by keeping both reports, newest first.
-3. Push the branch and open a pull request against `main` with
+4. Push the branch and open a pull request against `main` with
    `gh pr create --base main`, whose description links the handoff entry. If
    that is not possible, say so in the report and give the exact commands.
 

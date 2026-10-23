@@ -40,6 +40,32 @@ Claude Code tasks are coordinated through [CLAUDE.md](CLAUDE.md),
 [handoff reports](docs/coordination/HANDOFF.md): one branch and pull request per
 task, reviewed before merging.
 
+## Install verified changes for the maintainer
+
+The maintainer has given standing authorization to install completed, verified
+SOL application changes into their existing local installation as part of each
+task. Do this automatically after the appropriate checks pass; a commit or an
+updated checkout alone does not update the installed application. Local
+installation does not merge or publish the branch.
+
+Resolve the existing `sol` and `sol-window` launchers and inspect their Python
+interpreter before installing. Build a wheel from the tested checkout, then
+reinstall it into that interpreter's environment, preserving the installed
+dependencies and optional ESSENCE extra. For an environment whose dependencies
+already satisfy the checkout, use
+`python -m pip install --no-deps --force-reinstall /path/to/the-built.whl`;
+reinstall even when the distribution version has not changed. Follow the
+reserved-decision procedure for dependency changes rather than silently
+changing the dependency set.
+
+Verify using the launcher's interpreter from outside the checkout, with Python
+isolated mode (`-I`): check the installed module path, compare installed package
+files with the built wheel, run `pip check`, and smoke-test the installed
+interface. An import from the checkout's working directory is not evidence that
+the launcher's installation is current. Report the installed revision and any
+need to reopen an already running interface; leave the maintainer's active
+session intact.
+
 ## Where behavior belongs
 
 | Area | Owner |
