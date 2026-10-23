@@ -734,6 +734,99 @@ end
         self.assertIn("Enter reads a landmark; D forgets it", panel)
         self.assertEqual(report["count"], 4)
 
+    def test_landmark_panel_renames_unavailable_rows_and_toggles_order_without_moving(self):
+        report = self.run_lua(r'''
+  local sent, warned = {}, {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  vim.notify = function(message) warned[#warned + 1] = message end
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local resting = reader.capture('n', nil, reader.source_point(data.records[1].id, 7))
+  reader.restore(resting)
+  local rows = {{name = 'Alpha', label = 'saved paragraph is unavailable', available = false},
+                {name = 'Zulu', label = 'A later passage', available = true}}
+  local function reply(action, name, order, shown)
+    _G.SOLReaderChannel.pending[sent[#sent].id]({landmarks = {action = action, name = name,
+      order = order, persistent = true, rows = shown}})
+  end
+  vim.api.nvim_feedkeys('L', 'xt', false)
+  reply('list', '', 'name', rows)
+  report.name_panel = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  local initial_panel = vim.api.nvim_get_current_buf()
+  -- Rename works on an unavailable passage; the prompt starts with its name.
+  vim.fn.input = function(prompt, initial)
+    assert(prompt == 'Rename landmark: ' and initial == 'Alpha')
+    return 'Zulu'
+  end
+  vim.api.nvim_feedkeys('r', 'xt', false)
+  assert(sent[2].op == 'landmark_rename' and sent[2].name == 'Alpha' and sent[2].new_name == 'Zulu')
+  _G.SOLReaderChannel.pending[sent[2].id](nil, 'bookmark name already exists')
+  assert(vim.api.nvim_get_current_buf() == initial_panel, 'refusal replaced the panel')
+  assert(vim.deep_equal(report.name_panel, vim.api.nvim_buf_get_lines(0, 0, -1, false)))
+  vim.fn.input = function() return '' end
+  vim.api.nvim_feedkeys('r', 'xt', false)
+  assert(sent[3].op == 'landmark_rename' and sent[3].new_name == '')
+  _G.SOLReaderChannel.pending[sent[3].id](nil, 'a landmark name is 1–80 characters of ordinary text')
+  vim.fn.input = function() error('cancelled') end
+  vim.api.nvim_feedkeys('r', 'xt', false)
+  assert(#sent == 3, 'cancelled rename sent a request')
+  vim.fn.input = function() return 'Renamed' end
+  vim.api.nvim_feedkeys('r', 'xt', false)
+  assert(sent[4].op == 'landmark_rename' and sent[4].new_name == 'Renamed')
+  rows[1].name = 'Renamed'
+  reply('renamed', 'Renamed', 'name', rows)
+  assert(vim.api.nvim_buf_get_lines(0, 2, 3, false)[1] == 'Renamed')
+  vim.api.nvim_feedkeys('o', 'xt', false)
+  assert(sent[5].op == 'landmark_order')
+  reply('list', '', 'book', {rows[2], rows[1]})
+  report.book_panel = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  assert(report.book_panel[3] == 'Zulu' and report.book_panel[5] == 'Renamed')
+  -- Both displayed lines choose their landmark, including after reordering.
+  vim.api.nvim_win_set_cursor(0, {6, 0})
+  vim.api.nvim_feedkeys(vim.keycode('<CR>'), 'xt', false)
+  assert(#sent == 5, 'an unavailable landmark was opened')
+  vim.api.nvim_feedkeys('o', 'xt', false)
+  reply('list', '', 'name', rows)
+  report.returned = vim.api.nvim_buf_get_lines(0, 0, 1, false)[1]
+  vim.api.nvim_feedkeys(vim.keycode('<Esc>'), 'xt', false)
+  assert(vim.api.nvim_get_current_win() == reader.window)
+  assert(vim.deep_equal(reader.capture(), resting), 'landmark management moved the reading position')
+  vim.api.nvim_feedkeys('?', 'xt', false)
+  report.help = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  report.warned = warned
+''')
+        name_panel = '\n'.join(report['name_panel'])
+        self.assertIn('Landmarks — name order', name_panel)
+        self.assertIn('r renames; o toggles name/book order (session only)', name_panel)
+        self.assertIn('Landmarks — book order', '\n'.join(report['book_panel']))
+        self.assertEqual(report['returned'], 'Landmarks — name order')
+        self.assertIn('r renames; D forgets; o toggles name/book order (session only)', '\n'.join(report['help']))
+        self.assertEqual(len(report['warned']), 3)
+        self.assertIn('already exists', report['warned'][0])
+        self.assertIn('ordinary text', report['warned'][1])
+        self.assertIn('unavailable', report['warned'][2])
+
+    def test_empty_temporary_landmark_panel_can_toggle_and_has_no_rename_target(self):
+        report = self.run_lua(r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  vim.api.nvim_feedkeys('L', 'xt', false)
+  _G.SOLReaderChannel.pending[sent[1].id]({landmarks = {action = 'list', order = 'name',
+    persistent = false, rows = {}}})
+  vim.fn.input = function() error('empty list prompted for a name') end
+  vim.api.nvim_feedkeys('rD', 'xt', false)
+  assert(#sent == 1)
+  vim.api.nvim_feedkeys('o', 'xt', false)
+  assert(sent[2].op == 'landmark_order')
+  _G.SOLReaderChannel.pending[sent[2].id]({landmarks = {action = 'list', order = 'book',
+    persistent = false, rows = {}}})
+  report.panel = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+''')
+        self.assertIn('Landmarks — book order (this session only)', '\n'.join(report['panel']))
+
     def test_keys_json_moves_reader_keys_and_lists_them_in_help(self):
         report = self.run_lua(r'''
   local sent = {}

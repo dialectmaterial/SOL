@@ -15,7 +15,7 @@ import re
 import textwrap
 
 from sol.core.references import Reference, resolve_reference
-from sol.being.workspace.store import Workspace, WorkspaceError, _position
+from sol.being.workspace.store import Workspace, WorkspaceError, _position, _string
 from sol.presentation.text import safe_output
 
 
@@ -384,6 +384,25 @@ class WorkspaceReader:
     def remove_bookmark(self, name):
         self.ensure_corpus_current()
         self.store.delete_bookmark(name)
+
+    def rename_bookmark(self, name, new_name):
+        """Change only the name, including for an unavailable saved passage.
+
+        Hold the write lock from lookup through rename: a competing name cannot
+        be replaced, and any failure rolls back without losing the original.
+        """
+        name = _string(name, "bookmark name")
+        new_name = _string(new_name, "bookmark name")
+        self.ensure_corpus_current()
+        with self.store._transaction() as connection:
+            if self.store.get_bookmark(name) is None:
+                raise WorkspaceError("no such bookmark")
+            if new_name != name and self.store.get_bookmark(new_name) is not None:
+                raise WorkspaceError("bookmark name already exists")
+            connection.execute("UPDATE bookmarks SET name = ? WHERE name = ?", (new_name, name))
+            result = self.store.get_bookmark(new_name)
+            self.ensure_corpus_current()
+        return result
 
     def add_annotation(self, body, session, identifier=None):
         self.require_author()

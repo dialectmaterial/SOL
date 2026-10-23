@@ -40,7 +40,7 @@ steps 5–7). Rules for all three lanes:
 
 ## Claude Code: measure reader latency on screen
 
-**Status:** In review
+**Status:** Done (#115)
 **Branch:** `claude/section-keys-use-channel`
 **Scope:** reader backlog item "measured navigation latency": time from key to
 readable text in a real terminal. The measurement found `]c`/`[c` restarting
@@ -66,39 +66,36 @@ use existing READING documents only; recommendation is a maintainer decision
 **Acceptance:** `scripts/check_docs.py` and full suite; commit, push and open a
 PR against main; report its URL and do not merge. Previous E2 study done (#108).
 
-## Codex B: private source-request hardening
+## Codex B: landmark management
 
-**Status:** Done (#110)
-**Branch:** `codex/source-gap-fixes`
+**Status:** Done (#113)
+**Branch:** `codex/landmark-management`
 **Requested:** 23 October 2026, by the maintainer
 
 ### Goal
 
-Close the three known gaps pinned in #107, applying
-[SOURCE_VALIDATION §3.2](restructuring/SOURCE_VALIDATION.md#32-required-behavior-and-ordering)
-inside CORE's private source implementation. Authority: Architecture §§2/9,
-CORE §§4/8; the public-interface decision in #104 stays pending.
+Close the named-landmark rename and ordering limitation in
+[BEING §7](../BEING.md#7-boundaries-and-known-limitations).
 
 ### Scope
 
-Normalize malformed requested IDs and request shapes to chained `SourceError`;
-validate `render_region` before source/bbox access; refuse corpus changes during
-or after viewer PDF hashing with a final `verify_snapshot_current` check before
-viewer/companion/D-Bus access. Convert the three known-gap tests and add
-synthetic regressions for every consumer. Update SOURCE_VALIDATION and HANDOFF.
+Add atomic rename with the existing name rules to the Neovim reader's `L`
+panel; preserve the saved target and metadata on success, and the old landmark
+on failure. Add a session-only toggle between name and whole-book passage
+order, with unavailable passages last. Update panel hints, `?` help, BEING and
+CHANGELOG. Cover workspace transactions, conflicts and unavailable targets,
+controller behavior and headless Neovim controls.
 
 ### Constraints
 
-No new public names, validator, facade/API_VERSION or request-format changes.
-Preserve capture output, rendering, caching and viewer launching. Existing
-private CORE imports in `source_view` may remain. No private corpus or generated
-artifacts; other lanes' slots stay unchanged. Do not merge.
+No workspace schema change or new persisted settings. Keep the three reader
+markers and other lanes' slots unchanged. Branch from `origin/main`; open a PR
+and do not merge it.
 
 ### Acceptance
 
-Full suite, `tests/test_architecture.py`, `scripts/check_docs.py`; commit, push
-and open a PR against main. Prior source-check coverage completed in #107;
-the source-validation public proposal remains pending in #104.
+Full suite, `tests/test_architecture.py`, `scripts/check_docs.py`; commit, push,
+open a PR against main, and record a HANDOFF report and PR URL.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.

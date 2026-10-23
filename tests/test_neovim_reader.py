@@ -441,6 +441,144 @@ assert 'textual' not in sys.modules
             self.assertEqual(self.run_view(), 0)
         self.assertEqual(self.files(), before)
 
+    def test_landmark_rename_validates_names_and_preserves_targets_in_both_modes(self):
+        self.extend(3)
+        for persistent in (False, True):
+            with self.subTest(persistent=persistent):
+                service = self.service() if persistent else None
+                if service is not None:
+                    self.position(service)
+                def native(payload, _, on_request):
+                    def request(op, **fields):
+                        return on_request({'op': op, 'packet': self.reply(payload, record=2)['packet'],
+                                           'mode': 'continuous', **fields})
+                    request('marker_set', slot=1)
+                    request('landmark_set', name='Original')
+                    request('landmark_set', name='Occupied')
+                    before = (service.store.export() | {"exported_at": None}) if persistent else self.files()
+                    for bad in ('', '   ', 'sol:reader-marker:1', 'x' * 81, 'line\nbreak',
+                                'x\u200dy', 'x\u2028y', 'x\u2029y', '\ud800', ' Occupied '):
+                        with self.subTest(name=bad), self.assertRaises(ValueError):
+                            request('landmark_rename', name='Original', new_name=bad)
+                        self.assertEqual((service.store.export() | {"exported_at": None}) if persistent else self.files(), before)
+                        self.assertEqual([row['name'] for row in request('landmark_list')['landmarks']['rows']],
+                                         ['Occupied', 'Original'])
+                    with self.assertRaisesRegex(ValueError, 'gone|no such bookmark'):
+                        request('landmark_rename', name='Missing', new_name='Unused')
+                    with self.assertRaises(ValueError):
+                        request('landmark_rename', name='sol:reader-marker:1', new_name='Hijacked')
+                    for fields in ({'name': 'Original'}, {'name': 'Original', 'new_name': None},
+                                   {'name': 'Original', 'new_name': 'New', 'extra': True}):
+                        with self.assertRaises(ValueError):
+                            request('landmark_rename', **fields)
+                    result = request('landmark_rename', name='Original', new_name='  Renamed  ')['landmarks']
+                    self.assertEqual((result['action'], result['name'], result['persistent']),
+                                     ('renamed', 'Renamed', persistent))
+                    self.assertEqual([row['name'] for row in result['rows']], ['Occupied', 'Renamed'])
+                    with self.assertRaisesRegex(ValueError, 'landmark is gone'):
+                        request('landmark_open', name='Original')
+                    if persistent:
+                        after = (service.store.export() | {"exported_at": None})
+                        self.assertEqual(after['state'], before['state'])
+                        self.assertEqual(after['history'], before['history'])
+                        old = next(row for row in before['bookmarks'] if row['name'] == 'Original')
+                        self.assertEqual(service.store.get_bookmark('Renamed'), {**old, 'name': 'Renamed'})
+                        marker = next(row for row in before['bookmarks'] if row['name'] == 'sol:reader-marker:1')
+                        self.assertEqual(service.store.get_bookmark(marker['name']), marker)
+                    shown = request('landmark_open', name='Renamed')['payload']
+                    self.assertEqual(shown['restore']['reference']['reference']['target_id'],
+                                     self.book.passages[2].identifier)
+                    return 0, None
+                with patch.object(neovim, 'launch_payload', side_effect=native):
+                    self.assertEqual(self.run_view(service), 0)
+                if service is not None:
+                    service.store.close()
+
+    def test_landmark_book_order_resolves_retired_ids_and_puts_unavailable_last(self):
+        self.extend(66)
+        note = self.add_note()
+        records = self.rows()
+        retired = deepcopy(records[1])
+        retired.pop('note_ids', None)
+        retired.update(id=RETIRED, type='retired_record', redirect_id=self.identifier, order=len(records),
+                       markdown='An invented retired record.', plain_text='An invented retired record.')
+        self.write_records([*records, retired])
+        service = self.service()
+        self.position(service)
+        targets = {'Zulu': self.book.passages[0].identifier, 'alpha': self.book.passages[2].identifier,
+                   'Alpha': self.book.passages[2].identifier, 'Beta': self.book.passages[65].identifier,
+                   'Retired': RETIRED, 'A missing': str(UUID(int=9999)), 'Absent note': note,
+                   'sol:reader-marker:1': self.book.passages[1].identifier}
+        for name, target in targets.items():
+            service.store.set_bookmark(name, target)
+        before = (service.store.export() | {"exported_at": None})
+        def native(payload, _, on_request):
+            def request(op, **fields):
+                return on_request({'op': op, 'packet': self.reply(payload)['packet'],
+                                   'mode': 'continuous', **fields})['landmarks']
+            listed = request('landmark_list')
+            self.assertEqual(listed['order'], 'name')
+            name_order = ['A missing', 'Absent note', 'Alpha', 'alpha', 'Beta', 'Retired', 'Zulu']
+            self.assertEqual([row['name'] for row in listed['rows']], name_order)
+            ordered = request('landmark_order')
+            self.assertEqual(ordered['order'], 'book')
+            self.assertEqual([row['name'] for row in ordered['rows']],
+                             ['Retired', 'Zulu', 'Alpha', 'alpha', 'Beta', 'A missing', 'Absent note'])
+            self.assertEqual([row['available'] for row in ordered['rows']], [True] * 5 + [False] * 2)
+            self.assertEqual(request('landmark_list'), ordered)
+            self.assertEqual([row['name'] for row in request('landmark_order')['rows']], name_order)
+            request('landmark_order')  # leave this session in book order
+            self.assertEqual((service.store.export() | {"exported_at": None}), before)
+            # Unavailable landmarks remain manageable and unavailable after a rename.
+            renamed = request('landmark_rename', name='A missing', new_name='Lost')
+            self.assertEqual(renamed['order'], 'book')
+            self.assertEqual([row['name'] for row in renamed['rows']][-2:], ['Absent note', 'Lost'])
+            self.assertFalse(renamed['rows'][-1]['available'])
+            with self.assertRaisesRegex(ValueError, 'unavailable'):
+                request('landmark_open', name='Lost')
+            self.assertEqual(service.store.get_bookmark('Lost')['target_id'], targets['A missing'])
+            return 0, None
+        with patch.object(neovim, 'launch_payload', side_effect=native):
+            self.assertEqual(self.run_view(service), 0)
+        def reopened(payload, _, on_request):
+            listed = on_request({'op': 'landmark_list', 'packet': self.reply(payload)['packet'],
+                                 'mode': 'continuous'})['landmarks']
+            self.assertEqual(listed['order'], 'name')
+            self.assertEqual([row['name'] for row in listed['rows']],
+                             ['Absent note', 'Alpha', 'alpha', 'Beta', 'Lost', 'Retired', 'Zulu'])
+            return 0, None
+        with patch.object(neovim, 'launch_payload', side_effect=reopened):
+            self.assertEqual(self.run_view(service), 0)
+
+    def test_temporary_landmark_order_is_session_only_and_updates_after_rename(self):
+        self.extend(3)
+        before = self.files()
+        def native(payload, _, on_request):
+            def request(op, record=0, **fields):
+                return on_request({'op': op, 'packet': self.reply(payload, record=record)['packet'],
+                                   'mode': 'continuous', **fields})['landmarks']
+            request('landmark_set', name='Zulu')
+            request('landmark_set', record=2, name='Alpha')
+            self.assertEqual([row['name'] for row in request('landmark_list')['rows']], ['Alpha', 'Zulu'])
+            self.assertEqual([row['name'] for row in request('landmark_order')['rows']], ['Zulu', 'Alpha'])
+            result = request('landmark_rename', name='Alpha', new_name='Aardvark')
+            self.assertEqual(result['order'], 'book')
+            self.assertEqual([row['name'] for row in result['rows']], ['Zulu', 'Aardvark'])
+            self.assertEqual([row['name'] for row in request('landmark_order')['rows']], ['Aardvark', 'Zulu'])
+            request('landmark_order')
+            return 0, None
+        with patch.object(neovim, 'launch_payload', side_effect=native), \
+                patch('sol.being.workspace.store.Workspace', side_effect=AssertionError('No personal store')):
+            self.assertEqual(self.run_view(), 0)
+        def reopened(payload, _, on_request):
+            listed = on_request({'op': 'landmark_list', 'packet': self.reply(payload)['packet'],
+                                 'mode': 'continuous'})['landmarks']
+            self.assertEqual((listed['order'], listed['rows']), ('name', []))
+            return 0, None
+        with patch.object(neovim, 'launch_payload', side_effect=reopened):
+            self.assertEqual(self.run_view(), 0)
+        self.assertEqual(self.files(), before)
+
     def test_live_section_transition_does_not_restart_the_native_process(self):
         self.extend(3)
         def native(payload, _, on_request):
