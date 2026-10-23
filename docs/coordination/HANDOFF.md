@@ -33,6 +33,37 @@ Write "None." rather than deleting a heading.
 -->
 
 
+
+## C3 projection-boundary proposal — 23 October 2026
+
+**Task:** [Codex A: C3 projection-boundary proposal](https://github.com/dialectmaterial/SOL/blob/6b9634ea9aa145218c333b7955ed68ed432ded9d/docs/coordination/CURRENT_TASK.md#codex-a-c3-projection-boundary-proposal), assigned directly by the maintainer.
+**Branch / PR:** `codex/c3-projection-proposal` · [#111](https://github.com/dialectmaterial/SOL/pull/111); author does not merge.
+**Last implementation commit:** `6b9634ea9aa145218c333b7955ed68ed432ded9d` (this report is committed afterward).
+
+### Changed files
+
+- [PROJECTION_BOUNDARY](restructuring/PROJECTION_BOUNDARY.md) — baseline inventory of CORE models/path/loader/config/file/source/protocol responsibilities and corpus maintenance, all reader/workspace/ESSENCE/CLI consumers and fixture assumptions. Distinguishes verified identity/provenance from stored projection metadata and presentation; proposes trusted package-owned internal description data behind the existing loader. Specifies the legacy Hegel rules, unchanged paths/UUIDs/schema-3 positions, complete facade names and independent versions, second-edition/view requirements, alternatives and exact existing/new compatibility tests.
+- `REEVALUATION.md` §3.5 links the proposal; `CURRENT_TASK.md` updates only Codex A's slot to In review; this file records the handoff. No governing Decision/register, runtime code, tests, dependencies, API or format changes. No private corpus text, PDFs, workspaces or exports were accessed or added; tests use disposable synthetic material.
+
+### Tests performed
+
+All Python commands use `/home/dima/Projects/code/sol/.venv/bin/python -B`.
+
+- `scripts/check_docs.py` — OK, including all proposal source links and anchors; external URLs are not network-checked. `git diff --check` — OK.
+- Initial `-m unittest discover -s tests` — **1,273 tests OK (7 skipped, 4 existing expected failures)**, 96.636 s, isolated XDG config/data/state/cache and no private corpus/PDF environment overrides; log `/tmp/sol-c3-full-suite.log`, outside Git.
+- After integrating main at `a509f85`, the same full suite repeats **1,273 tests OK (7 skipped, 4 existing expected failures)**, 111.151 s, with fresh isolated XDG directories; log `/tmp/sol-c3-final-suite.log`, outside Git. The four-file scope audit confirms other lanes and all earlier handoff reports are retained.
+- Read-only AST audit confirms all 50 existing named test references and the complete facade name inventory match the source. The five new equality tests in proposal §5 are explicitly future acceptance requirements, not implemented tests or claimed byte-identity evidence.
+
+### Outstanding issues
+
+This is a design proposal, not the extraction. Alternate mappings still require a deliberate source-guard/file-resolution interface, and schema 3 has no projection discriminator; another view cannot silently reinterpret saved paths. Existing source-validation gaps remain outside scope. No private-corpus comparison was performed or required.
+
+The supplied checkout's `.git` is mounted read-only. Branch, commits, tests and publication use the separate clone `/tmp/sol-c3-projection`, branched from `origin/main`; the final docs are copied back to the supplied checkout. The branch integrates main through `a509f851f3ee3e041cd4c03c226c4d40cc34314a`; original mounted metadata remains on its original main. Review the published topic branch.
+
+### Decisions requiring approval
+
+**Maintainer decision (reserved: public contract):** whether to adopt the package-owned internal description and unchanged-default compatibility promise, or defer until a concrete second projection. No implementation depends on approval in this PR. Public selectors/models, corpus-side descriptions, workspace projection binding and protocol extensions require separate decisions/version policy; all current versions remain unchanged.
+
 ## Private source-request hardening — 23 October 2026
 
 **Task:** [Codex B: private source-request hardening](https://github.com/dialectmaterial/SOL/blob/5c2e657b4d2865f8b91e3308de2fda245a0681a7/docs/coordination/CURRENT_TASK.md#codex-b-private-source-request-hardening).
