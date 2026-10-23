@@ -36,7 +36,7 @@ Write "None." rather than deleting a heading.
 ## Sentence segmentation audit — 23 October 2026
 
 **Task:** [Codex A: sentence segmentation audit](https://github.com/dialectmaterial/SOL/blob/da675a9e02b98a96fdf531ca89c382e55f0a24f1/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer.
-**Branch / PR:** `codex/sentence-segmentation-audit` · [pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fsentence-segmentation-audit); author does not merge.
+**Branch / PR:** `codex/sentence-segmentation-audit` · [#116](https://github.com/dialectmaterial/SOL/pull/116); author does not merge.
 **Last implementation commit:** `da675a9e02b98a96fdf531ca89c382e55f0a24f1` (this report is committed afterward).
 
 ### Changed files
