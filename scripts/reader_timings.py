@@ -179,7 +179,8 @@ def controller_session(directory, root, number, width, measure):
         nonlocal startup
         startup = time.perf_counter() - started
         # Model a reader who has paused on the drawn view before navigating.
-        # Startup ends above; neighbour work belongs to idle, as in the host.
+        # Startup above includes the opening preparation; idle can fill any
+        # remaining neighbours before the navigation measurements.
         for _ in range(2):
             on_request.idle()
         first = payload["records"][0]

@@ -78,8 +78,11 @@ backlog's measured navigation latency and [BEING §2](../BEING.md#2-what-is-impl
 Profile the whole opening with `scripts/reader_timings.py --startup-only` and
 real-terminal tmux `sol --none` status-line polling. Measure imports, corpus and
 snapshot loads/verification, workspace, first payload, neighbour preparation,
-splash, Neovim startup and adapter. Keep only measured improvements; add tests
-for changed behavior, update BEING's numbers and CHANGELOG.
+splash, Neovim startup and adapter. Retain the profiling and applicable timing
+and test improvements. Per review of #117, preserve the maintainer's #112 choice:
+prepare both neighbours during opening; document idle deferral only as a measured
+option for the maintainer. Update BEING and CHANGELOG without claiming an opening
+speedup.
 
 ### Constraints
 Use `/home/dima/Projects/code/sol/local-corpus` read-only. Preserve all CORE §5
