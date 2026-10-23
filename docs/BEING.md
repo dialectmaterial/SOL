@@ -140,6 +140,14 @@ files and must equal the prepared record's checked reference; otherwise the
 section is built as before. On the book (23 October) this cut a section change
 from about 430 to 275 ms of Python time, for about 0.3 s more opening screen.
 The rest is CORE's per-check file verification (CORE §5), unchanged.
+**Measured on screen (23 October, tmux, 100×36, the book):** from key to the
+new section's text, `]c`/`[c` took 1.16 s before sections were prepared ahead,
+0.83 s after, and 0.56 s once they used the action channel. Until then they
+restarted Neovim for every section (a variable lost when the Lua reader was
+split into modules on 18 October; `n`/`b` across a boundary were unaffected).
+Of the 0.56 s, Python takes about 0.52 s, mostly CORE re-hashing the corpus
+files on each check, and Neovim decodes and draws in about 0.04 s. Opening to
+readable text takes about 2.0–2.3 s.
 
 **Book footnote reading:** Footnotes are the edition's own notes, separate from personal notes. Each number is a dim superscript (`⁹⁵`, or `[k]` for lettered notes) at its canonical Markdown callout. The number is display only, absent from `plain_text`, so search, selection and offsets ignore it. `c` works from a cursor or a passage-local visual selection. Its book notes, personal notes and technical source context have separate headings. Enter on a book-note row opens only that note, with its canonical `note_paragraph` children ordered by `order`, original emphasis, per-paragraph attribution, review warnings and display-only callouts. Enter on a listed further footnote follows that link. Backspace returns to the preceding note at its earlier panel cursor, or to `c`; Esc or `q` returns directly to the exact passage cursor and selection in the same reading mode. Resizing closes the panel and restores the passage. Opening or following a note checks the source again and saves no reading visit or workspace data. A refused request leaves the preceding panel available; a reply received after that panel closes is ignored.
 

@@ -360,6 +360,8 @@ return function(reader)
     end
   end
   local function reading_request(action)
+    -- The action channel that neovim_requests opened, if Python offered one.
+    local channel = rawget(_G, 'SOLReaderChannel')
     if action ~= "quit" then
       if not data.navigation[action] then return end
       if vim.fn.mode(1) ~= "n" then fail("clear selection before changing reading sections") end

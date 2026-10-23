@@ -67,9 +67,30 @@ None introduced. No sustained human reading trial is claimed. The supplied check
 None reserved. Defaults: `r` renames, `o` toggles order; an unchanged name is a no-op; unavailable landmarks may still be renamed; rename preserves all metadata; book-order ties use case-insensitive name order with exact-name ties; new sessions start in name order. The maintainer may overrule these defaults.
 
 
+## Reader latency on screen; section keys use the channel — 23 October 2026
+
+**Task:** [Claude Code: measure reader latency on screen](CURRENT_TASK.md#claude-code-measure-reader-latency-on-screen).
+**Branch / PR:** `claude/section-keys-use-channel` · pull request from this branch.
+**Last implementation commit:** the commit before this report.
+
+### Changed files
+- `sol/being/neovim/neovim_controls.lua` — `reading_request` reads `_G.SOLReaderChannel`. Since the module split (552a769, 18 October) it tested an undefined global `channel`, so `]c`/`[c` always quit and restarted Neovim, and quitting never waited for pending saves.
+- `tests/test_reader_surface_neovim.py` — `]c`/`[c` send channel requests and leave Neovim running (fails without the fix).
+- `docs/BEING.md`, `CHANGELOG.md`.
+
+### Tests performed
+- Full suite — OK (7 skipped, 4 expected failures); docs check OK.
+- Real terminal (tmux 100×36, the book, `sol --none`, 6–8 presses each, polled every 5 ms until the status line and text changed): `]c` 1.16 s before #112 → 0.83 s after → 0.56 s with this fix. Python's handling, logged in the same runs, was about 0.52 s; Neovim decode and draw about 0.04 s. Opening to readable text 2.0–2.3 s. Two Codex test suites were running at the same time, so absolute Python times are higher than on an idle machine.
+
+### Outstanding issues
+- Nearly all remaining latency is CORE's per-check verification (about 14 full re-hashes of the canonical files per move). See *Decisions requiring approval*.
+
+### Decisions requiring approval
+- **(reserved)** CORE §5 per-check file verification: hashing once per user action instead of at every check would cut a section change to roughly 0.2 s. Files changed in the milliseconds between checks of one action would then be caught at the next action instead. Not implemented.
+
 ## Sections prepared ahead — 23 October 2026
 
-**Task:** [Claude Code: prepare reader sections ahead](CURRENT_TASK.md#claude-code-prepare-reader-sections-ahead).
+**Task:** [Claude Code: prepare reader sections ahead](https://github.com/dialectmaterial/SOL/blob/d9fa759/docs/coordination/CURRENT_TASK.md#claude-code-prepare-reader-sections-ahead).
 **Branch / PR:** `claude/prepare-sections-ahead` · pull request from this branch.
 **Last implementation commit:** the commit before this report.
 
