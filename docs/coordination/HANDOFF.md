@@ -33,6 +33,42 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## ESSENCE study settings and comparison sorting — 23 October 2026
+
+**Task:** [Codex A: ESSENCE study settings and comparison sorting](https://github.com/dialectmaterial/SOL/blob/22ed09fb8098c80607fc662afd225a3b349c1d9d/docs/coordination/CURRENT_TASK.md#codex-a-essence-study-settings-and-comparison-sorting), assigned directly by the maintainer.
+**Branch / PR:** `codex/essence-study-settings` · [pull request for this branch](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fessence-study-settings), opened after this report; author does not merge.
+**Last implementation commit:** `22ed09fb8098c80607fc662afd225a3b349c1d9d` (this report is committed afterward).
+
+### Changed files
+
+- `sol/essence/tui/app.py` — TF-IDF integer input, default 20, refuses invalid/out-of-range values before starting a worker; forwards the selected 1–1,000 to the adapter. Comparison results offer `s`, arrows/Enter to select every column ascending/descending or engine order, Escape to cancel; a visible line names the active order and undefined-last policy. Rebuilds preserve sorted source navigation, selected word/occurrence and export status; the menu scrolls within an 80×24 window.
+- `sol/essence/tui/tfidf.py` — passes `top_n` to `analyze_tfidf`; the existing results header and TF-IDF artifact already include the chosen value.
+- `sol/essence/tui/words.py` — separate display indices sort numeric engine values, with stable engine-order ties and undefined values last in both directions. Sorting precedes the 2,000-row display limit. No engine rows/studies are mutated; status text, saved artifacts and complete CSV/TSV exports remain unchanged.
+- `tests/test_essence_settings.py` — five Textual pilot tests on disposable invented UTF-8 files cover engine argument/header/artifact, both bounds, invalid refusals, all seven columns both ways, ties/nulls, empty sides/union, source mapping, resize/menu visibility, reset/limit and byte-identical CSV/TSV exports.
+- `docs/ESSENCE.md`, `CHANGELOG.md` — implemented controls and limits; `CURRENT_TASK.md` changes only Codex A's slot to In review. No engines, schemas, method IDs, dependencies or logical placements change.
+
+### Tests performed
+
+All Python commands use `/home/dima/Projects/code/sol/.venv/bin/python -B` (Python 3.14.8, Textual 8.2.8).
+
+- Focused `-m unittest discover -s tests -p test_essence_tui.py` — 36 tests OK. New `test_essence_settings.py` — five tests OK; final full suite includes the added menu-visibility regression.
+- Final `-m unittest discover -s tests` — **1,286 tests OK (7 skipped, 4 existing expected failures)**, 182.688 s, isolated XDG config/data/state/cache and Neovim log. Log: `/tmp/sol-essence-final-suite.log`, outside Git. Earlier full run: same counts, 184.561 s.
+- `scripts/check_docs.py` and `git diff --check` — OK; external URLs are not network-checked. Scope comparison confirms engines, methods catalog, dependencies and investigation-state module are untouched.
+- Inspected Textual SVG screenshots rendered to PNG: synthetic Paper 80×24 TF-IDF input, sort menu with its last option highlighted, and sorted results. The first inspection exposed a clipped final menu option; fixed its bounded scrolling layout and added pilot checks. Images remain in `/tmp`, outside Git. Existing tests also exercise both Results sizes and themes.
+
+### Outstanding issues
+
+Investigation state v1 currently records **only version, open screen and origin record** (`EssenceApp.action_leave`); it does **not** record study choices. As requested, no new persistent format or field was invented. `top_n` stays in the current UI and the existing TF-IDF artifact; a new opening starts at 20. Comparison order is presentation only and resets for a new result; the menu can restore engine order explicitly.
+
+No private corpus text, source PDF, personal workspace or generated export was read or committed. Automated synthetic UI checks and screenshot inspection do not establish sustained human reading/terminal acceptance.
+
+The supplied checkout grants read-only Git metadata. Branching, commits, tests and publication use `/tmp/sol-essence-settings`, cloned from `origin/main` at `d9fa759faef63e276ebcbe2d854c1ed5c7e212c2`; final task files are mirrored into the supplied workspace without changing its mounted Git metadata. Review the published topic branch.
+
+### Decisions requiring approval
+
+None reserved. Defaults: `s` opens an explicit column/direction menu; ties retain engine order in either direction, undefined values always come last, and sorting covers the complete result before limiting displayed rows. Existing screen/origin state remains unchanged. New results use engine order; sorting and resizing retain the selected word where it is still displayed.
+
+
 ## Sections prepared ahead — 23 October 2026
 
 **Task:** [Claude Code: prepare reader sections ahead](CURRENT_TASK.md#claude-code-prepare-reader-sections-ahead).
