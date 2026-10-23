@@ -38,14 +38,13 @@ steps 5–7). Rules for all three lanes:
    the PR, update module paths in ARCHITECTURE §2 and the component document,
    and add a CHANGELOG line.
 
-## Claude Code: prepare reader sections ahead
+## Claude Code: measure reader latency on screen
 
 **Status:** In review
-**Branch:** `claude/prepare-sections-ahead`
-**Scope:** maintainer request (23 October): make section crossings faster by
-doing more work on the opening screen. The reader prepares neighbouring
-sections at startup and while idle; CORE's checks are unchanged. Previous task
-(word-unit docs) done: #109.
+**Branch:** `claude/section-keys-use-channel`
+**Scope:** reader backlog item "measured navigation latency": time from key to
+readable text in a real terminal. The measurement found `]c`/`[c` restarting
+Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
 
 ## Codex A: C3 projection-boundary proposal
 

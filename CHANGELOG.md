@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Section keys keep Neovim running — 23 October 2026
+
+`]c` and `[c` restarted Neovim for every section because the Lua controls lost
+their reference to the action channel when the reader was split into modules
+(18 October). They now use the channel like `n`/`b`: about 0.83 → 0.56 s from
+key to text on the book. The same fix restores the wait for unacknowledged
+saves (such as a marker) before quitting.
+
 ### Sections prepared ahead — 23 October 2026
 
 The reader builds the neighbouring sections during the opening screen and,
