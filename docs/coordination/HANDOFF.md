@@ -33,6 +33,33 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## Sections prepared ahead — 23 October 2026
+
+**Task:** [Claude Code: prepare reader sections ahead](CURRENT_TASK.md#claude-code-prepare-reader-sections-ahead).
+**Branch / PR:** `claude/prepare-sections-ahead` · pull request from this branch.
+**Last implementation commit:** the commit before this report.
+
+### Changed files
+- `sol/being/neovim/reader.py` — `prepare_ahead()` builds one neighbouring section per call (both during the opening screen, then on idle); `prepare()` adopts a prepared section only for an exact key (section, width, emphasis, theme) and an unaliased position, else builds as before. Prepared sections are used once and evicted when no longer neighbours.
+- `sol/being/neovim/host.py` — `adopt_restore()` runs the two packet checks `build_payload` runs for a restore position; the fresh capture must equal the prepared record's reference.
+- `sol/being/neovim/channel.py` — a handler may offer `idle()`, called only when no request is waiting and no response is pending.
+- Tests: the four tests that inject failures, competing saves or corpus edits while a destination is prepared now inject into both paths (build and adopt); new tests for adoption equal to a fresh build, idle preparation, theme miss, and the channel's idle hook. `docs/BEING.md`, `CHANGELOG.md`.
+
+### Tests performed
+- Full suite — 1,275 tests OK (7 skipped, 4 expected failures). `scripts/check_docs.py` — OK.
+- Real book, Python only (no Neovim painting): section change 432 → 274 ms median; startup to Neovim launch 309 → 612 ms.
+
+### Review round (Codex B, #112)
+- Adoption now also requires every in-memory book value a fresh build reads (the passages' fields, their records, notes and note bodies, via `section_inputs()`, taken before the build) to be unchanged, and the loaded graph to equal the snapshot, as a fresh build's export finish does. Regressions: a changed other displayed passage, a review flag added after preparation, a replaced record.
+- The channel no longer runs idle work while a request is partly received; regression with a fragmented request.
+- Re-measured: prepared crossing 253 ms median.
+
+### Outstanding issues
+- Remaining section-change time is mostly CORE re-verifying corpus files (14 verifications, ~1,400 hashes per action, ~240 ms). Reducing it would change the maintainer-approved per-check verification in CORE §5, so it is not done here.
+
+### Decisions requiring approval
+- None; the CORE §5 option above is listed for the maintainer, not assumed.
+
 
 ## C3 projection-boundary proposal — 23 October 2026
 
@@ -99,7 +126,7 @@ Interpreter: `/home/dima/Projects/code/sol-codex/.venv/bin/python`, from isolate
 
 ## Word units documented — 23 October 2026
 
-**Task:** [Claude Code: document word units](CURRENT_TASK.md#claude-code-document-word-units).
+**Task:** [Claude Code: document word units](https://github.com/dialectmaterial/SOL/blob/a509f85/docs/coordination/CURRENT_TASK.md#claude-code-document-word-units).
 **Branch / PR:** `claude/word-unit-docs` · pull request from this branch.
 **Last implementation commit:** the commit before this report.
 

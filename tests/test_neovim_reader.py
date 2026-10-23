@@ -17,6 +17,7 @@ from sol.app import main as app
 from sol.being.actions import ReaderActions
 from sol.being.neovim import host as neovim
 from sol.being.neovim import reader as neovim_reader
+from sol.being.surface import Sample
 from sol.presentation.theme import THEMES
 from sol.being.workspace.reader import WorkspaceReader
 from sol.being.workspace.store import Workspace, WorkspaceConflict
@@ -969,7 +970,7 @@ assert 'textual' not in sys.modules
         text = "Short one. This sentence is the longest one in the passage, by a clear margin of words."
         records[1].update(markdown=text, plain_text=text)
         self.write_records(records)
-        build = neovim.build_payload
+        build, adopt = neovim.build_payload, neovim.adopt_restore
         # Each live navigation route, with the request that makes it available first.
         routes = {"next": ({}, None), "previous": ({}, None),
                   "passage_next": ({}, None), "passage_previous": ({}, None),
@@ -1001,6 +1002,12 @@ assert 'textual' not in sys.modules
                         raise RuntimeError("injected view preparation failure")
                     return build(*args, **kwargs)
 
+                # A neighbouring section prepared ahead is adopted, not built.
+                def adopt_or_fail(*args, **kwargs):
+                    if failing:
+                        raise RuntimeError("injected view preparation failure")
+                    return adopt(*args, **kwargs)
+
                 def native(payload, _, on_request):
                     shown = payload
                     for step in ([] if setup is None else setup if isinstance(setup, list) else [setup]):
@@ -1029,6 +1036,7 @@ assert 'textual' not in sys.modules
 
                 with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
                         patch.object(neovim, "build_payload", side_effect=build_or_fail), \
+                        patch.object(neovim, "adopt_restore", side_effect=adopt_or_fail), \
                         patch.dict(os.environ, XDG_DATA_HOME=str(self.root / "data")), \
                         patch.object(neovim, "launch_payload", side_effect=native):
                     self.assertEqual(self.run_view(service), 0)
@@ -1039,13 +1047,18 @@ assert 'textual' not in sys.modules
 
     def test_refused_destination_leaves_mode_and_theme_for_the_next_view(self):
         self.extend(3)
-        build = neovim.build_payload
+        build, adopt = neovim.build_payload, neovim.adopt_restore
         failing, shown = [], []
 
         def build_or_fail(*args, **kwargs):
             if failing:
                 raise RuntimeError("injected view preparation failure")
             return build(*args, **kwargs)
+
+        def adopt_or_fail(*args, **kwargs):
+            if failing:
+                raise RuntimeError("injected view preparation failure")
+            return adopt(*args, **kwargs)
 
         def native(payload, _, on_request):
             shown.append(payload)
@@ -1062,6 +1075,7 @@ assert 'textual' not in sys.modules
 
         with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
                 patch.object(neovim, "build_payload", side_effect=build_or_fail), \
+                patch.object(neovim, "adopt_restore", side_effect=adopt_or_fail), \
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(), 0)
         first, second = shown
@@ -1125,27 +1139,111 @@ assert 'textual' not in sys.modules
                 self.assertEqual(actions.snapshot().current.identifier, destination)
                 self.assertEqual(actions.snapshot().cursor_offset, 0)
 
+    def test_neighbouring_sections_are_prepared_ahead_and_equal_a_fresh_build(self):
+        """Crossing a section boundary adopts a section prepared while reading, checked as a fresh one."""
+        self.extend(4)
+        service = self.service()
+        self.position(service, 0, self.book.passages[1].identifier)
+        build = neovim.build_payload
+        calls = []
+
+        def counted(*args, **kwargs):
+            calls.append(args[0].passages[0].identifier)
+            return build(*args, **kwargs)
+
+        def native(payload, _, on_request):
+            def move(op, packet, **fields):
+                return on_request({"op": op, "packet": packet, "mode": "continuous", **fields})["payload"]
+            # The opening screen prepared both neighbours.
+            with patch.object(neovim, "build_payload", side_effect=AssertionError("prepared section rebuilt")):
+                moved = move("passage_next", payload["restore"])
+            self.assertEqual(moved["records"][0]["id"], self.book.passages[2].identifier)
+            sample = Sample(self.book, (self.book.passages[2],), ReaderActions(self.book))
+            fresh = build(sample, 72, moved["restore"], requested_ids={self.book.passages[2].identifier:
+                                                                        self.book.passages[2].identifier})
+            self.assertEqual(moved["records"], fresh["records"])
+            self.assertEqual(moved["restore"], fresh["restore"])
+            # Idle moments prepare the new neighbours, one section each, then rest.
+            with patch.object(neovim, "build_payload", side_effect=counted):
+                for _ in range(3):
+                    on_request.idle()
+            self.assertEqual(sorted(calls), sorted([self.book.passages[3].identifier,
+                                                    self.book.passages[1].identifier]))
+            with patch.object(neovim, "build_payload", side_effect=AssertionError("prepared section rebuilt")):
+                back = move("passage_previous", moved["restore"])
+            self.assertEqual(back["records"][0]["id"], self.book.passages[1].identifier)
+            # Another theme shapes the view differently, so nothing prepared is reused.
+            calls.clear()
+            with patch.object(neovim, "build_payload", side_effect=counted):
+                move("passage_next", back["restore"], theme="latte")
+            self.assertEqual(calls, [self.book.passages[2].identifier])
+            return 1, None
+
+        with patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 1)
+
+    def test_prepared_section_is_rebuilt_when_the_loaded_book_changed(self):
+        """Adoption requires every book value a fresh build reads to be unchanged."""
+        self.extend(4)
+
+        def changed_text(book):
+            book.passages[3] = replace(book.passages[3], text="Changed reader projection")
+
+        def flagged(book):
+            book.passages[2] = replace(book.passages[2], transcription_status="needs_review")
+
+        def other_record(book):
+            identifier = book.passages[3].identifier
+            book.canonical_records[identifier] = {**book.canonical_records[identifier], "markdown": "Changed."}
+
+        for edit, refused in ((changed_text, True), (flagged, False), (other_record, True)):
+            with self.subTest(edit=edit.__name__):
+                book = core.load_corpus_book(self.corpus)
+                outcome = []
+
+                def native(payload, _, on_request):
+                    edit(book)
+                    request = {"op": "next", "packet": payload["restore"], "mode": "continuous"}
+                    if refused:
+                        with self.assertRaises(ValueError):
+                            on_request(request)
+                    else:
+                        outcome.append(on_request(request)["payload"])
+                    return 1, None
+
+                with patch.object(neovim_reader, "SECTION_BUDGET", 2), \
+                        patch.object(neovim, "validate_environment", return_value="/invented/nvim"), \
+                        patch.object(neovim, "launch_payload", side_effect=native):
+                    self.assertEqual(neovim_reader.run_reader(book, None), 1)
+                if not refused:
+                    self.assertIn("Source transcription needs review.", outcome[0]["records"][0]["warnings"])
+
     def test_competing_save_during_destination_preparation_is_not_rolled_back(self):
         self.extend(3)
         service = self.service()
         self.position(service, 4)
         other = self.service(service.store.path)
-        build = neovim.build_payload
+        build, adopt = neovim.build_payload, neovim.adopt_restore
         competing_state = []
 
-        def build_with_competing_save(*args, **kwargs):
-            prepared = build(*args, **kwargs)
-            competing = ReaderActions(self.book, other)
-            competing.restore()
-            competing.open(self.book.passages[2].identifier)
-            competing.set_cursor(9)
-            competing.save_position()
-            competing_state.append(other.store.get_state())
-            return prepared
+        def competing_save(prepare):
+            def run(*args, **kwargs):
+                prepared = prepare(*args, **kwargs)
+                competing = ReaderActions(self.book, other)
+                competing.restore()
+                competing.open(self.book.passages[2].identifier)
+                competing.set_cursor(9)
+                competing.save_position()
+                competing_state.append(other.store.get_state())
+                return prepared
+            return run
 
         def native(payload, _, on_request):
             request = {"op": "next", "packet": payload["restore"], "mode": "continuous"}
-            with patch.object(neovim, "build_payload", side_effect=build_with_competing_save):
+            # The destination view is built now or, prepared ahead, adopted now.
+            with patch.object(neovim, "build_payload", side_effect=competing_save(build)), \
+                    patch.object(neovim, "adopt_restore", side_effect=competing_save(adopt)):
                 with self.assertRaises(WorkspaceConflict):
                     on_request(deepcopy(request))
             self.assertEqual(len(competing_state), 1)
@@ -1193,19 +1291,22 @@ assert 'textual' not in sys.modules
         self.extend(3)
         service = self.service()
         self.position(service, 4)
-        build = neovim.build_payload
+        build, adopt = neovim.build_payload, neovim.adopt_restore
 
-        def build_then_change_generation(*args, **kwargs):
-            prepared = build(*args, **kwargs)
-            source = self.corpus / "sample.md"
-            source.write_text(source.read_text() + "\nAn unindexed edit.\n")
-            return prepared
+        def then_change_generation(prepare):
+            def run(*args, **kwargs):
+                prepared = prepare(*args, **kwargs)
+                source = self.corpus / "sample.md"
+                source.write_text(source.read_text() + "\nAn unindexed edit.\n")
+                return prepared
+            return run
 
         def native(payload, _, on_request):
             origin = deepcopy(payload["restore"])
             origin["cursor_offset"] = 6
             request = {"op": "next", "packet": origin, "mode": "continuous"}
-            with patch.object(neovim, "build_payload", side_effect=build_then_change_generation):
+            with patch.object(neovim, "build_payload", side_effect=then_change_generation(build)), \
+                    patch.object(neovim, "adopt_restore", side_effect=then_change_generation(adopt)):
                 with self.assertRaises(ValueError):
                     on_request(deepcopy(request))
             saved = service.store.get_state()
