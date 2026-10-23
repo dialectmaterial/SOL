@@ -33,6 +33,48 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## ESSENCE catalog navigation — 24 October 2026
+
+**Task:** [Codex A: ESSENCE catalog navigation](https://github.com/dialectmaterial/SOL/blob/e6e0fdc918baead91ce29b2b7a71b0bcbb5cacae/docs/coordination/CURRENT_TASK.md), requested directly by the maintainer: keep improving the interface.
+**Branch / PR:** `codex/essence-catalog-navigation`, stacked on `f604538`; not opened. Shell `gh pr list` still cannot connect to GitHub; the previously rejected integration write was not repeated. Integration search shows only open Codex PRs #117 and #76, with no open Claude implementation PR. No merge attempted.
+**Last implementation commit:** `e6e0fdc918baead91ce29b2b7a71b0bcbb5cacae` (this report is committed afterward).
+
+### Changed files
+
+- `sol/essence/tui/app.py` — local catalog search by normalized title, identifier or description; shown/total counts; empty-match guidance and disabled configuration; stable option identities for reading, method actions and genealogy destinations. `/` and Ctrl-F find, Enter browses/reads, Escape clears/returns. Search survives screen changes and resize without changing persisted state. Compact study choices share one line below 100 columns, giving source settings two more lines; full labels and descriptions remain in the wide sidebar and hover text. Rounded frames, engines, results, exports and source-return guards are retained.
+- `tests/test_essence_catalog_navigation.py` — four pilot regressions for filtered method identity and CLI-only actions, empty matches, Unicode/description search and queued edits, genealogy destinations outside a filter, retained search/focus and unclipped study controls at 40/80/120 columns.
+- `docs/ESSENCE.md`, `CHANGELOG.md`, `CURRENT_TASK.md` — record implemented controls and scope; only Codex A's coordination slot changes. No dependencies, contracts, logical placements or persistence changes.
+
+### Tests performed
+
+- Final full suite: **1,325 tests OK (7 skipped, 4 existing expected failures)**, 153.858 s; command `.venv/bin/python -B /tmp/sol_essence_test_runner.py`, log `/tmp/sol-essence-catalog-full-suite.log`. Uses isolated XDG directories and the same temporary 50 ms asyncio heartbeat described in the preceding UI reports; no test assertions or skips changed. Normal host command remains `.venv/bin/python -B -m unittest discover -s tests`.
+- Final new navigation tests: **four OK**, 7.275 s. Existing catalog, method, cancellation, source, sorting, settings, persistence, export, layout and packaging checks pass in the full suite. Documentation check and `git diff --check`: **OK**; external URLs are not network-checked.
+- Generated 24 synthetic SVG previews: Night 120×40 and 40×24, Paper 80×24, Mocha 60×24; catalogs, setup, filtered entries and empty matches. Inspected rasterized wide filtered Methods, compact empty matches/setup and narrow genealogy/setup. Selected PNGs: `/home/dima/Documents/Codex/2026-10-24/essence-navigation/`. No private corpus or workspace content is used.
+- Automatically built and installed the tested wheel into `/home/dima/.local/share/sol-app` using `--no-index --no-deps --force-reinstall`. Wheel: `/tmp/sol-essence-catalog-install-b0iiky_3/sol_organizes_logic-0.1.0-py3-none-any.whl`, SHA-256 `b7425fbbed6437a04e7f7691a71e044e6def4d0bac5020119f8bd954bd46ab43`. **All 110 installed package files match both the wheel and checkout byte-for-byte.**
+- Installed verification: `/home/dima/.local/share/sol-app/bin/python3 -I /tmp/sol_verify_installed_catalog.py` from `/tmp`: **passed**. No checkout on `sys.path`; UI imports from the launcher's `site-packages`. Real installed pilot covers catalog filtering, correct TF-IDF configuration, one-line unclipped choices at 40/80 columns, all four screens and existing rounded results/filter/details controls. Both launcher paths/shebangs, `sol --help`, `sol-window --help`, `sol essence --help` and `pip check`: **OK**. Dependency inventory is unchanged. Verification JSON and installed SVGs remain beside the wheel; installed PNGs were inspected and copied to the preview directory.
+
+### Outstanding issues
+
+Installation is complete. An already running ESSENCE retains its imported code;
+leave with `q`, then press `E` in the reader to load the update. The active
+reader was not terminated. At 40 columns source settings still scroll, with
+selection and all controls retained; automated previews do not establish
+sustained human acceptance. Publication awaits GitHub access:
+
+```sh
+git push --set-upstream origin codex/essence-catalog-navigation
+gh pr create --base main --head codex/essence-catalog-navigation --title "Refine ESSENCE's rounded research workspace" --body-file /tmp/sol-essence-navigation-pr.md
+```
+
+### Decisions requiring approval
+
+None reserved. Defaults: search matches a literal normalized substring in the
+catalog's title/ID/description; the shown count includes Genealogy; empty
+matches disable configuration; map navigation clears the search to reveal its
+destination. Compact study names are Words, Sentences and TF-IDF. These
+presentation choices may be revised after use.
+
+
 ## Install verified SOL changes — 24 October 2026
 
 **Task:** [Codex A: install verified SOL changes](https://github.com/dialectmaterial/SOL/blob/205346f72169b0074fd3046e8c0c329cfd79ff2e/docs/coordination/CURRENT_TASK.md), requested directly after the installed interface still appeared old.
