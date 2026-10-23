@@ -10,7 +10,7 @@ import sys
 import threading
 import time
 
-from sol.core.source import SourceError, _request_current, _verify_file
+from sol.core.source import SourceError, _request_current, _verify_file, _verify_snapshot_current
 
 
 def open_viewer(path):
@@ -65,12 +65,13 @@ def open_pdf(request, page_index):
     graphical viewer is available.
     """
     global _companion
-    _request_current(request)
+    snapshot = _request_current(request)
     if type(page_index) is not int or not 0 <= page_index < len(request["sources"]):
         raise SourceError("Choose a source page index within this record's captured page list")
     page = request["sources"][page_index]["pdf_page"]
     pdf = Path(request["source"]["verified_pdf"])
     _verify_file(pdf, request["source"]["sha256"])
+    _verify_snapshot_current(snapshot)
     configured = os.environ.get("SOL_PDF_VIEWER", "").strip()
     if configured:
         command = [part.replace("{page}", str(page)).replace("{file}", str(pdf)) for part in shlex.split(configured)]
@@ -110,10 +111,11 @@ def follow_pdf(request, page_index=0):
 
     Following never opens a window: it only moves one the reader opened with S.
     """
-    _request_current(request)
+    snapshot = _request_current(request)
     if type(page_index) is not int or not 0 <= page_index < len(request["sources"]):
         raise SourceError("Choose a source page index within this record's captured page list")
     _verify_file(Path(request["source"]["verified_pdf"]), request["source"]["sha256"])
+    _verify_snapshot_current(snapshot)
     return _show_on_companion(request, page_index)
 
 

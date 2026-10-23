@@ -10,6 +10,13 @@ boundary no longer wait for a full section build (about 430 → 275 ms of Python
 time on the book; the opening screen is about 0.3 s longer). Prepared sections
 are reused only when a fresh CORE capture still matches them.
 
+### Private source-request hardening — 23 October 2026
+
+Malformed source requests raise `SourceError`; region rendering validates before
+reading page locations. PDF viewers and following refuse a corpus generation
+change during/after PDF verification before accessing a viewer or D-Bus.
+Capture output, rendering, caches and public CORE interfaces are unchanged.
+
 ### Word units documented — 23 October 2026
 
 `--word` help and BEING/ESSENCE docs now say what whole-word search matches

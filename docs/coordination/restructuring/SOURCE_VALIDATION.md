@@ -5,9 +5,9 @@
 **Inspected baseline:** `origin/main` at
 `9beb586073d2247c852f7640bd4e660167d5cc90`; later documentation-only main
 integration is recorded in HANDOFF and does not change the inspected source.
-No Python, tests, exports, versions, dependencies, schemas or Decision statements
-are changed by this document. The test cases below are implementation acceptance
-criteria, not tests added in this PR.
+The original proposal changed no Python, tests, exports, versions, dependencies,
+schemas or Decision statements. Its public-interface acceptance criteria remain
+pending; subsequent private hardening is recorded below.
 
 This follows [REEVALUATION §3.6](REEVALUATION.md#36-the-source-viewer-imports-private-core-helpers).
 Authority remains [CORE §§4–6/8](../../CORE.md#4-core-public-api-and-runtime-boundary),
@@ -16,6 +16,20 @@ Authority remains [CORE §§4–6/8](../../CORE.md#4-core-public-api-and-runtime
 Keep capture/verification/rendering in CORE and detached viewers in BEING.
 There is no new logical placement or claim that page coordinates constitute
 Measure; the stage E reading and judgment remain the rationale.
+
+**Private hardening, 23 October 2026.** The three known gaps pinned in #107
+are closed privately: malformed requested IDs/request shapes raise `SourceError`
+with chained validation causes; `render_region` validates before reading source
+entries or bbox; `open_pdf`/`follow_pdf` retain the freshly loaded snapshot and
+call `verify_snapshot_current` after PDF hashing, translating `CorpusError`
+before any viewer, companion or D-Bus access. Regressions cover all four
+consumers, crop/fallback rendering and changes during/after hashing. Capture
+output, identifier-prefix resolution, rendering/cache/viewer behavior, request
+version and `sol.core` facade/API_VERSION are unchanged. The new generation
+wrapper is private; this does **not** implement the proposed public validator,
+immutable results, full-UUID/absolute-path contract or asynchronous highlight
+ownership changes. Those decisions remain pending in #104. The inventory and
+limitations below describe the inspected baseline unless marked otherwise.
 
 ## 1. Inventory method and scope
 
