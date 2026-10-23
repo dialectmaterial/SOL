@@ -35,7 +35,7 @@ Write "None." rather than deleting a heading.
 ## Faster opening to readable text — 23 October 2026
 
 **Task:** [Codex B: faster opening to readable text](https://github.com/dialectmaterial/SOL/blob/d1dc8875919c5cad36ead80477cc09003fb7586b/docs/coordination/CURRENT_TASK.md#codex-b-faster-opening-to-readable-text), assigned directly by the maintainer.
-**Branch / PR:** `codex/faster-opening` · [PR for this branch](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Ffaster-opening); author does not merge.
+**Branch / PR:** `codex/faster-opening` · [#117](https://github.com/dialectmaterial/SOL/pull/117); author does not merge.
 **Last implementation commit:** `d1dc8875919c5cad36ead80477cc09003fb7586b` (this report is committed afterward).
 
 ### Changed files
