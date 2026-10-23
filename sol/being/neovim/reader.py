@@ -328,9 +328,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
 
     with single_action(book.corpus_snapshot):
         payload, sample, extent = prepare()
-    # While the opening screen still shows, prepare both neighbouring sections.
-    for _ in range(2):
-        prepare_ahead()
+    # Launch the checked first view before doing speculative neighbour work.
+    # The native channel calls prepare_ahead on idle, one section at a time.
 
     # Each action's extra fields, their checks and the refusals shown in Neovim.
     # Actions without an entry take no extra field.

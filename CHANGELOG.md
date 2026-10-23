@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Faster opening — 23 October 2026
+
+Launch the fully checked first view before preparing neighbouring sections;
+prepare them through the existing native idle hook, one at a time. On the real
+book, tmux launch-to-status-line median falls from 2.09 to 1.65 s (seven fresh
+`sol --none` sessions per version, warm OS cache). Immediate navigation still
+builds an unprepared destination normally. CORE verification, the splash,
+contracts, schemas and dependencies are unchanged. The controller timing probe
+allows idle preparation after measuring startup and before measuring navigation.
+
 ### ESSENCE study controls — 23 October 2026
 
 Experiment accepts TF-IDF top_n from 1 to 1,000 (default 20), shows the choice
