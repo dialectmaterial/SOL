@@ -36,7 +36,7 @@ Write "None." rather than deleting a heading.
 ## ESSENCE study settings and comparison sorting — 23 October 2026
 
 **Task:** [Codex A: ESSENCE study settings and comparison sorting](https://github.com/dialectmaterial/SOL/blob/22ed09fb8098c80607fc662afd225a3b349c1d9d/docs/coordination/CURRENT_TASK.md#codex-a-essence-study-settings-and-comparison-sorting), assigned directly by the maintainer.
-**Branch / PR:** `codex/essence-study-settings` · [pull request for this branch](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fessence-study-settings), opened after this report; author does not merge.
+**Branch / PR:** `codex/essence-study-settings` · [#114](https://github.com/dialectmaterial/SOL/pull/114); author does not merge.
 **Last implementation commit:** `22ed09fb8098c80607fc662afd225a3b349c1d9d` (this report is committed afterward).
 
 ### Changed files
@@ -60,7 +60,7 @@ All Python commands use `/home/dima/Projects/code/sol/.venv/bin/python -B` (Pyth
 
 Investigation state v1 currently records **only version, open screen and origin record** (`EssenceApp.action_leave`); it does **not** record study choices. As requested, no new persistent format or field was invented. `top_n` stays in the current UI and the existing TF-IDF artifact; a new opening starts at 20. Comparison order is presentation only and resets for a new result; the menu can restore engine order explicitly.
 
-No private corpus text, source PDF, personal workspace or generated export was read or committed. Automated synthetic UI checks and screenshot inspection do not establish sustained human reading/terminal acceptance.
+No private corpus text, source PDF or personal workspace was read; no generated exports were committed. Automated synthetic UI checks and screenshot inspection do not establish sustained human reading/terminal acceptance.
 
 The supplied checkout grants read-only Git metadata. Branching, commits, tests and publication use `/tmp/sol-essence-settings`, cloned from `origin/main` at `d9fa759faef63e276ebcbe2d854c1ed5c7e212c2`; final task files are mirrored into the supplied workspace without changing its mounted Git metadata. Review the published topic branch.
 
