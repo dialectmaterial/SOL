@@ -46,23 +46,24 @@ steps 5–7). Rules for all three lanes:
 readable text in a real terminal. The measurement found `]c`/`[c` restarting
 Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
 
-## Codex A: install verified SOL changes
+## Codex A: ESSENCE catalog navigation
 
 **Status:** In review (local; publication blocked by GitHub access)
-**Branch:** `codex/install-verified-changes`
-**Requested:** 24 October 2026, directly by the maintainer after their installed ESSENCE still showed the old interface
-**Scope:** update the actual launcher environment with the tested redesign and
-workflow polish; record standing authorization to install future verified
-application changes automatically. This is the operational installation
-procedure in [CONTRIBUTING](../../CONTRIBUTING.md#install-verified-changes-for-the-maintainer),
-not a change to [ESSENCE](../ESSENCE.md) or the other governing documents.
-**Constraints:** preserve dependencies, optional features and personal data;
-leave active sessions intact; other lanes' slots unchanged; do not merge own PR.
-**Acceptance:** build and install the tested wheel, verify installed files and
-UI behavior with isolated Python outside the checkout, check dependencies and
-launcher entry points; document the earlier incorrect import check and the
-standing installation workflow. Stacked on local polish `37f7fd4`; publication
-remains subject to the existing GitHub access restriction.
+**Branch:** `codex/essence-catalog-navigation`
+**Requested:** 24 October 2026, directly by the maintainer: keep improving the interface
+**Scope:** searchable Encyclopedia/Methods catalogs with explicit empty states
+and correct filtered entry/actions; a compact horizontal study selector to give
+source settings more room in reader splits. Follow
+[ESSENCE §4](../ESSENCE.md#4-interaction-model-and-inquiry-contract), retaining the
+accepted rounded style. Install the verified result automatically under
+[CONTRIBUTING](../../CONTRIBUTING.md#install-verified-changes-for-the-maintainer).
+**Constraints:** preserve study engines, full catalog content, genealogy links,
+source-return guards, persistence, dependencies and active sessions; other
+lanes' slots unchanged; do not merge own PR.
+**Acceptance:** keyboard/filter/method mapping and resize regression checks,
+synthetic previews in wide and narrow windows, full suite and docs check;
+verify the installed wheel/UI outside the checkout. Stacked on `f604538`;
+publication remains subject to the existing GitHub access restriction.
 
 ## Codex B: landmark management
 

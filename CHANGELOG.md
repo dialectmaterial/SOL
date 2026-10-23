@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### ESSENCE catalog navigation — 24 October 2026
+
+Encyclopedia and Methods have local search by title, identifier or description,
+with shown/total counts, clear empty matches and keyboard access through `/` or
+Ctrl-F. Filtered entries keep their correct reading and configuration actions;
+genealogy links reveal destinations outside the search. Search survives screen
+changes and resize without changing saved investigation state. Below 100
+columns, a one-line study selector gives source settings two more lines; full
+study labels and guidance remain in the wide sidebar and hover descriptions.
+
 ### ESSENCE results and method workflow — 24 October 2026
 
 Results opens with compact totals and an `i Details` disclosure for the existing

@@ -223,6 +223,26 @@ Prose export and saved-study checking remain labeled CLI operations with their
 documented commands. Catalog/detail panels and all existing reading controls
 remain available.
 
+**Catalog navigation (24 October 2026):** Encyclopedia and Methods have a compact
+search field and a shown/total entry count. `/` or Ctrl-F focuses the field;
+matching uses a normalized, case-insensitive literal substring of the title,
+identifier or description (the Encyclopedia's ESSENCE note or the Methods
+summary). Enter moves to matching entries, then Enter reads the chosen entry;
+Escape in a nonempty search clears it, and a further Escape returns to the
+list. Search fields retain their values while switching screens and resizing,
+without extending persisted investigation state. A search with no matches
+shows an explicit empty view and disables method configuration. Filtered rows
+retain their original catalog identity; genealogy links reveal their destination
+even when it falls outside the search. Attribution, excerpts, full method
+descriptions and CLI commands remain available in their original entries.
+
+Below 100 columns, the study choices become a single horizontal row labeled
+**Words**, **Sentences** and **TF-IDF**, giving source settings two more lines
+of vertical space. Left/Right or Up/Down chooses a study and Enter selects it;
+resizing preserves selection and form values. Wide windows retain the full
+labels and explanatory sidebar; hover text provides the study description at
+either size.
+
 **Proposed launch and return requirements:**
 
 | Event | Required behaviour |

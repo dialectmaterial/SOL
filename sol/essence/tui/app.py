@@ -57,6 +57,8 @@ STUDY_NOTES = {
 }
 
 METHOD_STUDIES = {"words": "words", "word-comparison": "words", "tfidf": "tfidf", "sentences": "sentences"}
+STUDY_LABELS = {"words": ("Word frequencies", "Words"), "sentences": ("Sentence lengths", "Sentences"),
+                "tfidf": ("TF-IDF · top terms", "TF-IDF")}
 
 SCREENS = {
     "encyclopedia": ("Encyclopedia", None),
@@ -135,7 +137,10 @@ class EssenceApp(App):
     Tab { color: $text-muted; padding: 0 2; }
     Tab.-active { color: $accent; text-style: bold; }
     TabPane { padding: 0 1; }
-    .browser-help { height: 1; color: $text-muted; text-overflow: ellipsis; text-wrap: nowrap; }
+    .browser-tools { height: 1; margin-bottom: 1; }
+    .browser-search { width: 1fr; height: 1; border: none; padding: 0 1; background: $surface; }
+    .browser-search:focus { border: none; background: $primary 18%; }
+    .browser-count { width: auto; padding-left: 1; color: $text-muted; }
     .browser-layout { height: 1fr; }
     .browser-list, .browser-detail, .setup-panel, .choice-group,
     #tfidf-settings, #summary-box, DataTable, #empty-results {
@@ -212,6 +217,8 @@ class EssenceApp(App):
     Screen.-compact .browser-detail { width: 1fr; }
     Screen.-compact #experiment-layout { layout: vertical; }
     Screen.-compact #study-panel { width: 1fr; height: auto; margin: 0 0 1 0; }
+    Screen.-compact #study { layout: horizontal; height: 1; }
+    Screen.-compact #study RadioButton { width: auto; padding: 0 1 0 0; }
     Screen.-compact #study-note { display: none; }
     Screen.-compact #experiment-body { width: 1fr; }
     Screen.-compact Tab { padding: 0 1; }
@@ -219,6 +226,8 @@ class EssenceApp(App):
     Screen.-compact #word-tools { margin-top: 0; }
     Screen.-compact #summary-box { height: 3; max-height: 3; }
     Screen.-small .choices { layout: vertical; }
+    Screen.-small #study-panel { padding: 0; }
+    Screen.-small #study RadioButton { padding: 0; }
     Screen.-small .choice-group { width: 1fr; }
     Screen.-small #reference-group { margin: 1 0 0 0; }
     """
@@ -289,10 +298,12 @@ class EssenceApp(App):
                                     f"*{titles.get(reference, reference)}*, on the Encyclopedia screen (1)."))
 
     def compose_browser(self, name) -> ComposeResult:
-        yield Static(BROWSERS[name], classes="browser-help")
-        first = ["Genealogy"] if name == "encyclopedia" else []
+        with Horizontal(classes="browser-tools"):
+            yield Input(placeholder="/ Find a topic" if name == "encyclopedia" else "/ Find a method",
+                        id=f"{name}-search", classes="browser-search")
+            yield Static("", id=f"{name}-count", classes="browser-count", markup=False)
         with Horizontal(classes="browser-layout"):
-            yield OptionList(*first, *(item["title"] for item in self.browser_items(name)), id=f"{name}-list",
+            yield OptionList(*self.browser_options(name), id=f"{name}-list",
                              classes="browser-list")
             with VerticalScroll(id=f"{name}-detail", classes="browser-detail"):
                 yield Markdown(self.browser_markdown(name, 0), id=f"{name}-entry")
@@ -303,6 +314,56 @@ class EssenceApp(App):
             with Horizontal(id="method-actions"):
                 yield Button("Use this method", id="use-method")
                 yield Static("Configure it in Experiment", id="method-availability")
+
+    @staticmethod
+    def normalized_query(value):
+        return unicodedata.normalize("NFC", value.strip()).casefold().replace("’", "'")
+
+    def browser_options(self, name, query=""):
+        """Stable option IDs keep filtered positions separate from catalog entries."""
+        entries = ([{"title": "Genealogy", "essence": self.catalog["genealogy"]["note"]}]
+                   if name == "encyclopedia" else []) + self.browser_items(name)
+        query = self.normalized_query(query)
+        return [Option(Text(item["title"]), id=str(index)) for index, item in enumerate(entries)
+                if query in self.normalized_query(" ".join((item["title"], item.get("id", ""),
+                                                            item.get("essence", item.get("summary", "")))))]
+
+    def browser_index(self, name):
+        option = self.query_one(f"#{name}-list", OptionList).highlighted_option
+        return int(option.id) if option is not None else None
+
+    def filter_browser(self, name) -> None:
+        listing = self.query_one(f"#{name}-list", OptionList)
+        selected = self.browser_index(name)
+        field = self.query_one(f"#{name}-search", Input)
+        options = self.browser_options(name, field.value)
+        ids = [option.id for option in options]
+        with self.prevent(OptionList.OptionHighlighted):
+            listing.set_options(options)
+            listing.highlighted = ids.index(str(selected)) if str(selected) in ids else 0 if ids else None
+        self.update_browser(name)
+
+    def update_browser(self, name) -> None:
+        index = self.browser_index(name)
+        total = len(self.browser_items(name)) + (name == "encyclopedia")
+        shown = self.query_one(f"#{name}-list", OptionList).option_count
+        self.query_one(f"#{name}-count", Static).update(f"{shown} / {total}")
+        detail = self.query_one(f"#{name}-detail", VerticalScroll)
+        if index is None:
+            title = "No matches"
+            content = "## No matches\n\nTry a shorter search, or press Escape in the search field to show all entries."
+        else:
+            title = ("Genealogy" if name == "encyclopedia" and index == 0 else
+                     self.browser_items(name)[index - (name == "encyclopedia")]["title"])
+            content = self.browser_markdown(name, index)
+        detail.border_title = Text(title)
+        self.query_one(f"#{name}-entry", Markdown).update(content)
+        detail.scroll_home(animate=False)
+        if name == "methods":
+            self.update_method_action(index)
+        else:
+            for part in ("#genealogy-map", "#genealogy-sources"):
+                self.query_one(part).display = index == 0
 
     def genealogy_options(self):
         """One line per method: year, line of descent, ● runs in ESSENCE, ○ a reading topic."""
@@ -328,13 +389,9 @@ class EssenceApp(App):
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         name = (event.option_list.id or "").removesuffix("-list")
         if name in BROWSERS:
-            self.query_one(f"#{name}-entry", Markdown).update(self.browser_markdown(name, event.option_index))
-            self.query_one(f"#{name}-detail", VerticalScroll).scroll_home(animate=False)
-            if name == "methods":
-                self.update_method_action(event.option_index)
-            if name == "encyclopedia":
-                for part in ("#genealogy-map", "#genealogy-sources"):
-                    self.query_one(part).display = event.option_index == 0
+            # Ignore highlight messages queued before a newer search rebuilt the list.
+            if event.option_id == str(self.browser_index(name)):
+                self.update_browser(name)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if event.option_list.id == "genealogy-map":
@@ -342,13 +399,20 @@ class EssenceApp(App):
             entry = genealogy_rows(self.catalog)[event.option_index]["entry"]
             ids = [item["id"] for item in self.catalog["entries"]]
             if entry in ids:
+                # A map entry may be outside the current search; reveal it first.
+                with self.prevent(Input.Changed):
+                    self.query_one("#encyclopedia-search", Input).value = ""
+                self.filter_browser("encyclopedia")
                 self.query_one("#encyclopedia-list", OptionList).highlighted = ids.index(entry) + 1
+                self.update_browser("encyclopedia")
                 self.query_one("#encyclopedia-detail").focus()
             return
         name = (event.option_list.id or "").removesuffix("-list")
-        if name == "encyclopedia" and event.option_index == 0:
+        if name not in BROWSERS or event.option_id != str(self.browser_index(name)):
+            return
+        if name == "encyclopedia" and self.browser_index(name) == 0:
             self.query_one("#genealogy-map", OptionList).focus()
-        elif name in BROWSERS:
+        else:
             self.query_one(f"#{name}-detail").focus()
 
     def compose_experiment(self) -> ComposeResult:
@@ -421,6 +485,10 @@ class EssenceApp(App):
         self.query_one("#tfidf-settings").display = self.choice("study") == "tfidf"
 
     def update_method_action(self, index) -> None:
+        if index is None:
+            self.query_one("#use-method", Button).disabled = True
+            self.query_one("#method-availability", Static).update("Find a method to configure it")
+            return
         item = self.methods["entries"][index]
         supported = item["id"] in METHOD_STUDIES
         self.query_one("#use-method", Button).disabled = not supported
@@ -429,16 +497,24 @@ class EssenceApp(App):
         self.query_one("#methods-detail").border_title = Text(item["title"])
 
     def on_input_changed(self, event: Input.Changed) -> None:
+        name = (event.input.id or "").removesuffix("-search")
+        if name in BROWSERS:
+            if event.value == event.input.value:
+                self.filter_browser(name)
+            return
         if event.input.id != "word-filter" or not isinstance(self.last_count, words.Count):
             return
         if event.value != event.input.value:
             return  # A new result may already have cleared an old queued edit.
-        query = unicodedata.normalize("NFC", event.value.strip()).casefold().replace("’", "'")
+        query = self.normalized_query(event.value)
         if query != self.word_filter:
             self.word_filter = query
             self.reflow_result()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        name = (event.input.id or "").removesuffix("-search")
+        if name in BROWSERS and self.browser_index(name) is not None:
+            self.query_one(f"#{name}-list").focus()
         if event.input.id == "word-filter":
             self.query_one("#frequencies").focus()
 
@@ -483,8 +559,10 @@ class EssenceApp(App):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "use-method":
-            listing = self.query_one("#methods-list", OptionList)
-            method = self.methods["entries"][listing.highlighted or 0]["id"]
+            index = self.browser_index("methods")
+            if index is None:
+                return
+            method = self.methods["entries"][index]["id"]
             study = METHOD_STUDIES.get(method)
             if study is not None:
                 for button in self.query("#study RadioButton"):
@@ -829,6 +907,8 @@ class EssenceApp(App):
         for screen in self.screen_stack:
             screen.set_class(width < 100, "-compact")
             screen.set_class(width < 60, "-small")
+        for button in self.query("#study RadioButton"):
+            button.label = STUDY_LABELS[button.name][width < 100]
 
     def reflow_result(self) -> None:
         table = self.query_one("#frequencies", DataTable)
@@ -864,6 +944,21 @@ class EssenceApp(App):
         if isinstance(self.screen, WordSort):
             return
         active = self.query_one("#screens", TabbedContent).active
+        if active in BROWSERS:
+            field = self.query_one(f"#{active}-search", Input)
+            if self.focused is field:
+                if event.key == "escape":
+                    if field.value:
+                        field.value = ""
+                    else:
+                        self.query_one(f"#{active}-list").focus()
+                    event.stop()
+                    event.prevent_default()
+                return
+            if event.key in ("slash", "/", "ctrl+f"):
+                field.focus()
+                event.stop()
+                event.prevent_default()
         if active == "results" and self.last_count is not None:
             field = self.query_one("#word-filter", Input)
             if self.focused is field:
@@ -925,7 +1020,13 @@ class EssenceApp(App):
         }.items():
             self.query_one(f"#{selector}").border_title = title
         self.update_choices()
-        self.update_method_action(self.query_one("#methods-list", OptionList).highlighted or 0)
+        for button in self.query("#study RadioButton"):
+            button.tooltip = STUDY_LABELS[button.name][0] + " · " + STUDY_NOTES[button.name]
+        for name in BROWSERS:
+            self.query_one(f"#{name}-search").tooltip = "Find by title, identifier or description. " + BROWSERS[name]
+            self.query_one(f"#{name}-list").border_subtitle = "/ Find · Enter read"
+            self.query_one(f"#{name}-detail").border_subtitle = "Esc contents"
+            self.update_browser(name)
         self.query_one("#word-filter").tooltip = "Filter normalized word spellings; counts, denominators and exports retain the full study."
         self.set_word_widgets(False)
         if self.theme_file:
