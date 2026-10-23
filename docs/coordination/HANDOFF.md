@@ -33,6 +33,44 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## Install verified SOL changes — 24 October 2026
+
+**Task:** [Codex A: install verified SOL changes](https://github.com/dialectmaterial/SOL/blob/205346f72169b0074fd3046e8c0c329cfd79ff2e/docs/coordination/CURRENT_TASK.md), requested directly after the installed interface still appeared old.
+**Branch / PR:** `codex/install-verified-changes`, stacked on local polish `37f7fd4`; not opened because the previously established GitHub DNS/write-access restriction remains. No merge attempted.
+**Last implementation commit:** `205346f72169b0074fd3046e8c0c329cfd79ff2e` (this report is committed afterward).
+
+### Changed files
+
+- `CONTRIBUTING.md`, `CLAUDE.md` — record the maintainer's standing authorization: install each completed, verified application change into the existing launcher environment, then verify outside the checkout. Preserve dependencies and active sessions. Local installation does not publish or merge a branch.
+- `CURRENT_TASK.md` — update only Codex A's slot. No application code, dependency, corpus or workspace change in this follow-up.
+- Local installation — replaced the old package in `/home/dima/.local/share/sol-app`, which both `~/.local/bin/sol` and `sol-window` launch. The old distribution pointed to a temporary `scratchpad/install-src` directory. The preceding reports' imports had run inside the checkout, masking the stale installed package; their installation claims were incorrect and are corrected below.
+
+### Tests performed
+
+- Built the tested checkout with `.venv/bin/python -I -m pip wheel --no-index --no-deps --no-build-isolation --wheel-dir /tmp/sol-local-install-inu0ub71 /home/dima/Projects/code/sol`. Installed with `/home/dima/.local/share/sol-app/bin/python3 -I -m pip install --no-index --no-deps --force-reinstall /tmp/sol-local-install-inu0ub71/sol_organizes_logic-0.1.0-py3-none-any.whl` from `/tmp`.
+- Wheel SHA-256: `5548552649cbf7bf45329917c451102850dfb49e5c4604310036272cac93792e`. All **110 installed package files match** the built wheel byte-for-byte. Application content includes redesign `c4c1d53` and polish `59904eb`; this follow-up changes operational documentation only.
+- `/home/dima/.local/share/sol-app/bin/python3 -I /tmp/sol_verify_installed_ui.py`, working directory `/tmp`: **passed**. No checkout directory on `sys.path`; imported UI is under the launcher's `site-packages`. Real installed Textual pilot verified all four screens, rounded borders, word filtering, expanded details and resizing from 120×40 to 80×24, with invented text and temporary XDG directories. SVG/PNG previews and `verification.json` remain in the wheel staging directory.
+- Both launcher paths/shebangs, `sol --help`, `sol-window --help`, `sol essence --help`: **OK** from outside the checkout. `pip check`: **no broken requirements**. Package inventory comparison confirms all dependencies unchanged, including Textual 8.2.8.
+- Documentation check and `git diff --check`: **OK**. No new application code; the installed application is the same code covered by the preceding **1,321-test** full-suite run, not a newly repeated full suite.
+
+### Outstanding issues
+
+An already open ESSENCE process retains its imported code: leave with `q`, then
+press `E` in the reader to start the installed version. The active reader was
+not terminated. GitHub publication is still unavailable; local installation is
+complete. When access is available:
+
+```sh
+git push --set-upstream origin codex/install-verified-changes
+gh pr create --base main --head codex/install-verified-changes --title "Install verified SOL changes and refine ESSENCE" --body-file /tmp/sol-install-workflow-pr.md
+```
+
+### Decisions requiring approval
+
+None. Automatic installation after appropriate verification is explicitly
+authorized by the maintainer for future application changes.
+
+
 ## ESSENCE workflow polish — 24 October 2026
 
 **Task:** [Codex A: ESSENCE workflow polish](https://github.com/dialectmaterial/SOL/blob/59904eb455c57a1e414349ed1be2b763713f99bd/docs/coordination/CURRENT_TASK.md), requested directly after the maintainer accepted the redesigned appearance.
@@ -54,7 +92,7 @@ Python 3.14.8, Textual 8.2.8, checkout `.venv/bin/python -B`.
 - Focused UI suite: 50 tests OK. Final workflow/layout run: nine tests OK, including expanded details and source/export frame bounds. Existing sorting, CSV/TSV exports, source navigation, temporary-session writes, cancellation, theme and package checks pass in the final full suite.
 - Documentation check, `git diff --check` and `python -m sol essence --help`: OK. External documentation URLs are not network-checked.
 - Generated 36 invented-text SVG previews across Night 120×40 and 40×24, Paper 80×24 and Mocha 60×24: catalogs, setup, empty/results views, filtered results and expanded details. Inspected rasterized wide/compact results, method actions, filtering and expanded details, including 40-column frame bounds. Files remain outside Git in `/tmp/sol-essence-polish-preview`; selected PNGs are in `/home/dima/Documents/Codex/2026-10-24/essence-polish/`.
-- The installed `sol` environment imports this checkout and its four method shortcuts. Reopen ESSENCE with `E` to use the changes; no reinstall is needed.
+- **Correction, 24 October:** the import check ran inside the checkout and masked the stale installed package. Reinstallation was required and is now complete; see the installation report above.
 
 ### Outstanding issues
 
@@ -101,7 +139,7 @@ Python 3.14.8, Textual 8.2.8, using the checkout's `.venv/bin/python -B`.
 - Final five new layout tests: OK, 8.767 s. Existing comparison sorting, undefined values, source navigation, cancellation, exports, themes and small-window tests pass in the final full suite. An earlier full run had 1,316 tests OK before adding the sort-modal resize regression and fix.
 - `scripts/check_docs.py`, `git diff --check` and `python -m sol essence --help`: OK. External documentation URLs are not network-checked.
 - Generated 28 synthetic Textual SVG previews: Night 120×40 and 40×24, Paper 80×24, Mocha 60×24; catalog, methods, setup, empty results, comparison, sentences and TF-IDF. Inspected rasterized wide Night catalog/setup/comparison, compact Paper setup/comparison and narrow Night TF-IDF; all use invented text. Preview files remain outside Git in `/tmp/sol-essence-redesign-preview`; selected PNGs are also in `/home/dima/Documents/Codex/2026-10-24/essence-redesign/`.
-- The installed `/home/dima/.local/bin/sol` environment imports this checkout's `sol/essence/tui/app.py`: closing ESSENCE and pressing `E` again loads the redesign without reinstalling.
+- **Correction, 24 October:** the import check ran inside the checkout and did not verify the launcher's installed package. The actual installation has now been updated and verified outside the checkout; see the installation report above.
 
 ### Outstanding issues
 
