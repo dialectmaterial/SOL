@@ -264,12 +264,42 @@ def build_payload(sample: Sample, width=72, restore=None, *, requested_ids=None,
     return payload
 
 
-def adopt_restore(sample: Sample, payload: dict, restore: dict) -> None:
+def section_inputs(sample: Sample) -> str:
+    """Every in-memory book value build_payload reads for this section, as one string.
+
+    The passages' fields (not their mutable node trees), their records, and
+    their notes with note bodies; a prepared payload is reused only while
+    this string, taken again, is identical.
+    """
+    book = sample.book
+    bodies = note_paragraph_ids(book)
+    rows = []
+    for passage in sample.passages:
+        record = book.canonical_records.get(passage.identifier)
+        notes = [[note, book.canonical_records.get(note),
+                  [book.canonical_records.get(body) for body in bodies.get(note, [])]]
+                 for note in (record or {}).get("note_ids", [])]
+        rows.append([passage.identifier, passage.text, passage.heading, passage.node.title, list(passage.path),
+                     passage.pdf_page, passage.printed_page, passage.end_pdf_page, passage.end_printed_page,
+                     passage.kind, passage.transcription_status, list(passage.facsimile_labels),
+                     book.find_passage(passage.identifier) is passage, record, notes])
+    return json.dumps(rows, ensure_ascii=False, sort_keys=True, allow_nan=False)
+
+
+def adopt_restore(sample: Sample, payload: dict, restore: dict, inputs: str) -> None:
     """Give a payload built without a position the checks build_payload runs on one.
 
     The restore's reference must be freshly captured by the caller and equal the
     prepared record's checked reference, so stale prepared text is refused.
+    inputs is section_inputs() taken when the payload was built: the book values
+    it was built from must be unchanged, and, as a fresh build's export finish
+    requires, the whole loaded graph must still equal the verified snapshot.
     """
+    book = sample.book
+    if (section_inputs(sample) != inputs
+            or book.corpus_manifest != book.corpus_snapshot.manifest
+            or book.canonical_records != {row["id"]: row for row in book.corpus_snapshot.records}):
+        raise ValueError("the loaded book changed after this section was prepared")
     _check_sample_packet(sample, restore)
     _check_sample_packet(sample, restore, payload["records"])
     payload["restore"] = deepcopy(restore)

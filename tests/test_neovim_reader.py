@@ -1183,6 +1183,42 @@ assert 'textual' not in sys.modules
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 1)
 
+    def test_prepared_section_is_rebuilt_when_the_loaded_book_changed(self):
+        """Adoption requires every book value a fresh build reads to be unchanged."""
+        self.extend(4)
+
+        def changed_text(book):
+            book.passages[3] = replace(book.passages[3], text="Changed reader projection")
+
+        def flagged(book):
+            book.passages[2] = replace(book.passages[2], transcription_status="needs_review")
+
+        def other_record(book):
+            identifier = book.passages[3].identifier
+            book.canonical_records[identifier] = {**book.canonical_records[identifier], "markdown": "Changed."}
+
+        for edit, refused in ((changed_text, True), (flagged, False), (other_record, True)):
+            with self.subTest(edit=edit.__name__):
+                book = core.load_corpus_book(self.corpus)
+                outcome = []
+
+                def native(payload, _, on_request):
+                    edit(book)
+                    request = {"op": "next", "packet": payload["restore"], "mode": "continuous"}
+                    if refused:
+                        with self.assertRaises(ValueError):
+                            on_request(request)
+                    else:
+                        outcome.append(on_request(request)["payload"])
+                    return 1, None
+
+                with patch.object(neovim_reader, "SECTION_BUDGET", 2), \
+                        patch.object(neovim, "validate_environment", return_value="/invented/nvim"), \
+                        patch.object(neovim, "launch_payload", side_effect=native):
+                    self.assertEqual(neovim_reader.run_reader(book, None), 1)
+                if not refused:
+                    self.assertIn("Source transcription needs review.", outcome[0]["records"][0]["warnings"])
+
     def test_competing_save_during_destination_preparation_is_not_rolled_back(self):
         self.extend(3)
         service = self.service()

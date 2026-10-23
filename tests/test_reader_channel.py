@@ -5,7 +5,9 @@ from pathlib import Path
 import sys
 import tempfile
 import threading
+import time
 import unittest
+from unittest.mock import patch
 
 from sol.being.neovim.channel import run_native
 
@@ -58,6 +60,29 @@ time.sleep(.35)
         at = events.index("request")
         self.assertIn("idle", events[:at])
         self.assertIn("idle", events[at + 1:])
+
+    def test_idle_work_waits_for_a_partly_received_request(self):
+        events = []
+        def handle(request):
+            events.append(("request", time.time()))
+            return {"ok": True}
+        handle.idle = lambda: events.append(("idle", time.time()))
+        with tempfile.TemporaryDirectory(prefix="sol-reader-channel-mark-") as directory:
+            mark = Path(directory) / "fragment"
+            with patch.dict(os.environ, SOL_TEST_FRAGMENT_MARK=str(mark)):
+                status = self.run_child("""
+import time
+writer.write(b'{"id":1,')
+open(os.environ['SOL_TEST_FRAGMENT_MARK'], 'w').write(repr(time.time()))
+time.sleep(.35)
+writer.write(b'"op":"partial"}\\n')
+assert json.loads(reader.readline())['ok'] is True
+""", handle)
+            sent = float(mark.read_text())
+        self.assertEqual(status, 0)
+        received = next(at for kind, at in events if kind == "request")
+        # The first fragment was buffered for about 350 ms; no idle work ran in between.
+        self.assertEqual([at for kind, at in events if kind == "idle" and sent + .05 < at < received], [])
 
     def test_invalid_json_duplicate_fields_and_invalid_ids_never_call_handler(self):
         def refuse(request):

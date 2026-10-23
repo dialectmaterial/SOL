@@ -257,11 +257,13 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             del ahead[key]
         for key, around in wanted.items():
             if key not in ahead:
-                passages = tuple(book.passages[around.first:around.last + 1])
+                ready = Sample(book, tuple(book.passages[around.first:around.last + 1]), ReaderActions(book))
                 try:
+                    # The book values are taken first: an edit during the build cannot match later.
+                    inputs = neovim.section_inputs(ready)
                     with single_action(book.corpus_snapshot):
-                        ahead[key] = neovim.build_payload(Sample(book, passages, ReaderActions(book)), width,
-                                                          emphasis=emphasis, theme=theme, _typography=typography)
+                        ahead[key] = inputs, neovim.build_payload(ready, width, emphasis=emphasis, theme=theme,
+                                                                  _typography=typography)
                 except Exception:
                     # Never ends reading: the move itself builds and reports the section as before.
                     ahead[key] = None
@@ -277,10 +279,12 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         restored = {"reference": capture_reference(book.corpus_snapshot, state.requested_id),
                     "selection": None if state.selection is None else asdict(state.selection),
                     "cursor_offset": state.cursor_offset}
-        payload = ahead.pop(section_key(extent), None) if state.requested_id == state.current.identifier else None
-        if payload is not None:
+        prepared = ahead.pop(section_key(extent), None) if state.requested_id == state.current.identifier else None
+        payload = None
+        if prepared is not None:
+            inputs, payload = prepared
             try:
-                neovim.adopt_restore(sample, payload, restored)
+                neovim.adopt_restore(sample, payload, restored, inputs)
             except ValueError:
                 payload = None
         if payload is None:

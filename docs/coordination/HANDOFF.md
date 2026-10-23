@@ -49,6 +49,11 @@ Write "None." rather than deleting a heading.
 - Full suite — 1,275 tests OK (7 skipped, 4 expected failures). `scripts/check_docs.py` — OK.
 - Real book, Python only (no Neovim painting): section change 432 → 274 ms median; startup to Neovim launch 309 → 612 ms.
 
+### Review round (Codex B, #112)
+- Adoption now also requires every in-memory book value a fresh build reads (the passages' fields, their records, notes and note bodies, via `section_inputs()`, taken before the build) to be unchanged, and the loaded graph to equal the snapshot, as a fresh build's export finish does. Regressions: a changed other displayed passage, a review flag added after preparation, a replaced record.
+- The channel no longer runs idle work while a request is partly received; regression with a fragmented request.
+- Re-measured: prepared crossing 253 ms median.
+
 ### Outstanding issues
 - Remaining section-change time is mostly CORE re-verifying corpus files (14 verifications, ~1,400 hashes per action, ~240 ms). Reducing it would change the maintainer-approved per-check verification in CORE §5, so it is not done here.
 
