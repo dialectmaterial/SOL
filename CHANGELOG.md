@@ -12,6 +12,22 @@ the sorted word. Engine order remains the default and can be restored. Sorting
 leaves saved artifacts and exports unchanged; investigation state still records
 only the screen and origin.
 
+### Landmark management — 23 October 2026
+
+In the Neovim reader's `L` panel, `r` renames the selected landmark with the
+existing name rules and duplicate protection. Rename atomically preserves its
+target and metadata, including unavailable targets. `o` toggles name/book order
+for the session, with unavailable passages last in book order. Panel hints and
+`?` help document the keys. Workspace schema and quick markers are unchanged.
+
+### Section keys keep Neovim running — 23 October 2026
+
+`]c` and `[c` restarted Neovim for every section because the Lua controls lost
+their reference to the action channel when the reader was split into modules
+(18 October). They now use the channel like `n`/`b`: about 0.83 → 0.56 s from
+key to text on the book. The same fix restores the wait for unacknowledged
+saves (such as a marker) before quitting.
+
 ### Sections prepared ahead — 23 October 2026
 
 The reader builds the neighbouring sections during the opening screen and,

@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import patch
 
 import sol.app.main as sol
-from sol.being.workspace.store import Workspace, WorkspaceConflict
+from sol.being.workspace.store import Workspace, WorkspaceConflict, WorkspaceError
 from sol.being.workspace.reader import WorkspaceReader, resolve_reference, safe_output, workspace_path
 
 
@@ -67,6 +67,67 @@ class WorkspaceReaderTests(unittest.TestCase):
     def make_reader(self, store=None, actor='Ada'):
         return WorkspaceReader(self.book, store or self.store, actor, sol.resolve_path,
                                sol.display_path, sol.render_passage)
+
+    def test_bookmark_rename_changes_only_name_and_survives_reopen(self):
+        original = self.store.set_bookmark('Old name', IDS[0])
+        self.store.set_bookmark('sol:reader-marker:1', IDS[1])
+        before = (self.store.export() | {"exported_at": None})
+        # Renaming must not reattribute someone else's bookmark to this reader.
+        with Workspace(self.path, CORPUS_ID, self.provenance, actor='Other') as other:
+            renamed = self.make_reader(other, actor='Other').rename_bookmark('Old name', 'New name')
+        self.assertEqual(renamed, {**original, 'name': 'New name'})
+        expected = {**before, 'bookmarks': sorted(
+            [{**row, 'name': 'New name'} if row['name'] == 'Old name' else row
+             for row in before['bookmarks']], key=lambda row: row['name'])}
+        self.assertEqual((self.store.export() | {"exported_at": None}), expected)
+        self.assertIsNone(self.store.get_bookmark('Old name'))
+        self.assertEqual(self.reader.rename_bookmark('New name', 'New name'), renamed)
+
+    def test_bookmark_rename_conflict_from_another_session_preserves_both(self):
+        self.store.set_bookmark('Original', IDS[0])
+        with Workspace(self.path, CORPUS_ID, self.provenance, actor='Other') as other:
+            other.set_bookmark('Occupied', IDS[1])
+        before = (self.store.export() | {"exported_at": None})
+        with self.assertRaisesRegex(WorkspaceError, 'already exists'):
+            self.reader.rename_bookmark('Original', 'Occupied')
+        self.assertEqual((self.store.export() | {"exported_at": None}), before)
+        with self.assertRaisesRegex(WorkspaceError, 'no such bookmark'):
+            self.reader.rename_bookmark('Gone', 'Unused')
+        self.assertEqual((self.store.export() | {"exported_at": None}), before)
+
+    def test_bookmark_rename_keeps_unavailable_and_retired_targets(self):
+        retired = 'eeeeeeee-0000-4000-8000-000000000001'
+        self.book.redirects[retired] = IDS[0]
+        for target in (IDS[3], 'ffffffff-0000-4000-8000-000000000001', retired):
+            with self.subTest(target=target):
+                original = self.store.set_bookmark('Original', target)
+                renamed = self.reader.rename_bookmark('Original', 'Renamed')
+                self.assertEqual(renamed, {**original, 'name': 'Renamed'})
+                self.store.delete_bookmark('Renamed')
+
+    def test_bookmark_rename_failure_after_update_rolls_back(self):
+        self.store.set_bookmark('Original', IDS[0])
+        before = (self.store.export() | {"exported_at": None})
+        def refuse_final_check():
+            if self.store.get_bookmark('Renamed') is not None:
+                raise WorkspaceError('corpus changed during rename')
+        with patch.object(self.reader, 'ensure_corpus_current', side_effect=refuse_final_check), \
+                self.assertRaisesRegex(WorkspaceError, 'corpus changed'):
+            self.reader.rename_bookmark('Original', 'Renamed')
+        self.assertEqual((self.store.export() | {"exported_at": None}), before)
+        self.assertFalse(self.store._connection.in_transaction)
+
+    def test_bookmark_rename_invalid_names_and_read_only_store_leave_original(self):
+        self.store.set_bookmark('Original', IDS[0])
+        before = (self.store.export() | {"exported_at": None})
+        for invalid in ('', '   ', 'line\nbreak', '\x00', '\ud800', None):
+            with self.subTest(name=invalid), self.assertRaises(WorkspaceError):
+                self.reader.rename_bookmark('Original', invalid)
+            self.assertEqual((self.store.export() | {"exported_at": None}), before)
+        with Workspace(self.path, CORPUS_ID, self.provenance, read_only=True) as other:
+            with self.assertRaisesRegex(WorkspaceError, 'read-only'):
+                self.make_reader(other).rename_bookmark('Original', 'Renamed')
+        self.assertEqual((self.store.export() | {"exported_at": None}), before)
 
     def main(self, arguments):
         stdout, stderr = StringIO(), StringIO()

@@ -315,7 +315,8 @@ return function(reader)
         { "Esc", "hide the search marks" },
         { "Alt-Left/Right", "back / forward through your reading" },
         { "m1 m2 m3", "set a paragraph marker; '1 '2 '3 jump, dm1… clear" },
-        { "M / L", "name this place / list named places (Enter reads)" } } },
+        { "M / L", "name this place / list named places" },
+        { "In L", "Enter reads; r renames; D forgets; o toggles name/book order (session only)" } } },
       { "Text, sources and notes", {
         { "v  then y", "select; copy to the clipboard, across paragraphs too" },
         { "mouse", "scroll; drag to select and copy" },
@@ -359,6 +360,8 @@ return function(reader)
     end
   end
   local function reading_request(action)
+    -- The action channel that neovim_requests opened, if Python offered one.
+    local channel = rawget(_G, 'SOLReaderChannel')
     if action ~= "quit" then
       if not data.navigation[action] then return end
       if vim.fn.mode(1) ~= "n" then fail("clear selection before changing reading sections") end

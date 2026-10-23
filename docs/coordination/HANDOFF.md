@@ -69,9 +69,65 @@ The supplied checkout grants read-only Git metadata. Branching, commits, tests a
 None reserved. Defaults: `s` opens an explicit column/direction menu; ties retain engine order in either direction, undefined values always come last, and sorting covers the complete result before limiting displayed rows. Existing screen/origin state remains unchanged. New results use engine order; sorting and resizing retain the selected word where it is still displayed.
 
 
+
+
+## Landmark management — 23 October 2026
+
+**Task:** [Codex B: landmark management](https://github.com/dialectmaterial/SOL/blob/b01e09912ff648037b2524ab10aefd5de268f17c/docs/coordination/CURRENT_TASK.md#codex-b-landmark-management), assigned directly by the maintainer.
+**Branch / PR:** `codex/landmark-management` · [#113](https://github.com/dialectmaterial/SOL/pull/113); author does not merge.
+**Last implementation commit:** `b01e09912ff648037b2524ab10aefd5de268f17c` (this report is committed afterward).
+
+### Changed files
+
+- `sol/being/workspace/reader.py` — `rename_bookmark` holds one existing write transaction from lookup through conflict check and name-only UPDATE, with a final corpus check before commit. Target, author and timestamps stay unchanged, including for unavailable/retired targets; failures roll back.
+- `sol/being/neovim/reader.py` — validates both names with the existing landmark rules; supports workspace and temporary-session rename. Session-local order toggles between name and whole-book passage position, resolving retired IDs; ties use name order and unavailable passages come last in book order. No new persistent state or schema.
+- `sol/being/neovim/neovim_panels.lua`, `neovim_controls.lua` — `r` prompts with the current name, retaining the panel on refusal; successful rename selects the new name. `o` toggles order, shown in the heading. Panel hints and `?` help list both keys. Three quick markers retain their controls and behavior.
+- `tests/test_workspace_reader.py`, `tests/test_neovim_reader.py`, `tests/test_reader_surface_neovim.py` — ten new tests cover metadata preservation, competing-session conflicts, rollback after UPDATE, invalid names/read-only refusal, missing/non-prose/retired targets, both persistence modes, whole-book ordering across the loaded-section boundary, stable ties, session reset, empty lists, prompts/cancellation/refusals and unchanged reading position.
+- `docs/BEING.md`, `CHANGELOG.md` — document keys and behavior; remove the §7 limitation. `CURRENT_TASK.md` replaces only Codex B's slot and marks it In review; this file records the report.
+
+### Tests performed
+
+All Python checks use `/home/dima/Projects/code/sol/.venv/bin/python -B` in `/tmp/sol-landmark-management` (Python 3.14.8).
+
+- `-m unittest discover -s tests` — **1,291 tests OK (7 skipped, 4 existing expected failures)**, 120.434 s. Fresh temporary XDG config/data/state/cache and Neovim log paths, no SOL environment overrides; log `/tmp/sol-landmark-full-suite.log` stays outside Git. Includes packaging and real headless Neovim checks.
+- Focused workspace/controller/headless Neovim modules — **21 / 59 / 55 tests OK**, respectively.
+- `-m unittest discover -s tests -p 'test_architecture.py'` — **5 tests OK**.
+- `scripts/check_docs.py` — OK, including the final handoff; external URLs are not network-checked. `git diff --check` — OK.
+- Diff inspection: workspace schema, dependencies, CORE contracts, quick-marker handlers and other agents' slots are unchanged. No private corpus, PDF, workspace or generated export was added or used.
+
+### Outstanding issues
+
+None introduced. No sustained human reading trial is claimed. The supplied checkout's Git metadata is mounted read-only, so branch creation, commits, tests and publication use the clean clone `/tmp/sol-landmark-management`, based on `origin/main` at `d9fa759faef63e276ebcbe2d854c1ed5c7e212c2`. Final changed files are mirrored into the supplied checkout; its mounted Git metadata remains on main. Review the published topic branch.
+
+### Decisions requiring approval
+
+None reserved. Defaults: `r` renames, `o` toggles order; an unchanged name is a no-op; unavailable landmarks may still be renamed; rename preserves all metadata; book-order ties use case-insensitive name order with exact-name ties; new sessions start in name order. The maintainer may overrule these defaults.
+
+
+## Reader latency on screen; section keys use the channel — 23 October 2026
+
+**Task:** [Claude Code: measure reader latency on screen](CURRENT_TASK.md#claude-code-measure-reader-latency-on-screen).
+**Branch / PR:** `claude/section-keys-use-channel` · pull request from this branch.
+**Last implementation commit:** the commit before this report.
+
+### Changed files
+- `sol/being/neovim/neovim_controls.lua` — `reading_request` reads `_G.SOLReaderChannel`. Since the module split (552a769, 18 October) it tested an undefined global `channel`, so `]c`/`[c` always quit and restarted Neovim, and quitting never waited for pending saves.
+- `tests/test_reader_surface_neovim.py` — `]c`/`[c` send channel requests and leave Neovim running (fails without the fix).
+- `docs/BEING.md`, `CHANGELOG.md`.
+
+### Tests performed
+- Full suite — OK (7 skipped, 4 expected failures); docs check OK.
+- Real terminal (tmux 100×36, the book, `sol --none`, 6–8 presses each, polled every 5 ms until the status line and text changed): `]c` 1.16 s before #112 → 0.83 s after → 0.56 s with this fix. Python's handling, logged in the same runs, was about 0.52 s; Neovim decode and draw about 0.04 s. Opening to readable text 2.0–2.3 s. Two Codex test suites were running at the same time, so absolute Python times are higher than on an idle machine.
+
+### Outstanding issues
+- Nearly all remaining latency is CORE's per-check verification (about 14 full re-hashes of the canonical files per move). See *Decisions requiring approval*.
+
+### Decisions requiring approval
+- **(reserved)** CORE §5 per-check file verification: hashing once per user action instead of at every check would cut a section change to roughly 0.2 s. Files changed in the milliseconds between checks of one action would then be caught at the next action instead. Not implemented.
+
 ## Sections prepared ahead — 23 October 2026
 
-**Task:** [Claude Code: prepare reader sections ahead](CURRENT_TASK.md#claude-code-prepare-reader-sections-ahead).
+**Task:** [Claude Code: prepare reader sections ahead](https://github.com/dialectmaterial/SOL/blob/d9fa759/docs/coordination/CURRENT_TASK.md#claude-code-prepare-reader-sections-ahead).
 **Branch / PR:** `claude/prepare-sections-ahead` · pull request from this branch.
 **Last implementation commit:** the commit before this report.
 

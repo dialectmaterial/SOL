@@ -63,7 +63,7 @@ replaced at the terminal boundary. Real-book medians and limits are in the
 | `y` | Copy the selection (exact source text, paragraphs joined by a blank line) or the current paragraph to the system clipboard |
 | Mouse | Wheel scrolls; dragging selects, and the selection is copied when the button is released |
 | `m1`–`m3`; `'1`–`'3`; `dm1`–`dm3` | Set, open, clear one of three paragraph markers |
-| `M`; `L` | Name the current place; list named places (Enter reads one, `D` forgets it). They are the workspace's named bookmarks, including any made by earlier versions; a temporary session keeps them until it ends |
+| `M`; `L` | Name the current place; list named places (Enter reads one, `r` renames it, `D` forgets it, `o` toggles name/book order for this session). They are the workspace's named bookmarks, including any made by earlier versions; a temporary session keeps them until it ends |
 | `t` | Dynamic structure tree (Vim-style navigation) |
 | `c` | Beside the text when there is room: pages, footnotes, your notes, markers and the record; Enter on a footnote reads it, `e` edits your note and `r` shows its versions |
 | `a` | Write a personal note on this passage, saved in the workspace (`Ctrl-S` or `:w` saves, `Ctrl-C` discards) |
@@ -79,6 +79,19 @@ replaced at the terminal boundary. Real-book medians and limits are in the
 | `:qa!` | Quit without saving the current position |
 
 `n` means *next paragraph*, **not** Neovim's default next regex match. `gg/G` operate only within the loaded section. Selections are not automatically saved as annotations; one that spans paragraphs can be copied, but notes and ESSENCE take a single passage. Search and passage navigation preserve source offsets as far as the verified projection allows.
+
+**Named landmarks:** in `L`, `r` prompts with the selected landmark's current
+name. Names use 1–80 characters of ordinary text after trimming surrounding
+spaces; empty names, control/invisible formatting characters and reserved `sol:`
+names are refused. Renaming to another landmark's name is refused; keeping the
+same name leaves it unchanged. Rename preserves the saved target, authorship and
+timestamps in one transaction, including when the target passage is unavailable;
+a failed rename retains the old landmark. `o` switches between name order (the
+default) and the passages' order across the whole book. Retired targets follow
+their live passage; landmarks at the same passage use name order, and unavailable
+passages come last in book order. The order lasts only for the reader session,
+with nothing new saved in the workspace. Naming, renaming and sorting leave the
+reading position unchanged. The three quick markers keep their existing controls.
 
 **Your own keys:** `~/.config/sol/keys.json` (under `XDG_CONFIG_HOME` when set) moves reader keys: `{"version": 1, "keys": {"n": "J", "b": "K"}}` makes `J` do what `n` does, and `n` then does nothing. Keys are written in Neovim's notation (`<C-n>`, `gp`); two keys can swap. Only reader keys move, not keys inside panels such as Enter or `D`. Checked in a real terminal on the book (tmux, 20 October): `/` with "770 matches in 305 passages", `Ctrl-N` about 0.25 s within a passage and about 1 s to the next, `gp`/a remapped `P` to pages 100, 240 and 500, `M`/`L` naming, listing and reopening, and `S` opening one Zathura window that the next `S` turned from PDF page 158 to 372. `?` lists your keys under their own heading, and a key SOL does not use is named in a warning. A malformed file stops SOL with its path rather than guessing. The file is data passed to the private Neovim configuration; it cannot run commands, and the user's own Neovim configuration still never loads.
 
@@ -127,6 +140,14 @@ files and must equal the prepared record's checked reference; otherwise the
 section is built as before. On the book (23 October) this cut a section change
 from about 430 to 275 ms of Python time, for about 0.3 s more opening screen.
 The rest is CORE's per-check file verification (CORE §5), unchanged.
+**Measured on screen (23 October, tmux, 100×36, the book):** from key to the
+new section's text, `]c`/`[c` took 1.16 s before sections were prepared ahead,
+0.83 s after, and 0.56 s once they used the action channel. Until then they
+restarted Neovim for every section (a variable lost when the Lua reader was
+split into modules on 18 October; `n`/`b` across a boundary were unaffected).
+Of the 0.56 s, Python takes about 0.52 s, mostly CORE re-hashing the corpus
+files on each check, and Neovim decodes and draws in about 0.04 s. Opening to
+readable text takes about 2.0–2.3 s.
 
 **Book footnote reading:** Footnotes are the edition's own notes, separate from personal notes. Each number is a dim superscript (`⁹⁵`, or `[k]` for lettered notes) at its canonical Markdown callout. The number is display only, absent from `plain_text`, so search, selection and offsets ignore it. `c` works from a cursor or a passage-local visual selection. Its book notes, personal notes and technical source context have separate headings. Enter on a book-note row opens only that note, with its canonical `note_paragraph` children ordered by `order`, original emphasis, per-paragraph attribution, review warnings and display-only callouts. Enter on a listed further footnote follows that link. Backspace returns to the preceding note at its earlier panel cursor, or to `c`; Esc or `q` returns directly to the exact passage cursor and selection in the same reading mode. Resizing closes the panel and restores the passage. Opening or following a note checks the source again and saves no reading visit or workspace data. A refused request leaves the preceding panel available; a reply received after that panel closes is ignored.
 
@@ -280,7 +301,6 @@ are unchanged ([Architecture §9, I1](ARCHITECTURE.md#launch-exchange-outside-th
 - Current normal reading is bounded by chapters/64-record sections, not a whole-book text buffer.
 - `gg`/`G` reach the ends of the loaded section, not the book; `gp` jumps to a printed page, the outline to any section.
 - Search is complete and occurrence-based (§2); matches without an exact contiguous source span still have no guessed highlight or offset.
-- Besides three quick markers, `M` and `L` name, list and open the workspace's named bookmarks; they cannot yet be renamed or sorted other than by name.
 - Reader keys can be moved with `keys.json`; panel keys cannot, and Neovim options are not configurable.
 - These gaps, found by comparing the reader with Zathura (20 October), are ranked in the [reader backlog](coordination/proposals/READER_GAPS_AFTER_ZATHURA.md).
 - Visual selection is transient. Copy can span paragraphs; notes and ESSENCE accept one passage, and no durable cross-paragraph span annotation is available.
