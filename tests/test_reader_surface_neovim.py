@@ -630,6 +630,24 @@ end
         self.assertIn("No graphical image viewer", fallback)
         self.assertIn("/cache/1.png", fallback)
 
+    def test_section_keys_use_the_action_channel_instead_of_restarting(self):
+        report = self.run_lua(r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  for _, key in ipairs({']c', '[c'}) do
+    _G.SOLReaderChannel.navigation_pending = nil
+    vim.api.nvim_feedkeys(key, 'xt', false)
+  end
+  report.sent = sent
+  report.running = vim.api.nvim_buf_is_valid(vim.api.nvim_get_current_buf())
+''', automatic_quit=False)
+        self.assertEqual([row["op"] for row in report["sent"]], ["next", "previous"])
+        self.assertTrue(report["running"])
+        self.assertFalse(self.output.exists())
+
     def test_gp_asks_for_a_printed_page(self):
         report = self.run_lua(r'''
   local sent = {}
