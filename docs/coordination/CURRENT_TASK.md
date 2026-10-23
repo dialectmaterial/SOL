@@ -46,22 +46,21 @@ steps 5–7). Rules for all three lanes:
 readable text in a real terminal. The measurement found `]c`/`[c` restarting
 Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
 
-## Codex A: sentence segmentation audit (ESSENCE Experiment A)
+## Codex A: ESSENCE interface redesign
 
-**Status:** In review
-**Branch:** `codex/sentence-segmentation-audit`
-**Requested:** 23 October 2026, by the maintainer
-**Scope:** [ESSENCE Experiment A](../ESSENCE.md#experiment-a--syntax-and-positionality-highest-priority):
-audit `punctuation-rules-v1` against every boundary in 60 reproducibly sampled
-private-corpus passages, read-only; state hand-check rules, boundary precision/
-recall and errors by type. Publish counts and abbreviation strings, no corpus
-sentences/passages. If material, add separately named `punctuation-rules-v2`,
-keep v1 selectable/checkable and existing artifacts valid, test with invented
-text, and remeasure the same sample. Document any interface default choice.
-**Constraints:** no dependencies, canonical edits or private text in Git; other
-lanes' slots unchanged; do not merge own PR.
-**Acceptance:** `restructuring/SENTENCE_AUDIT.md`, ESSENCE and CHANGELOG; full
-suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
+**Status:** In progress
+**Branch:** `codex/essence-interface-redesign`
+**Requested:** 24 October 2026, directly by the maintainer, with a Posting reference image
+**Scope:** completely revamp the Textual presentation with rounded, titled
+panels, clear visual hierarchy, responsive catalogs/setup, framed results and
+theme-aware focus. Follow [ESSENCE §4](../ESSENCE.md#4-interaction-model-and-inquiry-contract)
+and [Architecture §6](../ARCHITECTURE.md#6-development-order-and-acceptance-gates).
+**Constraints:** preserve analytical behavior, controls, source-return guards,
+artifact formats, persistence and dependencies; no private source text in Git;
+other lanes' slots unchanged; do not merge own PR.
+**Acceptance:** rendered synthetic previews at narrow and wide sizes; keyboard,
+resize and retained-state checks; full suite, documentation check; update
+ESSENCE and CHANGELOG; commit, push, PR and HANDOFF report.
 
 ## Codex B: landmark management
 

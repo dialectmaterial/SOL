@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### ESSENCE panel redesign — 24 October 2026
+
+ESSENCE has a new rounded-panel layout inspired by Posting: a compact masthead,
+numbered navigation, titled catalog/detail panes, a study sidebar with contextual
+guidance, framed source/settings controls and distinct summary, measurements and
+source-context panels. Catalogs and setup use columns in wide windows and stack
+inside reader splits; focus accents follow the reader's theme. Empty Results
+offers a keyboard-accessible route to choosing a study. Tables fold columns to
+fit their framed viewport, and browsing/form state survives layout changes.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary
