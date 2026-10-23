@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Landmark management — 23 October 2026
+
+In the Neovim reader's `L` panel, `r` renames the selected landmark with the
+existing name rules and duplicate protection. Rename atomically preserves its
+target and metadata, including unavailable targets. `o` toggles name/book order
+for the session, with unavailable passages last in book order. Panel hints and
+`?` help document the keys. Workspace schema and quick markers are unchanged.
+
 ### Sections prepared ahead — 23 October 2026
 
 The reader builds the neighbouring sections during the opening screen and,

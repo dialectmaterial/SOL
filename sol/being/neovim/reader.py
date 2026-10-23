@@ -135,6 +135,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
     else:
         actions.read((), first=True)
     transient_markers, transient_landmarks = {}, {}
+    landmark_order = "name"
     source_service, source_requests = None, {}
     mode = "continuous"
     focused = False
@@ -173,20 +174,27 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
                  {row["name"]: row for row in workspace_reader.store.list_bookmarks()
                   if not row["name"].startswith("sol:")})
         rows = []
-        for name in sorted(saved, key=str.casefold):
+        positions = {passage.identifier: index for index, passage in enumerate(book.passages)}
+        for name in sorted(saved, key=lambda name: (name.casefold(), name)):
             row = {"name": safe_label(name), "target": None, "label": "saved paragraph is unavailable"}
+            row["position"] = len(book.passages)
             try:
                 passage = book.find_passage(saved[name]["target_id"])
                 snippet = " ".join(passage.text.split())[:64]
                 row.update(target=saved[name]["target_id"],
+                           position=positions[passage.identifier],
                            label=f"{passage.heading or passage.node.title} | p. {passage.printed_page} | {snippet}")
             except ValueError:
                 pass
             rows.append(row)
+        if landmark_order == "book":
+            # Stable ties retain name order; retired IDs use their live passage.
+            rows.sort(key=lambda row: row["position"])
         return rows
 
     def landmarks(action, name=None):
         return {"landmarks": {"persistent": workspace_reader is not None, "action": action,
+                              "order": landmark_order,
                               "name": safe_label(name or ""), "rows": [
                                   {key: row[key] for key in ("name", "label")} | {"available": row["target"] is not None}
                                   for row in landmark_rows()]}}
@@ -335,6 +343,8 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         "node_open": [("node", lambda node: True, "")],
         "landmark_set": [("name", lambda name: isinstance(name, str), "name the landmark")],
         "landmark_open": [("name", lambda name: isinstance(name, str), "choose a listed landmark")],
+        "landmark_rename": [("name", lambda name: isinstance(name, str), "choose a listed landmark"),
+                            ("new_name", lambda name: isinstance(name, str), "name the landmark")],
         "page_open": [("page", lambda page: type(page) is int and 1 <= page <= 100000,
                        "type a printed page number")],
         "source_preview": [("page", lambda page: type(page) is int, "choose a source page by number")],
@@ -409,10 +419,25 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         return {"markers": markers()}
 
     def landmark_panel(request, identifier):
+        nonlocal landmark_order
         operation = request["op"]
         if operation == "landmark_list":
             return landmarks("list")
+        if operation == "landmark_order":
+            landmark_order = "book" if landmark_order == "name" else "name"
+            return landmarks("list")
         name = landmark_name(request["name"])
+        if operation == "landmark_rename":
+            new_name = landmark_name(request["new_name"])
+            if workspace_reader is None:
+                if name not in transient_landmarks:
+                    raise ValueError("that landmark is gone")
+                if new_name != name and new_name in transient_landmarks:
+                    raise ValueError("landmark name already exists")
+                transient_landmarks[new_name] = transient_landmarks.pop(name)
+            else:
+                workspace_reader.rename_bookmark(name, new_name)
+            return landmarks("renamed", new_name)
         if operation == "landmark_set":
             if workspace_reader is None:
                 transient_landmarks[name] = {"target_id": identifier}
@@ -524,6 +549,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
               "source_follow": source_panel,
               "marker_set": marker_panel, "marker_clear": marker_panel, "landmark_list": landmark_panel,
               "landmark_set": landmark_panel, "landmark_clear": landmark_panel, "note_add": note_panel,
+              "landmark_rename": landmark_panel, "landmark_order": landmark_panel,
               "note_edit": note_edit_panel, "note_history": note_history_panel, "footnote_open": footnote_panel, "essence_open": essence_panel}
 
     def handle(request):

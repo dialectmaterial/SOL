@@ -114,14 +114,15 @@ return function(reader)
     end, {buffer = panel, silent = true})
   end
   -- Named landmarks: the workspace's bookmarks, or this session's when temporary.
-  -- Naming one only echoes; the list opens one with Enter and forgets one with D.
+  -- Naming one only echoes; list edits keep the reader's position untouched.
   show_landmarks = function(result)
     if result.action == 'set' then
       api.nvim_echo({{'Landmark "' .. result.name .. '" is here' ..
         (result.persistent and '' or ' for this session'), 'None'}}, false, {})
       return
     end
-    local lines = {'Landmarks' .. (result.persistent and '' or ' (this session only)'), ''}
+    local lines = {'Landmarks — ' .. (result.order == 'book' and 'book order' or 'name order') ..
+      (result.persistent and '' or ' (this session only)'), ''}
     local rows = {}
     for _, item in ipairs(result.rows) do
       lines[#lines + 1] = item.name
@@ -131,10 +132,17 @@ return function(reader)
     end
     if #result.rows == 0 then lines[#lines + 1] = 'None yet: M names the place you are reading.' end
     lines[#lines + 1] = ''
-    lines[#lines + 1] = 'Enter reads a landmark; D forgets it; Esc returns unchanged.'
+    lines[#lines + 1] = 'Enter reads a landmark; D forgets it.'
+    lines[#lines + 1] = 'r renames; o toggles name/book order (session only).'
+    lines[#lines + 1] = 'Esc returns unchanged.'
     show_lines(lines, nil, {{1, 'SOLSourceHeading'}})
     local panel = api.nvim_get_current_buf()
     if #result.rows > 0 then api.nvim_win_set_cursor(panels.window, {3, 0}) end
+    if result.action == 'renamed' then
+      for index, item in ipairs(result.rows) do
+        if item.name == result.name then api.nvim_win_set_cursor(panels.window, {index * 2 + 1, 0}); break end
+      end
+    end
     local function chosen()
       return rows[api.nvim_win_get_cursor(panels.window)[1]]
     end
@@ -148,6 +156,14 @@ return function(reader)
       local item = chosen()
       if item then request('landmark_clear', {name = item.name}) end
     end, {buffer = panel, silent = true})
+    vim.keymap.set('n', 'r', function()
+      local item = chosen()
+      if not item then return end
+      local ok, name = pcall(vim.fn.input, 'Rename landmark: ', item.name)
+      api.nvim_echo({{'', 'None'}}, false, {})
+      if ok then request('landmark_rename', {name = item.name, new_name = name}) end
+    end, {buffer = panel, silent = true})
+    vim.keymap.set('n', 'o', function() request('landmark_order') end, {buffer = panel, silent = true})
   end
   -- The printed page is the authority for formulas the typed text cannot carry.
   -- Python renders it from the verified PDF; a separate viewer shows it, so this
