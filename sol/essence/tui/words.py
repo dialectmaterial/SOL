@@ -23,6 +23,8 @@ UNDEFINED = {"zero_target_count": "absent in target", "zero_reference_count": "a
 METHOD_LINE = ("Difference: target rate minus reference rate, per 10,000 tokens. "
                "Log₂ ratio: log₂ of target rate over reference rate. No smoothing: "
                "a word absent on one side has no ratio.")
+SORT_COLUMNS = ("Word", "Target count", "Target rate", "Reference count", "Reference rate",
+                "Difference", "Log₂ ratio")
 
 
 @dataclass
@@ -136,7 +138,33 @@ def verified_file_text(path, sha256):
         return None
 
 
-def rows(count, limit=ROW_LIMIT):
+def row_order(count, column=None, descending=False):
+    """Display indices only: stable engine-order ties and undefined values last.
+
+    Sort the complete comparison before the display limit; never reorder the
+    engine's rows or its embedded study (used by sources, saving and exports).
+    """
+    source = count.comparison["rows"] if count.comparison is not None else count.study["frequencies"]
+    indices = list(range(len(source)))
+    if column is None:
+        return indices
+
+    def value(index):
+        row = source[index]
+        if column == 0:
+            return row["word"]
+        if column < 5:
+            side = "target" if column < 3 else "reference"
+            cell = row[side]
+            return None if cell is None else cell["count" if column % 2 else "rate_per_10000_tokens"]
+        return row["rate_difference_per_10000_tokens" if column == 5 else "log2_rate_ratio"]
+
+    defined = [index for index in indices if value(index) is not None]
+    undefined = [index for index in indices if value(index) is None]
+    return sorted(defined, key=value, reverse=descending) + undefined
+
+
+def rows(count, limit=ROW_LIMIT, *, order=None):
     """Table rows: word, count and rate for each side, then the two measures."""
     def cells(cell):
         if cell is None:
@@ -145,14 +173,15 @@ def rows(count, limit=ROW_LIMIT):
         return (str(cell["count"]), "undefined" if rate is None else f"{rate:.2f}")
     def measure(value, status):
         return f"{value:+.2f}" if status == "defined" else UNDEFINED.get(status, status)
+    order = row_order(count)[:limit] if order is None else order[:limit]
     if count.comparison is None:
         table = [(row["word"], *cells(row["target"]), *cells(row["reference"]))
-                 for row in count.study["frequencies"][:limit]]
+                 for row in (count.study["frequencies"][index] for index in order)]
     else:
         table = [(row["word"], *cells(row["target"]), *cells(row["reference"]),
                   measure(row["rate_difference_per_10000_tokens"], row["rate_difference_status"]),
                   measure(row["log2_rate_ratio"], row["log2_ratio_status"]))
-                 for row in count.comparison["rows"][:limit]]
+                 for row in (count.comparison["rows"][index] for index in order)]
     return table, len(count.study["frequencies"])
 
 

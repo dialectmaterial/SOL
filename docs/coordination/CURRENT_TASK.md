@@ -46,25 +46,24 @@ steps 5–7). Rules for all three lanes:
 readable text in a real terminal. The measurement found `]c`/`[c` restarting
 Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
 
-## Codex A: C3 projection-boundary proposal
+## Codex A: ESSENCE study settings and comparison sorting
 
-**Status:** Done (#111)
-**Branch:** `codex/c3-projection-proposal`
+**Status:** Done (#114)
+**Branch:** `codex/essence-study-settings`
 **Requested:** 23 October 2026, by the maintainer
-**Scope:** [Projection boundary](restructuring/PROJECTION_BOUNDARY.md), following
-[REEVALUATION §3.5](restructuring/REEVALUATION.md#35-cores-edition-shaped-projection-c3)
-and [Architecture §9 C3](../ARCHITECTURE.md#9-placement-register): inventory
-edition assumptions and consumers, distinguish verified corpus custody from
-reader projection, propose an explicit description and compatibility seam,
-compare alternatives and state exact migration tests. Link from REEVALUATION
-and HANDOFF; update only Codex A's slot.
-**Constraints:** design and documentation only; no runtime, API, version,
-corpus-contract, workspace-schema or reference-protocol change. No private
-corpus text, PDFs, workspaces or generated exports. Hegel-placement remarks
-use existing READING documents only; recommendation is a maintainer decision
-(reserved: public contract).
-**Acceptance:** `scripts/check_docs.py` and full suite; commit, push and open a
-PR against main; report its URL and do not merge. Previous E2 study done (#108).
+**Scope:** [ESSENCE §4](../ESSENCE.md#4-interaction-model-and-inquiry-contract):
+add a bounded TF-IDF top_n choice before running, show it in the results header;
+inspect existing investigation state and retain study choices only if already
+recorded there. Add keyboard sorting by every displayed word-comparison column,
+both directions, stable ties and undefined values last with visible status;
+default and exports retain engine order. Update in-app help, ESSENCE's implemented
+section and CHANGELOG.
+**Constraints:** interface only (`sol/essence/tui/`); no engine, artifact schema,
+method ID, dependency or new persistent-format change. Synthetic test files only;
+other lanes' slots unchanged. Do not merge own PR.
+**Acceptance:** Textual pilot tests cover choices reaching analyze_tfidf, header,
+invalid values, sorting/nulls/ties and unchanged export. Full suite and
+`scripts/check_docs.py`; commit, push, PR against main and HANDOFF report.
 
 ## Codex B: landmark management
 
