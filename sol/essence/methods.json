@@ -138,8 +138,8 @@
           "meaning": "Optional CORE origin anchor, not a scope restriction; unavailable for file input."
         },
         {
-          "name": "Segmentation (fixed)",
-          "meaning": "Punctuation . ! ? … with abbreviation, initial and bracket rules; a newline always ends a sentence. No language model or adjustable segmentation thresholds."
+          "name": "--segmentation",
+          "meaning": "Choose punctuation-rules-v1 (default, including the interface) or opt-in punctuation-rules-v2 through CLI/API. V2 keeps opening Arabic list markers and attached numeric footnote callouts with their sentence. Both retain abbreviation, initial and bracket rules; a newline always ends a sentence. No language model or adjustable thresholds."
         }
       ],
       "output": "sol.sentence-study JSON: CORE legacy calls produce v1, explicit providers/files/passages/spans produce v2, and ESSENCE saves v2. CLI --json prints to stdout; ESSENCE Save writes sentences-<timestamp>[-N].sol-analysis.json in $XDG_DATA_HOME/sol/studies (default ~/.local/share/sol/studies). Artifacts contain offsets and digests, not sentence text.",
