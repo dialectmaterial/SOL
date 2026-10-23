@@ -33,6 +33,53 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## ESSENCE workflow polish — 24 October 2026
+
+**Task:** [Codex A: ESSENCE workflow polish](https://github.com/dialectmaterial/SOL/blob/59904eb455c57a1e414349ed1be2b763713f99bd/docs/coordination/CURRENT_TASK.md), requested directly after the maintainer accepted the redesigned appearance.
+**Branch / PR:** `codex/essence-workflow-polish`, stacked on local redesign `220c27b`; not opened. The preceding task established shell GitHub DNS failure and HTTP 403 for GitHub integration writes; no new access was provided and the rejected write was not repeated. No merge attempted.
+**Last implementation commit:** `59904eb455c57a1e414349ed1be2b763713f99bd` (this report is committed afterward).
+
+### Changed files
+
+- `sol/essence/tui/app.py` — compact result totals, expandable existing summary with a note count, literal presentation-only word filter before the display limit, explicit empty matches, selected-word occurrence titles, sort button and direct Methods-to-Experiment actions. Existing paths/settings survive method selection; no study runs until Run. Narrow frames account for the details panel and keep result tables/export controls inside the viewport; comparison headings fit at 80 columns. User filter text renders literally.
+- `tests/test_essence_workflow.py` — four real-engine invented-file pilot tests cover Unicode normalization/apostrophes, exact source mapping, byte-identical complete CSV after filtering, pre-limit and sorted filtering, empty-source clearing, new-result reset, all study totals/details, expanded-frame bounds at 40/80 columns, retained selection, method shortcuts and CLI-only availability.
+- `docs/ESSENCE.md`, `CHANGELOG.md`, `CURRENT_TASK.md` — document controls, semantics and current scope. No analytical method, artifact, persistence/workspace schema, dependency or logical placement changes.
+
+### Tests performed
+
+Python 3.14.8, Textual 8.2.8, checkout `.venv/bin/python -B`.
+
+- Final full suite: **1,321 tests OK (7 skipped, 4 existing expected failures)**, 139.577 s. Exact command: `.venv/bin/python -B /tmp/sol_essence_test_runner.py`; isolated XDG config/data/state/cache and Neovim log. Log: `/tmp/sol-essence-polish-full-suite-final.log`.
+- The temporary runner uses standard unittest discovery and the same 50 ms asyncio heartbeat documented in the preceding report, because restricted-shell socketpair writes return EPERM. It changes no tests/assertions/skips; no workaround was added to SOL. Normal host command remains `.venv/bin/python -B -m unittest discover -s tests`.
+- Focused UI suite: 50 tests OK. Final workflow/layout run: nine tests OK, including expanded details and source/export frame bounds. Existing sorting, CSV/TSV exports, source navigation, temporary-session writes, cancellation, theme and package checks pass in the final full suite.
+- Documentation check, `git diff --check` and `python -m sol essence --help`: OK. External documentation URLs are not network-checked.
+- Generated 36 invented-text SVG previews across Night 120×40 and 40×24, Paper 80×24 and Mocha 60×24: catalogs, setup, empty/results views, filtered results and expanded details. Inspected rasterized wide/compact results, method actions, filtering and expanded details, including 40-column frame bounds. Files remain outside Git in `/tmp/sol-essence-polish-preview`; selected PNGs are in `/home/dima/Documents/Codex/2026-10-24/essence-polish/`.
+- The installed `sol` environment imports this checkout and its four method shortcuts. Reopen ESSENCE with `E` to use the changes; no reinstall is needed.
+
+### Outstanding issues
+
+Publication remains pending available GitHub access. Publish both the accepted
+redesign and this follow-up from the current local branch:
+
+```sh
+git push --set-upstream origin codex/essence-workflow-polish
+gh pr create --base main --head codex/essence-workflow-polish --title "Refine ESSENCE's rounded research workspace" --body-file /tmp/sol-essence-polish-pr.md
+```
+
+Automated checks and rendered previews do not substitute for sustained human
+use. At 40 columns, comparison cells wrap and vertically scroll; compact details
+is a small independently scrollable panel. No private corpus or workspace data
+is included in Git or the previews.
+
+### Decisions requiring approval
+
+None reserved. Presentation defaults: details collapsed for each new result;
+filtering applies to normalized literal word spellings, clears on a new result,
+and never changes complete exports or saved counts. Use this method selects a
+reference for comparison only when none was selected. Session presentation does
+not extend persisted investigation state. These defaults may be revised after use.
+
+
 ## ESSENCE interface redesign — 24 October 2026
 
 **Task:** [Codex A: ESSENCE interface redesign](https://github.com/dialectmaterial/SOL/blob/c4c1d53af5b4c4b761df7e5fe9e6839a37cdfb91/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer with a Posting screenshot.

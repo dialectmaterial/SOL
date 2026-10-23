@@ -48,7 +48,7 @@ Neovim for every section; fixed. Previous task (sections prepared ahead) done: #
 
 ## Codex A: ESSENCE workflow polish
 
-**Status:** In progress
+**Status:** In review (local; publication blocked by GitHub access)
 **Branch:** `codex/essence-workflow-polish`
 **Requested:** 24 October 2026, directly by the maintainer after accepting the redesigned appearance
 **Scope:** improve the rounded interface's usability: direct Methods-to-setup
