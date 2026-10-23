@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### ESSENCE results and method workflow — 24 October 2026
+
+Results opens with compact totals and an `i Details` disclosure for the existing
+study summary, scope, formulas, exclusions and saved-artifact status; its badge
+counts existing method/source notes. `/` or Ctrl-F filters normalized word spellings before the
+display limit, Enter returns to the table, and Escape clears the filter. Sort
+and filter keep source rows aligned; the occurrence panel names its word.
+Counts, saved studies and full CSV/TSV exports retain the complete input.
+Methods offers Use this method for the shipped interactive studies, preserving
+form values; CLI-only operations remain labeled. Compact windows give tables
+more space and retain full comparison headings at 80 columns.
+
 ### ESSENCE panel redesign — 24 October 2026
 
 ESSENCE has a new rounded-panel layout inspired by Posting: a compact masthead,

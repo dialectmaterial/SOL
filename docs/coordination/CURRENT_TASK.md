@@ -46,21 +46,25 @@ steps 5–7). Rules for all three lanes:
 readable text in a real terminal. The measurement found `]c`/`[c` restarting
 Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
 
-## Codex A: ESSENCE interface redesign
+## Codex A: ESSENCE workflow polish
 
-**Status:** In review (local; publication blocked by GitHub access)
-**Branch:** `codex/essence-interface-redesign`
-**Requested:** 24 October 2026, directly by the maintainer, with a Posting reference image
-**Scope:** completely revamp the Textual presentation with rounded, titled
-panels, clear visual hierarchy, responsive catalogs/setup, framed results and
-theme-aware focus. Follow [ESSENCE §4](../ESSENCE.md#4-interaction-model-and-inquiry-contract)
+**Status:** In progress
+**Branch:** `codex/essence-workflow-polish`
+**Requested:** 24 October 2026, directly by the maintainer after accepting the redesigned appearance
+**Scope:** improve the rounded interface's usability: direct Methods-to-setup
+actions, compact totals and expandable details, presentation-only word filtering,
+selected-word context and narrow-window spacing. Follow
+[ESSENCE §4](../ESSENCE.md#4-interaction-model-and-inquiry-contract)
 and [Architecture §6](../ARCHITECTURE.md#6-development-order-and-acceptance-gates).
 **Constraints:** preserve analytical behavior, controls, source-return guards,
 artifact formats, persistence and dependencies; no private source text in Git;
 other lanes' slots unchanged; do not merge own PR.
-**Acceptance:** rendered synthetic previews at narrow and wide sizes; keyboard,
-resize and retained-state checks; full suite, documentation check; update
-ESSENCE and CHANGELOG; commit, push, PR and HANDOFF report.
+**Acceptance:** synthetic previews and pilot checks for filters, Unicode,
+sorting/source alignment, unchanged full exports, details/resize and method
+navigation; full suite and docs check; ESSENCE, CHANGELOG and HANDOFF updated.
+Stacked on local redesign `220c27b`; keep the accepted appearance. Commit and
+publish for review where access permits; the existing GitHub write restriction
+does not prevent local completion.
 
 ## Codex B: landmark management
 

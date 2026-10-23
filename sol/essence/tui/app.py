@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+import unicodedata
 
 from rich.text import Text
 from textual.app import App, ComposeResult
@@ -54,6 +55,8 @@ STUDY_NOTES = {
     "tfidf": "Rank terms within each passage and across the selected source.\n\n"
              "Weights depend on the chosen documents; they do not establish conceptual significance.",
 }
+
+METHOD_STUDIES = {"words": "words", "word-comparison": "words", "tfidf": "tfidf", "sentences": "sentences"}
 
 SCREENS = {
     "encyclopedia": ("Encyclopedia", None),
@@ -144,6 +147,9 @@ class EssenceApp(App):
     #summary-box:focus { border: round $accent; border-title-color: $accent; }
     .browser-list { width: 32; height: 1fr; padding: 0 1; margin-right: 1; }
     .browser-detail { width: 1fr; height: 1fr; padding: 0 1; }
+    #method-actions { height: 1; margin-top: 1; }
+    #method-actions Button { height: 1; border: none; min-width: 20; }
+    #method-availability { width: 1fr; color: $text-muted; }
     OptionList { background: $background; }
     OptionList > .option-list--option { padding: 0 1; }
     OptionList > .option-list--option-highlighted { background: $primary 18%; color: $foreground; text-style: bold; }
@@ -180,8 +186,15 @@ class EssenceApp(App):
     #empty-results { height: 1fr; align: center middle; padding: 1 3; }
     #empty-results Static { height: auto; width: 100%; text-align: center; color: $text-muted; margin-bottom: 1; }
     #summary { padding: 0; }
-    #summary-box { height: auto; min-height: 3; max-height: 20%; padding: 0 1; }
-    #sort-status { height: auto; color: $text-muted; }
+    #result-toolbar { height: auto; min-height: 1; max-height: 2; }
+    #result-metrics { height: auto; width: 1fr; }
+    #toggle-details { height: 1; min-width: 13; margin: 0; border: none; background: $surface; }
+    #summary-box { display: none; height: 30%; min-height: 3; max-height: 10; padding: 0 1; }
+    #word-tools { height: 1; margin-top: 1; }
+    #word-filter { height: 1; width: 1fr; border: none; background: $surface; padding: 0 1; }
+    #word-filter:focus { background: $primary 18%; }
+    #sort-words { height: 1; min-width: 10; margin: 0 0 0 1; border: none; }
+    #sort-status { height: 1; color: $text-muted; text-overflow: ellipsis; text-wrap: nowrap; }
     #frequencies { height: 1fr; min-height: 4; }
     DataTable > .datatable--header { background: $surface; color: $text-muted; text-style: bold; }
     DataTable > .datatable--cursor { background: $primary 25%; color: $foreground; }
@@ -203,6 +216,8 @@ class EssenceApp(App):
     Screen.-compact #experiment-body { width: 1fr; }
     Screen.-compact Tab { padding: 0 1; }
     Screen.-compact #masthead-note { display: none; }
+    Screen.-compact #word-tools { margin-top: 0; }
+    Screen.-compact #summary-box { height: 3; max-height: 3; }
     Screen.-small .choices { layout: vertical; }
     Screen.-small .choice-group { width: 1fr; }
     Screen.-small #reference-group { margin: 1 0 0 0; }
@@ -232,6 +247,8 @@ class EssenceApp(App):
         self.state = load_state(self.state_file) if self.state_file else {}
         self.word_sort = (None, False)
         self.word_order = []
+        self.word_filter = ""
+        self.details_caption = "i Details"
 
     def compose(self) -> ComposeResult:
         target = self.context["reference"]["reference"]["target_id"]
@@ -282,6 +299,10 @@ class EssenceApp(App):
                 if name == "encyclopedia":
                     yield OptionList(*self.genealogy_options(), id="genealogy-map")
                     yield Markdown(self.genealogy_sources(), id="genealogy-sources")
+        if name == "methods":
+            with Horizontal(id="method-actions"):
+                yield Button("Use this method", id="use-method")
+                yield Static("Configure it in Experiment", id="method-availability")
 
     def genealogy_options(self):
         """One line per method: year, line of descent, ● runs in ESSENCE, ○ a reading topic."""
@@ -309,6 +330,8 @@ class EssenceApp(App):
         if name in BROWSERS:
             self.query_one(f"#{name}-entry", Markdown).update(self.browser_markdown(name, event.option_index))
             self.query_one(f"#{name}-detail", VerticalScroll).scroll_home(animate=False)
+            if name == "methods":
+                self.update_method_action(event.option_index)
             if name == "encyclopedia":
                 for part in ("#genealogy-map", "#genealogy-sources"):
                     self.query_one(part).display = event.option_index == 0
@@ -363,9 +386,15 @@ class EssenceApp(App):
                          "Choose a study and a source.\nYour measurements and their source passages will appear here.")
             yield Button("Choose a study", id="configure")
         with Vertical(id="results-workspace"):
+            with Horizontal(id="result-toolbar"):
+                yield Static("", id="result-metrics", markup=False)
+                yield Button("i Details", id="toggle-details")
             with VerticalScroll(id="summary-box"):
-                yield Static("", id="summary")
-            yield Static("", id="sort-status")
+                yield Static("", id="summary", markup=False)
+            with Horizontal(id="word-tools"):
+                yield Input(placeholder="/ Filter words · Esc clears", id="word-filter")
+                yield Button("s Sort", id="sort-words")
+            yield Static("", id="sort-status", markup=False)
             yield DataTable(id="frequencies", zebra_stripes=True, cursor_type="row")
             yield Static("Overall · mean passage weights", id="overall-label")
             yield DataTable(id="overall", cursor_type="row", zebra_stripes=True)
@@ -391,12 +420,86 @@ class EssenceApp(App):
         self.query_one("#reference-file").display = comparison and self.choice("reference") == "file"
         self.query_one("#tfidf-settings").display = self.choice("study") == "tfidf"
 
+    def update_method_action(self, index) -> None:
+        item = self.methods["entries"][index]
+        supported = item["id"] in METHOD_STUDIES
+        self.query_one("#use-method", Button).disabled = not supported
+        self.query_one("#method-availability", Static).update(
+            "Configure it in Experiment" if supported else "CLI operation · command shown above")
+        self.query_one("#methods-detail").border_title = Text(item["title"])
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id != "word-filter" or not isinstance(self.last_count, words.Count):
+            return
+        if event.value != event.input.value:
+            return  # A new result may already have cleared an old queued edit.
+        query = unicodedata.normalize("NFC", event.value.strip()).casefold().replace("’", "'")
+        if query != self.word_filter:
+            self.word_filter = query
+            self.reflow_result()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "word-filter":
+            self.query_one("#frequencies").focus()
+
+    def toggle_details(self) -> None:
+        box = self.query_one("#summary-box")
+        box.display = not box.display
+        self.query_one("#toggle-details", Button).label = "i Hide" if box.display else self.details_caption
+        (box if box.display else self.query_one("#frequencies")).focus()
+
+    def show_metrics(self, count) -> None:
+        if isinstance(count, tfidf.TfidfCount):
+            totals = count.study["word_study"]["target"]["summary"]
+            notes = count.study["word_study"].get("warnings", [])
+            line = f"{totals['token_count']:,} tokens · {totals['input_count']:,} inputs · top {count.study['top_n']} terms"
+        elif isinstance(count, sentences.SentenceCount):
+            totals = count.study["summary"]
+            notes = []
+            mean = "—" if totals["mean"] is None else f"{totals['mean']:.1f}"
+            line = f"{totals['sentences']:,} sentences · {totals['tokens']:,} words · mean {mean}"
+        else:
+            totals = count.study["target"]["summary"]
+            notes = (count.comparison if count.comparison is not None else count.study).get("warnings", [])
+            line = f"Target {totals['token_count']:,} tokens"
+            if count.reference is not None:
+                line += f" · Reference {count.study['reference']['summary']['token_count']:,} tokens"
+            else:
+                line += f" · {totals['type_count']:,} distinct words"
+        content = Text(line)
+        # Include the following space so SVG previews keep the boundary beside
+        # bold numbers, just as occurrence contexts keep their word spaces.
+        content.highlight_regex(r"\d[\d,]*(?:\.\d+)?(?:\s|$)", "bold")
+        self.query_one("#result-metrics", Static).update(content)
+        self.query_one("#result-metrics").tooltip = line
+        self.details_caption = "i Details" + (f" ({len(notes)})" if notes else "")
+        button = self.query_one("#toggle-details", Button)
+        button.label = "i Hide" if self.query_one("#summary-box").display else self.details_caption
+        button.tooltip = (f"{len(notes)} method/source notes. " if notes else "") + "Study summary, scope, formulas, exclusions and saved-artifact status."
+
     count_serial = 0
     last_count = None
     shown_sources = ()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "configure":
+        if event.button.id == "use-method":
+            listing = self.query_one("#methods-list", OptionList)
+            method = self.methods["entries"][listing.highlighted or 0]["id"]
+            study = METHOD_STUDIES.get(method)
+            if study is not None:
+                for button in self.query("#study RadioButton"):
+                    button.value = button.name == study
+                if method == "word-comparison" and self.choice("reference") == "none":
+                    reference = "book" if self.context["corpus"] else "file"
+                    for button in self.query("#reference RadioButton"):
+                        button.value = button.name == reference
+                self.update_choices()
+                self.action_screen("experiment")
+        elif event.button.id == "toggle-details":
+            self.toggle_details()
+        elif event.button.id == "sort-words":
+            self.push_screen(WordSort(self.word_sort), self.sort_words)
+        elif event.button.id == "configure":
             self.action_screen("experiment")
         elif event.button.id == "run":
             top_n = 20
@@ -475,6 +578,12 @@ class EssenceApp(App):
         self.query_one("#results-workspace").display = True
         if count is not self.last_count:
             self.word_sort = (None, False)
+            self.word_filter = ""
+            with self.prevent(Input.Changed):
+                self.query_one("#word-filter", Input).value = ""
+            self.query_one("#summary-box").display = False
+            self.query_one("#toggle-details", Button).label = "i Details"
+        self.show_metrics(count)
         if isinstance(count, tfidf.TfidfCount):
             return self.show_tfidf(count, saved)
         if isinstance(count, sentences.SentenceCount):
@@ -491,26 +600,36 @@ class EssenceApp(App):
         budget = self.result_width(len(columns) + 1)
         # Narrow reader splits retain every measurement, folding cells instead
         # of letting fixed numeric widths force the word column off-screen.
-        numeric_budget = max(len(columns), budget - max(4, budget // 4))
+        numeric_budget = max(len(columns), budget - min(8, max(4, budget // 5)))
         desired = sum(width for _, width in columns)
         if desired > numeric_budget:
             columns = [(label, max(1, width * numeric_budget // desired)) for label, width in columns]
         table.add_column("Word", width=max(1, budget - sum(width for _, width in columns)))
         for label, width in columns:
             table.add_column(label, width=width)
-        self.word_order = words.row_order(count, *self.word_sort)[:words.ROW_LIMIT]
+        ordered = words.row_order(count, *self.word_sort)
+        matching = [index for index in ordered if self.word_filter in count.study["frequencies"][index]["word"]]
+        self.word_order = matching[:words.ROW_LIMIT]
         shown, total = words.rows(count, order=self.word_order)
         for index, row in zip(self.word_order, shown):
             cells = row if count.reference is not None else row[:3]
             table.add_row(*cells, key=str(index), height=None)
         column, descending = self.word_sort
         sort_status = self.query_one("#sort-status", Static)
-        sort_status.display = count.comparison is not None
-        sort_status.update("s sort · " + ("Engine order (default)" if column is None else
-                           f"{words.SORT_COLUMNS[column]} · {'descending' if descending else 'ascending'}") +
-                           " · undefined last")
+        sort_status.display = True
+        order_label = "Engine order (default)" if column is None else f"{words.SORT_COLUMNS[column]} · {'descending' if descending else 'ascending'}"
+        match_label = (f"{len(shown):,} of {len(matching):,} matching {'word' if len(matching) == 1 else 'words'}" if self.word_filter else
+                       f"{len(shown):,} of {total:,} {'word' if total == 1 else 'words'}")
+        if self.word_filter and not matching:
+            match_label = "No matching words · Esc clears the filter"
+        status_label = match_label + (" · " + order_label + " · undefined last" if count.comparison is not None else "")
+        sort_status.update(status_label)
+        sort_status.tooltip = status_label
         lines = words.summary(count)
-        if len(shown) < total:
+        if self.word_filter:
+            lines.append(f"Display filter: {self.query_one('#word-filter', Input).value!r}; "
+                         f"{len(matching):,} matching words. Counts and exports retain the full study.")
+        elif len(shown) < total:
             lines.append(f"Showing the first {len(shown):,} of {total:,} words in the selected order.")
         lines.append(f"Saved: {saved} (check with: sol essence check FILE)" if saved else
                      "Not saved: this reader session has no workspace.")
@@ -522,6 +641,7 @@ class EssenceApp(App):
         for button in self.query("#export-row Button"):
             button.disabled = count.reference is None
         self.query_one("#export-row").display = count.reference is not None
+        self.query_one("#sort-words", Button).display = count.comparison is not None
         self.show_sources(self.word_order[0] if self.word_order else None)
         self.query_one("#screens", TabbedContent).active = "results"
         # Words first: arrows choose a word, Enter goes to its sources.
@@ -539,6 +659,7 @@ class EssenceApp(App):
         self.query_one("#sort-status").display = False
         self.query_one("#overall").display = False
         self.query_one("#overall-label").display = False
+        self.query_one("#word-tools").display = shown
         # Sources and export belong to word counts only.
         for selector in ("#sources-label", "#sources", "#export-row"):
             self.query_one(selector).display = shown
@@ -605,6 +726,8 @@ class EssenceApp(App):
 
     def show_sources(self, index) -> None:
         table = self.query_one("#sources", DataTable)
+        table.border_title = (Text(f"Occurrences · {self.last_count.study['frequencies'][index]['word']}")
+                              if index is not None else "Source context")
         table.clear(columns=True)
         budget = self.result_width(4)
         side_width = min(9, max(3, budget // 7))
@@ -615,6 +738,7 @@ class EssenceApp(App):
         table.add_column("Where", width=where_width)
         table.add_column("In context", width=max(1, budget - side_width - occurrence_width - where_width))
         self.shown_sources = () if index is None else tuple(words.sources(self.last_count, index))
+        self.query_one("#sources-label", Static).update(SOURCES_HELP if index is not None else "No word selected")
         for item in self.shown_sources:
             label = item["label"].replace(" | p. ", "\np. ")
             table.add_row(item["side"], f"{item['number']} of {item['count']}" if item["number"]
@@ -737,7 +861,30 @@ class EssenceApp(App):
             focused.focus()
 
     def on_key(self, event) -> None:
+        if isinstance(self.screen, WordSort):
+            return
         active = self.query_one("#screens", TabbedContent).active
+        if active == "results" and self.last_count is not None:
+            field = self.query_one("#word-filter", Input)
+            if self.focused is field:
+                if event.key == "escape":
+                    if field.value:
+                        field.value = ""
+                    else:
+                        self.query_one("#frequencies").focus()
+                    event.stop()
+                    event.prevent_default()
+                return
+            if event.key == "i":
+                self.toggle_details()
+                event.stop()
+            if event.key in ("slash", "/", "ctrl+f") and isinstance(self.last_count, words.Count):
+                field.focus()
+                event.stop()
+                event.prevent_default()
+            if event.key == "escape" and self.focused is self.query_one("#summary-box"):
+                self.query_one("#frequencies").focus()
+                event.stop()
         if (event.key == "s" and active == "results"
                 and self.focused is self.query_one("#frequencies", DataTable)
                 and isinstance(self.last_count, words.Count) and self.last_count.comparison is not None):
@@ -778,6 +925,8 @@ class EssenceApp(App):
         }.items():
             self.query_one(f"#{selector}").border_title = title
         self.update_choices()
+        self.update_method_action(self.query_one("#methods-list", OptionList).highlighted or 0)
+        self.query_one("#word-filter").tooltip = "Filter normalized word spellings; counts, denominators and exports retain the full study."
         self.set_word_widgets(False)
         if self.theme_file:
             # A stat-sized read twice a second; T in the reader shows here within half a second.
