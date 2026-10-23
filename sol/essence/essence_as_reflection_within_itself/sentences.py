@@ -124,6 +124,84 @@ def segment(text):
     return spans
 
 
+# V2 deliberately inherits v1's abbreviation policy and all its other limits.
+# Only line-leading Arabic list markers and attached numeric callouts differ.
+_ABBREVIATIONS_V2 = _ABBREVIATIONS
+SEGMENTATIONS = ("punctuation-rules-v1", "punctuation-rules-v2")
+_CALLOUT = re.compile(r"(?:[0-9]+|\[[0-9]+\]|[⁰¹²³⁴⁵⁶⁷⁸⁹]+)")
+
+
+def segment_v2(text):
+    """V1 punctuation policy with list prefixes and numeric footnote callouts.
+
+    A line-leading Arabic integer plus period and horizontal whitespace stays
+    with its item. A numeric callout attached to terminal punctuation belongs
+    to the preceding sentence, including after closing quotes/brackets. Bare,
+    square-bracketed and superscript digits are supported. A period immediately
+    after a digit cannot introduce a callout (decimal guard). Neither rule
+    guesses footnotes from arbitrary numbers elsewhere in the prose.
+    """
+    spans, start, opened, position = [], 0, [], 0
+    markers = {match.end() - 1 for match in re.finditer(r"(?m)^[ \t]*[0-9]+\.(?=[ \t])", text)}
+
+    def close(end):
+        nonlocal start
+        left, right = start, end
+        while left < right and text[left].isspace():
+            left += 1
+        while right > left and text[right - 1].isspace():
+            right -= 1
+        if left < right:
+            spans.append((left, right))
+        start = end
+
+    while position < len(text):
+        character = text[position]
+        if character == "\n":
+            close(position)
+            opened, position = [], position + 1
+            continue
+        if character in "([":
+            opened.append(position)
+        elif character in ")]" and opened:
+            opened.pop()
+        match = _END.match(text, position) if character in ".!?…" else None
+        if match is None:
+            position += 1
+            continue
+        end = match.end()
+        for closer in match.group():
+            if closer in ")]" and opened:
+                opened.pop()
+        first = start
+        while first < position and text[first].isspace():
+            first += 1
+        word = re.search(r"([^\W\d_]+(?:\.[^\W\d_]+)*)$", text[start:position])
+        token = word.group(1) if word else ""
+        # Consume a callout before testing whitespace/capitalization. Its end,
+        # not the punctuation's end, is the source boundary. Do not reinterpret
+        # a decimal point followed by digits as terminal punctuation.
+        callout = (_CALLOUT.match(text, end) if not
+                   (character == "." and position > 0 and text[position - 1].isdigit()) else None)
+        if callout is not None:
+            end = callout.end()
+            while end < len(text) and text[end] in "”’\"')]":
+                if text[end] in ")]" and opened:
+                    opened.pop()
+                end += 1
+        followed = end == len(text) or text[end].isspace()
+        boundary = (position not in markers and followed and not any(at > first for at in opened)
+                    and _starts_sentence(text, end)
+                    and not (match.group().startswith(".") and len(match.group().rstrip("”’\"')]")) == 1
+                             and ((token.casefold() in _ABBREVIATIONS_V2 and (len(token) > 1 or token.islower()))
+                                  or _initial(text, token, position, end))))
+        if boundary:
+            close(end)
+        position = end
+    close(len(text))
+    return spans
+
+
 def _scope(scope):
     if not isinstance(scope, dict) or scope.get("kind") not in {"corpus", "within", "passages"}:
         raise SentenceStudyError("Scope must be corpus, within PATH, or ordered passage IDs", code="invalid_scope")
@@ -314,19 +392,24 @@ def _validate(result):
     return result
 
 
-def analyze_sentences(snapshot, *, scope=None, origin=None):
+def analyze_sentences(snapshot, *, scope=None, origin=None, segmentation="punctuation-rules-v1"):
     """Measure sentences from an explicit provider, or retain the legacy snapshot API.
 
     Providers carry their own scope and produce v2; bare snapshots preserve v1
-    and the reader's S command. File input never imports CORE or the reader.
+    artifacts. File input never imports CORE or the reader. Explicit providers
+    may select punctuation-rules-v2; defaults and bare snapshots retain v1.
     """
+    if segmentation not in SEGMENTATIONS:
+        raise SentenceStudyError("Unsupported sentence segmentation", code="unsupported_method")
     if isinstance(snapshot, (CoreProvider, FileProvider)):
         if scope is not None:
             raise SentenceStudyError("Set the sentence scope on the provider", code="invalid_scope")
         from sol.essence.essence_as_reflection_within_itself.sentence_inputs import analyze_provider
-        return analyze_provider(snapshot, origin=origin)
+        return analyze_provider(snapshot, origin=origin, segmentation=segmentation)
     from sol.essence.essence_as_reflection_within_itself.corpus_inputs import _fresh
 
+    if segmentation != "punctuation-rules-v1":
+        raise SentenceStudyError("Use an explicit CoreProvider for punctuation-rules-v2", code="invalid_provider")
     scope = _scope({"kind": "corpus"} if scope is None else _json_value(scope))
     return _analyze(_fresh(snapshot), scope, origin)
 

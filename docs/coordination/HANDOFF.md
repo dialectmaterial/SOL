@@ -116,6 +116,42 @@ None required for this implementation. Default: first launch the checked view, p
 
 
 
+## Sentence segmentation audit — 23 October 2026
+
+**Task:** [Codex A: sentence segmentation audit](https://github.com/dialectmaterial/SOL/blob/da675a9e02b98a96fdf531ca89c382e55f0a24f1/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer.
+**Branch / PR:** `codex/sentence-segmentation-audit` · [#116](https://github.com/dialectmaterial/SOL/pull/116); author does not merge.
+**Last implementation commit:** `da675a9e02b98a96fdf531ca89c382e55f0a24f1` (this report is committed afterward).
+
+### Changed files
+
+- `docs/coordination/restructuring/SENTENCE_AUDIT.md` — complete hand-style review rules, reproducible draw (seed 20261023, 60 of 1,757 eligible passages), exact boundary counts, category coverage/errors, abbreviation strings/list, hashes and privacy/interpretation limits. No corpus sentences/passages are published.
+- `scripts/sentence_audit.py` — read-only sample reselection and optional private-gold scoring; stdout has aggregates/digests only. All 60 passages were read and gold fixed before displaying v1 predictions. Single-agent review, not independent human adjudication.
+- `sol/essence/essence_as_reflection_within_itself/sentences.py`, `sentence_inputs.py` — separate `segment_v2`/`punctuation-rules-v2` keeps opening Arabic list markers and attached numeric callouts with their sentences, with a decimal guard. Provider v2 artifacts record the new algorithm; checking dispatches by the exact saved method. V1 function bodies/metadata remain unchanged.
+- `sol/essence/cli.py`, `sentence_cli.py`, `methods.json` — explicit `--segmentation` selection and accurate method labels/help. An explicit choice uses providers; ordinary corpus output still uses protocol v1. Interface and API/CLI defaults stay v1.
+- `tests/test_sentence_v2.py`, `test_sentence_audit.py`, `fixtures_sentence_provider_v1.py` — invented-text rules, every listed abbreviation, offsets/spans, file/CORE API/CLI, method tampering, audit accounting and legacy checks. The new old-provider fixture was captured from main before implementation; existing snapshot fixtures remain intact.
+- `docs/ESSENCE.md`, `CHANGELOG.md` — measured audit, opt-in method and limits; `CURRENT_TASK.md` changes only Codex A's slot, now In review. No dependencies, schemas or logical placements change.
+
+### Tests performed
+
+All Python commands use `/home/dima/Projects/code/sol/.venv/bin/python -B` (Python 3.14.8).
+
+- Final `-m unittest discover -s tests` — **1,312 tests OK (7 skipped, 4 existing expected failures)**, 183.101 s; isolated XDG config/data/state/cache and Neovim log. Log outside Git: `/tmp/sol-sentence-final-suite.log`.
+- Focused `-m unittest discover -s tests -p 'test_sentence*.py'` — **50 tests OK (4 expected failures)**. Methods catalog: four tests OK. CLI sentence help exposes both method choices.
+- `scripts/check_docs.py` and `git diff --check` — OK; external URLs are not network-checked. AST comparison with origin/main confirms `segment`, `_initial`, `_starts_sentence`, `_METHOD`, `_ABBREVIATIONS`, `_END`, `_OPENERS` unchanged. Old protocol-v1 fixtures and the old provider-method fixture recheck and encode byte-for-byte (runtime Unicode version normalized as before).
+- Private read-only sample: **282 gold internal boundaries**; v1 **281 TP / 5 FP / 1 FN**, precision **98.25%**, recall **99.65%**; v2 **282 / 0 / 0**, **100% / 100% on the same sample**. Five opening-number false splits and one attached-footnote miss. Provider artifacts for both methods recompute; retained sentences **340 → 341**, word tokens **12,319 unchanged**, empty segments **6 → 1**. Final reselection/scoring JSON is byte-identical to the first v2 measurement.
+- Corpus index SHA-256 before/after: `91b1d25a60a914bd3644df038179583c8690b396cecb2e676ddfc2d6a6f36269`; CORE freshness checks pass. No corpus/PDF/workspace writes or private text committed.
+
+### Outstanding issues
+
+The v2 score is an **in-sample correction**, not held-out accuracy. Single-agent hand-style annotation has no independent human adjudication/agreement estimate. Ellipses, initials, section signs and several requested abbreviations are absent from the draw; bracketed/superscript callouts have synthetic coverage only. Both methods retain the four documented v1 limitations. The counts-only report publishes no gold offsets/identities; the private offset-only annotation file remains at `/tmp/sentence-audit-gold.json` (hash in the audit), and a reviewer can reselect and reread the sample independently.
+
+The supplied checkout has read-only Git metadata. Work/publication uses `/tmp/sol-sentence-audit`, cloned from `origin/main` at `6ae639d4ad08070cb9cec6245e84e90e5ac720d8`; task files are mirrored to the supplied workspace without changing its Git metadata. Review the published branch.
+
+### Decisions requiring approval
+
+None reserved. Defaults the maintainer may overrule: retain **punctuation-rules-v1** in the interface/API/CLI until broader validation; v2 is opt-in and narrowly corrects the observed error classes. Both share v1's declared abbreviation list. An explicit CLI method uses the existing provider artifact protocol v2; saved artifacts choose their recorded method during checking, without an override. Boundary metrics score raw internal offsets, excluding forced passage ends and before zero-word filtering.
+
+
 ## ESSENCE study settings and comparison sorting — 23 October 2026
 
 **Task:** [Codex A: ESSENCE study settings and comparison sorting](https://github.com/dialectmaterial/SOL/blob/22ed09fb8098c80607fc662afd225a3b349c1d9d/docs/coordination/CURRENT_TASK.md#codex-a-essence-study-settings-and-comparison-sorting), assigned directly by the maintainer.

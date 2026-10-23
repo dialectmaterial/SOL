@@ -18,6 +18,8 @@ def build_parser() -> argparse.ArgumentParser:
     from sol.essence.word_cli import add_input_arguments
     add_input_arguments(sentences, words=True, unit="sentences")
     sentences.add_argument("--reference", metavar="FILE|-", help="optional CORE reference anchor; it does not restrict the scope")
+    sentences.add_argument("--segmentation", choices=("punctuation-rules-v1", "punctuation-rules-v2"),
+                           help="sentence method (default: punctuation-rules-v1; explicit choice uses providers)")
     words = commands.add_parser("words", help="count normalized words with explicit target/reference denominators")
     from sol.essence.word_cli import add_arguments
     add_arguments(words, words=True)
@@ -116,7 +118,8 @@ def main(arguments: list[str] | None = None) -> int:
         if options.action == "words":
             from sol.essence.word_cli import run
             return run(options)
-        if options.action == "sentences" and (options.input_file is not None or options.provider is not None
+        if options.action == "sentences" and (options.segmentation is not None
+                                               or options.input_file is not None or options.provider is not None
                                                or options.passage is not None or options.span is not None):
             from sol.essence.sentence_cli import run
             return run(options)
