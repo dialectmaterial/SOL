@@ -12,7 +12,7 @@ import uuid
 
 import json
 
-from sol.essence.essence_as_reflection_within_itself.sentences import PROVIDER_MAX_RESULT_BYTES, SentenceStudyError, _METHOD, _measure, segment
+from sol.essence.essence_as_reflection_within_itself.sentences import PROVIDER_MAX_RESULT_BYTES, SentenceStudyError, _METHOD, _measure, segment, segment_v2
 from sol.essence.essence_as_reflection_within_itself.tokenization import word_tokens
 from sol.essence.essence_as_reflection_within_itself.validation import _integer, _json, _json_value, _keys, _validate_binding
 from sol.essence.essence_as_reflection_within_itself.word_inputs import CoreProvider, FileProvider, WordStudyError, _scope, load_input
@@ -25,6 +25,21 @@ METHOD = {**_METHOD, "algorithm": "sentence-length-distribution-providers-v1",
           "order": "provider-input-order",
           "scope_policy": "whole-sentences-contained-in-half-open-codepoint-span-v1",
           "position_unit": "retained sentences in each input row; one row per CORE record or whole file"}
+# Artifact protocol v2 is independent of the punctuation-method version.
+METHOD_V2 = {**METHOD, "algorithm": "sentence-length-distribution-providers-v2",
+             "segmentation": "punctuation-rules-v2: v1 except line-leading Arabic integer-plus-period list markers"
+                             " stay with their item; attached bare, square-bracketed or superscript numeric"
+                             " footnote callouts stay with preceding punctuation (never after a decimal point)"}
+_METHODS = {"punctuation-rules-v1": METHOD, "punctuation-rules-v2": METHOD_V2}
+
+
+def _segmentation(method):
+    for name, declared in _METHODS.items():
+        if _json(method) == _json(declared):
+            return name
+    raise SentenceStudyError("Unsupported sentence-study method or Unicode runtime", code="unsupported_method")
+
+
 _CORE_FIELDS = {"id", "content_sha256", "reader_path", "sources", "attribution"}
 _REASONS = {"scope", "attribution", "record_type", "review", "reader_path"}
 
@@ -48,7 +63,8 @@ def _origin(provider, origin):
         raise _refusal(error) from error
 
 
-def _analyze(loaded, origin):
+def _analyze(loaded, origin, segmentation="punctuation-rules-v1"):
+    splitter = segment if segmentation == "punctuation-rules-v1" else segment_v2
     inputs, rows = [], []
     exclusions = {"by_reason": loaded.exclusions["by_reason"], "empty_segments": 0,
                   "outside_span": 0, "masked_segments": 0}
@@ -56,7 +72,7 @@ def _analyze(loaded, origin):
         index = len(inputs)
         metadata = {key: value for key, value in item.items() if key not in {"text", "masks"}}
         metadata["sentences"] = 0
-        for start, end in segment(item["text"]):
+        for start, end in splitter(item["text"]):
             if any(left <= start and end <= right for left, right in item["masks"]):
                 exclusions["masked_segments"] += 1
                 continue
@@ -70,7 +86,7 @@ def _analyze(loaded, origin):
             rows.append([index, start, end, tokens])
             metadata["sentences"] += 1
         inputs.append(metadata)
-    result = {"protocol": "sol.sentence-study", "version": 2, "method": METHOD,
+    result = {"protocol": "sol.sentence-study", "version": 2, "method": _METHODS[segmentation],
               "input": {"provider": loaded.provider, "binding": loaded.binding,
                         "scope": loaded.scope, "inputs": inputs}, "origin": origin,
               **_measure(inputs, rows), "sentences": rows, "exclusions": exclusions}
@@ -79,12 +95,12 @@ def _analyze(loaded, origin):
     return result
 
 
-def analyze_provider(provider, *, origin=None):
+def analyze_provider(provider, *, origin=None, segmentation="punctuation-rules-v1"):
     """Return a v2 study from the word engine's CoreProvider or FileProvider."""
     try:
         # Reject a foreign anchor before opening any file.
         origin = _origin(provider, origin)
-        return _analyze(load_input(provider), origin)
+        return _analyze(load_input(provider), origin, segmentation)
     except WordStudyError as error:
         raise _refusal(error) from error
 
@@ -110,8 +126,7 @@ def validate_result(result):
                    "by_position", "longest", "sentences", "exclusions"}, "Provider sentence study")
     if result["protocol"] != "sol.sentence-study" or type(result["version"]) is not int or result["version"] != 2:
         raise SentenceStudyError("Unsupported provider sentence-study version", code="unsupported_version")
-    if _json(result["method"]) != _json(METHOD):
-        raise SentenceStudyError("Unsupported sentence-study method or Unicode runtime", code="unsupported_method")
+    _segmentation(result["method"])
     part = result["input"]
     _keys(part, {"provider", "binding", "scope", "inputs"}, "Sentence input")
     provider = part["provider"]
@@ -217,7 +232,7 @@ def check_provider_result(provider, result):
                                      code="file_changed" if file else "corpus_mismatch" if corpus_changed else "generation_changed")
         if loaded.scope != part["scope"]:
             raise SentenceStudyError("The sentence input scope differs", status="mismatch", code="scope_mismatch")
-        expected = _analyze(loaded, _origin(provider, result["origin"]))
+        expected = _analyze(loaded, _origin(provider, result["origin"]), _segmentation(result["method"]))
         if _json(result) != _json(expected):
             raise SentenceStudyError("Sentence rows, statistics or provenance disagree with recomputation",
                                      status="mismatch", code="result_mismatch")

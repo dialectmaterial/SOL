@@ -46,24 +46,22 @@ steps 5–7). Rules for all three lanes:
 readable text in a real terminal. The measurement found `]c`/`[c` restarting
 Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
 
-## Codex A: ESSENCE study settings and comparison sorting
+## Codex A: sentence segmentation audit (ESSENCE Experiment A)
 
-**Status:** Done (#114)
-**Branch:** `codex/essence-study-settings`
+**Status:** In review
+**Branch:** `codex/sentence-segmentation-audit`
 **Requested:** 23 October 2026, by the maintainer
-**Scope:** [ESSENCE §4](../ESSENCE.md#4-interaction-model-and-inquiry-contract):
-add a bounded TF-IDF top_n choice before running, show it in the results header;
-inspect existing investigation state and retain study choices only if already
-recorded there. Add keyboard sorting by every displayed word-comparison column,
-both directions, stable ties and undefined values last with visible status;
-default and exports retain engine order. Update in-app help, ESSENCE's implemented
-section and CHANGELOG.
-**Constraints:** interface only (`sol/essence/tui/`); no engine, artifact schema,
-method ID, dependency or new persistent-format change. Synthetic test files only;
-other lanes' slots unchanged. Do not merge own PR.
-**Acceptance:** Textual pilot tests cover choices reaching analyze_tfidf, header,
-invalid values, sorting/nulls/ties and unchanged export. Full suite and
-`scripts/check_docs.py`; commit, push, PR against main and HANDOFF report.
+**Scope:** [ESSENCE Experiment A](../ESSENCE.md#experiment-a--syntax-and-positionality-highest-priority):
+audit `punctuation-rules-v1` against every boundary in 60 reproducibly sampled
+private-corpus passages, read-only; state hand-check rules, boundary precision/
+recall and errors by type. Publish counts and abbreviation strings, no corpus
+sentences/passages. If material, add separately named `punctuation-rules-v2`,
+keep v1 selectable/checkable and existing artifacts valid, test with invented
+text, and remeasure the same sample. Document any interface default choice.
+**Constraints:** no dependencies, canonical edits or private text in Git; other
+lanes' slots unchanged; do not merge own PR.
+**Acceptance:** `restructuring/SENTENCE_AUDIT.md`, ESSENCE and CHANGELOG; full
+suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 
 ## Codex B: landmark management
 

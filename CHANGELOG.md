@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Sentence segmentation audit — 23 October 2026
+
+A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary
+precision 98.25% and recall 99.65% (281 TP, 5 FP, 1 FN). Opt-in
+`punctuation-rules-v2` keeps opening list numbers and attached numeric footnote
+callouts with their sentences; on the same frozen sample it corrects all six
+errors. This is an in-sample result. `sol essence sentences --segmentation` and
+the provider API select either method; checks use the recorded method. V1,
+existing artifact encodings and the interface default remain unchanged. The
+audit publishes counts and abbreviation strings only, with synthetic tests for
+the rules and no new dependencies.
+
 ### ESSENCE study controls — 23 October 2026
 
 Experiment accepts TF-IDF top_n from 1 to 1,000 (default 20), shows the choice

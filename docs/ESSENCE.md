@@ -28,8 +28,9 @@ The relation between Hegel's explicit argument and the output of an algorithm is
 [E1–E4](ARCHITECTURE.md#9-placement-register) and their stage C rationale.
 The lazy `sol.essence` facade exports the same names; CLI adapters, optional
 Textual interface and catalogs remain at their existing paths. Engine bodies,
-receipt methods/versions and the four known sentence-boundary failures are
-unchanged. Old engine module paths have no compatibility shims.
+receipt methods/versions and the four known sentence-boundary failures were
+unchanged by that relocation. The later opt-in segmentation v2 audit is recorded
+below. Old engine module paths have no compatibility shims.
 
 ESSENCE is not currently a complete model environment. The inspected code contains:
 
@@ -413,18 +414,19 @@ Design a minimal, inspectable analysis rather than jumping straight to a large m
 
 A sentence-length comparison can be deterministic, cheap, and independently validated against a hand-checked sample.
 
-**Implemented (17 October): the sentence-length half.** `sol.essence.essence_as_reflection_within_itself.sentences` selects eligible Hegel main text exactly as the term study does (pending-review records are excluded and counted), masks converter facsimile labels, and segments with declared rules (`punctuation-rules-v1`): a sentence ends at `.`, `!`, `?` or an ellipsis (with closing quotes/brackets) followed by whitespace and a capital, digit, opening quote/bracket or dash; never inside a bracket opened within the sentence (citations such as *(Princ. Math. Phil. Natu. Lib. II, …)*), after a listed abbreviation (single letters only in lower case, so a logical term like *S-U-P.* still ends a sentence) or within a chain of initials; a newline always ends one. Length is counted in the term study's word tokens. The artifact (`sol.sentence-study` v1) stores record IDs, digests, codepoint offsets and token counts — **no book text** — plus the distribution, percentiles, means by place in the paragraph (first/middle/last/only) and the longest sentences; `check` recomputes it exactly against the current generation. Rules were tuned on the local corpus: of 9,127 sentences (median 31 words), the three longest (150, 148, 146 words) were read and are genuine Hegel sentences, a random sample of boundaries was correct, and the 40 held-back periods followed by capitals were almost all citation abbreviations; one known miss is a full sentence inside a parenthesis opened mid-sentence. **Not yet done:** a formal hand-checked sample with a reported error rate, part-of-speech/dependency statistics, and sentence-level scopes smaller than a loaded section from the reader. POS tagging and parsing will be probabilistic/error-prone, so present them as **model annotations**, not source facts. The linguistic conclusions describe the chosen translator's text; contrast with Hegel's German only if a distinct German source is actually available and audited in a future research cycle.
+**Implemented (17 October): the sentence-length half.** `sol.essence.essence_as_reflection_within_itself.sentences` selects eligible Hegel main text exactly as the term study does (pending-review records are excluded and counted), masks converter facsimile labels, and segments with declared rules (`punctuation-rules-v1`): a sentence ends at `.`, `!`, `?` or an ellipsis (with closing quotes/brackets) followed by whitespace and a capital, digit, opening quote/bracket or dash; never inside a bracket opened within the sentence (citations such as *(Princ. Math. Phil. Natu. Lib. II, …)*), after a listed abbreviation (single letters only in lower case, so a logical term like *S-U-P.* still ends a sentence) or within a chain of initials; a newline always ends one. Length is counted in the term study's word tokens. The artifact (`sol.sentence-study` v1) stores record IDs, digests, codepoint offsets and token counts — **no book text** — plus the distribution, percentiles, means by place in the paragraph (first/middle/last/only) and the longest sentences; `check` recomputes it exactly against the current generation. Rules were tuned on the local corpus: of 9,127 sentences (median 31 words), the three longest (150, 148, 146 words) were read and are genuine Hegel sentences, a random sample of boundaries was correct, and the 40 held-back periods followed by capitals were almost all citation abbreviations; one known miss is a full sentence inside a parenthesis opened mid-sentence. **Audit (23 October):** a fixed-seed, 60-passage hand-style review now reports boundary precision/recall and coverage below. **Not yet done:** independently human-adjudicated segmentation validation, part-of-speech/dependency statistics, and sentence-level scopes smaller than a loaded section from the reader. POS tagging and parsing will be probabilistic/error-prone, so present them as **model annotations**, not source facts. The linguistic conclusions describe the chosen translator's text; contrast with Hegel's German only if a distinct German source is actually available and audited in a future research cycle.
 
 #### Sentence providers and file input — implemented 19 October 2026
 
-`sol.essence.analyze_sentences(provider, *, origin=None)` accepts the **same**
+`sol.essence.analyze_sentences(provider, *, origin=None, segmentation="punctuation-rules-v1")` accepts the **same**
 `CoreProvider(snapshot, scope=None)` and `FileProvider(path, scope=None)` as
 the word engine. CORE scopes are `corpus`, `within` a reader path, exact
 `passages` IDs, or a `span` with one exact `id`, `start` and `end`. Files use
 `file` or a `span` with `start` and `end`. Set scope on the provider; a separate
 `scope=` argument remains available only for the legacy snapshot API.
 
-The original complete text is segmented with unchanged `punctuation-rules-v1`
+The original complete text is segmented with `punctuation-rules-v1` by default
+(or explicitly selected `punctuation-rules-v2`, described below)
 **before** the half-open codepoint span is applied. Only complete sentences
 contained in the span are measured. A sentence cut at either boundary is
 excluded, with the count in `exclusions.outside_span`; no fragment becomes a
@@ -436,7 +438,8 @@ word engine's attribution/type/review filters and facsimile policy. Empty
 inputs yield zero sentences and null means/percentiles.
 
 Explicit providers produce **`sol.sentence-study` v2**, with the separately
-named method `sentence-length-distribution-providers-v1`. Its `input` records
+named method `sentence-length-distribution-providers-v1` (or
+`sentence-length-distribution-providers-v2` for opt-in punctuation v2). Its `input` records
 provider, binding, scope and input rows (digests, spans, sentence counts and,
 for CORE, source identities/provenance); `sentences` rows are
 `[input_index, start, end, token_count]`. Summaries, histogram, positional
@@ -469,19 +472,36 @@ result = analyze_sentences(provider)
 checked = check_sentence_result(provider, result)
 ```
 
-This adds no model, dependency, corpus/workspace contract or interface control.
-The underlying segmenter's known limitations and the need for human boundary
-validation remain unchanged.
+This adds no model, dependency or corpus/workspace contract. An explicit
+`--segmentation punctuation-rules-v1|punctuation-rules-v2` CLI choice uses
+providers and protocol v2, including for whole-corpus input. Without that option,
+ordinary corpus CLI output retains protocol v1. Bare snapshots retain v1; choose
+an explicit `CoreProvider` to run punctuation v2. Checks recompute with the exact
+recorded method; old snapshot and provider artifacts remain valid.
 
-#### Segmentation validation remains open
+#### Sentence-boundary audit — 23 October 2026
 
-The segmentation-pilot sample, export, import and scoring tools were removed
-in the maintainer's 21 October cleanup. No real-book segmentation error rate
-has been established. Human boundary validation remains necessary before
-claiming accuracy for `punctuation-rules-v1`; the sentence study and its method
-are unchanged. Four expected-failure tests still document known rule limits:
-mid-sentence parentheses, physical line breaks, sentence-final abbreviations
-and lowercase sentence starts. They do not establish a real-book error rate.
+The [counts-only audit](coordination/restructuring/SENTENCE_AUDIT.md) documents a
+fixed-seed random sample of 60 eligible private-corpus passages, complete
+hand-style boundary rules and coverage by error type. The single-agent review
+found 282 internal gold boundaries: v1 has 281 TP, 5 FP and 1 FN (**98.25%
+precision, 99.65% recall**). Opening numbered-list markers cause the five false
+splits; an attached footnote number causes the missed boundary. Semicolons and
+colons remain within sentences by design. Abbreviation/quotation/bracket
+coverage and absent rare cases are stated explicitly; no corpus text is
+published and the corpus was read-only.
+
+The new, separately named **`punctuation-rules-v2`** keeps opening Arabic list
+markers with their item and attached numeric footnote callouts with the preceding
+sentence, with a decimal guard. It otherwise retains v1's rules and declared
+abbreviation list. On the **same frozen sample**, it has 282 TP, 0 FP and 0 FN
+(100% precision/recall); this is an in-sample correction, not independent
+validation. The **interface, API and CLI default remains v1** pending broader
+review. Synthetic tests cover each rule and artifact-method dispatch. The four
+expected-failure tests still document both methods' limits: mid-sentence
+parentheses, physical line breaks, sentence-final abbreviations and lowercase
+starts. No independent human adjudication or real-book accuracy for absent
+categories is claimed.
 
 ### Experiment B — embeddings and TensorFlow Embedding Projector
 

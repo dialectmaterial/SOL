@@ -14,7 +14,7 @@ def render_sentences(result):
     label = (f"characters {scope['start']}–{scope['end']}" if scope["kind"] == "span"
              else "whole file" if scope["kind"] == "file" else scope.get("path", scope["kind"]))
     lines = [f"Sentence lengths: {part['provider']} ({_safe(label)})",
-             "Word tokens per sentence; punctuation-rules-v1 on the original text.",
+             f"Word tokens per sentence; {result['method']['segmentation'].split(':', 1)[0]} on the original text.",
              "Only complete sentences contained in the scope are measured.",
              "Positions are among retained sentences in each input row (one CORE passage or the whole file)."]
     if part["provider"] == "file":
@@ -64,7 +64,10 @@ def run(options, result=None):
         from sol.core import decode_reference
         origin = decode_reference(read_artifact(options.reference))
     provider = _provider(options, saved=saved)
-    result = analyze_sentences(provider, origin=origin) if result is None else check_sentence_result(provider, result)
+    if result is None:
+        result = analyze_sentences(provider, origin=origin, segmentation=options.segmentation or "punctuation-rules-v1")
+    else:
+        result = check_sentence_result(provider, result)
     if options.action == "check":
         if result["version"] == 1:
             receipt = {"status": "current", "protocol": result["protocol"], "corpus_id": result["corpus"]["id"],
