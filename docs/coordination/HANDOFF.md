@@ -33,6 +33,52 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## ESSENCE interface redesign — 24 October 2026
+
+**Task:** [Codex A: ESSENCE interface redesign](https://github.com/dialectmaterial/SOL/blob/c4c1d53af5b4c4b761df7e5fe9e6839a37cdfb91/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer with a Posting screenshot.
+**Branch / PR:** `codex/essence-interface-redesign` · not opened: shell Git cannot resolve `github.com`; the GitHub connection's create-tree request returned HTTP 403, `Resource not accessible by integration`. No merge attempted.
+**Last implementation commit:** `c4c1d53af5b4c4b761df7e5fe9e6839a37cdfb91` (this report is committed afterward).
+
+### Changed files
+
+- `sol/essence/tui/app.py` — Posting-inspired rounded/titled panels across all four screens; compact masthead/source line, numbered navigation, theme-aware focus, responsive catalog and study sidebars, framed source/settings controls, result panels and an actionable empty state. Width-aware table columns retain every measurement; layout updates also reach the workspace behind the sort modal. Existing analysis, source-return, save/export and persistence code paths are retained.
+- `tests/test_essence_layout.py` — five invented-input pilot tests protect catalog selection/focus, form values and reachable controls, empty-state navigation, all three result types at 40/60/120 columns, and resizing with the sort menu open. Existing UI tests remain intact.
+- `docs/ESSENCE.md`, `CHANGELOG.md` — document presentation and breakpoints; `CURRENT_TASK.md` changes only Codex A's slot. No dependencies, public APIs, artifact/workspace schemas or logical placements change.
+
+### Tests performed
+
+Python 3.14.8, Textual 8.2.8, using the checkout's `.venv/bin/python -B`.
+
+- Final full suite: **1,317 tests OK (7 skipped, 4 existing expected failures)**, 127.816 s; isolated XDG config/data/state/cache and Neovim log. Exact command: `.venv/bin/python -B /tmp/sol_essence_test_runner.py`; log `/tmp/sol-essence-redesign-full-suite-final.log`.
+- The restricted shell rejects even a local `socketpair().send` with `EPERM`, preventing asyncio's thread-safe wakeup. Stock unittest completed assertions but hung at runner shutdown on both unchanged main and the new interface. The temporary runner loads standard unittest discovery with a 50 ms event-loop heartbeat; it changes no tests, assertions or skips. On an unrestricted host, run the usual `.venv/bin/python -B -m unittest discover -s tests`. No environment workaround was added to SOL or its tests.
+- Final five new layout tests: OK, 8.767 s. Existing comparison sorting, undefined values, source navigation, cancellation, exports, themes and small-window tests pass in the final full suite. An earlier full run had 1,316 tests OK before adding the sort-modal resize regression and fix.
+- `scripts/check_docs.py`, `git diff --check` and `python -m sol essence --help`: OK. External documentation URLs are not network-checked.
+- Generated 28 synthetic Textual SVG previews: Night 120×40 and 40×24, Paper 80×24, Mocha 60×24; catalog, methods, setup, empty results, comparison, sentences and TF-IDF. Inspected rasterized wide Night catalog/setup/comparison, compact Paper setup/comparison and narrow Night TF-IDF; all use invented text. Preview files remain outside Git in `/tmp/sol-essence-redesign-preview`; selected PNGs are also in `/home/dima/Documents/Codex/2026-10-24/essence-redesign/`.
+- The installed `/home/dima/.local/bin/sol` environment imports this checkout's `sol/essence/tui/app.py`: closing ESSENCE and pressing `E` again loads the redesign without reinstalling.
+
+### Outstanding issues
+
+Publication is unavailable in this session. Local commits and the working tree
+contain the completed change. Once GitHub access is available, publish with:
+
+```sh
+git push --set-upstream origin codex/essence-interface-redesign
+gh pr create --base main --head codex/essence-interface-redesign --title "Redesign ESSENCE with rounded responsive panels" --body-file /tmp/sol-essence-redesign-pr.md
+```
+
+Rendered previews and automated terminal/keyboard checks do not establish
+sustained human acceptance. No private corpus text, PDF or personal workspace
+is included in the change or previews. At very narrow widths, tables wrap cells
+and scroll vertically; the numbered tab bar scrolls horizontally as needed.
+
+### Decisions requiring approval
+
+None reserved. Provisional presentation defaults: catalog/setup sidebars at
+100 columns and above, stacked source groups below 60 columns, rounded panel
+borders with theme-derived accent focus, and a Choose a study empty-state action.
+The maintainer may revise these defaults after using the interface.
+
+
 ## Sentence segmentation audit — 23 October 2026
 
 **Task:** [Codex A: sentence segmentation audit](https://github.com/dialectmaterial/SOL/blob/da675a9e02b98a96fdf531ca89c382e55f0a24f1/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer.

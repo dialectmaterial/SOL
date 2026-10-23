@@ -48,7 +48,7 @@ Neovim for every section; fixed. Previous task (sections prepared ahead) done: #
 
 ## Codex A: ESSENCE interface redesign
 
-**Status:** In progress
+**Status:** In review (local; publication blocked by GitHub access)
 **Branch:** `codex/essence-interface-redesign`
 **Requested:** 24 October 2026, directly by the maintainer, with a Posting reference image
 **Scope:** completely revamp the Textual presentation with rounded, titled
