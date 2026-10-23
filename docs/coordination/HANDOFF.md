@@ -32,37 +32,45 @@ Write "None." rather than deleting a heading.
 - <decision, the options, and what was assumed meanwhile>
 -->
 
-## Faster opening to readable text — 23 October 2026
+## Opening profile; retain preparation during opening — 23 October 2026
 
 **Task:** [Codex B: faster opening to readable text](https://github.com/dialectmaterial/SOL/blob/d1dc8875919c5cad36ead80477cc09003fb7586b/docs/coordination/CURRENT_TASK.md#codex-b-faster-opening-to-readable-text), assigned directly by the maintainer.
 **Branch / PR:** `codex/faster-opening` · [#117](https://github.com/dialectmaterial/SOL/pull/117); author does not merge.
-**Last implementation commit:** `d1dc8875919c5cad36ead80477cc09003fb7586b` (this report is committed afterward).
+**Last implementation commit:** `b84ca657838f081a59f05755b0bd2301f80d2d51` (review revision; this report is committed afterward).
 
 ### Changed files
 
-- `sol/being/neovim/reader.py` — launch the fully checked first view without first calling `prepare_ahead()` twice. The existing native idle hook prepares one neighbour per call. All preparation, adoption, source checks and persistence guards remain unchanged; a key before preparation uses the ordinary fresh build.
-- `scripts/reader_timings.py` — measure controller startup before invoking idle preparation, then allow two idle units before navigation measurements, modelling a pause on the reading view. The fresh-process `--startup-only` measurement, report formats and operation names are unchanged.
-- `tests/test_neovim_reader.py` — verify exactly one view is built before launch; one neighbour per idle call on both sides of a resumed section; prepared/fresh equivalence; an immediate move builds normally; failed idle work leaves the shown payload and saved position intact and a subsequent move retries fresh. Injected preparation refusals now run with both fresh and prepared destinations. Existing in-memory edits, source-generation edits and competing-save regressions explicitly exercise the idle-prepared adoption path.
-- `docs/BEING.md`, `CHANGELOG.md` — current preparation timing, measured opening improvement, immediate-navigation tradeoff and limits. `CURRENT_TASK.md` replaces only Codex B's slot and marks it In review. No CORE implementation, Lua, public contract, schema, dependency or logical placement changes.
+- `sol/being/neovim/reader.py` — restored both `prepare_ahead()` calls before launch in response to Claude's #117 review. The maintainer explicitly chose preparation during the opening screen in #112, accepting a longer opening for faster section moves. Runtime preparation now matches main; the existing idle hook prepares new neighbours after navigation.
+- `scripts/reader_timings.py` — controller startup includes preparation during opening; allow two idle units after recording startup and before navigation measurements, modelling a pause on the reading view. The fresh-process `--startup-only` measurement, report formats and operation names are unchanged.
+- `tests/test_neovim_reader.py` — verify both neighbours of a resumed section are built before launch and an immediate first move adopts preparation; retain prepared/fresh equivalence and one neighbour per idle call after moving. Failed idle work leaves the shown payload and saved position intact and a subsequent move retries fresh. Refusal cases explicitly assert fresh-build (different theme) and prepared-adoption paths for every navigation route. In-memory edits, source-generation edits and competing-save regressions still exercise prepared adoption.
+- `docs/BEING.md`, `CHANGELOG.md` — retained opening preparation and measurements of idle deferral as an unimplemented maintainer option, with no opening speedup claimed. `CURRENT_TASK.md` keeps Codex B In review and records the review scope; other lanes' slots stay unchanged. No CORE implementation, Lua, public contract, schema, dependency or logical placement changes. Merged `origin/main` at `b2a5fb7` first in `3d84dd9`, retaining both stacked CHANGELOG entries and HANDOFF reports, including #116's sentence audit.
 
 ### Tests performed
 
 All Python checks use `/home/dima/Projects/code/sol/.venv/bin/python -B` (Python 3.14.8); Neovim 0.12.6. Tests run in `/tmp/sol-faster-opening`, with temporary XDG configuration/data/state/cache and Neovim log paths.
+
+The following full-suite and real-book results were recorded before review, with the experimental deferral; revision validation is recorded below.
 
 - Focused `PYTHONPATH=tests ... -m unittest test_neovim_reader test_reader_timings test_reader_channel` — **72 tests OK**, 7.111 s.
 - Full `-m unittest discover -s tests` — **1,299 tests OK (7 skipped, 4 existing expected failures)**, 182.495 s. Log `/tmp/opening-full-suite.log` stays outside Git; includes packaging and headless Neovim checks.
 - Explicit `-m unittest discover -s tests -p test_architecture.py` — **5 tests OK**. `scripts/check_docs.py` and `git diff --check` — OK, including the final handoff; external URLs are not network-checked.
 - Real book **read-only**: 4,629 records / 1,803 passages. All **211 files** retain identical SHA-256 hashes, sizes and modification times before/after all measurements. No private text, source PDF, personal workspace, preferences or generated export is committed. The source PDF and personal workspaces were not opened. Temporary persistent-workspace probes create their own SQLite files outside the corpus.
 
-**Opening outcome.** Same machine, warm OS cache, sequential runs without concurrent tests/profiling, one discarded warmup and seven measured fresh processes/launches per version. Baseline is `origin/main` at `6ae639d`; only neighbour deferral is kept.
+**Review revision validation (opening preparation restored):**
 
-| Measurement | Before median (ms) | Kept change (ms) |
+- Focused `PYTHONPATH=tests ... -m unittest test_neovim_reader test_reader_timings test_reader_channel` — **72 tests OK**, 7.148 s; `/tmp/sol-opening-revision-focus.log`.
+- Full `-m unittest discover -s tests` — **1,314 tests OK (7 skipped, 4 existing expected failures)**, 184.989 s; `/tmp/sol-opening-revision-full.log`. Fresh isolated XDG directories and Neovim log; includes packaging and headless Neovim checks.
+- Explicit architecture suite — **5 tests OK**. Final `scripts/check_docs.py` and `git diff --check` — OK; external URLs are not network-checked. `git diff origin/main -- sol/being/neovim/reader.py` is empty: both pre-launch preparation calls match main. No real-book measurements were rerun for this revision; the earlier measured comparison is retained below.
+
+**Measured option for the maintainer — not implemented:** defer preparation to idle: opening about **0.44 s faster**, an immediate first move about **0.27 s slower**. The experiment below is retained as evidence, not the current behavior; both initial preparation calls are restored. Same machine, warm OS cache, sequential runs without concurrent tests/profiling, one discarded warmup and seven measured fresh processes/launches per version. Baseline is main at `6ae639d`.
+
+| Measurement | Opening preparation median (ms) | Experimental idle deferral (ms) |
 | --- | ---: | ---: |
 | `--startup-only`, application imports/dispatch to first payload | 1,833 | 1,319 |
 | `--startup-only`, complete fresh worker wall time | 2,114 | 1,596 |
 | tmux launch to drawn reader status, `sol --none` | 2,086 | 1,648 |
 
-Opening on the terminal is **21% faster (438 ms saved)**. First-payload time improves 28%. The isolated startup probe command is:
+In the deferral experiment, terminal opening was **21% faster (438 ms saved)** and first-payload time improved 28%; these gains are not implemented. The isolated startup probe command is:
 
 ```sh
 /home/dima/Projects/code/sol/.venv/bin/python -B scripts/reader_timings.py \
@@ -74,9 +82,9 @@ Real-terminal measurements use a private `tmux -S TEMP_SOCKET new-session -d -x 
 
 A rotating three-variant comparison through the unchanged fresh startup worker (one warmup per variant, seven samples each) also finds **1,827 → 1,265 ms** for deferral. It exposes the discarded import experiment described below. Different runs vary; the sequential full probe above supplies the documented opening numbers.
 
-**Whole-opening breakdown.** Low-overhead wrappers time imports, source loaders/checks, payload builds and splash lifecycle; native `--startuptime` logs separate Neovim startup/adapter/draw. Three measured terminal launches per version after a warmup. Rows overlap and **must not be added**; this diagnostic preloads the eventual reader/workspace modules to wrap them, so use the uninstrumented outcome above for total speed claims.
+**Whole-opening breakdown.** Low-overhead wrappers time imports, source loaders/checks, payload builds and splash lifecycle; native `--startuptime` logs separate Neovim startup/adapter/draw. Three measured terminal launches per version after a warmup. Rows overlap and **must not be added**; this diagnostic preloads the eventual reader/workspace modules to wrap them, so use the uninstrumented comparison above to assess the proposed tradeoff.
 
-| Stage or work completed before launching Neovim | Before median (ms) | After median (ms) |
+| Stage or work completed before launching Neovim | Opening preparation median (ms) | Experimental idle deferral (ms) |
 | --- | ---: | ---: |
 | Application imports | 92 | 95 |
 | Remaining reader/host/measurement workspace imports | 67 | 67 |
@@ -92,26 +100,26 @@ A rotating three-variant comparison through the unchanged fresh startup worker (
 | Native Neovim through first screen update | 40 | 39 |
 | Command arguments, principally SOL adapter load (inside native total) | 26 | 24 |
 
-At this initial book section there is one neighbour; the two old preparation calls build it once. After idle completes there are **12 verification calls on both versions**: those checks move later and are never skipped. First idle starts about **101 ms after native launch**, after the measured 36–40 ms first draw. Resumed sections can have two neighbours; the synthetic test checks both are deferred and built separately. Separate isolated persistent-workspace stage probes give **18.7 ms** for new `Workspace` construction and **0.02 ms** for `WorkspaceReader`; the first view then makes ten verification calls (about 217 ms). No remembered personal workspace is used or timed.
+At this initial book section there is one neighbour; the two preparation calls build it once. After idle completes there are **12 verification calls on both versions**: those checks move later and are never skipped. First idle starts about **101 ms after native launch**, after the measured 36–40 ms first draw. Resumed sections can have two neighbours; the revised synthetic test checks both are built before launch, and new neighbours are built separately on idle after moving. Separate isolated persistent-workspace stage probes give **18.7 ms** for new `Workspace` construction and **0.02 ms** for `WorkspaceReader`; the first view then makes ten verification calls (about 217 ms). No remembered personal workspace is used or timed.
 
 The trace confirms **one** `load_corpus_book`, **one** `load_snapshot`, **one** `remember_verified` and one JSONL record parse per opening. There is no duplicate book/snapshot load to remove. The remaining CORE work includes graph loading/validation, private verified-copy construction, checked graph detachment/comparison and per-check file verification. All remain intact. A separate no-splash cProfile diagnostic attributes 0.52 s to snapshot loading, 0.69 s to verified-copy construction, 0.84 s to initial view preparation and 0.62 s to neighbour preparation (overlapping profiled spans; profiling increases startup to about 3 s). No cProfile total is used as an outcome measurement.
 
 **Experiments not kept.** Deferring installation-metadata/URL imports reduces isolated application-import median **93.9 → 78.0 ms** (15 measured alternating pairs), and separate native samples appeared to improve 1,653 → 1,602 ms. It fails the whole-startup test: rotating worker medians are **1,265 ms for deferral alone versus 1,383 ms with lazy imports**; the independent sequential startup-only comparison likewise rises 1,311 → 1,380 ms. Reverted it and its test changes. No startup improvement is claimed for it. Disabling the splash gives **2,016 versus 2,086 ms** in separate seven-launch baseline samples, while measured start/handoff costs are only about 1.4 ms; this does not establish a cheaper equivalent animation. The existing opening screen stays unchanged. No verification batching, caching or policy change was attempted.
 
-**Immediate-navigation tradeoff.** Additional same-route tmux measurements send `]c` immediately after first draw, then a second `]c` after one second for idle work: first move **638 → 909 ms** (baseline five / final seven measured launches); rested second move **717 → 722 ms**. An immediate key has to build its unprepared destination; after a reading pause, preparation still supplies the existing navigation benefit. A repeated baseline opening in this experiment is 2.14 s, consistent with run-to-run variation. These routes/chapters differ from #115's 0.56 s sample, so they do not replace that older section measurement.
+**Immediate-navigation tradeoff in the unimplemented experiment.** Additional same-route tmux measurements send `]c` immediately after first draw, then a second `]c` after one second for idle work: first move **638 → 909 ms** (baseline five / final seven measured launches); rested second move **717 → 722 ms**. With deferral, an immediate key has to build its unprepared destination; after a reading pause, preparation still supplies the existing navigation benefit. A repeated baseline opening in this experiment is 2.14 s, consistent with run-to-run variation. These routes/chapters differ from #115's 0.56 s sample, so they do not replace that older section measurement.
 
 Raw text-free JSON, diagnostic profiles and temporary measurement helpers stay outside Git at `/tmp/opening-*`; canonical before/after fingerprint manifests are there too. Key reports: `opening-{baseline,idle,lazy,final}-startup.json`, `opening-{baseline,final,baseline-nav}-terminal.json`, `opening-startup-ab.json`, `opening-import-ab.json`; stage reports live under the temporary roots named in `opening-{baseline-stages-detailed,kept-stages,workspace-stages}-terminal.json`.
 
 ### Outstanding issues
 
-- Opening is still about 1.65 s, with the immediate-first-jump tradeoff above. Results are warm-cache local samples, not a cold-storage or cross-host guarantee. Existing per-check verification and whole-graph work remain substantial. Persistent-workspace probes use a new database; remembered-workspace resume is not measured. No sustained human reading/visual acceptance is claimed.
+- Current opening retains the measured baseline of about 2.09 s and prepares neighbours before launch. The 1.65 s figure belongs to the unimplemented deferral experiment, with the immediate-first-jump tradeoff above. Results are warm-cache local samples, not a cold-storage or cross-host guarantee. Existing per-check verification and whole-graph work remain substantial. Persistent-workspace probes use a new database; remembered-workspace resume is not measured. No sustained human reading/visual acceptance is claimed.
 - The supplied checkout's Git metadata is mounted read-only. Branch creation, commits, tests and publication use `/tmp/sol-faster-opening`, cloned from `origin/main` at `6ae639d`. Final task files are mirrored into the supplied checkout without changing its mounted Git metadata; review the published topic branch.
 
 ### Decisions requiring approval
 
-None required for this implementation. Default: first launch the checked view, prepare neighbours through the existing idle hook, and build normally if a key arrives first. The maintainer may overrule this latency tradeoff.
+No new decision is required for this revision. The maintainer's #112 choice remains: prepare both neighbours during the opening screen, then use idle after moves. **Option for the maintainer, not implemented:** defer preparation to idle: opening about 0.44 s faster, an immediate first move about 0.27 s slower. No implementation in this PR depends on choosing that option.
 
-- **(reserved; quantified only)** CORE §5 per-check file verification remains unchanged: nine calls cost about **193 ms before first native launch**, twelve cost about **252 ms including the deferred initial neighbour**. Fewer file checks per user action would change the approved freshness policy and require a separate maintainer decision and contract/tests. This PR implements no such change and does not depend on it. Graph loading/validation and checked copies also remain; the entire opening cannot be attributed to file hashing alone.
+- **(reserved; quantified only)** CORE §5 per-check file verification remains unchanged: in the deferral experiment, nine calls cost about **193 ms before first native launch**, twelve cost about **252 ms including the deferred initial neighbour**; retained opening preparation performs all twelve before launch. Fewer file checks per user action would change the approved freshness policy and require a separate maintainer decision and contract/tests. This PR implements no such change and does not depend on it. Graph loading/validation and checked copies also remain; the entire opening cannot be attributed to file hashing alone.
 
 
 
