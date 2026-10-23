@@ -12,6 +12,7 @@ import json
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.screen import ModalScreen
 from textual.theme import Theme
 from textual import work
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -70,6 +71,44 @@ def in_context(context):
     return Text.assemble(left, (word, "bold"), right)
 
 
+class WordSort(ModalScreen):
+    """A keyboard menu with explicit column and direction choices."""
+
+    BINDINGS = [("escape", "cancel", "Cancel")]
+    DEFAULT_CSS = """
+    WordSort { align: center middle; }
+    #sort-dialog { width: 52; max-width: 100%; height: 22; max-height: 90%;
+                   background: $surface; border: solid $accent; padding: 1; }
+    #sort-options { height: 1fr; }
+    #sort-help { height: auto; }
+    """
+
+    def __init__(self, current):
+        super().__init__()
+        self.current = current
+        self.choices = [(None, False), *((column, descending)
+                        for column in range(len(words.SORT_COLUMNS)) for descending in (False, True))]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="sort-dialog"):
+            yield Static("Sort words · undefined values always last\n"
+                         "Arrows choose · Enter applies · Escape cancels", id="sort-help")
+            yield OptionList("Engine order (default)",
+                             *(f"{words.SORT_COLUMNS[column]} · {'descending' if descending else 'ascending'}"
+                               for column, descending in self.choices[1:]), id="sort-options")
+
+    def on_mount(self) -> None:
+        options = self.query_one(OptionList)
+        options.highlighted = self.choices.index(self.current)
+        options.focus()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        self.dismiss(self.choices[event.option_index])
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class EssenceApp(App):
     """One investigation, shown in whatever space Neovim gives it."""
 
@@ -100,6 +139,7 @@ class EssenceApp(App):
     #results { height: 1fr; }
     #summary { padding: 0; }
     #summary-box { height: auto; max-height: 20%; }
+    #sort-status { height: auto; color: $text-muted; }
     #frequencies { height: 1fr; min-height: 3; }
     DataTable { background: $background; }
     #sources-label, #overall-label { color: $text-muted; height: auto; max-height: 2; }
@@ -132,6 +172,8 @@ class EssenceApp(App):
         self.context = context
         self.state_file = context["state_file"]
         self.state = load_state(self.state_file) if self.state_file else {}
+        self.word_sort = (None, False)
+        self.word_order = []
 
     def compose(self) -> ComposeResult:
         target = self.context["reference"]["reference"]["target_id"]
@@ -247,6 +289,10 @@ class EssenceApp(App):
                             yield RadioButton(label, value=key == "none", name=key)
             yield Input(placeholder="Target file · UTF-8 path", id="target-file")
             yield Input(placeholder="Reference file · UTF-8 path", id="reference-file")
+            with Vertical(id="tfidf-settings", classes="choices"):
+                yield Label("Top terms per passage and overall · integer 1–1,000 (default 20)",
+                            classes="section-label")
+                yield Input("20", id="top-n", placeholder="TF-IDF top_n · 1–1,000", type="integer")
             with Horizontal(id="run-row"):
                 yield Button("Run study", id="run")
                 yield Button("Cancel", id="cancel", disabled=True)
@@ -257,6 +303,7 @@ class EssenceApp(App):
         # table keeps most of the height.
         with VerticalScroll(id="summary-box"):
             yield Static("Nothing yet. Choose a study and a target in Experiment, then press Run.", id="summary")
+        yield Static("", id="sort-status")
         yield DataTable(id="frequencies", zebra_stripes=True, cursor_type="row")
         yield Static("Overall · mean passage weights", id="overall-label")
         yield DataTable(id="overall", cursor_type="row", zebra_stripes=True)
@@ -279,6 +326,7 @@ class EssenceApp(App):
         self.query_one("#reference-group").display = comparison
         self.query_one("#target-file").display = self.choice("target") == "file"
         self.query_one("#reference-file").display = comparison and self.choice("reference") == "file"
+        self.query_one("#tfidf-settings").display = self.choice("study") == "tfidf"
 
     count_serial = 0
     last_count = None
@@ -286,6 +334,17 @@ class EssenceApp(App):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "run":
+            top_n = 20
+            if self.choice("study") == "tfidf":
+                value = self.query_one("#top-n", Input).value.strip()
+                try:
+                    top_n = int(value) if value.isascii() and value.isdecimal() else 0
+                except ValueError:
+                    top_n = 0  # Also refuse values beyond Python's integer-string limit.
+                if not 1 <= top_n <= 1000:
+                    self.query_one("#status", Static).update("Not counted: top_n must be an integer from 1 to 1,000.")
+                    self.query_one("#top-n", Input).focus()
+                    return
             # Read the choices here, on the interface thread; each count has a
             # number, and only the latest one may save or show anything.
             self.count_serial += 1
@@ -293,7 +352,7 @@ class EssenceApp(App):
             self.query_one("#cancel", Button).disabled = False
             self.count_words(self.count_serial, self.choice("target"), self.choice("reference"),
                              self.query_one("#target-file", Input).value,
-                             self.query_one("#reference-file", Input).value, self.choice("study"))
+                             self.query_one("#reference-file", Input).value, self.choice("study"), top_n)
         elif event.button.id == "cancel":
             # The engine cannot be interrupted midway: the count finishes in
             # the background, and its result is discarded like a replaced one.
@@ -311,11 +370,11 @@ class EssenceApp(App):
             self.export_table(self.last_count, event.button.id.removeprefix("export-"))
 
     @work(thread=True, exclusive=True)
-    def count_words(self, serial, target, reference, target_file, reference_file, study="words") -> None:
+    def count_words(self, serial, target, reference, target_file, reference_file, study="words", top_n=20) -> None:
         # The engine reads the corpus or files; keep the interface responsive.
         try:
             if study == "tfidf":
-                outcome = tfidf.run(self.context, target, target_file=target_file)
+                outcome = tfidf.run(self.context, target, target_file=target_file, top_n=top_n)
             elif study == "sentences":
                 outcome = sentences.run(self.context, target, target_file=target_file)
             else:
@@ -347,6 +406,8 @@ class EssenceApp(App):
         self.show_result(outcome, saved)
 
     def show_result(self, count, saved) -> None:
+        if count is not self.last_count:
+            self.word_sort = (None, False)
         if isinstance(count, tfidf.TfidfCount):
             return self.show_tfidf(count, saved)
         if isinstance(count, sentences.SentenceCount):
@@ -363,13 +424,20 @@ class EssenceApp(App):
         table.add_column("Word", width=max(1, budget - sum(width for _, width in columns)))
         for label, width in columns:
             table.add_column(label, width=width)
-        shown, total = words.rows(count)
-        for row in shown:
+        self.word_order = words.row_order(count, *self.word_sort)[:words.ROW_LIMIT]
+        shown, total = words.rows(count, order=self.word_order)
+        for index, row in zip(self.word_order, shown):
             cells = row if count.reference is not None else row[:3]
-            table.add_row(*cells, height=None)
+            table.add_row(*cells, key=str(index), height=None)
+        column, descending = self.word_sort
+        sort_status = self.query_one("#sort-status", Static)
+        sort_status.display = count.comparison is not None
+        sort_status.update("s sort · " + ("Engine order (default)" if column is None else
+                           f"{words.SORT_COLUMNS[column]} · {'descending' if descending else 'ascending'}") +
+                           " · undefined last")
         lines = words.summary(count)
         if len(shown) < total:
-            lines.append(f"Showing the {len(shown):,} most frequent of {total:,} words.")
+            lines.append(f"Showing the first {len(shown):,} of {total:,} words in the selected order.")
         lines.append(f"Saved: {saved} (check with: sol essence check FILE)" if saved else
                      "Not saved: this reader session has no workspace.")
         self.query_one("#summary", Static).update("\n".join(lines))
@@ -380,7 +448,7 @@ class EssenceApp(App):
         for button in self.query("#export-row Button"):
             button.disabled = count.reference is None
         self.query_one("#export-row").display = count.reference is not None
-        self.show_sources(0 if total else None)
+        self.show_sources(self.word_order[0] if self.word_order else None)
         self.query_one("#screens", TabbedContent).active = "results"
         # Words first: arrows choose a word, Enter goes to its sources.
         table.focus()
@@ -394,6 +462,7 @@ class EssenceApp(App):
         return max(columns, self.size.width - 4 - 2 * columns)
 
     def set_word_widgets(self, shown) -> None:
+        self.query_one("#sort-status").display = False
         self.query_one("#overall").display = False
         self.query_one("#overall-label").display = False
         # Sources and export belong to word counts only.
@@ -480,7 +549,7 @@ class EssenceApp(App):
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if (event.data_table.id == "frequencies" and self.last_count is not None
                 and isinstance(self.last_count, words.Count)):
-            self.show_sources(event.cursor_row)
+            self.show_sources(int(event.row_key.value))
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         if event.data_table.id == "frequencies":
@@ -549,6 +618,8 @@ class EssenceApp(App):
         screen = self.query_one("#screens", TabbedContent).active
         focused = self.focused
         row = table.cursor_row
+        word_index = (self.word_order[row] if isinstance(self.last_count, words.Count)
+                      and row < len(self.word_order) else None)
         sources = self.query_one("#sources", DataTable)
         source_row = sources.cursor_row
         export_disabled = [button.disabled for button in self.query("#export-row Button")]
@@ -558,9 +629,11 @@ class EssenceApp(App):
         # intermediate events so they cannot reset the restored occurrence.
         with self.prevent(DataTable.RowHighlighted):
             self.show_result(self.last_count, self.last_saved)
+            if word_index is not None:
+                row = self.word_order.index(word_index) if word_index in self.word_order else 0
             table.move_cursor(row=row)
             if isinstance(self.last_count, words.Count):
-                self.show_sources(row if table.row_count else None)
+                self.show_sources(self.word_order[row] if table.row_count else None)
                 sources.move_cursor(row=source_row)
         for button, disabled in zip(self.query("#export-row Button"), export_disabled):
             button.disabled = disabled
@@ -572,12 +645,22 @@ class EssenceApp(App):
 
     def on_key(self, event) -> None:
         active = self.query_one("#screens", TabbedContent).active
+        if (event.key == "s" and active == "results"
+                and self.focused is self.query_one("#frequencies", DataTable)
+                and isinstance(self.last_count, words.Count) and self.last_count.comparison is not None):
+            self.push_screen(WordSort(self.word_sort), self.sort_words)
+            event.stop()
         if event.key == "escape" and active in BROWSERS:
             self.query_one(f"#{active}-list").focus()
             event.stop()
         if event.key == "escape" and self.focused is self.query_one("#sources", DataTable):
             self.query_one("#frequencies", DataTable).focus()
             event.stop()
+
+    def sort_words(self, choice) -> None:
+        if choice is not None:
+            self.word_sort = choice
+            self.reflow_result()
 
     def follow_reader_theme(self) -> None:
         """Take the theme the reader last wrote; anything unreadable or unknown is ignored."""

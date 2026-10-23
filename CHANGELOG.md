@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### ESSENCE study controls — 23 October 2026
+
+Experiment accepts TF-IDF top_n from 1 to 1,000 (default 20), shows the choice
+in Results and records it in the existing TF-IDF artifact. With comparison
+results focused, `s` opens a column/direction sort menu; undefined values stay
+last, their reasons remain visible, and ties keep engine order. Sources follow
+the sorted word. Engine order remains the default and can be restored. Sorting
+leaves saved artifacts and exports unchanged; investigation state still records
+only the screen and origin.
+
 ### Sections prepared ahead — 23 October 2026
 
 The reader builds the neighbouring sections during the opening screen and,

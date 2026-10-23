@@ -164,7 +164,21 @@ context directory at exit. Saved investigation state remains owned by
 
 **Small-window Results (21 October 2026):** at 80×24 and 120×40 the Results pane stays within its window. The scrollable summary takes at most a fifth of its height; word frequencies and their occurrences share the remaining space, with compact source help and one-line export controls. Column widths reserve room for cell padding and vertical scrollbars: words, undefined measures, sentence beginnings, locations and TF-IDF terms wrap rather than requiring sideways scrolling. All comparison columns remain present. The occurrence list stays visible while arrows choose a word; Enter focuses its occurrences, Enter there opens the reader, and Escape returns to words. Resizing preserves the selected word/occurrence, focus and export status. Long rows and summaries remain available by vertical scrolling; engines, saved artifacts and exports are unchanged.
 
-TF-IDF calls `sol.essence.analyze_tfidf` with the same passage/section/book/file targets and no reference, retaining the default top 20. Results lists each passage in reading order with its ranked terms and weights **first**, then a separate overall mean-weight table. Every retained top term remains available by scrolling. Enter on a passage sends its ID, span start and content digest through the same guarded reader request as sentences; file rows explain that they cannot open. Workspace sessions save `tfidf-*.sol-analysis.json` owner-only beside other studies, checkable with `sol essence check`; temporary sessions save nothing. Headings and pages are display-only. TF-IDF declares raw-count TF, smoothed IDF, L2 normalization and no stop-word removal; it does not claim to identify concepts.
+TF-IDF calls `sol.essence.analyze_tfidf` with the same passage/section/book/file targets and no reference. Experiment offers **Top terms per passage and overall**, an integer from **1 to 1,000**, default **20**; invalid values are refused before a worker starts. The results header shows the chosen number, and the existing TF-IDF artifact records it as `top_n`. The screen/origin investigation state does not record study choices, so its format is unchanged and a new opening starts at 20. Results lists each passage in reading order with its ranked terms and weights **first**, then a separate overall mean-weight table. Every retained top term remains available by scrolling. Enter on a passage sends its ID, span start and content digest through the same guarded reader request as sentences; file rows explain that they cannot open. Workspace sessions save `tfidf-*.sol-analysis.json` owner-only beside other studies, checkable with `sol essence check`; temporary sessions save nothing. Headings and pages are display-only. TF-IDF declares raw-count TF, smoothed IDF, L2 normalization and no stop-word removal; it does not claim to identify concepts.
+
+**Implemented (23 October 2026), comparison sorting:** with the word-comparison
+results table focused, `s` opens a sort menu. Arrows choose **Engine order
+(default)** or **ascending / descending** for Word, Target count/rate, Reference
+count/rate, Difference or Log₂ ratio; Enter applies, Escape cancels. A line above
+the table shows the active column/direction and that undefined values are always
+last. Numeric sorting uses the engine's numeric values, before the 2,000-row
+display limit; ties (including undefined ties) retain engine order in either
+direction. Undefined rates still say *undefined*, and undefined measures retain
+their reason (*absent in target/reference*, *empty target/reference/both*).
+Source navigation follows the sorted word; resizing retains that word and its
+occurrence. New results start in engine order; the menu can also restore it.
+Sorting changes only presentation: saved artifacts and CSV/TSV exports retain
+all engine rows in their original order and with their unchanged content.
 
 **Proposed launch and return requirements:**
 

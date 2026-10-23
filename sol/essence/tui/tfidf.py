@@ -12,7 +12,7 @@ class TfidfCount:
     labels: dict = field(default_factory=dict, repr=False)
 
 
-def run(context, target_choice, *, target_file=None, loader=None):
+def run(context, target_choice, *, target_file=None, top_n=20, loader=None):
     from sol.essence import analyze_tfidf
 
     _, inputs = words.engine()
@@ -25,7 +25,7 @@ def run(context, target_choice, *, target_file=None, loader=None):
         snapshot = book.corpus_snapshot
         core.check_reference(snapshot, context["reference"])
     target = words.provider(target_choice, context, book=book, snapshot=snapshot, path=target_file, inputs=inputs)
-    study = analyze_tfidf(target)
+    study = analyze_tfidf(target, top_n=top_n)
     labels = {}
     if book is not None:
         for item in study["word_study"]["target"]["inputs"]:
