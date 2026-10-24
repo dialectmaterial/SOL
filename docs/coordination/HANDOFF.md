@@ -37,7 +37,7 @@ Write "None." rather than deleting a heading.
 ## ESSENCE sentence scope refusals — 25 October 2026
 
 **Task:** Codex B, maintainer's bounded bug hunt; see CURRENT_TASK.md.
-**Branch / PR:** `codex/essence-cli-scope-validation` · PR pending publication.
+**Branch / PR:** `codex/essence-cli-scope-validation` · [#123](https://github.com/dialectmaterial/SOL/pull/123).
 **Last implementation commit:** `aaa12794edb42e489f7ef998823441048e4b79b1`.
 
 ### Changed files

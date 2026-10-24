@@ -66,7 +66,7 @@ suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 ## Codex B: ESSENCE sentence scope refusals
 
 **Status:** In review
-**Branch:** `codex/essence-cli-scope-validation`
+**Branch:** `codex/essence-cli-scope-validation` · [PR #123](https://github.com/dialectmaterial/SOL/pull/123)
 **Requested:** 25 October 2026, by the maintainer
 **Scope:** Bug hunting in ESSENCE measurement core, CLI and interchange, excluding
 `sol/essence/tui/`. This batch fixes empty/unknown sentence reader paths and
