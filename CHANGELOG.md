@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### ESSENCE workspace — 24 October 2026
+
+ESSENCE opens on its study instead of four tabs. A one-key study menu (`w`/`s`/`t`,
+`p`/`c`/`b`/`f`, `0`/`C`/`B`/`F`, Enter) says what it will run; the result
+replaces it in place. Words show bars for rates and log₂ ratios and a
+concordance with the word in an aligned column, sortable by left or right
+context, with a strip showing where it occurs; sentence lengths show their
+distribution first; TF-IDF draws its overall weights. Tables move with
+`j`/`k`, `g`/`G`, Ctrl-D/U. Fullscreen puts words, concordance and details side
+by side. The Encyclopedia and Methods open as reference (`K` for the study's
+method, `M`, or the `:` command palette). `f` hides a declared list of function
+words from the display only. With the reader's position file, "this passage"
+follows the reader and a moved result offers `R` to rerun. Engines, artifacts,
+exports and source return are unchanged.
+
 ### ESSENCE catalog navigation — 24 October 2026
 
 Encyclopedia and Methods have local search by title, identifier or description,
