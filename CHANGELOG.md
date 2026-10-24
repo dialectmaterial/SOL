@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### ESSENCE in the reader's colors — 24 October 2026
+
+ESSENCE draws with the reader's own palette for every preset: the same page,
+text, headings, rules and selection, read from `sol.presentation.theme`. It
+no longer uses Textual's Catppuccin themes, whose darker page, pink cursor and
+grey footer did not match the reader. Terminal still inherits the terminal's
+colors.
+
 ### ESSENCE workspace — 24 October 2026
 
 ESSENCE opens on its study instead of four tabs. A one-key study menu (`w`/`s`/`t`,

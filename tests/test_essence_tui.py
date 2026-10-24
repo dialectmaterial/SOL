@@ -184,6 +184,24 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(app.screen_stack), 1)
             await pilot.press("q")
 
+    async def test_draws_with_the_readers_own_palette(self):
+        from sol.essence.tui.app import EssenceApp, TEXTUAL_THEMES
+        from sol.presentation.theme import reader_palette
+
+        for name in ("mocha", "latte", "paper", "night"):
+            with self.subTest(theme=name):
+                app = EssenceApp(context(), theme=name)
+                async with app.run_test() as pilot:
+                    palette = reader_palette(name)
+                    colors = app.theme_variables
+                    self.assertEqual(app.theme, TEXTUAL_THEMES[name])
+                    for variable, role in (("background", "page"), ("foreground", "text"),
+                                           ("primary", "heading"), ("text-muted", "muted"),
+                                           ("block-cursor-background", "selection"),
+                                           ("border-blurred", "border"), ("footer-background", "page")):
+                        self.assertEqual(colors[variable].lower(), palette[role], variable)
+                    await pilot.press("q")
+
     async def test_follows_the_reader_theme_while_open(self):
         from sol.essence.tui.app import EssenceApp
 
@@ -191,10 +209,10 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
         theme_file.write_text("mocha", encoding="utf-8")
         app = EssenceApp(context(), theme="mocha", theme_file=str(theme_file))
         async with app.run_test() as pilot:
-            self.assertEqual(app.theme, "catppuccin-mocha")
+            self.assertEqual(app.theme, "sol-mocha")
             theme_file.write_text("latte", encoding="utf-8")
             await pilot.pause(0.8)
-            self.assertEqual(app.theme, "catppuccin-latte")
+            self.assertEqual(app.theme, "sol-latte")
             # Anything unknown, or a vanished file, leaves the theme as it is.
             for content in ("sepia", None):
                 if content is None:
@@ -202,7 +220,7 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 else:
                     theme_file.write_text(content, encoding="utf-8")
                 await pilot.pause(0.8)
-                self.assertEqual(app.theme, "catppuccin-latte")
+                self.assertEqual(app.theme, "sol-latte")
             await pilot.press("q")
 
 

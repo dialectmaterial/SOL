@@ -28,19 +28,42 @@ from sol.essence.tui.context import load_state, save_state
 from sol.essence.tui.menu import STUDIES, SCOPES, StudyMenu
 from sol.essence.tui.reference import METHOD_STUDIES, ReferenceScreen
 from sol.essence.tui.results import OpenSource, SentencesView, Status, TfidfView, WordsView, WIDE
-from sol.presentation.theme import DEFAULT_READER_THEME
+from sol.presentation.theme import BACKGROUNDS, DEFAULT_READER_THEME, READER_THEMES, reader_palette
 
-TEXTUAL_THEMES = {"mocha": "catppuccin-mocha", "latte": "catppuccin-latte", "paper": "sol-paper",
-                  "night": "sol-night", "terminal": "ansi-dark"}
-# SOL's own, matching the reader's Paper and Night (actualspirit.com).
-SOL_THEMES = (
-    Theme(name="sol-paper", primary="#55308a", secondary="#45424d", accent="#55308a", warning="#9b2c2c",
-          error="#9b2c2c", success="#3d6b3a", foreground="#17151c", background="#f3f0e6", surface="#ebe7d9",
-          panel="#e4dfcf", dark=False),
-    Theme(name="sol-night", primary="#c3a6ee", secondary="#a29cae", accent="#c3a6ee", warning="#e8a87c",
-          error="#e8a87c", success="#a6c99a", foreground="#ece7da", background="#1b1820", surface="#221e28",
-          panel="#2a2531", dark=True),
-)
+TEXTUAL_THEMES = {name: f"sol-{name}" for name in READER_THEMES if name != "terminal"} | {"terminal": "ansi-dark"}
+
+
+def reader_theme(name):
+    """ESSENCE in the reader's own colors: its page, ink, headings, rules and selection.
+
+    Terminal has no palette; Textual's ANSI theme inherits the terminal's colors as the reader does.
+    """
+    p = reader_palette(name)
+    return Theme(
+        name=TEXTUAL_THEMES[name], dark=BACKGROUNDS[name] == "dark",
+        foreground=p["text"], background=p["page"], surface=p["panel"], panel=p["selection"],
+        primary=p["heading"], secondary=p["muted"], accent=p["heading"],
+        warning=p["warning"], error=p["warning"], success=p["heading"],
+        variables={
+            "text-muted": p["muted"], "foreground-muted": p["muted"],
+            "border": p["heading"], "border-blurred": p["border"],
+            "block-cursor-foreground": p["text"], "block-cursor-background": p["selection"],
+            "block-cursor-text-style": "bold",
+            "block-cursor-blurred-foreground": p["text"], "block-cursor-blurred-background": p["panel"],
+            "input-cursor-foreground": p["page"], "input-cursor-background": p["text"],
+            "input-selection-background": p["selection"],
+            "footer-background": p["page"], "footer-foreground": p["muted"],
+            "footer-key-foreground": p["heading"], "footer-description-foreground": p["muted"],
+            "scrollbar": p["border"], "scrollbar-hover": p["muted"], "scrollbar-active": p["heading"],
+            "scrollbar-background": p["page"], "scrollbar-background-hover": p["page"],
+            "scrollbar-background-active": p["page"], "scrollbar-corner-color": p["page"],
+            "link-color": p["heading"], "link-color-hover": p["text"], "link-background-hover": p["selection"],
+            "button-foreground": p["page"], "button-color-foreground": p["page"],
+            **{f"markdown-h{level}-{part}": value for level in range(1, 7)
+               for part, value in (("color", p["heading"]), ("background", "transparent"))},
+        })
+
+
 # Views a leaving session can return to; earlier screens map onto them.
 VIEWS = {"workspace": "workspace", "experiment": "workspace", "results": "workspace",
          "encyclopedia": "encyclopedia", "methods": "methods"}
@@ -100,52 +123,53 @@ class EssenceApp(App):
     .metrics-row { height: 1; }
     #result-metrics, #sentence-metrics, #tfidf-metrics { width: 1fr; text-wrap: nowrap; text-overflow: ellipsis; }
     #details-hint, .details-hint { width: auto; color: $text-muted; }
-    #word-filter { height: 1; border: none; padding: 0 1; background: $primary 18%; }
+    #word-filter { height: 1; border: none; padding: 0 1; background: $surface; }
     #sort-status { height: 1; color: $text-muted; text-wrap: nowrap; text-overflow: ellipsis; }
     .result-layout { height: 1fr; layout: vertical; }
     ResultView.-wide .result-layout { layout: horizontal; }
     VimTable { background: $background; scrollbar-size-vertical: 1; }
     VimTable > .datatable--header { background: $background; color: $text-muted; text-style: bold; }
-    VimTable > .datatable--cursor { background: $primary 18%; color: $foreground; }
-    VimTable:focus > .datatable--cursor { background: $primary 35%; color: $foreground; text-style: bold; }
+    VimTable > .datatable--cursor { background: $block-cursor-blurred-background; color: $foreground; }
+    VimTable:focus > .datatable--cursor { background: $block-cursor-background; color: $block-cursor-foreground;
+        text-style: bold; }
     #frequencies { height: 1fr; min-height: 4; }
     #occurrences-pane { height: 1fr; min-height: 5; }
     #sources-label, #longest-label, #passages-label, #overall-label {
         height: 1; color: $text-muted; text-wrap: nowrap; text-overflow: ellipsis;
-        border-top: solid $primary 30%; height: 2; }
+        border-top: solid $border-blurred; height: 2; }
     #occurrences-pane:focus-within #sources-label, #longest-pane:focus-within #longest-label,
     #passages-pane:focus-within #passages-label, #overall-pane:focus-within #overall-label {
         color: $accent; border-top: solid $accent; }
     #sources { height: 1fr; }
     .details { display: none; height: auto; max-height: 45%; padding: 0 1;
-               border-top: solid $primary 30%; color: $text-muted; }
+               border-top: solid $border-blurred; color: $text-muted; }
     .details:focus { border-top: solid $accent; }
     ResultView.-wide .details { display: block; height: 1fr; max-height: 100%; width: 40;
-                                border-top: none; border-left: vkey $primary 30%; }
+                                border-top: none; border-left: vkey $border-blurred; }
     ResultView.-wide #frequencies { width: 86; height: 1fr; }
-    ResultView.-wide #occurrences-pane { width: 1fr; height: 1fr; border-left: vkey $primary 30%; padding-left: 1; }
+    ResultView.-wide #occurrences-pane { width: 1fr; height: 1fr; border-left: vkey $border-blurred; padding-left: 1; }
     ResultView.-wide #sources-label { border-top: none; height: 1; }
     #distribution { height: auto; max-height: 50%; }
     ResultView.-wide #distribution { width: 1fr; height: 1fr; max-height: 100%; }
     #longest-pane { height: 1fr; }
-    ResultView.-wide #longest-pane { width: 1fr; border-left: vkey $primary 30%; padding-left: 1; }
+    ResultView.-wide #longest-pane { width: 1fr; border-left: vkey $border-blurred; padding-left: 1; }
     #longest { height: 1fr; }
     #passages-pane { height: 1fr; }
     #overall-pane { height: 1fr; max-height: 40%; }
-    ResultView.-wide #overall-pane { width: 42; max-height: 100%; border-left: vkey $primary 30%; padding-left: 1; }
+    ResultView.-wide #overall-pane { width: 42; max-height: 100%; border-left: vkey $border-blurred; padding-left: 1; }
     #passages, #overall { height: 1fr; }
     StudyMenu { height: auto; max-height: 100%; overflow-y: auto; padding: 0 1;
-                border-top: solid $primary 40%; background: $background; }
+                border-top: solid $border-blurred; background: $background; }
     Screen.-short #intro { display: none; }
     StudyMenu:focus-within { border-top: solid $accent; }
     #menu-choices { height: auto; }
     .menu-field { height: 1; }
     .menu-field Label { width: auto; color: $text-muted; }
-    .menu-field Input { height: 1; border: none; padding: 0 1; background: $primary 18%; width: 1fr; }
+    .menu-field Input { height: 1; border: none; padding: 0 1; background: $surface; width: 1fr; }
     #menu-summary { height: auto; margin-top: 1; }
     #status { height: auto; color: $warning; }
     #result-status { height: auto; max-height: 2; padding: 0 1; color: $text-muted; }
-    Footer { background: $surface; }
+    Footer { background: $footer-background; }
     /* Reference screen: the catalogs, as before. */
     #reference-header { height: 1; padding: 0 1; }
     #catalogs, ContentSwitcher { height: 1fr; }
@@ -155,10 +179,10 @@ class EssenceApp(App):
     TabPane { padding: 0 1; }
     .browser-tools { height: 1; margin-bottom: 1; }
     .browser-search { width: 1fr; height: 1; border: none; padding: 0 1; background: $surface; }
-    .browser-search:focus { border: none; background: $primary 18%; }
+    .browser-search:focus { border: none; background: $panel; }
     .browser-count { width: auto; padding-left: 1; color: $text-muted; }
     .browser-layout { height: 1fr; }
-    .browser-list, .browser-detail { border: round $primary 45%; background: $background;
+    .browser-list, .browser-detail { border: round $border-blurred; background: $background;
         border-title-color: $text-muted; border-title-style: bold; }
     .browser-list:focus, .browser-detail:focus { border: round $accent; border-title-color: $accent; }
     .browser-list { width: 32; height: 1fr; padding: 0 1; margin-right: 1; }
@@ -168,8 +192,10 @@ class EssenceApp(App):
     #method-availability { width: 1fr; color: $text-muted; }
     OptionList { background: $background; }
     OptionList > .option-list--option { padding: 0 1; }
-    OptionList > .option-list--option-highlighted { background: $primary 18%; color: $foreground; text-style: bold; }
-    OptionList:focus > .option-list--option-highlighted { background: $primary 30%; color: $foreground; }
+    OptionList > .option-list--option-highlighted { background: $block-cursor-blurred-background; color: $foreground;
+        text-style: bold; }
+    OptionList:focus > .option-list--option-highlighted { background: $block-cursor-background;
+        color: $block-cursor-foreground; }
     Markdown { padding: 0 1; }
     MarkdownH2 { margin-top: 0; }
     #genealogy-map { height: auto; border: none; background: transparent; padding: 0 1; }
@@ -202,9 +228,9 @@ class EssenceApp(App):
 
     def __init__(self, context, theme=DEFAULT_READER_THEME, theme_file=None, position_file=None):
         super().__init__()
-        for sol_theme in SOL_THEMES:
-            self.register_theme(sol_theme)
-        # Textual's own Catppuccin themes; Terminal uses the terminal's ANSI colors.
+        for name in READER_THEMES:
+            if name != "terminal":
+                self.register_theme(reader_theme(name))
         self.theme = TEXTUAL_THEMES[theme]
         self.theme_file = theme_file
         self.position_file = position_file
