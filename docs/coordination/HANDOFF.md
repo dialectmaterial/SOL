@@ -37,7 +37,7 @@ Write "None." rather than deleting a heading.
 
 **Task:** [Claude Code: ESSENCE workspace](https://github.com/dialectmaterial/SOL/blob/claude/essence-workspace/docs/coordination/CURRENT_TASK.md), requested by the maintainer after the ESSENCE visual audit, with all five decisions approved.
 **Branch / PR:** `claude/essence-workspace`, stacked on #118 (Codex's unpublished ESSENCE stack, published by Claude) · PR linked below.
-**Last implementation commit:** `8c3fc3cff75df0bfd26bc9c41c8b821c0cc9c13b` (this report is committed after it)
+**Last implementation commit:** `50cf51d` (review fixes; this report is updated after it)
 
 ### Changed files
 - `sol/essence/tui/views.py` (new) — bars, diverging log-ratio bars, dispersion strips, concordance lines and context sort keys in block characters; pure functions.
@@ -50,7 +50,8 @@ Write "None." rather than deleting a heading.
 - `docs/ESSENCE.md` §4 — the maintainer's decisions of 24 October and the implemented workspace; `CHANGELOG.md`; this slot in `CURRENT_TASK.md`.
 
 ### Tests performed
-- `.venv/bin/python -B -m unittest discover -s tests` — **1,335 tests OK** (7 skipped, 4 expected failures), 183 s.
+- `.venv/bin/python -B -m unittest discover -s tests` — **1,339 tests OK** (7 skipped, 4 expected failures), 193 s, after the review fixes.
+- Codex's review found four faults, now fixed with regression tests that fail without the fix: Escape taken by a path field or the concordance instead of cancelling a count; `R` rerunning unrun menu edits; a palette Encyclopedia command landing on the wrong topic under a search; a second export starting while the first ran.
 - `.venv/bin/python -B scripts/check_docs.py` — OK.
 - Real terminal: the reader from this checkout in tmux (190×50, `sol -n`), `E` on p. 345 of the book: menu, `c B Enter` counted the section (5,711 tokens) against the book (312,481) with bars, log ratios and the concordance; Alt-F gave the three fullscreen panes; Enter on an occurrence moved the reader to p. 341. No book text is in Git or this report.
 - Installed into `~/.local/share/sol-app` (the `sol`/`sol-window` launchers) with `pip install --no-deps --force-reinstall`; all 114 package files match the wheel; `pip check` clean; an isolated-mode pilot smoke test from `/tmp` ran a comparison, the concordance, `K`, a sentence study and fullscreen on the installed code.
