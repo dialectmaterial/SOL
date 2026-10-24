@@ -63,36 +63,35 @@ lanes' slots unchanged; do not merge own PR.
 **Acceptance:** `restructuring/SENTENCE_AUDIT.md`, ESSENCE and CHANGELOG; full
 suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 
-## Codex B: landmark management
+## Codex B: ESSENCE follows the reader
 
-**Status:** Done (#113)
-**Branch:** `codex/landmark-management`
-**Requested:** 23 October 2026, by the maintainer
+**Status:** In review
+**Branch:** `codex/essence-follows-reader`
+**Requested:** 24 October 2026, by the maintainer
 
 ### Goal
 
-Close the named-landmark rename and ordering limitation in
-[BEING §7](../BEING.md#7-boundaries-and-known-limitations).
+While ESSENCE is open, follow the reader's current passage and codepoint position
+([BEING §6](../BEING.md#6-being--essence-without-terminal-dogma),
+[ESSENCE §4](../ESSENCE.md#4-interaction-model-and-inquiry-contract)).
 
 ### Scope
 
-Add atomic rename with the existing name rules to the Neovim reader's `L`
-panel; preserve the saved target and metadata on success, and the old landmark
-on failure. Add a session-only toggle between name and whole-book passage
-order, with unavailable passages last. Update panel hints, `?` help, BEING and
-CHANGELOG. Cover workspace transactions, conflicts and unavailable targets,
-controller behavior and headless Neovim controls.
+Add the version-1 private atomic position exchange in `sol/interchange/essence.py`,
+fresh CORE capture through the reader action channel and Lua follow lifecycle,
+exchange/reader tests, BEING §6, ESSENCE §4 and CHANGELOG.
 
 ### Constraints
 
-No workspace schema change or new persisted settings. Keep the three reader
-markers and other lanes' slots unchanged. Branch from `origin/main`; open a PR
-and do not merge it.
+Do not touch `sol/essence/tui/` or `tests/test_essence_*.py` (Claude's workspace
+redesign). No passage text in the exchange; failures must not block reading.
+This PR must merge **after Claude's ESSENCE workspace PR**, which adds
+`--position-file`. Other lanes' slots stay unchanged. Do not merge own PR.
 
 ### Acceptance
 
-Full suite, `tests/test_architecture.py`, `scripts/check_docs.py`; commit, push,
-open a PR against main, and record a HANDOFF report and PR URL.
+Exchange validation, round trip, atomicity and permissions; reader passage changes
+and capture failure; docs check and full suite; commit, push, PR and HANDOFF.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.

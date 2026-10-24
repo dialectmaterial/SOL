@@ -22,6 +22,38 @@ return function(reader)
   local function alive()
     return state.window ~= nil and api.nvim_win_is_valid(state.window)
   end
+  local function reader_window()
+    local current = rawget(_G, 'SOLNvimReader')
+    return current and current.window and api.nvim_win_is_valid(current.window) and current.window or nil
+  end
+  local function passage_location(packet)
+    local records = reader.view.data.records
+    return packet.reference.reference.target_id .. ':' .. records[1].id .. ':' .. records[#records].id
+  end
+  -- Only passage/section changes need a fresh CORE capture. Cursor and selection
+  -- changes inside that passage never publish. The timer retries failed changes
+  -- quietly and survives reloads; this function is rebound to the current view.
+  function state.follow_tick()
+    local channel = rawget(_G, 'SOLReaderChannel')
+    if not state.job or not state.position_file or state.position_busy
+        or not channel or channel.navigation_pending or not alive()
+        or api.nvim_get_current_win() ~= reader_window() then return end
+    local ok, packet = pcall(reader.panels.current_packet)
+    if not ok or not packet then return end
+    local location = passage_location(packet)
+    if location == state.position_location then return end
+    local now = (vim.uv or vim.loop).now()
+    if location == state.position_attempt and now - (state.position_time or 0) < 500 then return end
+    local position_file = state.position_file
+    state.position_busy = true
+    state.position_time, state.position_attempt = now, location
+    local sent = pcall(reader.requests.request, 'essence_position', nil, function(result)
+      if state.position_file ~= position_file then return end
+      state.position_busy = false
+      if result then state.position_location = location end
+    end, packet)
+    if not sent then state.position_busy = false end
+  end
   -- ESSENCE follows the reader's theme by reading this owner-only file, which
   -- Python created beside its context; replaced whole so it is never half-written.
   function state.set_theme(name)
@@ -55,10 +87,6 @@ return function(reader)
     if alive() then api.nvim_win_set_config(state.window, config()) end
     local current = rawget(_G, 'SOLNvimReader')
     if current and current.relayout then current.relayout() end
-  end
-  local function reader_window()
-    local current = rawget(_G, 'SOLNvimReader')
-    return current and current.window and api.nvim_win_is_valid(current.window) and current.window or nil
   end
   -- Back to the reader at the position and selection E captured, once.
   local function return_to_reader()
@@ -177,6 +205,13 @@ return function(reader)
   function state.closed(code, message)
     local window, buffer = state.window, state.buffer
     state.job, state.window, state.buffer, state.layout = nil, nil, nil, nil
+    state.position_file, state.position_busy, state.position_location = nil, nil, nil
+    state.position_attempt, state.position_time = nil, nil
+    if state.position_timer then
+      state.position_timer:stop()
+      state.position_timer:close()
+      state.position_timer = nil
+    end
     vim.cmd('stopinsert')
     if window and api.nvim_win_is_valid(window) then api.nvim_win_close(window, true) end
     if buffer and api.nvim_buf_is_valid(buffer) then api.nvim_buf_delete(buffer, { force = true }) end
@@ -200,6 +235,13 @@ return function(reader)
     if spec.theme_file ~= nil and (type(spec.theme_file) ~= 'string' or spec.theme_file:sub(1, 1) ~= '/') then
       fail('invalid ESSENCE launch')
     end
+    if spec.position_file ~= nil and (type(spec.position_file) ~= 'string' or spec.position_file:sub(1, 1) ~= '/') then
+      fail('invalid ESSENCE launch')
+    end
+    state.position_file = spec.position_file
+    -- Python already published the opening packet before returning this launch.
+    state.position_location = spec.position_file and state.origin and passage_location(state.origin) or nil
+    state.position_attempt, state.position_time = nil, nil
     state.theme_file = spec.theme_file
     -- The reader's theme now, which may have changed since Python last heard of it.
     local live = rawget(_G, 'SOLNvimReader')
@@ -222,6 +264,10 @@ return function(reader)
       return
     end
     state.job = job
+    if state.position_file then
+      state.position_timer = (vim.uv or vim.loop).new_timer()
+      state.position_timer:start(100, 100, vim.schedule_wrap(function() state.follow_tick() end))
+    end
     -- Layout keys belong to Neovim; every other key goes to ESSENCE.
     for _, key_mode in ipairs({ 't', 'n' }) do
       vim.keymap.set(key_mode, '<M-f>', state.toggle, { buffer = buffer, silent = true })

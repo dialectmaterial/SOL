@@ -501,18 +501,34 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         return {"footnote": neovim.build_footnote_payload(sample, target, request["trail"])}
 
     essence_directory = None
+    essence_position_file = None
+
+    def essence_location(packet):
+        # Both opening and following cross the same fresh CORE boundary. Never
+        # publish the editor's old reference or its selection's passage text.
+        actions.check_return_reference(packet["reference"])
+        reference = capture_reference(book.corpus_snapshot, packet["reference"]["reference"]["requested_id"])
+        passage = book.find_passage(reference["reference"]["target_id"])
+        selection = packet["selection"]
+        return dict(reference=reference, cursor_offset=packet["cursor_offset"],
+                    selection=None if selection is None else {key: value for key, value in selection.items() if key != "text"},
+                    label=safe_label(f"{passage.heading or passage.node.title} | p. {passage.printed_page}"))
+
+    def essence_position(request, identifier):
+        from sol.interchange.essence import write_position
+        if essence_position_file is not None:
+            write_position(essence_position_file, **essence_location(request["packet"]))
+        return {}
 
     def essence_panel(request, identifier):
         # ESSENCE opens beside the reader with where the reader is: a checked
         # reference, cursor and selection. The context file holds no book text;
         # nothing here moves the cursor or writes the workspace.
-        nonlocal essence_directory
-        from sol.interchange.essence import TEXTUAL_HINT, textual_available, write_context
+        nonlocal essence_directory, essence_position_file
+        from sol.interchange.essence import TEXTUAL_HINT, textual_available, write_context, write_position
         if not textual_available():
             raise ValueError(TEXTUAL_HINT)
-        origin = request["packet"]["reference"]
-        actions.check_return_reference(origin)
-        passage = book.find_passage(origin["reference"]["target_id"])
+        location = essence_location(request["packet"])
         if essence_directory is None:
             import atexit
             import shutil
@@ -524,12 +540,10 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
             from pathlib import Path
             state_home = os.environ.get("XDG_STATE_HOME") or str(Path.home() / ".local" / "state")
             state_file = Path(state_home) / "sol" / "essence" / "investigation.json"
-        selection = request["packet"]["selection"]
-        context = write_context(
-            essence_directory, reference=origin, cursor_offset=request["packet"]["cursor_offset"],
-            selection=None if selection is None else {key: value for key, value in selection.items() if key != "text"},
-            label=safe_label(f"{passage.heading or passage.node.title} | p. {passage.printed_page}"),
-            corpus=str(book.corpus_directory or ""), state_file=state_file)
+        context = write_context(essence_directory, **location,
+                                corpus=str(book.corpus_directory or ""), state_file=state_file)
+        essence_position_file = context.with_name(context.name + ".position")
+        write_position(essence_position_file, **location)
         # Neovim runs with private XDG and temporary directories; ESSENCE is a
         # SOL program and saves studies where the reader does, so it gets the
         # reader's own values back (empty means unset, as XDG treats it).
@@ -541,8 +555,9 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
             stream.write(theme)
         return {"essence": {"command": [sys.executable, "-m", "sol.essence.tui", "--context", str(context),
-                                        "--theme", theme, "--theme-file", str(theme_file)],
-                            "theme_file": str(theme_file),
+                                        "--theme", theme, "--theme-file", str(theme_file),
+                                        "--position-file", str(essence_position_file)],
+                            "theme_file": str(theme_file), "position_file": str(essence_position_file),
                             "env": environment}}
 
     panels = {"search": search_panel, "source_preview": source_panel, "source_pdf": source_panel,
@@ -550,7 +565,7 @@ def run_reader(book, workspace_reader=None, *, width=72, emphasis="auto", start_
               "marker_set": marker_panel, "marker_clear": marker_panel, "landmark_list": landmark_panel,
               "landmark_set": landmark_panel, "landmark_clear": landmark_panel, "note_add": note_panel,
               "landmark_rename": landmark_panel, "landmark_order": landmark_panel,
-              "note_edit": note_edit_panel, "note_history": note_history_panel, "footnote_open": footnote_panel, "essence_open": essence_panel}
+              "essence_position": essence_position, "note_edit": note_edit_panel, "note_history": note_history_panel, "footnote_open": footnote_panel, "essence_open": essence_panel}
 
     def handle(request):
         # One editor request is one user action: CORE compares the in-memory
