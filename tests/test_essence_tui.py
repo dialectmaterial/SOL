@@ -645,6 +645,150 @@ class ComparisonScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(app.counting)
                 app.exit()
 
+    async def test_escape_cancels_from_a_path_field_and_from_a_result(self):
+        # Review of #121: an Input or a result view must not swallow the cancelling Escape.
+        import threading
+        from sol.essence.tui.app import EssenceApp
+
+        release, shown, saved = threading.Event(), [], []
+        def run(*arguments, **files):
+            release.wait(5)
+            return comparison_count()[0]
+        with patch.object(tui_words, "run", side_effect=run), \
+                patch.object(tui_words, "save", side_effect=lambda count: saved.append(count)):
+            app = EssenceApp(context(Path(tempfile.mkdtemp(prefix="sol-essence-cancel-")) / "state.json"))
+            async with app.run_test(size=(86, 48)) as pilot:
+                await pilot.press("f")
+                app.query_one("#target-file").value = "/invented/a.txt"
+                await pilot.press("enter")  # Runs from the path field, which keeps the focus.
+                await pilot.pause(0.1)
+                self.assertTrue(app.counting)
+                self.assertIs(app.focused, app.query_one("#target-file"))
+                await pilot.press("escape")
+                self.assertFalse(app.counting)
+                release.set()
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual((app.last_count, saved), (None, []))
+                # A finished result, then a rerun cancelled from the concordance.
+                release.set()
+                app.query_one("#menu").focus()
+                await pilot.press("enter")
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                shown_count = app.last_count
+                self.assertIsNotNone(shown_count)
+                release.clear()
+                await pilot.press("enter")
+                self.assertIs(app.focused, app.query_one("#sources"))
+                await pilot.press("R")
+                await pilot.pause(0.1)
+                self.assertTrue(app.counting)
+                await pilot.press("escape")
+                self.assertFalse(app.counting)
+                self.assertIs(app.focused, app.query_one("#sources"))  # Escape only cancelled.
+                release.set()
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertIs(app.last_count, shown_count)
+                self.assertEqual(len(saved), 1)
+                self.assertIn("Cancelled", str(app.query_one("#result-status").render()))
+                app.exit()
+
+    async def test_rerun_repeats_the_request_that_ran_not_unrun_menu_edits(self):
+        # Review of #121: R reran with a path edited in the menu but never run.
+        from sol.essence.tui.app import EssenceApp
+
+        calls = []
+        def run(context, target, reference, **files):
+            calls.append((target, reference, files["target_file"], files["reference_file"]))
+            return comparison_count()[0]
+        with patch.object(tui_words, "run", side_effect=run), patch.object(tui_words, "save", return_value=None):
+            app = EssenceApp(context())
+            async with app.run_test(size=(86, 48)) as pilot:
+                await pilot.press("f")
+                app.query_one("#target-file").value = "/invented/a.txt"
+                await pilot.press("enter")
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                await pilot.press("r", "f")
+                app.query_one("#target-file").value = "/invented/b.txt"
+                await pilot.press("escape", "escape")  # Out of the field, then the menu: nothing ran.
+                self.assertFalse(app.query_one("#menu").display)
+                await pilot.press("R")
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual([call[2] for call in calls], ["/invented/a.txt", "/invented/a.txt"])
+                app.exit()
+
+    async def test_a_second_export_waits_for_the_first_even_across_a_resize(self):
+        # Review of #121: the buttons' disabled state used to prevent a second file.
+        import threading
+        from sol.essence.tui.app import EssenceApp
+
+        count, _ = comparison_count()
+        release, exported = threading.Event(), []
+        def export(chosen, table_format):
+            exported.append(table_format)
+            release.wait(5)
+            return Path("/invented/words.csv")
+        with patch.object(tui_words, "run", return_value=count), patch.object(tui_words, "save", return_value=None), \
+                patch.object(tui_words, "export", side_effect=export):
+            app = EssenceApp(context(Path(tempfile.mkdtemp(prefix="sol-essence-export-")) / "state.json"))
+            async with app.run_test(size=(86, 48)) as pilot:
+                await self.counted(app, pilot)
+                await pilot.press("e")
+                await pilot.pause(0.1)
+                await pilot.resize_terminal(190, 50)
+                await pilot.pause()
+                app.query_one("#frequencies").focus()
+                await pilot.press("e")
+                await pilot.press("E")
+                self.assertIn("still running", str(app.query_one("#result-status").render()))
+                release.set()
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual(exported, ["csv"])
+                self.assertIn("Exported:", str(app.query_one("#result-status").render()))
+                # Once finished, the next export may run.
+                await pilot.press("E")
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual(exported, ["csv", "tsv"])
+                app.exit()
+
+    async def test_a_palette_entry_opens_that_topic_even_under_a_search(self):
+        # Review of #121: the palette used an unfiltered index as a filtered position.
+        from textual.widgets import Markdown
+        from sol.essence.tui.app import EssenceApp
+        from sol.essence.tui.reference import ReferenceScreen
+
+        app = EssenceApp(context())
+        async with app.run_test(size=(86, 48)) as pilot:
+            target = next(entry for entry in app.catalog["entries"] if entry["id"] == "tf-idf")
+            for search in ("Word counts", "no such topic"):
+                await pilot.press("M", "/")
+                app.screen.query_one("#encyclopedia-search").value = search
+                await pilot.pause()
+                # Enter to the list (or stay, with no matches), then Escape: the search stays.
+                await pilot.press("enter")
+                if search == "no such topic":
+                    app.screen.query_one("#encyclopedia-list").focus()
+                await pilot.press("escape")
+                self.assertNotIsInstance(app.screen, ReferenceScreen)
+                self.assertEqual(app.get_screen("reference").query_one("#encyclopedia-search").value, search)
+                await pilot.press("colon")
+                await pilot.pause()
+                await pilot.press(*f"Encyclopedia: {target['title']}")
+                await pilot.pause(0.5)
+                await pilot.press("enter")
+                await pilot.pause()
+                await pilot.pause()
+                self.assertIsInstance(app.screen, ReferenceScreen)
+                self.assertIn(target["title"], app.screen.query_one("#encyclopedia-entry", Markdown).source)
+                await pilot.press("escape")
+            app.exit()
+
     async def test_ctrl_q_leaves_and_saves_even_from_a_text_field(self):
         # Quitting the reader sends Ctrl-Q; a focused input must not swallow it.
         from sol.essence.tui.app import EssenceApp

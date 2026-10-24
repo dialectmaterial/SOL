@@ -186,6 +186,8 @@ class EssenceApp(App):
         Binding("M", "reference('encyclopedia')", "Catalogs", show=False),
         Binding("R", "rerun", "Rerun", show=False),
         Binding("question_mark", "keys", "Keys"),
+        # While counting, Escape cancels before any field or view can take it.
+        Binding("escape", "cancel_count", "Cancel", show=False, priority=True),
         Binding("q", "leave", "Leave"),
         # Priority: the reader sends Ctrl-Q when it quits, whatever has focus.
         Binding("ctrl+q", "leave", "Leave ESSENCE", show=False, priority=True),
@@ -196,6 +198,7 @@ class EssenceApp(App):
     last_saved = None
     last_run = None
     counting = False
+    exporting = False
 
     def __init__(self, context, theme=DEFAULT_READER_THEME, theme_file=None, position_file=None):
         super().__init__()
@@ -279,13 +282,9 @@ class EssenceApp(App):
 
     def on_study_menu_run(self, event):
         menu = self.query_one("#menu", StudyMenu)
-        self.run_study(menu.study, menu.target, menu.reference)
-
-    def run_study(self, study, target, reference):
-        menu = self.query_one("#menu", StudyMenu)
         status = menu.query_one("#status", Static)
         top_n = 20
-        if study == "tfidf":
+        if menu.study == "tfidf":
             value = menu.query_one("#top-n", Input).value.strip()
             try:
                 top_n = int(value) if value.isascii() and value.isdecimal() else 0
@@ -295,22 +294,28 @@ class EssenceApp(App):
                 status.update("Not counted: top_n must be an integer from 1 to 1,000.")
                 menu.query_one("#top-n", Input).focus()
                 return
+        self.run_study(menu.study, menu.target, menu.reference, menu.query_one("#target-file", Input).value,
+                       menu.query_one("#reference-file", Input).value, top_n)
+
+    def run_study(self, study, target, reference, target_file, reference_file, top_n):
+        """Count one complete request; `R` repeats exactly this, with the reader's present position."""
+        menu = self.query_one("#menu", StudyMenu)
+        status = menu.query_one("#status", Static)
         # Read the choices here, on the interface thread; each count has a
         # number, and only the latest one may save or show anything.
         self.count_serial += 1
         self.counting = True
-        self.pending_run = (study, target, reference)
+        self.pending_run = (study, target, reference, target_file, reference_file, top_n)
         status.update("Counting… Esc cancels")
         if not menu.display:  # A rerun from the result: say so where it shows.
             self.query_one("#result-status", Static).update("Counting… Esc cancels")
-        self.count_words(self.count_serial, target, reference, menu.query_one("#target-file", Input).value,
-                         menu.query_one("#reference-file", Input).value, study, top_n)
+        self.count_words(self.count_serial, target, reference, target_file, reference_file, study, top_n)
 
     def action_rerun(self):
         if self.last_run is not None and not self.counting:
             self.reading_moved = False
             self.update_header()
-            self.run_study(*self.last_run[:3])
+            self.run_study(*self.last_run)
 
     def cancel_count(self):
         # The engine cannot be interrupted midway: the count finishes in
@@ -416,6 +421,11 @@ class EssenceApp(App):
         if not self.state_file:
             status.update("Not exported: this reader session has no workspace, so ESSENCE writes nothing.")
             return
+        if self.exporting:
+            # The engine cannot be stopped midway; a second export would write a second file.
+            status.update("An export is still running; wait for it to finish.")
+            return
+        self.exporting = True
         status.update("Checking the sources again and exporting…")
         self.export_table(count, table_format)
 
@@ -431,6 +441,7 @@ class EssenceApp(App):
             pass
 
     def finish_export(self, count, outcome):
+        self.exporting = False
         if count is not self.last_count:
             return
         self.query_one("#result-status", Static).update(
@@ -464,8 +475,15 @@ class EssenceApp(App):
 
     @staticmethod
     def reveal_entry(screen, entry):
+        """Show catalog entry `entry`, by its stable option ID, even outside a search."""
         from textual.widgets import OptionList
-        screen.query_one("#encyclopedia-list", OptionList).highlighted = entry + 1
+        field = screen.query_one("#encyclopedia-search", Input)
+        if field.value:
+            with screen.prevent(Input.Changed):
+                field.value = ""
+            screen.filter_browser("encyclopedia")
+        listing = screen.query_one("#encyclopedia-list", OptionList)
+        listing.highlighted = listing.get_option_index(str(entry + 1))
         screen.update_browser("encyclopedia")
 
     def action_method(self):
@@ -499,11 +517,13 @@ class EssenceApp(App):
         else:
             self.action_show_help_panel()
 
-    def on_key(self, event):
-        if event.key == "escape" and self.counting and not isinstance(self.screen, ReferenceScreen):
-            self.cancel_count()
-            event.stop()
-            event.prevent_default()
+    def check_action(self, action, parameters):
+        if action == "cancel_count":
+            return self.counting and not isinstance(self.screen, ReferenceScreen)
+        return True
+
+    def action_cancel_count(self):
+        self.cancel_count()
 
     # Following the reader ------------------------------------------------------------------
     def follow_reader_theme(self):

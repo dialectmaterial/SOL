@@ -96,7 +96,7 @@ class FollowReaderTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             async with app.run_test(size=(86, 48)) as pilot:
                 await pilot.pause(0.6)  # Nothing written yet: nothing changes.
                 self.assertIn("First passage", str(app.query_one("#header").render()))
-                app.last_run = ("words", "passage", "none")
+                app.last_run = ("words", "passage", "none", "", "", 20)
                 app.show_result(count, None)
                 positions.append(moved)
                 await pilot.pause(0.8)
@@ -123,7 +123,7 @@ class FollowReaderTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
         app = EssenceApp(context(), position_file="/invented/context.position")
         with patch.object(exchange, "read_position", return_value=moved, create=True):
             async with app.run_test(size=(86, 48)) as pilot:
-                app.last_run = ("words", "book", "none")
+                app.last_run = ("words", "book", "none", "", "", 20)
                 await pilot.pause(0.8)
                 header = str(app.query_one("#header").render())
                 self.assertIn("Elsewhere · p. 90", header)
