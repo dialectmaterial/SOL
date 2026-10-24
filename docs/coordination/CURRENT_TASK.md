@@ -46,22 +46,24 @@ steps 5–7). Rules for all three lanes:
 readable text in a real terminal. The measurement found `]c`/`[c` restarting
 Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
 
-## Codex A: sentence segmentation audit (ESSENCE Experiment A)
+## Codex A: ESSENCE catalog navigation
 
-**Status:** In review
-**Branch:** `codex/sentence-segmentation-audit`
-**Requested:** 23 October 2026, by the maintainer
-**Scope:** [ESSENCE Experiment A](../ESSENCE.md#experiment-a--syntax-and-positionality-highest-priority):
-audit `punctuation-rules-v1` against every boundary in 60 reproducibly sampled
-private-corpus passages, read-only; state hand-check rules, boundary precision/
-recall and errors by type. Publish counts and abbreviation strings, no corpus
-sentences/passages. If material, add separately named `punctuation-rules-v2`,
-keep v1 selectable/checkable and existing artifacts valid, test with invented
-text, and remeasure the same sample. Document any interface default choice.
-**Constraints:** no dependencies, canonical edits or private text in Git; other
+**Status:** In review (local; publication blocked by GitHub access)
+**Branch:** `codex/essence-catalog-navigation`
+**Requested:** 24 October 2026, directly by the maintainer: keep improving the interface
+**Scope:** searchable Encyclopedia/Methods catalogs with explicit empty states
+and correct filtered entry/actions; a compact horizontal study selector to give
+source settings more room in reader splits. Follow
+[ESSENCE §4](../ESSENCE.md#4-interaction-model-and-inquiry-contract), retaining the
+accepted rounded style. Install the verified result automatically under
+[CONTRIBUTING](../../CONTRIBUTING.md#install-verified-changes-for-the-maintainer).
+**Constraints:** preserve study engines, full catalog content, genealogy links,
+source-return guards, persistence, dependencies and active sessions; other
 lanes' slots unchanged; do not merge own PR.
-**Acceptance:** `restructuring/SENTENCE_AUDIT.md`, ESSENCE and CHANGELOG; full
-suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
+**Acceptance:** keyboard/filter/method mapping and resize regression checks,
+synthetic previews in wide and narrow windows, full suite and docs check;
+verify the installed wheel/UI outside the checkout. Stacked on `f604538`;
+publication remains subject to the existing GitHub access restriction.
 
 ## Codex B: landmark management
 
