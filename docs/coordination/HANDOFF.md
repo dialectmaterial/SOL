@@ -347,7 +347,7 @@ None reserved. Defaults: `r` renames, `o` toggles order; an unchanged name is a 
 
 ## Reader latency on screen; section keys use the channel — 23 October 2026
 
-**Task:** [Claude Code: measure reader latency on screen](CURRENT_TASK.md#claude-code-measure-reader-latency-on-screen).
+**Task:** [Claude Code: measure reader latency on screen](https://github.com/dialectmaterial/SOL/blob/e6e0fdc918baead91ce29b2b7a71b0bcbb5cacae/docs/coordination/CURRENT_TASK.md).
 **Branch / PR:** `claude/section-keys-use-channel` · pull request from this branch.
 **Last implementation commit:** the commit before this report.
 
