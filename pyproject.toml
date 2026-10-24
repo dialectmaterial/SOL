@@ -44,4 +44,4 @@ namespaces = false
 
 [tool.setuptools.package-data]
 "sol.being.neovim" = ["*.lua", "fonts/*.ttf", "fonts/OFL.txt"]
-"sol.essence" = ["encyclopedia.json", "methods.json"]
+"sol.essence" = ["encyclopedia.json", "methods.json", "function_words.json"]
