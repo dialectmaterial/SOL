@@ -65,7 +65,7 @@ suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 
 ## Codex B: sentence suffix performance
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `codex/sentence-suffix-performance`
 **Requested:** 25 October 2026, by the maintainer
 **Scope:** Eliminate the sentence segmenters' quadratic suffix-regex slow path

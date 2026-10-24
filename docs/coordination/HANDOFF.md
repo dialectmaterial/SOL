@@ -33,6 +33,29 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## Sentence suffix performance — 25 October 2026
+
+**Task:** Codex B, maintainer's bounded bug hunt; CURRENT_TASK.md.
+**Branch / PR:** `codex/sentence-suffix-performance` · PR pending publication. Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123), [#125](https://github.com/dialectmaterial/SOL/pull/125).
+**Last implementation commit:** `86cb60d960f68ba3de4ab34ecff84d6a39ac39e8`.
+
+### Changed files
+- `sol/essence/essence_as_reflection_within_itself/sentences.py` — scan only the final token; cache first non-whitespace per sentence; avoid token scanning when punctuation cannot be a boundary. No rule or method changes.
+- `tests/test_sentence_performance.py` — three timeout regressions, all run failing before fixes, plus original-regex equivalence on fixed-seed invented Unicode suffixes. CHANGELOG and this lane's coordination slot record the batch.
+
+### Tests performed
+- Final full suite: **1,316 OK**, 7 skipped, 4 expected failures, 177.901 s; isolated XDG paths. Focused sentence suite: 54 OK (4 expected failures). Docs and diff checks pass.
+- Both complete segmenters equal `origin/main` on 30,000 invented random strings. Real-corpus boundary digests over all 1,757 eligible passages are unchanged: 9,283 v1 raw segments and 9,146 v2 raw segments. No private text/artifacts committed.
+- Locally: 100,002-character long-word input about 12 ms; 400,000-character abbreviation sequence about 0.2 s; 90,000-character padding and 120,000-character period chains below 0.1 s. Each timeout regression exceeded three seconds before its fix. Real-corpus segmentation about 0.27–0.28 s. Slow input also completes through tmux CLI at 40×24.
+- Actual checkout reader/ESSENCE round trip also exercised beside at about 86×48 and fullscreen at 190×50, with explicit checkout PYTHONPATH so the editable installation cannot shadow the child module.
+
+### Outstanding issues
+Saved-study refusal/failed-save diagnostics and stale TF-IDF encyclopedia guidance remain for the next batch. Existing frozen segmentation limitations and out-of-lane 40-column UI clipping remain. Clone: `/tmp/sol-codex-b-hunt`.
+
+### Decisions requiring approval
+None. No dependencies, schemas, flags, method IDs or segmentation results changed.
+
+
 ## Sentence segmentation audit — 23 October 2026
 
 **Task:** [Codex A: sentence segmentation audit](https://github.com/dialectmaterial/SOL/blob/da675a9e02b98a96fdf531ca89c382e55f0a24f1/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer.
