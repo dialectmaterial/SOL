@@ -28,6 +28,8 @@ def write_context(directory, *, reference, cursor_offset, selection, label, corp
                "state_file": None if state_file is None else str(state_file)}
     check_context(context)
     data = json.dumps(context, ensure_ascii=False, allow_nan=False).encode("utf-8")
+    if len(data) > MAX_CONTEXT_BYTES:
+        raise ValueError("ESSENCE context must be a small regular file")
     directory = Path(directory)
     for number in range(1000):
         path = directory / f"context-{os.getpid()}-{number}.json"
@@ -35,14 +37,19 @@ def write_context(directory, *, reference, cursor_offset, selection, label, corp
             descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
         except FileExistsError:
             continue
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(data)
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(data)
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
         return path
     raise ValueError("could not create a private ESSENCE context file")
 
 
 def check_context(context):
-    if not isinstance(context, dict) or set(context) != _FIELDS or context["version"] != CONTEXT_VERSION:
+    if (not isinstance(context, dict) or set(context) != _FIELDS
+            or type(context["version"]) is not int or context["version"] != CONTEXT_VERSION):
         raise ValueError("unsupported ESSENCE context")
     reference = context["reference"]
     if (not isinstance(reference, dict) or not isinstance(reference.get("reference"), dict)
@@ -62,12 +69,14 @@ def check_context(context):
 
 def read_context(path):
     path = Path(path)
-    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
     with os.fdopen(descriptor, "rb") as stream:
         info = os.fstat(stream.fileno())
         if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_CONTEXT_BYTES:
             raise ValueError("ESSENCE context must be a small regular file")
         data = stream.read(MAX_CONTEXT_BYTES + 1)
+    if len(data) > MAX_CONTEXT_BYTES:
+        raise ValueError("ESSENCE context must be a small regular file")
     return check_context(json.loads(data.decode("utf-8")))
 
 
