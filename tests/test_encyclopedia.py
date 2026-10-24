@@ -101,29 +101,31 @@ class EncyclopediaBrowserTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             with self.subTest(size=size):
                 app = EssenceApp(context())
                 async with app.run_test(size=size) as pilot:
+                    await pilot.press('M')
                     await pilot.pause()
-                    listing = app.query_one('#encyclopedia-list', OptionList)
+                    ref = app.screen
+                    listing = ref.query_one('#encyclopedia-list', OptionList)
                     self.assertIs(app.focused, listing)
                     # The encyclopedia opens on its genealogy, then lists the entries.
                     self.assertEqual(listing.option_count, 10)
-                    self.assertTrue(app.query_one('#genealogy-map').display)
+                    self.assertTrue(ref.query_one('#genealogy-map').display)
                     await pilot.press('down')
-                    self.assertFalse(app.query_one('#genealogy-map').display)
+                    self.assertFalse(ref.query_one('#genealogy-map').display)
                     for entry in app.catalog['entries']:
                         await pilot.pause()
-                        rendered = app.query_one('#encyclopedia-entry', Markdown).source
+                        rendered = ref.query_one('#encyclopedia-entry', Markdown).source
                         self.assertIn(entry['quote'], rendered)
                         self.assertIn(entry['article_url'], rendered)
                         if entry is not app.catalog['entries'][-1]:
                             await pilot.press('down')
                     await pilot.press('enter', 'pagedown')
-                    detail = app.query_one('#encyclopedia-detail')
+                    detail = ref.query_one('#encyclopedia-detail')
                     self.assertIs(app.focused, detail)
                     if size == (60, 24):
                         self.assertGreater(detail.scroll_y, 0)
                     await pilot.press('escape')
                     self.assertIs(app.focused, listing)
-                    await pilot.press('3', '1')
+                    await pilot.press('2', '1')
                     self.assertIs(app.focused, listing)
                     self.assertEqual(listing.highlighted, 9)
                     await pilot.press('q')
@@ -137,8 +139,10 @@ class GenealogyBrowserTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
         from test_essence_tui import context
         app = EssenceApp(context())
         async with app.run_test(size=(100, 36)) as pilot:
+            await pilot.press('M')
             await pilot.pause()
             await pilot.press('enter')
+            app = app.screen  # The catalogs are a screen over the study.
             atlas = app.query_one('#genealogy-map', OptionList)
             self.assertIs(app.focused, atlas)
             # Ancestors without an entry are skipped; the first stop opens an entry.
@@ -147,7 +151,7 @@ class GenealogyBrowserTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             atlas.highlighted = tfidf
             await pilot.press('enter')
             await pilot.pause()
-            ids = [entry['id'] for entry in app.catalog['entries']]
+            ids = [entry['id'] for entry in app.app.catalog['entries']]
             self.assertEqual(app.query_one('#encyclopedia-list', OptionList).highlighted, ids.index('tf-idf') + 1)
             self.assertIn('TF-IDF', app.query_one('#encyclopedia-entry', Markdown).source)
             self.assertFalse(atlas.display)
