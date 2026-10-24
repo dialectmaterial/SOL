@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### ESSENCE sentence scope validation — 25 October 2026
+
+The sentence CLI refuses empty and unknown reader paths, instead of measuring
+the whole corpus or silently returning an empty result. Malformed saved v1
+scopes return typed refusals instead of tracebacks. Existing v1 empty studies
+remain checkable.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary

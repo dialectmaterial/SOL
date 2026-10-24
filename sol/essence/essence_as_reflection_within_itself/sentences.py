@@ -203,7 +203,8 @@ def segment_v2(text):
 
 
 def _scope(scope):
-    if not isinstance(scope, dict) or scope.get("kind") not in {"corpus", "within", "passages"}:
+    if (not isinstance(scope, dict) or not isinstance(scope.get("kind"), str)
+            or scope["kind"] not in {"corpus", "within", "passages"}):
         raise SentenceStudyError("Scope must be corpus, within PATH, or ordered passage IDs", code="invalid_scope")
     if scope["kind"] == "corpus":
         _keys(scope, {"kind"}, "Corpus scope")
@@ -216,8 +217,8 @@ def _scope(scope):
     else:
         _keys(scope, {"kind", "ids"}, "Passage scope")
         ids = scope["ids"]
-        if (not isinstance(ids, list) or not 1 <= len(ids) <= 4096 or len(set(ids)) != len(ids)
-                or not all(isinstance(value, str) for value in ids)):
+        if (not isinstance(ids, list) or not 1 <= len(ids) <= 4096
+                or not all(isinstance(value, str) for value in ids) or len(set(ids)) != len(ids)):
             raise SentenceStudyError("Passage scope needs 1–4096 distinct record IDs", code="invalid_scope")
     return scope
 

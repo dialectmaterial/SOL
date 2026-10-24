@@ -167,7 +167,11 @@ def main(arguments: list[str] | None = None) -> int:
                 "Canonical ancestry, headings and source references remain in metadata.\n"
                 "Use sol essence prose --json to export the complete input."))
         elif options.action == "sentences":
-            scope = {"kind": "within", "path": options.within} if options.within else None
+            scope = {"kind": "within", "path": options.within} if options.within is not None else None
+            if scope is not None:
+                sentence_study._scope(scope)
+                if not any(sentence_study._in_scope(record, scope) for record in snapshot.records):
+                    raise sentence_study.SentenceStudyError("Reader path names no records", code="invalid_scope")
             result = sentence_study.analyze_sentences(snapshot, scope=scope, origin=origin)
             print(sentence_study.encode_sentence_result(result) if options.json else render_sentences(result))
         return 0

@@ -63,36 +63,18 @@ lanes' slots unchanged; do not merge own PR.
 **Acceptance:** `restructuring/SENTENCE_AUDIT.md`, ESSENCE and CHANGELOG; full
 suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 
-## Codex B: landmark management
+## Codex B: ESSENCE sentence scope refusals
 
-**Status:** Done (#113)
-**Branch:** `codex/landmark-management`
-**Requested:** 23 October 2026, by the maintainer
-
-### Goal
-
-Close the named-landmark rename and ordering limitation in
-[BEING §7](../BEING.md#7-boundaries-and-known-limitations).
-
-### Scope
-
-Add atomic rename with the existing name rules to the Neovim reader's `L`
-panel; preserve the saved target and metadata on success, and the old landmark
-on failure. Add a session-only toggle between name and whole-book passage
-order, with unavailable passages last. Update panel hints, `?` help, BEING and
-CHANGELOG. Cover workspace transactions, conflicts and unavailable targets,
-controller behavior and headless Neovim controls.
-
-### Constraints
-
-No workspace schema change or new persisted settings. Keep the three reader
-markers and other lanes' slots unchanged. Branch from `origin/main`; open a PR
-and do not merge it.
-
-### Acceptance
-
-Full suite, `tests/test_architecture.py`, `scripts/check_docs.py`; commit, push,
-open a PR against main, and record a HANDOFF report and PR URL.
+**Status:** In progress
+**Branch:** `codex/essence-cli-scope-validation`
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** Bug hunting in ESSENCE measurement core, CLI and interchange, excluding
+`sol/essence/tui/`. This batch fixes empty/unknown sentence reader paths and
+malformed saved scopes, per [ESSENCE](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
+**Constraints:** No private text, new dependencies, public-contract changes or
+SPECULATIVE edits. Base `origin/main`; do not merge own PR.
+**Acceptance:** Regressions fail before fixes; real-corpus tmux trials; full suite,
+`scripts/check_docs.py`, commit, push, PR and HANDOFF.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
