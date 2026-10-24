@@ -41,7 +41,8 @@ class FunctionWordsTests(unittest.TestCase):
                          "have", "has", "had", "having", "do", "does", "did",
                          "can", "could", "may", "might", "must", "shall", "should",
                          "will", "would"} <= words)
-        self.assertTrue(words.isdisjoint({"being", "beings", "essence", "concept",
+        self.assertTrue(words.isdisjoint({"being", "other", "one", "many",
+                                         "beyond", "itself", "beings", "essence", "concept",
                                          "ground", "nothing", "becoming"}))
 
     def test_loads_are_independent(self):

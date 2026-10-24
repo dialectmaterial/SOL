@@ -147,13 +147,14 @@ prepositions and conjunctions; auxiliary/modal forms; negation, common whole
 contractions and particles. The JSON carries the full inclusion criteria and
 sorted categories; each spelling occurs once, in ESSENCE's normalized token form
 with straight apostrophes. This is a bounded spelling list, without contextual
-part-of-speech analysis, stemming or multiword expressions. Changed membership
-requires a new list version/id.
+part-of-speech analysis, stemming or multiword expressions. After release,
+changed membership requires a new list version/id.
 
 `am`, `are`, `be`, `been`, `is`, `was`, `were` are included for their copular and
-auxiliary uses. **`being` is excluded**: in Hegel it is a philosophical term used
-as a noun, and must remain visible. `have`, `has`, `had`, `having` are included
-for their auxiliary uses. Matching cannot distinguish those from lexical or
+auxiliary uses. **Closed-class spellings that name logical determinations in the
+CORE edition stay visible.** Exclude `being`, `other`, `one`, `many`, `beyond`
+and `itself`; the last carries the determinations “in itself” / “for itself”.
+`have`, `has`, `had`, `having` are included for their auxiliary uses. Matching cannot distinguish those from lexical or
 philosophically significant uses of the same spellings; this limitation is why
 the choice is explicit and off by default. It is **presentation only**: analysis
 inputs, counts, denominators, scores, saved artifacts and exports never change.

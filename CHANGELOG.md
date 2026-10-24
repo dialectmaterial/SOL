@@ -6,7 +6,9 @@
 
 Bundle the original, categorized `english-closed-class-v1` list and dependency-free
 loader for the optional, off-by-default Hide function words presentation choice;
-keep `being` visible. Counts, denominators, artifacts and exports are unchanged.
+keep logical determinations `being`, `other`, `one`, `many`, `beyond` and `itself`
+visible. Retain the unreleased list id/version. Counts, denominators, artifacts
+and exports are unchanged.
 The interface switch will be wired separately.
 
 ### Sentence segmentation audit — 23 October 2026
