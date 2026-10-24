@@ -1135,7 +1135,7 @@ Earlier reports are in Git history (trimmed 21 October 2026).
 
 ## Codex A — launcher startup failures, 25 October 2026
 
-Branch `codex/launcher-startup-errors`; PR link follows publication. Cleaned
+Branch `codex/launcher-startup-errors`; [PR #127](https://github.com/dialectmaterial/SOL/pull/127). Cleaned
 unusable Neovim preflight and disappearing-executable launch failures, sol-window
 font-cache/terminal process failures, its invalid -w help example, and the
 41-column splash track overflowing onto labels at 40 columns. Each regression
