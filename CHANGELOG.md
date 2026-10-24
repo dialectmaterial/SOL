@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Sentence suffix performance — 25 October 2026
+
+Both punctuation segmenters avoid repeated regex rescans on long nonmatching
+word suffixes. The optimization preserves existing boundaries and method IDs.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary

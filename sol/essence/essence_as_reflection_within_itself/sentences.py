@@ -72,6 +72,14 @@ def _initial(text, token, position, end):
             or re.search(r"(?:^|[\s(])[^\W\d_]\. $", text[max(0, position - 5):position - 1]) is not None)
 
 
+def _ending_token(text, start, end):
+    # Match the reversed suffix once instead of retrying an end-anchored
+    # search at every character of a long word. Preserve $'s final-newline rule.
+    backwards = text[start:end].removesuffix("\n")[::-1]
+    word = re.match(r"[^\W\d_]+(?:\.[^\W\d_]+)*", backwards)
+    return word.group()[::-1] if word else ""
+
+
 def segment(text):
     """Half-open sentence spans over ``text``, trimmed of surrounding spaces."""
     # Open brackets, by position: one opened inside the current sentence (a
@@ -110,8 +118,7 @@ def segment(text):
         first = start
         while first < position and text[first].isspace():
             first += 1
-        word = re.search(r"([^\W\d_]+(?:\.[^\W\d_]+)*)$", text[start:position])
-        token = word.group(1) if word else ""
+        token = _ending_token(text, start, position)
         followed = end == len(text) or text[end].isspace()
         boundary = (followed and not any(at > first for at in opened) and _starts_sentence(text, end)
                     and not (match.group().startswith(".") and len(match.group().rstrip("”’\"')]")) == 1
@@ -176,8 +183,7 @@ def segment_v2(text):
         first = start
         while first < position and text[first].isspace():
             first += 1
-        word = re.search(r"([^\W\d_]+(?:\.[^\W\d_]+)*)$", text[start:position])
-        token = word.group(1) if word else ""
+        token = _ending_token(text, start, position)
         # Consume a callout before testing whitespace/capitalization. Its end,
         # not the punctuation's end, is the source boundary. Do not reinterpret
         # a decimal point followed by digits as terminal punctuation.
