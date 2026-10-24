@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Launcher: report unusable/disappearing Neovim executables and sol-window font-cache/process failures without tracebacks; correct the window help's workspace option. Keep the opening animation inside a 40-column terminal.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary

@@ -1132,3 +1132,17 @@ initial timing probe, so use the clean medians above for outcome claims.
 - **(reserved; proposal only)** Consider separately approving action-scoped fingerprint batching with a mandatory final verification before persistence/output and explicit semantics for edits during an action. This would change CORE's per-reference fingerprint policy and needs its own design/tests and maintainer approval. The current policy remains unchanged; this PR does not implement or depend on that proposal.
 
 Earlier reports are in Git history (trimmed 21 October 2026).
+
+## Codex A — launcher startup failures, 25 October 2026
+
+Branch `codex/launcher-startup-errors`; PR link follows publication. Cleaned
+unusable Neovim preflight and disappearing-executable launch failures, sol-window
+font-cache/terminal process failures, its invalid -w help example, and the
+41-column splash track overflowing onto labels at 40 columns. Each regression
+failed first; 29 host, 8 window and 8 splash checks passed. Full suite: 1,318
+tests OK (7 skipped, 4 expected failures); docs and diff checks passed. Manual
+tmux reproductions/rechecks used an invented non-executable managed runtime,
+unavailable /proc cache path, and a 40×24 splash. Real corpus was used only
+read-only in earlier reading sessions; no corpus/PDF/workspace/export contents
+in Git. No dependencies, palettes or public contracts changed. Previous batches
+#124 and #126. Next: equivalent key-name remappings crashing native startup.

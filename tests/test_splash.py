@@ -1,5 +1,6 @@
 """The opening screen: its frames, the movement, and that it never blocks the reader."""
 import os
+import re
 import unittest
 from unittest.mock import patch
 
@@ -32,6 +33,18 @@ class FrameTests(unittest.TestCase):
         self.assertIn("S O L", text)
         self.assertNotIn(splash.TITLE[7], text)
         self.assertNotIn("38;2;", text)
+    def test_every_opening_frame_stays_inside_a_40_column_terminal(self):
+        for columns in (40, 80, 86, 190):
+            for step in range(20):
+                with self.subTest(columns=columns, step=step):
+                    text = re.sub(r"\x1b\[[0-9;]*m", "", splash.frame(step * splash.PERIOD / 20,
+                                                                 columns, 24, "terminal"))
+                    runs = re.split(r"\x1b\[(\d+);(\d+)H", text)[1:]
+                    for index in range(0, len(runs), 3):
+                        row, column, value = runs[index:index + 3]
+                        self.assertLessEqual(int(column) - 1 + len(value), columns)
+                        self.assertLessEqual(int(row), 24)
+
 
 
 class LifecycleTests(unittest.TestCase):
@@ -86,7 +99,7 @@ class LifecycleTests(unittest.TestCase):
         with patch.object(neovim, "_isolated_environment", side_effect=lambda *a: order.append("prepared") or {}), \
                 patch.object(splash, "handoff", side_effect=lambda: order.append("handoff")), \
                 patch.object(neovim.subprocess, "run", side_effect=FileNotFoundError("nvim")):
-            with self.assertRaises(FileNotFoundError):
+            with self.assertRaisesRegex(RuntimeError, "Cannot launch Neovim"):
                 neovim.launch_payload({"records": []}, "/missing/nvim")
         self.assertEqual(order, ["prepared", "handoff"])
 

@@ -46,22 +46,20 @@ steps 5–7). Rules for all three lanes:
 readable text in a real terminal. The measurement found `]c`/`[c` restarting
 Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
 
-## Codex A: sentence segmentation audit (ESSENCE Experiment A)
+## Codex A: reader launcher and opening failures
 
 **Status:** In review
-**Branch:** `codex/sentence-segmentation-audit`
-**Requested:** 23 October 2026, by the maintainer
-**Scope:** [ESSENCE Experiment A](../ESSENCE.md#experiment-a--syntax-and-positionality-highest-priority):
-audit `punctuation-rules-v1` against every boundary in 60 reproducibly sampled
-private-corpus passages, read-only; state hand-check rules, boundary precision/
-recall and errors by type. Publish counts and abbreviation strings, no corpus
-sentences/passages. If material, add separately named `punctuation-rules-v2`,
-keep v1 selectable/checkable and existing artifacts valid, test with invented
-text, and remeasure the same sample. Document any interface default choice.
-**Constraints:** no dependencies, canonical edits or private text in Git; other
-lanes' slots unchanged; do not merge own PR.
-**Acceptance:** `restructuring/SENTENCE_AUDIT.md`, ESSENCE and CHANGELOG; full
-suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
+**Branch:** `codex/launcher-startup-errors`
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** [BEING §2](../BEING.md#2-what-is-implemented): clean refusals for
+unusable Neovim/runtime and sol-window font-cache/process failures, a valid
+sol-window help example, and an opening animation that fits 40 columns.
+Prior batches: [#124](https://github.com/dialectmaterial/SOL/pull/124),
+[#126](https://github.com/dialectmaterial/SOL/pull/126).
+**Constraints:** lane A only; no dependencies, palette/public-contract changes,
+private corpus text/PDF/workspaces/exports, sol/essence or SPECULATIVE edits.
+**Acceptance:** regression failures first; manual tmux reproductions and rechecks,
+full suite, docs check; commit, push, PR and HANDOFF; no self-merge.
 
 ## Codex B: landmark management
 
