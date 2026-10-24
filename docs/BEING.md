@@ -153,6 +153,11 @@ readable text takes about 2.0–2.3 s.
 
 The note path is limited to eight distinct notes; links back to an open note are marked as cycles. A view accepts at most 64 body paragraphs, lists up to 128 further links, and refuses text over 1 MiB or a presentation over 4 MiB. Limits are disclosed rather than silently truncating source text. Missing/unlinked notes are refused without substituted text; the corpus contract already refuses broken canonical note links on load. Backspace revisits the checked panel already shown, while following a new link makes a new checked request. These are presentation defaults. Controller and headless Neovim checks cover both modes, forward/reverse selections, styling, callouts, nested links, refusal and narrow widths; sustained manual terminal reading remains untested.
 
+**ESSENCE window resizing:** resizing keeps the active ESSENCE terminal focused.
+If a split becomes too narrow while the reader or its outline has focus,
+ESSENCE hides until `E` reopens the same process; when ESSENCE itself has
+focus it becomes fullscreen. Keyboard input stays with the visible active view.
+
 **Native motions and outline:** use `j/k` for wrapped rows. Up/Down retain native Neovim buffer-line motion; they are not currently mapped to the same visual-row actions. The single vertical outline has no shipped horizontal-layout switch.
 
 **Help and outline:** `?` groups the keys under Reading, Finding your way, Text, sources and notes, ESSENCE and Leaving, with headed sections and descriptions that wrap under their own column. `t` opens the outline as a centred panel at most 84 columns wide with ▾/▸ for open and closed branches, ● and the heading colour on the current section, and each section's printed page at the right; titles too long for a line end in an ellipsis. Screenshot-checked in foot on the book.

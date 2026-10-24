@@ -237,7 +237,11 @@ return function(reader)
 
   local group = api.nvim_create_augroup('SOLEssence', { clear = true })
   api.nvim_create_autocmd('VimResized', { group = group, callback = function()
-    if alive() and state.layout == 'split' and vim.o.columns < SPLIT_MINIMUM then state.layout = 'full' end
+    if alive() and state.layout == 'split' and vim.o.columns < SPLIT_MINIMUM then
+      -- A focused terminal grows over the page; a reader browsing beside it
+      -- keeps the page and hides ESSENCE until E brings it back.
+      state.layout = api.nvim_get_current_win() == state.window and 'full' or 'hidden'
+    end
     relayout()
   end })
   api.nvim_create_autocmd('VimLeavePre', { group = group, callback = function() state.save_before_exit() end })
