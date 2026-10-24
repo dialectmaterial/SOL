@@ -33,6 +33,27 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## ESSENCE context transport — 25 October 2026
+
+**Task:** Codex B, maintainer's bounded bug hunt; CURRENT_TASK.md.
+**Branch / PR:** `codex/essence-context-transport` · PR pending publication. Prior batch: [#123](https://github.com/dialectmaterial/SOL/pull/123).
+**Last implementation commit:** `00aec538c0a25a4498b2a14cece0d9499f972493`.
+
+### Changed files
+- `sol/interchange/essence.py` — nonblocking special-file refusal; enforce the same UTF-8 byte limit before writing and after reading; integer version validation; remove newly created partial files after write failures.
+- `tests/test_essence_interchange.py` — five failing regressions and exact-limit Unicode acceptance, all invented input. CHANGELOG and this lane's coordination slot describe the batch.
+
+### Tests performed
+- Full suite: **1,318 OK**, 7 skipped, 4 expected failures, 177.343 s; isolated XDG paths. Six focused transport tests and 36 existing ESSENCE UI tests pass. `scripts/check_docs.py` and `git diff --check` pass.
+- FIFO subprocess regression timed out before the fix; now finishes immediately. Real tmux launcher at 86 and 40 columns reports a clear refusal. Original private real-corpus context remains readable; CORE provider sentence recomputation agrees. No private text/artifacts committed.
+
+### Outstanding issues
+Sentence-regex slow path and saved-study malformed-input/failed-save diagnostics remain for subsequent batches. Work/publication clone: `/tmp/sol-codex-b-hunt` because supplied Git metadata is read-only. No TUI edits.
+
+### Decisions requiring approval
+None. Existing exchange fields/encoding, flags and dependencies unchanged.
+
+
 ## Sentence segmentation audit — 23 October 2026
 
 **Task:** [Codex A: sentence segmentation audit](https://github.com/dialectmaterial/SOL/blob/da675a9e02b98a96fdf531ca89c382e55f0a24f1/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer.
