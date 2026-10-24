@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reader: keep wrapped help descriptions aligned at 40 columns, and compact the status line before its mode, search count and quit hint are clipped.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary

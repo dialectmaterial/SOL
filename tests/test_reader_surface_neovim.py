@@ -484,7 +484,30 @@ end
             self.assertIn(section, lines)
         self.assertTrue(any(line.startswith(":qa!") and line[17:].startswith("quit without saving") for line in lines))
         self.assertTrue(report["breakindent"])
-        self.assertEqual(report["shift"], "shift:17")
+        self.assertEqual(report["shift"], "min:0,shift:17")
+
+    def test_narrow_help_continuations_stay_under_the_description(self):
+        report = self.run_lua(r'''
+  vim.o.columns, vim.o.lines = 40, 24
+  reader.help()
+  local panel = vim.api.nvim_get_current_win()
+  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  local row
+  for index, line in ipairs(lines) do
+    if line:find('theme:', 1, true) then row = index; break end
+  end
+  vim.api.nvim_win_set_cursor(panel, {row, 0})
+  vim.cmd('normal! zt')
+  vim.cmd('redraw!')
+  local line = lines[row]
+  local column = assert(line:find('Latte', 1, true))
+  local description = vim.fn.screenpos(panel, row, 18)
+  local continuation = vim.fn.screenpos(panel, row, column)
+  report.columns = {description.col, continuation.col}
+  report.rows = {description.row, continuation.row}
+''')
+        self.assertGreater(report["rows"][1], report["rows"][0])
+        self.assertEqual(report["columns"][0], report["columns"][1])
 
     def test_outline_marks_folds_the_current_section_and_pages(self):
         from sol.being.quality.structure import structure_payload
@@ -1277,6 +1300,32 @@ end
         self.assertTrue(report["tiny"].startswith(" …"), report["tiny"])
         self.assertIn("%=   Continuous", report["tiny"])
         self.assertEqual(report["refused"], 4)
+
+    def test_status_fits_narrow_terminals_in_both_modes_with_search_counts(self):
+        report = self.run_lua(r'''
+  vim.o.columns, vim.o.lines = 40, 24
+  local payload = vim.deepcopy(data)
+  payload.progress = {first = 49, total = 101}
+  payload.search_marks = {id = data.records[1].id, query = 'thought',
+    spans = {{7, 14}}, position = 12, total = 87}
+  report.cases = {}
+  for _, count in ipairs({{12, 87}, {12345, 100000}}) do
+    for _, mode in ipairs({'continuous', 'paragraph'}) do
+      payload.mode = mode
+      payload.search_marks.position, payload.search_marks.total = count[1], count[2]
+      assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(payload))
+      local status = SOLStatus()
+      local expanded = status:gsub('%%=', ''):gsub('%%%%', '%%')
+      local rendered = vim.api.nvim_eval_statusline(status, {maxwidth = 40}).str
+      report.cases[#report.cases + 1] = {width = vim.fn.strwidth(expanded), rendered = rendered, count = count[1] .. " of " .. count[2]}
+    end
+  end
+''')
+        for case in report["cases"]:
+            self.assertLessEqual(case["width"], 40, case)
+            self.assertIn(case["count"], case["rendered"])
+            self.assertIn(":q quit", case["rendered"])
+            self.assertNotIn("<", case["rendered"])
 
     def test_context_opens_beside_the_page_when_there_is_room(self):
         report = self.run_lua(r'''

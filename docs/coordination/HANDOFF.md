@@ -1132,3 +1132,18 @@ initial timing probe, so use the clean medians above for outcome claims.
 - **(reserved; proposal only)** Consider separately approving action-scoped fingerprint batching with a mandatory final verification before persistence/output and explicit semantics for edits during an action. This would change CORE's per-reference fingerprint policy and needs its own design/tests and maintainer approval. The current policy remains unchanged; this PR does not implement or depend on that proposal.
 
 Earlier reports are in Git history (trimmed 21 October 2026).
+
+## Codex A — narrow reader layouts, 25 October 2026
+
+Branch `codex/reader-panel-resize`; PR link follows publication. Fixed help
+continuations drifting left at 40 columns (Neovim's default 20-column minimum
+clamped the hanging indent), and clipped status text in paragraph/search views
+(status only budgeted the location half). Explicit help indentation and compact
+status labels preserve descriptions, occurrence count and quit hint. Both new
+regressions failed first; 58 native-reader tests passed, final narrow checks
+passed, docs check and diff check passed. Full suite: 1,314 tests, OK (7 skipped,
+4 expected failures). Read-only real-corpus tmux runs at 86×48, 190×50, 80×24,
+40×24; fixed help/status rechecked at 40×24. Captures stayed under /tmp, with no
+corpus text, workspaces, PDFs or exports in Git. No contracts/dependencies/palette
+changes. Do not merge own PR. Next: reader-side ESSENCE focus on resize and
+launcher failure paths.

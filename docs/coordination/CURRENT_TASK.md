@@ -46,22 +46,19 @@ steps 5–7). Rules for all three lanes:
 readable text in a real terminal. The measurement found `]c`/`[c` restarting
 Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
 
-## Codex A: sentence segmentation audit (ESSENCE Experiment A)
+## Codex A: narrow reader layout bugs
 
 **Status:** In review
-**Branch:** `codex/sentence-segmentation-audit`
-**Requested:** 23 October 2026, by the maintainer
-**Scope:** [ESSENCE Experiment A](../ESSENCE.md#experiment-a--syntax-and-positionality-highest-priority):
-audit `punctuation-rules-v1` against every boundary in 60 reproducibly sampled
-private-corpus passages, read-only; state hand-check rules, boundary precision/
-recall and errors by type. Publish counts and abbreviation strings, no corpus
-sentences/passages. If material, add separately named `punctuation-rules-v2`,
-keep v1 selectable/checkable and existing artifacts valid, test with invented
-text, and remeasure the same sample. Document any interface default choice.
-**Constraints:** no dependencies, canonical edits or private text in Git; other
-lanes' slots unchanged; do not merge own PR.
-**Acceptance:** `restructuring/SENTENCE_AUDIT.md`, ESSENCE and CHANGELOG; full
-suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
+**Branch:** `codex/reader-panel-resize`
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** Hunt reader/launcher bugs under [BEING §2](../BEING.md#2-what-is-implemented).
+This batch fixes help continuation alignment and clipped status information in
+small terminals. Use the configured corpus read-only in tmux at 86×48, 190×50,
+80×24 and 40×24; regressions use invented text only.
+**Constraints:** reader/launcher lane only; no ESSENCE code, palette changes,
+public-contract changes, dependencies or private data in Git; never edit SPECULATIVE.
+**Acceptance:** failing regressions first, focused and full suite, docs check,
+manual tmux recheck; commit, push, PR and short HANDOFF; do not merge own PR.
 
 ## Codex B: landmark management
 

@@ -247,11 +247,20 @@ return function(reader, supplied)
     if type(marks) == "table" and marks.position ~= nil and marks.id == record.id then
       right[#right + 1] = marks.position .. " of " .. marks.total
     end
+    local progress_index
     if data.progress ~= nil then
+      progress_index = #right + 1
       local done = (data.progress.first + index - 1) / math.max(1, data.progress.total - 1)
       right[#right + 1] = string.format("%d%%", math.floor(100 * done + 0.5))
     end
     right[#right + 1] = "? keys · :q quit"
+    local function fits() return vim.fn.strdisplaywidth(table.concat(right, " · ")) <= vim.o.columns - 5 end
+    -- Compact the status before Neovim truncates it, keeping the match count
+    -- and the help/quit keys readable even in a 40-column terminal.
+    if not fits() then right[1] = mode == "paragraph" and "Paragraph" or "Continuous" end
+    if not fits() then right[#right] = "? · :q quit" end
+    if not fits() and progress_index then table.remove(right, progress_index) end
+    if not fits() then table.remove(right, 1) end
     right = table.concat(right, " · ")
     -- Keep at least three spaces between the halves: when they do not fit, the
     -- section path gives way from its start, so the page stays in view.
