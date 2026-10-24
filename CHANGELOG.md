@@ -9,6 +9,11 @@ text, headings, rules and selection, read from `sol.presentation.theme`. It
 no longer uses Textual's Catppuccin themes, whose darker page, pink cursor and
 grey footer did not match the reader. Terminal still inherits the terminal's
 colors.
+Buttons, blurred selections and an open command palette stay readable and
+follow theme changes. Before the first result, the chosen study's method
+fills the space below the menu, and the header follows the menu's study;
+`M Encyclopedia` is always in the footer; the Encyclopedia's contents list
+shows every entry, and its frame no longer repeats the entry's title.
 
 ### ESSENCE workspace — 24 October 2026
 

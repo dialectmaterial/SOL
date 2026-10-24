@@ -125,6 +125,33 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             self.assertIs(app.focused, app.query_one("#menu"))
             await pilot.press("q")
 
+    async def test_the_opening_shows_the_chosen_studys_method_and_names_m(self):
+        from sol.essence.tui.app import EssenceApp
+
+        app = EssenceApp(context())
+        async with app.run_test(size=(86, 48)) as pilot:
+            await pilot.pause()
+            primer = app.query_one("#primer-method")
+            self.assertTrue(app.query_one("#primer").display)
+            self.assertIn("Word frequencies", primer.source)
+            footer = " ".join(active.binding.description for active in app.screen.active_bindings.values()
+                              if active.binding.show)
+            self.assertIn("Encyclopedia", footer)
+            # Choosing another study before any run updates the header and the method shown.
+            await pilot.press("s")
+            await pilot.pause()
+            self.assertIn("sentences", str(app.query_one("#header").render()))
+            self.assertNotIn("words", str(app.query_one("#header").render()).split("   ")[0])
+            self.assertIn("Sentence", primer.source)
+            await pilot.press("w", "B")
+            await pilot.pause()
+            self.assertIn("comparison", primer.source.lower())
+            # The reference frame names its catalog; the entry's heading names the entry.
+            await pilot.press("M")
+            await pilot.pause()
+            self.assertEqual(app.screen.query_one("#encyclopedia-detail").border_title, "Encyclopedia")
+            await pilot.press("q")
+
     async def test_methods_screen_browses_every_method(self):
         from textual.widgets import Markdown, OptionList
         from sol.essence.tui.app import EssenceApp

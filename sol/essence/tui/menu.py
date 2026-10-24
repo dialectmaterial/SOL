@@ -40,6 +40,9 @@ class StudyMenu(Vertical, can_focus=True):
     class Close(Message):
         """Escape: put the menu away without running anything."""
 
+    class Changed(Message):
+        """A choice changed; the header and the method shown follow it."""
+
     BINDINGS = [
         *(Binding(key, f"choose('study', '{name}')", STUDIES[name], show=False)
           for name, key in STUDY_KEYS.items()),
@@ -87,6 +90,7 @@ class StudyMenu(Vertical, can_focus=True):
         self.query_one("#reference-file-row").display = words_study and self.reference == "file"
         self.query_one("#tfidf-settings").display = self.study == "tfidf"
         self.query_one("#menu-summary", Static).update(self.summary())
+        self.post_message(self.Changed())
 
     def choices_text(self, width):
         """Three columns of keyed choices, or three stacked groups when narrow."""

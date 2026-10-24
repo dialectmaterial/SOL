@@ -83,9 +83,7 @@ class ReferenceScreen(Screen):
                 yield Static("Choose its sources in the study menu", id="method-availability")
 
     def on_mount(self):
-        self.query_one("#reference-header", Static).update(Text.assemble(
-            (" ESSENCE ", "reverse bold"), ("  reference", "bold"),
-            ("  ·  1 Encyclopedia · 2 Methods · / find · Esc back to the study", "dim")))
+        self.update_header()
         for name, title in {"encyclopedia-list": "Contents", "encyclopedia-detail": "Encyclopedia",
                             "methods-list": "Available methods", "methods-detail": "Method"}.items():
             self.query_one(f"#{name}").border_title = title
@@ -95,6 +93,11 @@ class ReferenceScreen(Screen):
             self.query_one(f"#{name}-detail").border_subtitle = "Esc contents"
             self.update_browser(name)
         self.apply_pending()
+
+    def update_header(self):
+        self.query_one("#reference-header", Static).update(Text.assemble(
+            ("ESSENCE", self.app.title_style()), ("  reference", "bold"),
+            ("  ·  1 Encyclopedia · 2 Methods · / find · Esc back to the study", "dim")))
 
     def apply_pending(self):
         tab, method = self.pending
@@ -165,13 +168,10 @@ class ReferenceScreen(Screen):
         self.query_one(f"#{name}-count", Static).update(f"{shown} / {total}")
         detail = self.query_one(f"#{name}-detail", VerticalScroll)
         if index is None:
-            title = "No matches"
             content = "## No matches\n\nTry a shorter search, or press Escape in the search field to show all entries."
         else:
-            title = ("Genealogy" if name == "encyclopedia" and index == 0 else
-                     self.browser_items(name)[index - (name == "encyclopedia")]["title"])
             content = self.browser_markdown(name, index)
-        detail.border_title = Text(title)
+        detail.border_title = "Encyclopedia" if name == "encyclopedia" else "Method"
         self.query_one(f"#{name}-entry", Markdown).update(content)
         detail.scroll_home(animate=False)
         if name == "methods":
@@ -190,7 +190,6 @@ class ReferenceScreen(Screen):
         self.query_one("#use-method", Button).disabled = not supported
         self.query_one("#method-availability", Static).update(
             "Choose its sources in the study menu" if supported else "CLI operation · command shown above")
-        self.query_one("#methods-detail").border_title = Text(item["title"])
 
     def genealogy_options(self):
         """One line per method: year, line of descent, ● runs in ESSENCE, ○ a reading topic."""

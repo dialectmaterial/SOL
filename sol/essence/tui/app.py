@@ -17,12 +17,12 @@ from textual import work
 from textual.app import App
 from textual.binding import Binding
 from textual.command import DiscoveryHit, Hit, Provider
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.theme import Theme
-from textual.widgets import ContentSwitcher, Footer, Input, Static
+from textual.widgets import ContentSwitcher, Footer, Input, Markdown, Static
 
 from sol.essence.encyclopedia import load_catalog
-from sol.essence.methods import load_methods
+from sol.essence.methods import load_methods, method_markdown
 from sol.essence.tui import sentences, tfidf, words
 from sol.essence.tui.context import load_state, save_state
 from sol.essence.tui.menu import STUDIES, SCOPES, StudyMenu
@@ -65,10 +65,13 @@ def reader_theme(name):
             "scrollbar": p["border"], "scrollbar-hover": p["muted"], "scrollbar-active": p["heading"],
             "scrollbar-background": p["page"], "scrollbar-background-hover": p["page"],
             "scrollbar-background-active": p["page"], "scrollbar-corner-color": p["page"],
+            # Headings and menu choices are not links: bold, not underlined; links keep their color.
             "link-color": p["heading"], "link-color-hover": p["text"], "link-background-hover": p["selection"],
+            "link-style": "none", "link-style-hover": "underline",
             "button-foreground": p["text"], "button-color-foreground": p["page"],
             **{f"markdown-h{level}-{part}": value for level in range(1, 7)
-               for part, value in (("color", p["heading"]), ("background", "transparent"))},
+               for part, value in (("color", p["heading"]), ("background", "transparent"),
+                                   ("text-style", "bold"))},
         })
 
 
@@ -169,6 +172,8 @@ class EssenceApp(App):
     StudyMenu { height: auto; max-height: 100%; overflow-y: auto; padding: 0 1;
                 border-top: solid $border-blurred; background: $background; }
     Screen.-short #intro { display: none; }
+    #primer { height: 1fr; padding: 0 1; border-top: solid $border-blurred; scrollbar-size-vertical: 1; }
+    #primer Markdown { padding: 0 1; color: $text-muted; }
     StudyMenu:focus-within { border-top: solid $accent; }
     #menu-choices { height: auto; }
     .menu-field { height: 1; }
@@ -208,7 +213,7 @@ class EssenceApp(App):
     MarkdownH2 { margin-top: 0; }
     #genealogy-map { height: auto; border: none; background: transparent; padding: 0 1; }
     Screen.-compact .browser-layout { layout: vertical; }
-    Screen.-compact .browser-list { width: 1fr; height: 8; min-height: 4; max-height: 35%; margin: 0 0 1 0; }
+    Screen.-compact .browser-list { width: 1fr; height: auto; min-height: 4; max-height: 40%; margin: 0 0 1 0; }
     Screen.-compact .browser-detail { width: 1fr; }
     """
     # The private terminal sequence that asks the reader to open a source; the
@@ -217,7 +222,7 @@ class EssenceApp(App):
     BINDINGS = [
         Binding("r", "menu", "Study"),
         Binding("K", "method", "Method"),
-        Binding("M", "reference('encyclopedia')", "Catalogs", show=False),
+        Binding("M", "reference('encyclopedia')", "Encyclopedia"),
         Binding("R", "rerun", "Rerun", show=False),
         Binding("question_mark", "keys", "Keys"),
         # While counting, Escape cancels before any field or view can take it.
@@ -265,6 +270,9 @@ class EssenceApp(App):
                 yield SentencesView(id="sentences-view")
                 yield TfidfView(id="tfidf-view")
             yield StudyMenu(id="menu")
+            # Until the first result, the chosen study's method fills the space below the menu.
+            with VerticalScroll(id="primer"):
+                yield Markdown("", id="primer-method")
         yield Static("", id="result-status")
         yield Footer(compact=True)
 
@@ -284,9 +292,13 @@ class EssenceApp(App):
             self.action_reference(view)
 
     # The header ---------------------------------------------------------------------
+    def title_style(self):
+        """ESSENCE's name in the theme's heading color; Terminal's ANSI names become Rich's."""
+        return "bold " + self.theme_variables["primary"].removeprefix("ansi_")
+
     def update_header(self):
         header = Text()
-        header.append(" ESSENCE ", style="reverse bold")
+        header.append("ESSENCE", style=self.title_style())
         menu = self.query_one("#menu", StudyMenu)
         if self.last_run is not None:
             study, target, reference = self.last_run[:3]
@@ -301,6 +313,18 @@ class EssenceApp(App):
         if self.reading_moved:
             header.append("  ↻ reading moved · R reruns", style="bold")
         self.query_one("#header", Static).update(header)
+
+    def on_study_menu_changed(self, event):
+        self.update_header()
+        primer = self.query_one("#primer-method", Markdown)
+        if self.last_count is None and self.methods is not None:
+            menu = self.query_one("#menu", StudyMenu)
+            method = "word-comparison" if menu.study == "words" and menu.reference != "none" else STUDY_METHODS[menu.study]
+            entry = next(item for item in self.methods["entries"] if item["id"] == method)
+            text = method_markdown(dict(entry, encyclopedia=None))
+            if text != getattr(primer, "shown", None):
+                primer.shown = text
+                primer.update(text + "\n\nK opens this method in full · M the Encyclopedia")
 
     # Study menu and runs ------------------------------------------------------------
     def action_menu(self):
@@ -409,6 +433,7 @@ class EssenceApp(App):
         switcher = self.query_one("#results", ContentSwitcher)
         switcher.display = True
         self.query_one("#intro").display = False
+        self.query_one("#primer").display = False
         switcher.current = view.id
         view.show(count, saved)
         self.query_one("#menu").display = False
@@ -575,6 +600,9 @@ class EssenceApp(App):
         """Textual restyles only the base screen; an open palette or modal keeps the old colors."""
         for screen in self.screen_stack[1:]:
             self.stylesheet.update(screen, animate=False)
+        self.update_header()
+        if isinstance(self.screen, ReferenceScreen):
+            self.screen.update_header()
 
     def follow_reader_position(self):
         """Take the reader's latest checked position; "this passage" then means it."""
