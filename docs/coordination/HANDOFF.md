@@ -1135,7 +1135,7 @@ Earlier reports are in Git history (trimmed 21 October 2026).
 
 ## Codex A — ESSENCE resize focus, 25 October 2026
 
-Branch `codex/reader-essence-resize-focus`; PR link follows publication.
+Branch `codex/reader-essence-resize-focus`; [PR #126](https://github.com/dialectmaterial/SOL/pull/126).
 Fixed resizing stealing focus from ESSENCE (closing a nonexistent popup always
 focused the reader), and shrinking a reader-focused split covering that reader
 with fullscreen ESSENCE. Popup cleanup now changes focus only for an actual
