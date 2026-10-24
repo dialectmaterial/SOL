@@ -4,8 +4,9 @@
 
 ### Sentence suffix performance — 25 October 2026
 
-Both punctuation segmenters avoid repeated regex rescans on long nonmatching
-word suffixes. The optimization preserves existing boundaries and method IDs.
+Both punctuation segmenters avoid repeated rescans on long word suffixes,
+abbreviation sequences, leading padding and attached period chains. The
+optimizations preserve existing boundaries and method IDs.
 
 ### Sentence segmentation audit — 23 October 2026
 

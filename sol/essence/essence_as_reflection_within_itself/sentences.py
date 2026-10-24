@@ -95,9 +95,10 @@ def segment(text):
     # Open brackets, by position: one opened inside the current sentence (a
     # citation or aside) blocks a split; one that opens the sentence does not.
     spans, start, opened, position = [], 0, [], 0
+    first = None
 
     def close(end):
-        nonlocal start
+        nonlocal start, first
         left, right = start, end
         while left < right and text[left].isspace():
             left += 1
@@ -105,7 +106,7 @@ def segment(text):
             right -= 1
         if left < right:
             spans.append((left, right))
-        start = end
+        start, first = end, None
 
     while position < len(text):
         character = text[position]
@@ -125,15 +126,16 @@ def segment(text):
         for closer in match.group():
             if closer in ")]" and opened:
                 opened.pop()
-        first = start
-        while first < position and text[first].isspace():
-            first += 1
-        token = _ending_token(text, start, position)
+        if first is None:
+            first = start
+            while first < position and text[first].isspace():
+                first += 1
         followed = end == len(text) or text[end].isspace()
-        boundary = (followed and not any(at > first for at in opened) and _starts_sentence(text, end)
-                    and not (match.group().startswith(".") and len(match.group().rstrip("”’\"')]")) == 1
-                             and ((token.casefold() in _ABBREVIATIONS and (len(token) > 1 or token.islower()))
-                                  or _initial(text, token, position, end))))
+        boundary = followed and not any(at > first for at in opened) and _starts_sentence(text, end)
+        if boundary and match.group().startswith(".") and len(match.group().rstrip("”’\"')]")) == 1:
+            token = _ending_token(text, start, position)
+            boundary = not ((token.casefold() in _ABBREVIATIONS and (len(token) > 1 or token.islower()))
+                            or _initial(text, token, position, end))
         if boundary:
             close(end)
         position = end
@@ -159,10 +161,11 @@ def segment_v2(text):
     guesses footnotes from arbitrary numbers elsewhere in the prose.
     """
     spans, start, opened, position = [], 0, [], 0
+    first = None
     markers = {match.end() - 1 for match in re.finditer(r"(?m)^[ \t]*[0-9]+\.(?=[ \t])", text)}
 
     def close(end):
-        nonlocal start
+        nonlocal start, first
         left, right = start, end
         while left < right and text[left].isspace():
             left += 1
@@ -170,7 +173,7 @@ def segment_v2(text):
             right -= 1
         if left < right:
             spans.append((left, right))
-        start = end
+        start, first = end, None
 
     while position < len(text):
         character = text[position]
@@ -190,10 +193,10 @@ def segment_v2(text):
         for closer in match.group():
             if closer in ")]" and opened:
                 opened.pop()
-        first = start
-        while first < position and text[first].isspace():
-            first += 1
-        token = _ending_token(text, start, position)
+        if first is None:
+            first = start
+            while first < position and text[first].isspace():
+                first += 1
         # Consume a callout before testing whitespace/capitalization. Its end,
         # not the punctuation's end, is the source boundary. Do not reinterpret
         # a decimal point followed by digits as terminal punctuation.
@@ -207,10 +210,11 @@ def segment_v2(text):
                 end += 1
         followed = end == len(text) or text[end].isspace()
         boundary = (position not in markers and followed and not any(at > first for at in opened)
-                    and _starts_sentence(text, end)
-                    and not (match.group().startswith(".") and len(match.group().rstrip("”’\"')]")) == 1
-                             and ((token.casefold() in _ABBREVIATIONS_V2 and (len(token) > 1 or token.islower()))
-                                  or _initial(text, token, position, end))))
+                    and _starts_sentence(text, end))
+        if boundary and match.group().startswith(".") and len(match.group().rstrip("”’\"')]")) == 1:
+            token = _ending_token(text, start, position)
+            boundary = not ((token.casefold() in _ABBREVIATIONS_V2 and (len(token) > 1 or token.islower()))
+                            or _initial(text, token, position, end))
         if boundary:
             close(end)
         position = end

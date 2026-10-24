@@ -30,6 +30,18 @@ for splitter in (segment, segment_v2):
         run = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, timeout=3)
         self.assertEqual(run.returncode, 0, run.stderr)
 
+    def test_leading_padding_and_attached_period_chains_do_not_rescan(self):
+        code = '\n'.join((
+            "from sol.essence.essence_as_reflection_within_itself.sentences import segment, segment_v2",
+            "for splitter in (segment, segment_v2):",
+            "    text = ' ' * 60000 + 'p. A ' * 6000",
+            "    assert splitter(text) == [(60000, len(text) - 1)]",
+            "    text = 'a.' * 60000",
+            "    assert splitter(text) == [(0, len(text))]",
+        ))
+        run = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, timeout=3)
+        self.assertEqual(run.returncode, 0, run.stderr)
+
     def test_suffix_optimization_matches_the_original_regex(self):
         rng = random.Random(20261025)
         alphabet = "aApPéαΓⅣ²3_. '’\t\n\u0301"
