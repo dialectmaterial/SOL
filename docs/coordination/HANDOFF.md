@@ -36,7 +36,7 @@ Write "None." rather than deleting a heading.
 ## Sentence suffix performance — 25 October 2026
 
 **Task:** Codex B, maintainer's bounded bug hunt; CURRENT_TASK.md.
-**Branch / PR:** `codex/sentence-suffix-performance` · PR pending publication. Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123), [#125](https://github.com/dialectmaterial/SOL/pull/125).
+**Branch / PR:** `codex/sentence-suffix-performance` · [#128](https://github.com/dialectmaterial/SOL/pull/128). Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123), [#125](https://github.com/dialectmaterial/SOL/pull/125).
 **Last implementation commit:** `86cb60d960f68ba3de4ab34ecff84d6a39ac39e8`.
 
 ### Changed files
