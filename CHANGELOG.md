@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### ESSENCE follows the reader — 24 October 2026
+
+BEING publishes fresh CORE-captured passage positions through an owner-only,
+atomic `<context>.position` exchange while ESSENCE is open. Passage/section
+changes follow promptly; cursor moves coalesce to half-second updates without
+blocking reading. The reader passes `--position-file` alongside `--theme-file`;
+this requires Claude's companion ESSENCE workspace PR before merging.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary

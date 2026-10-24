@@ -289,8 +289,25 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 **Launch boundary (stage D):** `sol.being.neovim.reader` uses the stdlib-only
 `sol.interchange.essence` context format and Textual probe, so opening ESSENCE
 does not import its interface into the reader. The context directory belongs
-to the reader and is removed at its exit; format, messages and return behavior
-are unchanged ([Architecture §9, I1](ARCHITECTURE.md#launch-exchange-outside-the-logical-hierarchy-i1)).
+to the reader and is removed at its exit
+([Architecture §9, I1](ARCHITECTURE.md#launch-exchange-outside-the-logical-hierarchy-i1)).
+
+**Decision (maintainer, 24 October 2026): ESSENCE follows the reader while open.**
+Beside the opening context, the reader publishes `<context>.position` and passes
+its path as `--position-file`, next to `--theme-file`. Version 1 has exactly
+`version`, a fresh checked CORE v1 `reference` envelope, nonnegative codepoint
+`cursor_offset`, `selection` (an object of IDs, offsets and digests, or null),
+and a heading/page `label`; it contains no passage text. Passage and section
+changes, including search, marker and history jumps, trigger an update; cursor
+motion within a passage is coalesced to at most one update per half-second.
+A background action validates the editor packet and freshly captures its CORE
+reference through the same boundary used by `E`. A failed capture publishes
+nothing, keeps the last complete position and does not interrupt reading.
+Files are owner-only, bounded to 256 KiB and read without following a symlink;
+the writer uses a private temporary file and atomic rename. ESSENCE polls the
+position twice a second (Claude's companion workspace change). Closing ESSENCE
+stops following; reader exit removes the private directory and its position
+file. The opening context remains the separate return anchor.
 
 **Opening and returning from ESSENCE:** `E` (in normal or visual mode) captures the reader's exact position and selection first, then asks Python to check the reader's position against the corpus and write a private context file (reference, cursor, the selection's offsets and digests, a heading label; no book text), then opens ESSENCE in a Neovim terminal float on the right, the page re-centring in the remaining columns. Below 100 columns it opens fullscreen. In ESSENCE, Alt-F toggles fullscreen and beside, Alt-R returns to the reader (leaving ESSENCE beside it, or hiding it when there is no room), and `E` in the reader returns to ESSENCE; these are Neovim terminal-mode mappings, and every other key goes to ESSENCE. ESSENCE survives section changes in the reader. Alt-R and leaving (`q`) return to that captured position and selection, endpoints and direction included (once; after a section change the reader stays where it is). Leaving ends the process, closes its window and re-widens the page; a process that fails to start or exits with an error is reported and the reader stays where it was. Without Textual, `E` explains how to install the extra. Tested in headless Neovim with a real terminal process; the real app was also run inside Neovim's terminal, with keys typed through terminal mode. **Not yet tried by hand** in Alacritty or Kitty.
 

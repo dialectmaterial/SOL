@@ -533,6 +533,7 @@ return function(reader)
   local group = api.nvim_create_augroup('SOLReaderView', {clear = true})
   api.nvim_create_autocmd('CursorMoved', { group = group, buffer = buffer, callback = function()
     reader.panels.follow_tick()
+    reader.essence.follow_tick()
   end })
   api.nvim_create_autocmd("VimResized", { group = group, callback = function()
     if tree_view then tree_view.resize() else close_popup() end
