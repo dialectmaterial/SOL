@@ -1135,7 +1135,7 @@ Earlier reports are in Git history (trimmed 21 October 2026).
 
 ## Codex A — narrow reader layouts, 25 October 2026
 
-Branch `codex/reader-panel-resize`; PR link follows publication. Fixed help
+Branch `codex/reader-panel-resize`; [PR #124](https://github.com/dialectmaterial/SOL/pull/124). Fixed help
 continuations drifting left at 40 columns (Neovim's default 20-column minimum
 clamped the hanging indent), and clipped status text in paragraph/search views
 (status only budgeted the location half). Explicit help indentation and compact
