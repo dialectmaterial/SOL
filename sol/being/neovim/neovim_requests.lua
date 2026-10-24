@@ -63,7 +63,8 @@ return function(reader)
     message.id, message.op, message.packet, message.mode = channel.serial, operation, packet or current_packet(), mode
     message.focus = data.focus == true
     if data.theme then message.theme = data.theme.active end
-    -- Following in Zathura or ESSENCE is background work: it never holds back a key.
+    -- Following does not take the navigation lock. Python still services these
+    -- captures and subsequent navigation requests on the same serial channel.
     if operation ~= 'marker_set' and operation ~= 'marker_clear' and operation ~= 'source_follow'
         and operation ~= 'essence_position' then
       channel.navigation_pending = message.id

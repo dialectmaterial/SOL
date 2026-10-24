@@ -149,7 +149,8 @@ v1 `reference` envelope, `cursor_offset` (a nonnegative codepoint integer),
 It carries no passage text or investigation state. BEING validates the reader
 packet and freshly captures the passage as for `E`; passage/section changes
 (including search, marker and history jumps) publish a new position, and cursor
-moves within a passage publish at most once per half-second. Failed captures
+moves and selection changes within a passage never publish. The offset and
+selection are snapshots at opening or passage/section entry. Failed captures
 leave the last complete file untouched and do not interrupt reading. The
 stdlib-only exchange validates the shape and limits the owner-only, no-follow
 file to 256 KiB; writes use a private temporary file and atomic rename. Claude's
