@@ -36,7 +36,7 @@ Write "None." rather than deleting a heading.
 ## ESSENCE follows the reader — 24 October 2026
 
 **Task:** [Codex B: ESSENCE follows the reader](https://github.com/dialectmaterial/SOL/blob/5f5bdfbdcbbbf91d8241e25989a9cad406bfa8eb/docs/coordination/CURRENT_TASK.md#codex-b-essence-follows-the-reader), assigned directly by the maintainer.
-**Branch / PR:** `codex/essence-follows-reader` · [pull request](https://github.com/dialectmaterial/SOL/pulls?q=is%3Apr+head%3Acodex%2Fessence-follows-reader); author does not merge.
+**Branch / PR:** `codex/essence-follows-reader` · [#120](https://github.com/dialectmaterial/SOL/pull/120); author does not merge.
 **Last implementation commit:** `5f5bdfbdcbbbf91d8241e25989a9cad406bfa8eb` (this report is committed afterward).
 
 ### Changed files
