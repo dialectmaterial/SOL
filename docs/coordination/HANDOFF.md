@@ -33,6 +33,30 @@ Write "None." rather than deleting a heading.
 -->
 
 
+
+## ESSENCE sentence scope refusals — 25 October 2026
+
+**Task:** Codex B, maintainer's bounded bug hunt; see CURRENT_TASK.md.
+**Branch / PR:** `codex/essence-cli-scope-validation` · PR pending publication.
+**Last implementation commit:** `aaa12794edb42e489f7ef998823441048e4b79b1`.
+
+### Changed files
+- `sol/essence/cli.py`, `essence_as_reflection_within_itself/sentences.py` — refuse new empty/unknown CLI paths; type-check malformed saved scopes before set operations. Preserve legacy empty-path API/artifacts.
+- `tests/test_analysis_cli.py`, `test_sentence_study.py` — invented-text regressions, run failing before fixes.
+- ESSENCE, CHANGELOG and this lane's coordination slot — behavior and evidence.
+
+### Tests performed
+- `.venv/bin/python -B -m unittest discover -s tests` — **1,314 OK**, 7 skipped, 4 expected failures, 174.286 s; isolated XDG directories. First full run exposed an original empty-path fixture; the fix was restricted to CLI creation, then all four original fixtures passed unchanged.
+- Sentence tests: 51 OK (4 expected failures); CLI tests: 6 OK. `scripts/check_docs.py` and `git diff --check` pass.
+- Read-only real-corpus tmux use: words, sentences, TF-IDF, saved checks, TSV comparison export, prose summary, invalid paths, missing files and Ctrl-C. Checkout ESSENCE launched directly with a private real CORE context: word study, rapid screen switches, Paper→Night and 86×48 / 190×50 / 80×24 / 40×24 resizes. No text/artifacts committed. Index SHA-256 unchanged.
+
+### Outstanding issues
+40-column navigation clipping belongs to the UI lane. FIFO context hangs and pathological sentence regex latency are reproduced for subsequent batches. Work/publication clone: `/tmp/sol-codex-b-hunt` (supplied checkout has read-only Git metadata).
+
+### Decisions requiring approval
+None. No dependency, schema, flag, method or segmentation change.
+
+
 ## Sentence segmentation audit — 23 October 2026
 
 **Task:** [Codex A: sentence segmentation audit](https://github.com/dialectmaterial/SOL/blob/da675a9e02b98a96fdf531ca89c382e55f0a24f1/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer.

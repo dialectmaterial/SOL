@@ -65,7 +65,7 @@ suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 
 ## Codex B: ESSENCE sentence scope refusals
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `codex/essence-cli-scope-validation`
 **Requested:** 25 October 2026, by the maintainer
 **Scope:** Bug hunting in ESSENCE measurement core, CLI and interchange, excluding
