@@ -37,7 +37,7 @@ Write "None." rather than deleting a heading.
 ## Declared English function words — 24 October 2026
 
 **Task:** [Codex A: declared English function words](https://github.com/dialectmaterial/SOL/blob/1e401e2d358ae007e566e75f1fd63bd55aeafc27/docs/coordination/CURRENT_TASK.md#codex-a-declared-english-function-words), assigned directly by the maintainer.
-**Branch / PR:** `codex/function-words` · PR pending creation after this handoff commit; author does not merge.
+**Branch / PR:** `codex/function-words` · [#119](https://github.com/dialectmaterial/SOL/pull/119); author does not merge.
 **Last implementation commit:** `1e401e2d358ae007e566e75f1fd63bd55aeafc27` (this report is committed afterward).
 
 ### Changed files
