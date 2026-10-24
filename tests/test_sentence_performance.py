@@ -20,10 +20,20 @@ for splitter in (segment, segment_v2):
         run = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, timeout=3)
         self.assertEqual(run.returncode, 0, run.stderr)
 
+    def test_repeated_abbreviations_do_not_copy_the_entire_sentence(self):
+        code = '\n'.join((
+            "from sol.essence.essence_as_reflection_within_itself.sentences import segment, segment_v2",
+            "text = 'p. A ' * 80000",
+            "for splitter in (segment, segment_v2):",
+            "    assert splitter(text) == [(0, len(text) - 1)]",
+        ))
+        run = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, timeout=3)
+        self.assertEqual(run.returncode, 0, run.stderr)
+
     def test_suffix_optimization_matches_the_original_regex(self):
         rng = random.Random(20261025)
         alphabet = "aApPéαΓⅣ²3_. '’\t\n\u0301"
-        texts = ["", "a.approx", "A..B", "word ", "a" * 100 + "1b"]
+        texts = ["", "a.approx", "A..B", "word ", "word\n", "word\n\n", "a" * 100 + "1b"]
         texts += ["".join(rng.choices(alphabet, k=rng.randrange(80))) for _ in range(1000)]
         for text in texts:
             start = rng.randrange(len(text) + 1)

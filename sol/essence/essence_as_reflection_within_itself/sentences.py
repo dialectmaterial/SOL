@@ -46,6 +46,7 @@ _METHOD = {
 }
 _END = re.compile(r"(?:(?:\. ){2,}\.|[.!?…]+)[”’\"')\]]*")
 _OPENERS = "“‘\"'([–—"
+_WORD_CHARACTER = re.compile(r"[^\W\d_]")
 
 
 class SentenceStudyError(TermExperimentError):
@@ -73,11 +74,20 @@ def _initial(text, token, position, end):
 
 
 def _ending_token(text, start, end):
-    # Match the reversed suffix once instead of retrying an end-anchored
-    # search at every character of a long word. Preserve $'s final-newline rule.
-    backwards = text[start:end].removesuffix("\n")[::-1]
-    word = re.match(r"[^\W\d_]+(?:\.[^\W\d_]+)*", backwards)
-    return word.group()[::-1] if word else ""
+    # Walk only the final token: no end-anchored regex retries or whole-prefix
+    # copies. Preserve the original regex's optional single final newline.
+    if end > start and text[end - 1] == "\n":
+        end -= 1
+    left = end
+    while left > start:
+        if _WORD_CHARACTER.fullmatch(text, left - 1, left):
+            left -= 1
+        elif (left < end and left > start + 1 and text[left - 1] == "."
+              and _WORD_CHARACTER.fullmatch(text, left - 2, left - 1)):
+            left -= 1
+        else:
+            break
+    return text[left:end]
 
 
 def segment(text):
