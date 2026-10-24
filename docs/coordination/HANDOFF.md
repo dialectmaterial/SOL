@@ -36,7 +36,7 @@ Write "None." rather than deleting a heading.
 ## ESSENCE context transport — 25 October 2026
 
 **Task:** Codex B, maintainer's bounded bug hunt; CURRENT_TASK.md.
-**Branch / PR:** `codex/essence-context-transport` · PR pending publication. Prior batch: [#123](https://github.com/dialectmaterial/SOL/pull/123).
+**Branch / PR:** `codex/essence-context-transport` · [#125](https://github.com/dialectmaterial/SOL/pull/125). Prior batch: [#123](https://github.com/dialectmaterial/SOL/pull/123).
 **Last implementation commit:** `00aec538c0a25a4498b2a14cece0d9499f972493`.
 
 ### Changed files

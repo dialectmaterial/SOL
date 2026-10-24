@@ -66,7 +66,7 @@ suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 ## Codex B: ESSENCE context transport
 
 **Status:** In review
-**Branch:** `codex/essence-context-transport`
+**Branch:** `codex/essence-context-transport` · [PR #125](https://github.com/dialectmaterial/SOL/pull/125)
 **Requested:** 25 October 2026, by the maintainer
 **Scope:** `sol/interchange/essence.py` and invented context regression tests:
 nonblocking special-file refusal, consistent byte limits, strict integer versions
