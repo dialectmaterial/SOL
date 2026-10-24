@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Declared function-word vocabulary — 24 October 2026
+
+Bundle the original, categorized `english-closed-class-v1` list and dependency-free
+loader for the optional, off-by-default Hide function words presentation choice;
+keep `being` visible. Counts, denominators, artifacts and exports are unchanged.
+The interface switch will be wired separately.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary
