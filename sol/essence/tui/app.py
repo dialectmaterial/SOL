@@ -33,6 +33,12 @@ from sol.presentation.theme import BACKGROUNDS, DEFAULT_READER_THEME, READER_THE
 TEXTUAL_THEMES = {name: f"sol-{name}" for name in READER_THEMES if name != "terminal"} | {"terminal": "ansi-dark"}
 
 
+def blend(first, second, share):
+    """The #rrggbb color `share` of the way from `first` to `second`."""
+    one, two = (tuple(int(color[index:index + 2], 16) for index in (1, 3, 5)) for color in (first, second))
+    return "#" + "".join(f"{round(a + (b - a) * share):02x}" for a, b in zip(one, two))
+
+
 def reader_theme(name):
     """ESSENCE in the reader's own colors: its page, ink, headings, rules and selection.
 
@@ -49,7 +55,9 @@ def reader_theme(name):
             "border": p["heading"], "border-blurred": p["border"],
             "block-cursor-foreground": p["text"], "block-cursor-background": p["selection"],
             "block-cursor-text-style": "bold",
-            "block-cursor-blurred-foreground": p["text"], "block-cursor-blurred-background": p["panel"],
+            # Halfway to the selection: visible even where the panel is the page (Latte).
+            "block-cursor-blurred-foreground": p["text"],
+            "block-cursor-blurred-background": blend(p["page"], p["selection"], 0.5),
             "input-cursor-foreground": p["page"], "input-cursor-background": p["text"],
             "input-selection-background": p["selection"],
             "footer-background": p["page"], "footer-foreground": p["muted"],
@@ -58,7 +66,7 @@ def reader_theme(name):
             "scrollbar-background": p["page"], "scrollbar-background-hover": p["page"],
             "scrollbar-background-active": p["page"], "scrollbar-corner-color": p["page"],
             "link-color": p["heading"], "link-color-hover": p["text"], "link-background-hover": p["selection"],
-            "button-foreground": p["page"], "button-color-foreground": p["page"],
+            "button-foreground": p["text"], "button-color-foreground": p["page"],
             **{f"markdown-h{level}-{part}": value for level in range(1, 7)
                for part, value in (("color", p["heading"]), ("background", "transparent"))},
         })
@@ -264,6 +272,7 @@ class EssenceApp(App):
         self.update_layout()
         self.query_one("#results").display = False
         self.update_header()
+        self.theme_changed_signal.subscribe(self, self.restyle_open_screens)
         if self.theme_file:
             # A stat-sized read twice a second; T in the reader shows here within half a second.
             self.set_interval(0.5, self.follow_reader_theme)
@@ -561,6 +570,11 @@ class EssenceApp(App):
             return
         if name in TEXTUAL_THEMES and self.theme != TEXTUAL_THEMES[name]:
             self.theme = TEXTUAL_THEMES[name]
+
+    def restyle_open_screens(self, theme):
+        """Textual restyles only the base screen; an open palette or modal keeps the old colors."""
+        for screen in self.screen_stack[1:]:
+            self.stylesheet.update(screen, animate=False)
 
     def follow_reader_position(self):
         """Take the reader's latest checked position; "this passage" then means it."""

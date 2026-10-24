@@ -202,6 +202,43 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                         self.assertEqual(colors[variable].lower(), palette[role], variable)
                     await pilot.press("q")
 
+    async def test_buttons_selections_and_an_open_palette_stay_visible_in_every_preset(self):
+        from textual.color import Color
+        from textual.command import CommandList
+        from textual.widgets import Button
+        from sol.essence.tui.app import EssenceApp, TEXTUAL_THEMES
+        from sol.presentation.theme import contrast
+
+        def hex_of(color):
+            return Color.parse(color).hex.lower()
+
+        for name in ("mocha", "latte", "paper", "night"):
+            with self.subTest(theme=name):
+                app = EssenceApp(context(), theme=name)
+                async with app.run_test(size=(120, 40)) as pilot:
+                    colors = app.theme_variables
+                    # A blurred selection differs from the page it sits on.
+                    self.assertNotEqual(hex_of(colors["block-cursor-blurred-background"]),
+                                        hex_of(colors["background"]))
+                    await pilot.press("K")
+                    await pilot.pause()
+                    button = app.screen.query_one("#use-method", Button)
+                    self.assertGreaterEqual(contrast(hex_of(button.styles.color.hex),
+                                                     hex_of(button.styles.background.hex)), 4.5)
+                    await pilot.press("escape")
+                    await pilot.pause()
+                    await pilot.press("colon")
+                    await pilot.pause(0.3)
+                    other = "latte" if name != "latte" else "mocha"
+                    app.theme = TEXTUAL_THEMES[other]
+                    await pilot.pause(0.3)
+                    # The open palette takes the new theme too.
+                    listing = app.screen.query_one(CommandList)
+                    self.assertEqual(listing.styles.background.hex.lower(),
+                                     hex_of(app.theme_variables["background"]))
+                    await pilot.press("escape")
+                    await pilot.press("q")
+
     async def test_follows_the_reader_theme_while_open(self):
         from sol.essence.tui.app import EssenceApp
 
