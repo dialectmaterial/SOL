@@ -36,7 +36,7 @@ Write "None." rather than deleting a heading.
 ## ESSENCE input refusals and saved artifacts — 25 October 2026
 
 **Task:** Codex B, maintainer's bounded bug hunt; CURRENT_TASK.md.
-**Branch / PR:** `codex/essence-input-refusals` · PR pending publication. Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123), [#125](https://github.com/dialectmaterial/SOL/pull/125), [#128](https://github.com/dialectmaterial/SOL/pull/128).
+**Branch / PR:** `codex/essence-input-refusals` · [#130](https://github.com/dialectmaterial/SOL/pull/130). Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123), [#125](https://github.com/dialectmaterial/SOL/pull/125), [#128](https://github.com/dialectmaterial/SOL/pull/128).
 **Last implementation commit:** `a1c65a9effc1a3cb9eea62f8f9e42efd2649de1e`.
 
 ### Changed files
