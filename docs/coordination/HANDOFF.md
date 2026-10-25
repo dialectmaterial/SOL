@@ -1135,7 +1135,7 @@ Earlier reports are in Git history (trimmed 21 October 2026).
 
 ## Codex A — equivalent key remappings, 25 October 2026
 
-Branch `codex/reader-key-alias-conflicts`; PR link follows publication. Equivalent
+Branch `codex/reader-key-alias-conflicts`; [PR #129](https://github.com/dialectmaterial/SOL/pull/129). Equivalent
 source spellings removed one native mapping twice and crashed startup; equivalent
 destination spellings silently overwrote an action. Compare Neovim keycodes
 before applying any remapping; warn once and retain default controls when aliases
