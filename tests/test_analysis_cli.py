@@ -149,6 +149,14 @@ class AnalysisCLITests(unittest.TestCase):
             self.assertEqual(caught.exception.code, 0)
             self.assertIn("sol essence", output.getvalue())
 
+    def test_sentence_cli_rejects_empty_and_unknown_reader_paths(self):
+        for path in ("", "/MISSING", "/BEING/missing.txt"):
+            with self.subTest(path=path):
+                status, output, error = self.call(["sentences", "--within", path, "--json"])
+                self.assertEqual(status, 2, output)
+                self.assertEqual(json.loads(output)["code"], "invalid_scope")
+                self.assertTrue(error)
+
     def test_old_namespace_and_removed_commands_are_rejected(self):
         from sol.app import main as app
         with redirect_stderr(StringIO()), self.assertRaises(SystemExit) as caught:

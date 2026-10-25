@@ -150,6 +150,18 @@ class SentenceStudyTests(unittest.TestCase):
         with self.assertRaises(SentenceStudyError):
             analyze_sentences(self.snapshot, scope={"kind": "passages", "ids": ["not-in-this-corpus"]})
 
+    def test_malformed_saved_scopes_are_typed_refusals(self):
+        original = analyze_sentences(self.snapshot)
+        for scope in ({"kind": []}, {"kind": {}},
+                      {"kind": "passages", "ids": [{}]},
+                      {"kind": "passages", "ids": [[]]}):
+            altered = copy.deepcopy(original)
+            altered["scope"] = scope
+            with self.subTest(scope=scope):
+                with self.assertRaises(SentenceStudyError) as caught:
+                    decode_sentence_result(json.dumps(altered))
+                self.assertEqual(caught.exception.code, "invalid_scope")
+
     def test_check_recomputes_and_refuses_tampering_or_a_changed_corpus(self):
         result = analyze_sentences(self.snapshot)
         decoded = decode_sentence_result(encode_sentence_result(result))

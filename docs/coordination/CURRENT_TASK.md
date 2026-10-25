@@ -214,6 +214,18 @@ This PR must merge **after Claude's ESSENCE workspace PR**, which adds
 
 Exchange validation, round trip, atomicity and permissions; reader passage changes
 and capture failure; docs check and full suite; commit, push, PR and HANDOFF.
+## Codex B: ESSENCE sentence scope refusals
+
+**Status:** In review
+**Branch:** `codex/essence-cli-scope-validation` · [PR #123](https://github.com/dialectmaterial/SOL/pull/123)
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** Bug hunting in ESSENCE measurement core, CLI and interchange, excluding
+`sol/essence/tui/`. This batch fixes empty/unknown sentence reader paths and
+malformed saved scopes, per [ESSENCE](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
+**Constraints:** No private text, new dependencies, public-contract changes or
+SPECULATIVE edits. Base `origin/main`; do not merge own PR.
+**Acceptance:** Regressions fail before fixes; real-corpus tmux trials; full suite,
+`scripts/check_docs.py`, commit, push, PR and HANDOFF.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.

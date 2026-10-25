@@ -586,7 +586,9 @@ artifact. The CLI reconstructs the recorded scope after decoding, but file
 checks always require `--input-file PATH`. V2 is bounded to 16 MiB, allowing
 whole-book provenance, and files to the shared 64 MiB input bound. V1 keeps
 its 1 MiB bound and original encoding/method; bare-snapshot calls, existing
-artifacts and ordinary corpus CLI output remain v1 (as did the reader's `S` until its removal on 19 October).
+artifacts and ordinary corpus CLI output remain v1 (as did the reader's `S` until its removal on 19 October). New CLI sentence studies refuse
+empty or unknown `--within` reader paths. Legacy v1 empty-path studies retain
+their original API/checking behavior.
 
 ```sh
 sol essence sentences --file /absolute/path/to/text.txt
