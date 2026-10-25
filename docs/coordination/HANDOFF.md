@@ -1132,3 +1132,20 @@ initial timing probe, so use the clean medians above for outcome claims.
 - **(reserved; proposal only)** Consider separately approving action-scoped fingerprint batching with a mandatory final verification before persistence/output and explicit semantics for edits during an action. This would change CORE's per-reference fingerprint policy and needs its own design/tests and maintainer approval. The current policy remains unchanged; this PR does not implement or depend on that proposal.
 
 Earlier reports are in Git history (trimmed 21 October 2026).
+
+## Codex A — equivalent key remappings, 25 October 2026
+
+Branch `codex/reader-key-alias-conflicts`; PR link follows publication. Equivalent
+source spellings removed one native mapping twice and crashed startup; equivalent
+destination spellings silently overwrote an action. Compare Neovim keycodes
+before applying any remapping; warn once and retain default controls when aliases
+conflict. The config format is unchanged. Both native regressions failed first;
+58 native tests passed, final alias/reload checks and 3 user-key checks passed.
+Full suite: 1,314 tests OK (7 skipped, 4 expected failures); docs/diff checks OK.
+Real-corpus tmux, temporary config copy only: reproduced E31 at startup and
+rechecked startup/mode change with default keys and one warning. Also completed
+real-corpus guide/read/reference capture/check and missing-file smoke checks;
+40-column guide fits. Interrupted startup restored canonical input and echo.
+No private content, workspace, PDF, exports, dependencies, palette or public
+contract changes. Previous PRs #124, #126, #127. Next: clipped narrow outline
+header and deep-indent layout edge cases.

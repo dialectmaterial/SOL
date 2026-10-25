@@ -46,22 +46,21 @@ steps 5–7). Rules for all three lanes:
 readable text in a real terminal. The measurement found `]c`/`[c` restarting
 Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
 
-## Codex A: sentence segmentation audit (ESSENCE Experiment A)
+## Codex A: equivalent reader key remappings
 
 **Status:** In review
-**Branch:** `codex/sentence-segmentation-audit`
-**Requested:** 23 October 2026, by the maintainer
-**Scope:** [ESSENCE Experiment A](../ESSENCE.md#experiment-a--syntax-and-positionality-highest-priority):
-audit `punctuation-rules-v1` against every boundary in 60 reproducibly sampled
-private-corpus passages, read-only; state hand-check rules, boundary precision/
-recall and errors by type. Publish counts and abbreviation strings, no corpus
-sentences/passages. If material, add separately named `punctuation-rules-v2`,
-keep v1 selectable/checkable and existing artifacts valid, test with invented
-text, and remeasure the same sample. Document any interface default choice.
-**Constraints:** no dependencies, canonical edits or private text in Git; other
-lanes' slots unchanged; do not merge own PR.
-**Acceptance:** `restructuring/SENTENCE_AUDIT.md`, ESSENCE and CHANGELOG; full
-suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
+**Branch:** `codex/reader-key-alias-conflicts`
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** Reader key remappings under [BEING §4](../BEING.md#4-theming-and-typography-next-bounded-task):
+prevent equivalent source/destination key names from crashing startup or silently
+overwriting each other. Keep the keys.json format and default controls.
+Prior batches: [#124](https://github.com/dialectmaterial/SOL/pull/124),
+[#126](https://github.com/dialectmaterial/SOL/pull/126),
+[#127](https://github.com/dialectmaterial/SOL/pull/127).
+**Constraints:** lane A; no private text/PDF/workspaces/exports, dependencies,
+palette/public-contract changes, sol/essence or SPECULATIVE edits.
+**Acceptance:** native regressions fail first; manual tmux reproduction/recheck,
+full suite and docs check; commit, push, PR and HANDOFF; no self-merge.
 
 ## Codex B: landmark management
 

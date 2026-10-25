@@ -294,6 +294,21 @@ return function(reader)
   end
   -- The reader's key remappings, from keys.json through Python (see neovim.user_keys).
   local remap = vim.json.decode(vim.env.SOL_NVIM_KEYS or '{}', {luanil = {object = true, array = true}}) or {}
+  -- Different notations can name the same actual key (Ctrl-I and Tab, or
+  -- modifier case variants). Check aliases before deleting any default map.
+  local sources, destinations, conflict = {}, {}, false
+  for from, to in pairs(remap) do
+    local source, destination = vim.keycode(from), vim.keycode(to)
+    if sources[source] or destinations[destination] then conflict = true end
+    sources[source], destinations[destination] = true, true
+  end
+  if conflict then
+    if rawget(_G, 'SOLReaderKeyConflict') ~= vim.env.SOL_NVIM_KEYS then
+      vim.notify('keys.json contains equivalent source or destination keys; using default reader keys', vim.log.levels.WARN)
+      _G.SOLReaderKeyConflict = vim.env.SOL_NVIM_KEYS
+    end
+    remap = {}
+  end
   local function help()
     -- Sections of key / description; a wrapped description continues under
     -- its own column, and the section names carry the heading colour.

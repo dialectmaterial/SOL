@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reader: detect equivalent source/destination key names in keys.json before applying remappings, warn and keep default controls instead of crashing startup or silently overwriting an action.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary
