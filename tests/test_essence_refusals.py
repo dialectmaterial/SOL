@@ -107,9 +107,9 @@ class EssenceRefusalTests(unittest.TestCase):
         self.assertIn("top_n", error)
         self.assertEqual(json.loads(output)["code"], "invalid_number")
 
-    def test_tfidf_catalog_acknowledges_the_implemented_experiment_screen(self):
+    def test_tfidf_catalog_acknowledges_the_implemented_interface(self):
         entry = next(item for item in load_catalog()["entries"] if item["id"] == "tf-idf")
-        self.assertIn("Experiment", entry["essence"])
+        self.assertIn("ESSENCE interface", entry["essence"])
         self.assertNotIn("pending", entry["essence"])
 
 
