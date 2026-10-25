@@ -100,6 +100,22 @@ push, PR and HANDOFF report.
 ## Codex A: background ESSENCE exit preserves reader panel focus (round 2)
 ## Codex A: reader launcher and opening failures
 ## Codex A: equivalent reader key remappings
+## Codex A: narrow and deep outline layout
+
+**Status:** In review
+**Branch:** `codex/reader-outline-width`
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** [BEING §2](../BEING.md#2-what-is-implemented), reader outline:
+keep its close hint visible at 40×24; exercise deep indentation and Unicode title
+truncation without invalid highlights or hidden current-section marks.
+Prior batches: [#124](https://github.com/dialectmaterial/SOL/pull/124),
+[#126](https://github.com/dialectmaterial/SOL/pull/126),
+[#127](https://github.com/dialectmaterial/SOL/pull/127),
+[#129](https://github.com/dialectmaterial/SOL/pull/129).
+**Constraints:** lane A; invented fixtures only, no private text/PDF/workspaces/
+exports, dependencies, palette/public-contract changes, sol/essence or SPECULATIVE.
+**Acceptance:** regression failures first; tmux check, native/full suite and docs
+check; commit, push, PR and HANDOFF; no self-merge.
 
 **Status:** In review
 **Branch:** `codex/reader-key-alias-conflicts`
