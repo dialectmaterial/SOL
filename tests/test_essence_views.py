@@ -89,6 +89,18 @@ class LongestSentenceTests(unittest.TestCase):
         self.assertEqual(sentences.longest(study), [1, 0, 2])
 
 
+class PositionTests(unittest.TestCase):
+    def test_every_occurrence_counts_by_its_input(self):
+        from sol.essence.tui import words
+
+        class Count:
+            study = {"target": {"inputs": [{}, {}, {}, {}]},
+                     "frequencies": [{"target": {"locations": [[0, 2, 0, 3], [3, 1, 9, 12]]}}]}
+        self.assertEqual(words.positions(Count, 0), [0.125, 0.125, 0.875])
+        # Drawn, the last quarter shows too, though a listing might stop in the first.
+        self.assertEqual(views.dispersion(words.positions(Count, 0), 4), "█··▄")
+
+
 def context():
     return {"version": 1, "reference": {"reference": {"target_id": "bbbbbbbb-0000-4000-8000-000000000002"}},
             "cursor_offset": 0, "selection": None, "label": "First passage · p. 7", "corpus": "",

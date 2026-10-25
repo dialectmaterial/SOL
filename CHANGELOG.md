@@ -20,6 +20,11 @@ the result behind the menu. Word counts keep a space before them at five
 digits; the metrics line reads target ⇄ reference; the occurrence strip and
 TF-IDF passage labels fit their columns; TF-IDF terms wrap between terms;
 sentences list their hundred longest.
+The occurrence strip covers every occurrence of a common word, not only the
+thousand listed ("the" showed only the book's opening). Fullscreen gives the
+concordance the room a single-source word table does not use, and bars may
+widen; details opened in fullscreen no longer stay open after shrinking to a
+narrow window; concordance headings shorten in narrow panes.
 
 ### ESSENCE workspace — 24 October 2026
 

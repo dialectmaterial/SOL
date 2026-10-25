@@ -22,6 +22,7 @@ from sol.essence.tui import sentences, tfidf, views, words
 # Fullscreen from this many columns: panes side by side, details always shown.
 WIDE = 150
 WORDS_PANE = 86  # columns of the word table when panes sit side by side
+SINGLE_WORDS_PANE = 74  # without a reference: the rest goes to the concordance
 DETAILS_PANE = 40
 SHORT_UNDEFINED = {"zero_target_count": "∅ target", "zero_reference_count": "∅ reference",
                    "empty_target": "empty target", "empty_reference": "empty reference", "empty_both": "both empty"}
@@ -138,11 +139,21 @@ class ResultView(Vertical):
     def details_lines(self):
         return []
 
+    details_open = False  # opened with `i` in a narrow window; fullscreen always shows them
+
     def show_details(self, shown=None):
+        """Toggle the details in a narrow window; `shown` sets them for a new result."""
         box = self.query_one(".details")
-        box.display = (not box.display) if shown is None else shown
-        if not self.wide():
-            box.set_class(box.display, "-open")
+        if shown is None:
+            self.details_open = not box.display
+        elif not self.wide():
+            self.details_open = shown
+        self.place_details(self.wide())
+
+    def place_details(self, wide):
+        box = self.query_one(".details")
+        box.display = wide or self.details_open
+        box.set_class(not wide and box.display, "-open")
 
     def saved_line(self):
         return (f"Saved: {self.saved} (check with: sol essence check FILE)" if self.saved
@@ -202,7 +213,7 @@ class WordsView(ResultView):
             with self.prevent(Input.Changed):
                 self.query_one("#word-filter", Input).value = ""
             self.query_one("#word-filter").display = False
-            self.show_details(self.wide())
+            self.details_open = False
         self.rebuild()
         self.call_after_refresh(self.reflow)
 
@@ -211,8 +222,7 @@ class WordsView(ResultView):
         count = self.count
         wide = self.wide()
         self.set_class(wide, "-wide")
-        if wide:
-            self.query_one("#summary-box").display = True
+        self.place_details(wide)
         comparison = count.comparison is not None
         self.query_one("#result-metrics", Static).update(self.metrics())
         notes = len((count.comparison if comparison else count.study).get("warnings", []))
@@ -225,6 +235,7 @@ class WordsView(ResultView):
                     if self.word_filter in count.study["frequencies"][index]["word"]
                     and count.study["frequencies"][index]["word"] not in hidden]
         self.word_order = tuple(matching[:words.ROW_LIMIT])
+        table.styles.width = self.words_pane() if wide else None
         with self.prevent(DataTable.RowHighlighted):
             self.fill_words(table)
         total = len(count.study["frequencies"])
@@ -296,6 +307,10 @@ class WordsView(ResultView):
         if self.count is not None:
             self.rebuild(self.selected_word())
 
+    def words_pane(self):
+        """The word table's columns beside the concordance: a comparison needs its full width."""
+        return WORDS_PANE if self.count is not None and self.count.reference is not None else SINGLE_WORDS_PANE
+
     def table_width(self, selector):
         """Cells available to a table: its pane, less one column of scrollbar.
 
@@ -304,9 +319,9 @@ class WordsView(ResultView):
         """
         width = self.app.size.width
         if selector == "#frequencies":
-            width = min(WORDS_PANE, width) if self.wide() else width
+            width = min(self.words_pane(), width) if self.wide() else width
         elif self.wide():
-            width = width - WORDS_PANE - DETAILS_PANE - 2
+            width = width - self.words_pane() - DETAILS_PANE - 2
         estimate = width - 3
         laid_out = self.query_one(selector).size.width
         if laid_out:
@@ -342,7 +357,8 @@ class WordsView(ResultView):
                 break
         word_width = max(4, min(word_width, budget - fixed))
         room = budget - word_width - fixed
-        bars = max(0, min(16, room // sides_count - 1))
+        # One side's bars may take the room; two sides share it, kept equal.
+        bars = max(0, min(36 if not reference else 24 if self.wide() else 16, room // sides_count - 1))
         if bars < 3:
             bars = 0
         self.log_bar = log_bar
@@ -412,9 +428,9 @@ class WordsView(ResultView):
         left_width = context * 9 // 20
         right_width = context - left_width
         table.add_column(" ", width=1)
-        table.add_column(right("left context"), width=left_width)
+        table.add_column(right("left context" if left_width > 13 else "left"), width=left_width)
         table.add_column("", width=node)
-        table.add_column("right context", width=right_width)
+        table.add_column("right context" if right_width > 13 else "right", width=right_width)
         table.add_column(right("where"), width=gutter)
         for item in found:
             left, word, right_text = views.kwic(item["context"], left_width - 1, right_width - 1)
@@ -425,7 +441,13 @@ class WordsView(ResultView):
             shown.truncate(node, overflow="ellipsis")
             table.add_row(side, Text(left + " "), shown,
                           Text(right_text), right(where(item["label"]) + " "))
-        positions = [item["position"] for item in found if item["side"] == "target" and item.get("position") is not None]
+        target_total = row["target"]["count"] if row["target"] is not None else 0
+        listed = [item for item in found if item["side"] == "target"]
+        if len(listed) < target_total and row["target"] is not None:
+            # A common word lists only its first occurrences; the strip shows them all, by passage.
+            positions = words.positions(self.count, index)
+        else:
+            positions = [item["position"] for item in listed if item.get("position") is not None]
         sides = [f"{row[side]['count']:,} in {side}" for side in ("target", "reference") if row[side] is not None]
         head = f" {row['word']} · " + " · ".join(sides) + " "
         order = {"left": " · sorted by left context", "right": " · sorted by right context"}.get(self.context_sort, "")
@@ -585,7 +607,7 @@ class SentencesView(ResultView):
         new = count is not self.count
         self.count, self.saved = count, saved
         if new:
-            self.show_details(self.wide())
+            self.details_open = False
         self.rebuild()
         self.call_after_refresh(self.reflow)
 
@@ -593,8 +615,7 @@ class SentencesView(ResultView):
         study = self.count.study
         wide = self.wide()
         self.set_class(wide, "-wide")
-        if wide:
-            self.query_one("#sentence-details").display = True
+        self.place_details(wide)
         totals = study["summary"]
         mean = "—" if totals["mean"] is None else f"{totals['mean']:.1f}"
         line = Text(f"{views.plural(totals['sentences'], 'sentence')} · {views.plural(totals['tokens'], 'word')} · mean {mean}")
@@ -713,15 +734,14 @@ class TfidfView(ResultView):
         new = count is not self.count
         self.count, self.saved = count, saved
         if new:
-            self.show_details(self.wide())
+            self.details_open = False
         self.rebuild()
 
     def rebuild(self):
         study = self.count.study
         wide = self.wide()
         self.set_class(wide, "-wide")
-        if wide:
-            self.query_one("#tfidf-details").display = True
+        self.place_details(wide)
         totals = study["word_study"]["target"]["summary"]
         line = Text(f"{totals['token_count']:,} tokens · {views.plural(totals['input_count'], 'input')} · "
                     f"top {study['top_n']} terms each")
