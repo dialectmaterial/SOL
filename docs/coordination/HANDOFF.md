@@ -1135,7 +1135,7 @@ Earlier reports are in Git history (trimmed 21 October 2026).
 
 ## Codex A — outline widths and deep branches, 25 October 2026
 
-Branch `codex/reader-outline-width`; PR link follows publication. Fixed the
+Branch `codex/reader-outline-width`; [PR #131](https://github.com/dialectmaterial/SOL/pull/131). Fixed the
 43-cell outline hint clipped at 40×24; wide Unicode titles losing their current
 marker through over-truncation; and deep branches failing with invalid highlight
 columns after truncating their indentation. Compact hint, bounded indentation
