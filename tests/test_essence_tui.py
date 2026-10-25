@@ -173,6 +173,14 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             menu = app.query_one("#menu")
             self.assertIs(app.focused, menu)
             self.assertEqual((menu.study, menu.target), ("sentences", "section"))
+            # A view's own key moves focus too: `/` then the filter's text.
+            await pilot.press("escape")
+            await pilot.pause()
+            for key, character in (("slash", "/"), ("b", "b"), ("e", "e")):
+                app.post_message(events.Key(key, character))
+            await pilot.pause()
+            await pilot.pause()
+            self.assertEqual(app.query_one("#word-filter").value, "be")
             await pilot.press("q")
 
     async def test_methods_screen_browses_every_method(self):

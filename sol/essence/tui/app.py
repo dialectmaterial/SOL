@@ -13,7 +13,7 @@ import base64
 import json
 
 from rich.text import Text
-from textual import work
+from textual import events, work
 from textual.app import App
 from textual.binding import Binding
 from textual.command import DiscoveryHit, Hit, Provider
@@ -255,6 +255,27 @@ class EssenceApp(App):
         self.state = load_state(self.state_file) if self.state_file else {}
         self.reading_moved = False
         self._function_words = None
+        self.key_targets = {}
+
+    # Keys typed in a burst -------------------------------------------------------------------
+    # Textual sends each key to the widget focused when it arrives, so a burst
+    # (the reader's terminal delivers typing so) is queued on one widget before
+    # its first key can move focus: after `/`, the filter never saw `d e t`.
+    # A key that reaches the app after focus moved goes to the new focus instead.
+    async def on_event(self, event):
+        if isinstance(event, events.Key) and not event.is_forwarded:
+            self.key_targets[id(event)] = self.focused
+            while len(self.key_targets) > 256:  # keys a priority binding took never come back
+                del self.key_targets[next(iter(self.key_targets))]
+        await super().on_event(event)
+
+    def _on_key(self, event):
+        # Textual runs each class's _on_key in turn; App's, which checks bindings, follows
+        # unless this one re-sends the key.
+        target = self.key_targets.pop(id(event), None)
+        if target is not None and self.focused is not None and self.focused is not target:
+            event.prevent_default()
+            self.focused._forward_event(events.Key(event.key, event.character))
 
     def get_system_commands(self, screen):
         # Theme and quit commands would bypass the reader's theme and ESSENCE's

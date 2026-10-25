@@ -25,6 +25,8 @@ thousand listed ("the" showed only the book's opening). Fullscreen gives the
 concordance the room a single-source word table does not use, and bars may
 widen; details opened in fullscreen no longer stay open after shrinking to a
 narrow window; concordance headings shorten in narrow panes.
+Keys a view handles itself also survive a burst: `/det` typed at once now
+filters (the letters were lost on the table behind the filter).
 
 ### ESSENCE workspace — 24 October 2026
 
