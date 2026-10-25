@@ -98,6 +98,20 @@ push, PR and HANDOFF report.
 ## Codex A: reader / ESSENCE handoff bug hunt (round 2)
 ## Codex A: note editor resize returns to normal reading (round 2)
 ## Codex A: background ESSENCE exit preserves reader panel focus (round 2)
+## Codex A: reader launcher and opening failures
+
+**Status:** In review
+**Branch:** `codex/launcher-startup-errors`
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** [BEING §2](../BEING.md#2-what-is-implemented): clean refusals for
+unusable Neovim/runtime and sol-window font-cache/process failures, a valid
+sol-window help example, and an opening animation that fits 40 columns.
+Prior batches: [#124](https://github.com/dialectmaterial/SOL/pull/124),
+[#126](https://github.com/dialectmaterial/SOL/pull/126).
+**Constraints:** lane A only; no dependencies, palette/public-contract changes,
+private corpus text/PDF/workspaces/exports, sol/essence or SPECULATIVE edits.
+**Acceptance:** regression failures first; manual tmux reproductions and rechecks,
+full suite, docs check; commit, push, PR and HANDOFF; no self-merge.
 
 **Status:** In review
 **Branch:** `codex/reader-essence-close-focus`

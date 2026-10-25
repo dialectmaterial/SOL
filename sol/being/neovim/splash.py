@@ -73,21 +73,24 @@ def frame(t, columns, rows, theme="mocha"):
     for number, line in enumerate(title):
         out.append(f"\x1b[{top + number + 1};{left + 1}H{accent}{line}{reset}")
     below = top + len(title) + 1
-    line, moment = _movement(t)
+    track = max(1, min(TRACK, columns - 2))
+    if track % 2 == 0:
+        track -= 1
+    line, moment = _movement(t, track)
     out.append(_centred(below + 1, columns, f"{quiet}{line}{reset}".replace("●", f"{accent}●{quiet}")
-                        .replace("○", f"{accent}○{quiet}").replace("◉", f"{accent}◉{quiet}"), TRACK))
+                        .replace("○", f"{accent}○{quiet}").replace("◉", f"{accent}◉{quiet}"), track))
     labels = "   ".join(f"{accent}{name}{reset}" if name in moment else f"{quiet}{name}{reset}" for name in MOMENTS)
     out.append(_centred(below + 2, columns, labels, sum(map(len, MOMENTS)) + 6))
     return "".join(out) + ink
 
 
-def _movement(t):
+def _movement(t, width=TRACK):
     """The track at time t, and which moments are present: apart, or one in the other."""
     phase = (t % PERIOD) / PERIOD
-    half = TRACK // 2
+    half = (width - 1) // 2
     # Apart at phase 0, meeting at 0.5; eased, so the vanishing lingers.
     distance = round(half * abs(math.cos(math.pi * phase)) ** 1.6)
-    cells = ["·" if index % 2 == 0 else " " for index in range(TRACK)]
+    cells = ["·" if index % 2 == 0 else " " for index in range(width)]
     if distance == 0:
         cells[half] = "◉"
         return "".join(cells), ("Becoming",)
