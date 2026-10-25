@@ -108,6 +108,11 @@ The sentence CLI refuses empty and unknown reader paths, instead of measuring
 the whole corpus or silently returning an empty result. Malformed saved v1
 scopes return typed refusals instead of tracebacks. Existing v1 empty studies
 remain checkable.
+### ESSENCE context transport — 25 October 2026
+
+Context loading refuses FIFOs without blocking and checks the actual byte count
+after reading. Writers enforce the same UTF-8 size bound before creating a file
+and remove partial contexts after failed writes. Context versions require integers.
 
 ### Sentence segmentation audit — 23 October 2026
 

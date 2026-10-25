@@ -226,6 +226,18 @@ malformed saved scopes, per [ESSENCE](../ESSENCE.md#8-developer-acceptance-and-p
 SPECULATIVE edits. Base `origin/main`; do not merge own PR.
 **Acceptance:** Regressions fail before fixes; real-corpus tmux trials; full suite,
 `scripts/check_docs.py`, commit, push, PR and HANDOFF.
+## Codex B: ESSENCE context transport
+
+**Status:** In review
+**Branch:** `codex/essence-context-transport` · [PR #125](https://github.com/dialectmaterial/SOL/pull/125)
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** `sol/interchange/essence.py` and invented context regression tests:
+nonblocking special-file refusal, consistent byte limits, strict integer versions
+and cleanup after interrupted writes. Authority: [ESSENCE §8](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
+**Constraints:** No private text, dependencies, schema changes, TUI or SPECULATIVE edits.
+Base `origin/main`; do not merge own PR.
+**Acceptance:** Red/green regressions; real tmux use; full suite and docs check;
+commit, push, PR and HANDOFF. Prior batch: [#123](https://github.com/dialectmaterial/SOL/pull/123).
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
