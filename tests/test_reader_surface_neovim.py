@@ -882,6 +882,54 @@ end
         self.assertIn("Your keys (keys.json)", help_text)
         self.assertIn("does what gp does above", help_text)
 
+    def test_equivalent_key_sources_keep_defaults_instead_of_crashing_startup(self):
+        report = self.run_lua(r'''
+  local sent, warnings = {}, {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  vim.notify = function(message) warnings[#warnings + 1] = message end
+  vim.env.SOL_NVIM_KEYS = vim.json.encode({['<C-n>'] = '<F5>', ['<c-N>'] = '<F6>'})
+  local ok, problem = pcall(assert(loadfile(os.getenv('SOL_NVIM_ADAPTER'))), vim.deepcopy(data))
+  report.loaded, report.problem = ok, tostring(problem)
+  if ok then
+    reader = SOLNvimReader
+    reader.toggle_mode()
+    reader = SOLNvimReader
+    vim.api.nvim_feedkeys(vim.keycode('<C-n>'), 'xt', false)
+    report.operation = sent[1] and sent[1].op
+    reader.help()
+    report.help = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
+  end
+  report.warnings = warnings
+''')
+        self.assertTrue(report["loaded"], report)
+        self.assertEqual(report["operation"], "search_next")
+        self.assertEqual(len(report["warnings"]), 1)
+        self.assertIn("equivalent", report["warnings"][0])
+        self.assertIn("default reader keys", report["warnings"][0])
+        self.assertNotIn("Your keys (keys.json)", report["help"])
+
+    def test_equivalent_key_destinations_do_not_silently_overwrite_an_action(self):
+        report = self.run_lua(r'''
+  local sent, warnings = {}, {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  vim.notify = function(message) warnings[#warnings + 1] = message end
+  vim.env.SOL_NVIM_KEYS = vim.json.encode({['<C-n>'] = '<C-i>', ['<C-p>'] = '<Tab>'})
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  vim.api.nvim_feedkeys(vim.keycode('<C-n>'), 'xt', false)
+  report.next = sent[1] and sent[1].op
+  _G.SOLReaderChannel.navigation_pending = nil
+  vim.api.nvim_feedkeys(vim.keycode('<C-p>'), 'xt', false)
+  report.previous = sent[2] and sent[2].op
+  report.warnings = warnings
+''')
+        self.assertEqual(report.get("next"), "search_next", report)
+        self.assertEqual(report.get("previous"), "search_previous", report)
+        self.assertEqual(len(report["warnings"]), 1)
+        self.assertIn("equivalent", report["warnings"][0])
+
     def test_zathura_follows_the_resting_passage_after_s_until_it_closes(self):
         report = self.run_lua(r'''
   local sent = {}

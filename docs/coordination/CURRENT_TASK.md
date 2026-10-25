@@ -99,6 +99,21 @@ push, PR and HANDOFF report.
 ## Codex A: note editor resize returns to normal reading (round 2)
 ## Codex A: background ESSENCE exit preserves reader panel focus (round 2)
 ## Codex A: reader launcher and opening failures
+## Codex A: equivalent reader key remappings
+
+**Status:** In review
+**Branch:** `codex/reader-key-alias-conflicts`
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** Reader key remappings under [BEING §4](../BEING.md#4-theming-and-typography-next-bounded-task):
+prevent equivalent source/destination key names from crashing startup or silently
+overwriting each other. Keep the keys.json format and default controls.
+Prior batches: [#124](https://github.com/dialectmaterial/SOL/pull/124),
+[#126](https://github.com/dialectmaterial/SOL/pull/126),
+[#127](https://github.com/dialectmaterial/SOL/pull/127).
+**Constraints:** lane A; no private text/PDF/workspaces/exports, dependencies,
+palette/public-contract changes, sol/essence or SPECULATIVE edits.
+**Acceptance:** native regressions fail first; manual tmux reproduction/recheck,
+full suite and docs check; commit, push, PR and HANDOFF; no self-merge.
 
 **Status:** In review
 **Branch:** `codex/launcher-startup-errors`

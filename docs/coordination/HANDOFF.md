@@ -1511,3 +1511,19 @@ unavailable /proc cache path, and a 40×24 splash. Real corpus was used only
 read-only in earlier reading sessions; no corpus/PDF/workspace/export contents
 in Git. No dependencies, palettes or public contracts changed. Previous batches
 #124 and #126. Next: equivalent key-name remappings crashing native startup.
+## Codex A — equivalent key remappings, 25 October 2026
+
+Branch `codex/reader-key-alias-conflicts`; [PR #129](https://github.com/dialectmaterial/SOL/pull/129). Equivalent
+source spellings removed one native mapping twice and crashed startup; equivalent
+destination spellings silently overwrote an action. Compare Neovim keycodes
+before applying any remapping; warn once and retain default controls when aliases
+conflict. The config format is unchanged. Both native regressions failed first;
+58 native tests passed, final alias/reload checks and 3 user-key checks passed.
+Full suite: 1,314 tests OK (7 skipped, 4 expected failures); docs/diff checks OK.
+Real-corpus tmux, temporary config copy only: reproduced E31 at startup and
+rechecked startup/mode change with default keys and one warning. Also completed
+real-corpus guide/read/reference capture/check and missing-file smoke checks;
+40-column guide fits. Interrupted startup restored canonical input and echo.
+No private content, workspace, PDF, exports, dependencies, palette or public
+contract changes. Previous PRs #124, #126, #127. Next: clipped narrow outline
+header and deep-indent layout edge cases.

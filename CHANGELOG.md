@@ -99,6 +99,7 @@ ESSENCE workspace PR #121 before merging.
 
 - Reader: resizing ESSENCE keeps keyboard focus in its terminal. Shrinking a split while reading hides ESSENCE instead of covering the focused reader.
 - Launcher: report unusable/disappearing Neovim executables and sol-window font-cache/process failures without tracebacks; correct the window help's workspace option. Keep the opening animation inside a 40-column terminal.
+- Reader: detect equivalent source/destination key names in keys.json before applying remappings, warn and keep default controls instead of crashing startup or silently overwriting an action.
 
 ### Sentence segmentation audit — 23 October 2026
 
