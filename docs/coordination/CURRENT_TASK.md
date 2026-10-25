@@ -93,6 +93,19 @@ lanes' slots unchanged; do not merge own PR.
 **Acceptance:** token validity, category uniqueness/order, stable identity and
 installed-wheel tests; ESSENCE and CHANGELOG; docs check and full suite; commit,
 push, PR and HANDOFF report.
+## Codex A: narrow reader layout bugs
+
+**Status:** In review
+**Branch:** `codex/reader-panel-resize`
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** Hunt reader/launcher bugs under [BEING §2](../BEING.md#2-what-is-implemented).
+This batch fixes help continuation alignment and clipped status information in
+small terminals. Use the configured corpus read-only in tmux at 86×48, 190×50,
+80×24 and 40×24; regressions use invented text only.
+**Constraints:** reader/launcher lane only; no ESSENCE code, palette changes,
+public-contract changes, dependencies or private data in Git; never edit SPECULATIVE.
+**Acceptance:** failing regressions first, focused and full suite, docs check,
+manual tmux recheck; commit, push, PR and short HANDOFF; do not merge own PR.
 
 ## Codex B: ESSENCE follows the reader
 

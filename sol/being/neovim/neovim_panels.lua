@@ -62,7 +62,7 @@ return function(reader)
     panels.window = api.nvim_open_win(panel, true, config)
     vim.wo[panels.window].wrap, vim.wo[panels.window].linebreak = true, true
     if hanging then
-      vim.wo[panels.window].breakindent, vim.wo[panels.window].breakindentopt = true, 'shift:' .. hanging
+      vim.wo[panels.window].breakindent, vim.wo[panels.window].breakindentopt = true, 'min:0,shift:' .. hanging
     end
     vim.wo[panels.window].winhighlight = "NormalFloat:SOLPanel,FloatBorder:SOLPanelBorder"
     panels.return_packet = return_packet
