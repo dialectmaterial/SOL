@@ -189,6 +189,24 @@ class SentenceStudyTests(unittest.TestCase):
         self.assertIn("Verified against the current corpus generation.", checked)
         self.assertIn("4 sentences, 18 tokens in 2 passages.", checked)
 
+    def test_returned_method_metadata_cannot_change_later_studies(self):
+        from sol.essence.essence_as_reflection_within_itself import sentences as engine
+
+        declared = engine._METHOD["abbreviations"]
+        original = list(declared)
+        result = analyze_sentences(self.snapshot)
+        before = encode_sentence_result(result)
+        try:
+            result["method"]["abbreviations"].append("invented-sentinel")
+            with self.subTest(effect="later study"):
+                self.assertEqual(encode_sentence_result(analyze_sentences(self.snapshot)), before)
+            with self.subTest(effect="checking tampered method"):
+                with self.assertRaises(SentenceStudyError):
+                    check_sentence_result(self.snapshot, result)
+        finally:
+            # Keep even the failing pre-fix regression from poisoning other tests.
+            declared[:] = original
+
 
 if __name__ == "__main__":
     unittest.main()

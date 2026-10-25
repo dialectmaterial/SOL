@@ -344,7 +344,7 @@ def _analyze(snapshot, scope, origin):
     result = {"protocol": "sol.sentence-study", "version": 1, **binding, "method": dict(_METHOD),
               "scope": scope, "origin": origin, **_measure(passages, rows),
               "passages": passages, "sentences": rows, "exclusions": exclusions}
-    _validate(result)
+    result = _validate(result)
     _current(snapshot)
     return result
 
