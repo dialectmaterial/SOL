@@ -17,7 +17,7 @@ Isolated fresh-process, warm-file probe without concurrent tests: peak RSS
 not a cross-machine timing guarantee). CLI refusal is clean in tmux; a large
 repeated-word file succeeds, and a Ctrl-C trial exits 130 without a traceback.
 Full suite: 1,315 tests OK (29 skipped, 4 expected failures); docs/diff checks pass.
-PR pending. Earlier round-2
+[PR #137](https://github.com/dialectmaterial/SOL/pull/137). Earlier round-2
 batches: [#134](https://github.com/dialectmaterial/SOL/pull/134) on #132 and
 [#136](https://github.com/dialectmaterial/SOL/pull/136) on #130.
 

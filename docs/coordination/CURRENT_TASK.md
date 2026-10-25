@@ -66,7 +66,7 @@ suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 ## Codex B: early oversized word-result refusal (round 2)
 
 **Status:** In review
-**Branch:** `codex/word-result-budget`
+**Branch:** `codex/word-result-budget` · [PR #137](https://github.com/dialectmaterial/SOL/pull/137)
 **Requested:** 25 October 2026, by the maintainer
 **Scope:** Stop impossible word/TF-IDF vocabularies before expanding the whole
 frequency table. Authority: [ESSENCE §8](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
