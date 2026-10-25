@@ -108,6 +108,10 @@ The sentence CLI refuses empty and unknown reader paths, instead of measuring
 the whole corpus or silently returning an empty result. Malformed saved v1
 scopes return typed refusals instead of tracebacks. Existing v1 empty studies
 remain checkable.
+- Refuse excessively nested ESSENCE launch JSON without a traceback, and report
+  context serialization failures as input errors before creating any file; reject
+  nonfinite numbers and escaped surrogates consistently on read and write.
+
 ### ESSENCE context transport — 25 October 2026
 
 Context loading refuses FIFOs without blocking and checks the actual byte count
