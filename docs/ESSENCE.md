@@ -132,6 +132,34 @@ In particular, avoid these errors:
 5. Silently concatenating paragraphs, ignoring section boundaries, or truncating input beyond model limits.
 6. Calling distances or embeddings ontological relationships without an independent argument.
 
+### Optional presentation choice: hide function words
+
+**Decision (maintainer, 24 October 2026):** an optional **Hide function words**
+switch is off by default and declared as a method choice. Its bundled vocabulary
+is `english-closed-class-v1` (version 1), loaded by
+`sol.essence.function_words.load_function_words()` from `function_words.json`.
+This change supplies the list; the interface redesign wires the switch.
+
+SOL composed the list from grammatical categories, without copying a third-party
+stop-word list: articles/determiners and common quantifiers; personal, possessive,
+reflexive, relative, interrogative and demonstrative pronouns; single-token
+prepositions and conjunctions; auxiliary/modal forms; negation, common whole
+contractions and particles. The JSON carries the full inclusion criteria and
+sorted categories; each spelling occurs once, in ESSENCE's normalized token form
+with straight apostrophes. This is a bounded spelling list, without contextual
+part-of-speech analysis, stemming or multiword expressions. After release,
+changed membership requires a new list version/id.
+
+`am`, `are`, `be`, `been`, `is`, `was`, `were` are included for their copular and
+auxiliary uses. **Closed-class spellings that name logical determinations in the
+CORE edition stay visible.** Exclude `being`, `other`, `one`, `many`, `beyond`
+and `itself`; the last carries the determinations “in itself” / “for itself”.
+`have`, `has`, `had`, `having` are included for their auxiliary uses. Matching cannot distinguish those from lexical or
+philosophically significant uses of the same spellings; this limitation is why
+the choice is explicit and off by default. It is **presentation only**: analysis
+inputs, counts, denominators, scores, saved artifacts and exports never change.
+The projection and counting engines do not remove these words.
+
 ## 4. Interaction model and inquiry contract
 
 **Implemented (stage D):** the private launch-file schema, validation, owner-only

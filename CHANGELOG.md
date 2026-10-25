@@ -74,6 +74,14 @@ source-context panels. Catalogs and setup use columns in wide windows and stack
 inside reader splits; focus accents follow the reader's theme. Empty Results
 offers a keyboard-accessible route to choosing a study. Tables fold columns to
 fit their framed viewport, and browsing/form state survives layout changes.
+### Declared function-word vocabulary — 24 October 2026
+
+Bundle the original, categorized `english-closed-class-v1` list and dependency-free
+loader for the optional, off-by-default Hide function words presentation choice;
+keep logical determinations `being`, `other`, `one`, `many`, `beyond` and `itself`
+visible. Retain the unreleased list id/version. Counts, denominators, artifacts
+and exports are unchanged.
+The interface switch will be wired separately.
 
 ### Sentence segmentation audit — 23 October 2026
 

@@ -238,6 +238,38 @@ None reserved. Provisional presentation defaults: catalog/setup sidebars at
 borders with theme-derived accent focus, and a Choose a study empty-state action.
 The maintainer may revise these defaults after using the interface.
 
+## Declared English function words — 24 October 2026
+
+**Task:** [Codex A: declared English function words](https://github.com/dialectmaterial/SOL/blob/1e401e2d358ae007e566e75f1fd63bd55aeafc27/docs/coordination/CURRENT_TASK.md#codex-a-declared-english-function-words), assigned directly by the maintainer.
+**Branch / PR:** `codex/function-words` · [#119](https://github.com/dialectmaterial/SOL/pull/119); author does not merge.
+**Initial implementation commit:** `1e401e2d358ae007e566e75f1fd63bd55aeafc27` (review follow-up is recorded below).
+
+### Changed files
+
+- `sol/essence/function_words.json`, `function_words.py` — original `english-closed-class-v1`, version 1: 260 sorted, unique tokens in nine grammatical categories, written inclusion criteria, fresh metadata/categories and a `frozenset` union. Standard library only; no corpus/UI imports.
+- `pyproject.toml`, `MANIFEST.in`, `tests/test_packaging.py` — include the JSON in wheels and source archives; rerun the vocabulary tests against the unpacked wheel in an isolated process outside the checkout, refusing CORE and optional runtime imports.
+- `tests/test_function_words.py` — exact shared-tokenizer round trips, sorting, category uniqueness, identity/version, representative category coverage, philosophical exclusions and independent loads.
+- `docs/ESSENCE.md`, `CHANGELOG.md` — declare the off-by-default, display-only method choice, be/have policy and unchanged counts, denominators, scores, artifacts and exports. `CURRENT_TASK.md` changes only Codex A's slot to In review.
+
+### Tests performed
+
+Review follow-up runs in `/tmp/sol-lane-a-pr119` using `/tmp/sol-function-words/.venv/bin/python -B` (the existing Python 3.14 environment).
+
+- `scripts/check_docs.py` — OK; external URLs are not network-checked.
+- `-m unittest discover -s tests` — **1,317 tests OK (7 skipped, 4 existing expected failures)**, 168.111 s. Log outside Git: `/tmp/sol-lane-a-pr119-suite.log`.
+- The full suite includes `test_function_words.py` (**4 tests**) and `test_packaging.py` (**23 tests**), including wheel and source archive checks and the extended vocabulary tests against the wheel.
+- `git diff --check` — OK. No changes under `sol/essence/tui/` or to `tests/test_essence_*.py`. `origin/main` remains at `b2a5fb7b84c88dc8306aed86d9568a6e654e051a`.
+
+### Outstanding issues
+
+Claude wires the interface switch separately, as assigned. The vocabulary is bounded and matches spellings, without context-sensitive part-of-speech tagging: enabling it can also hide lexical/philosophical uses of included spellings. Closed-class spellings that name logical determinations in the CORE edition stay visible: `being`, `other`, `one`, `many`, `beyond` and `itself` are explicitly excluded. `itself` carries “in itself” / “for itself”; Claude’s review is addressed without changing the unreleased id/version. No engine or artifact behavior changes.
+
+The supplied checkout has read-only Git metadata. Review follow-up branch, commits and publication use `/tmp/sol-lane-a-pr119`, cloned from origin; the supplied workspace remains on `main` with unchanged Git metadata. Review the published branch.
+
+### Decisions requiring approval
+
+None reserved: the maintainer approved the optional display-only choice on 24 October. Defaults the maintainer may overrule: include `am/are/be/been/is/was/were` for copular/auxiliary uses while excluding nominal `being`; include `have/has/had/having` and do forms for auxiliary uses. Preserve whole contractions, assign each spelling once, and version membership changes after release.
+
 
 ## Sentence segmentation audit — 23 October 2026
 

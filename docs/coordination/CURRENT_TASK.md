@@ -69,6 +69,30 @@ lanes' slots unchanged; do not merge own PR.
 synthetic previews in wide and narrow windows, full suite and docs check;
 verify the installed wheel/UI outside the checkout. Stacked on `f604538`;
 publication remains subject to the existing GitHub access restriction.
+## Claude Code: measure reader latency on screen
+
+**Status:** Done (#115)
+**Branch:** `claude/section-keys-use-channel`
+**Scope:** reader backlog item "measured navigation latency": time from key to
+readable text in a real terminal. The measurement found `]c`/`[c` restarting
+Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
+
+## Codex A: declared English function words
+
+**Status:** In review
+**Branch:** `codex/function-words`
+**Requested:** 24 October 2026, by the maintainer
+**Scope:** [ESSENCE §3](../ESSENCE.md#3-proper-model-inputs-projections-not-destructive-cleaning):
+bundle the original, categorized `english-closed-class-v1` list and a standard-library
+loader for the optional, off-by-default, display-only hide-function-words method
+choice. Declare inclusion criteria and the treatment of be/have forms, keeping
+`being` out. Claude wires the switch during the interface redesign.
+**Constraints:** no edits to `sol/essence/tui/` or `tests/test_essence_*.py`;
+no dependencies, changed engine counts/denominators, artifacts or exports; other
+lanes' slots unchanged; do not merge own PR.
+**Acceptance:** token validity, category uniqueness/order, stable identity and
+installed-wheel tests; ESSENCE and CHANGELOG; docs check and full suite; commit,
+push, PR and HANDOFF report.
 
 ## Codex B: landmark management
 
