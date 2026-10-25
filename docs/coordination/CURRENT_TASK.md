@@ -66,7 +66,7 @@ suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 ## Codex B: malformed launch-context JSON refusals (round 2)
 
 **Status:** In review
-**Branch:** `codex/essence-context-json-errors`
+**Branch:** `codex/essence-context-json-errors` · [PR #139](https://github.com/dialectmaterial/SOL/pull/139)
 **Requested:** 25 October 2026, by the maintainer
 **Scope:** Translate context JSON decoder/encoder resource and type failures
 into clean input refusals. Authority: [ESSENCE §8](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
@@ -76,7 +76,8 @@ CLI flags or SPECULATIVE changes.
 **Acceptance:** Failing deep-file/launcher/encoder regressions; valid byte/permission
 round trips; full suite/docs; combined validation; commit, push, PR and handoff.
 **Validation:** 1,323 tests OK (29 skipped, 4 expected failures); docs/diff checks pass.
-Combined full suite running; all focused and real-corpus round trips pass.
+Combined round-1/round-2 suite: 1,353 tests OK (29 skipped, 4 expected failures);
+all focused and real-corpus round trips pass. Corpus binding/generation unchanged.
 Earlier round-2 batches: [#134](https://github.com/dialectmaterial/SOL/pull/134)
 (on #132), [#136](https://github.com/dialectmaterial/SOL/pull/136) (on #130),
 [#137](https://github.com/dialectmaterial/SOL/pull/137) (main).

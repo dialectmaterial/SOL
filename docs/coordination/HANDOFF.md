@@ -16,8 +16,9 @@ Full branch suite: 1,323 tests OK (29 skipped, 4 expected failures); docs/diff
 checks pass. A real tmux launch of the malformed context returns 2 without a
 traceback. Combined focused checks and inert mutation probes pass; read-only
 whole-corpus words, TF-IDF, legacy and both provider sentence methods save/check
-successfully and have identical word/sentence token totals. Combined full suite
-running; PR pending. Earlier round-2 batches:
+successfully and have identical word/sentence token totals. Combined full suite:
+1,353 tests OK (29 skipped, 4 expected failures); corpus binding/generation
+unchanged from the start. [PR #139](https://github.com/dialectmaterial/SOL/pull/139). Earlier round-2 batches:
 [#134](https://github.com/dialectmaterial/SOL/pull/134) on #132,
 [#136](https://github.com/dialectmaterial/SOL/pull/136) on #130,
 [#137](https://github.com/dialectmaterial/SOL/pull/137) on main.
