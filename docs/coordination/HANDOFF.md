@@ -36,7 +36,7 @@ Write "None." rather than deleting a heading.
 ## Legacy sentence method isolation — 25 October 2026
 
 **Task:** Codex B, maintainer's bounded bug hunt; CURRENT_TASK.md.
-**Branch / PR:** `codex/sentence-method-isolation` · PR pending publication. Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123), [#125](https://github.com/dialectmaterial/SOL/pull/125), [#128](https://github.com/dialectmaterial/SOL/pull/128), [#130](https://github.com/dialectmaterial/SOL/pull/130).
+**Branch / PR:** `codex/sentence-method-isolation` · [#132](https://github.com/dialectmaterial/SOL/pull/132). Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123), [#125](https://github.com/dialectmaterial/SOL/pull/125), [#128](https://github.com/dialectmaterial/SOL/pull/128), [#130](https://github.com/dialectmaterial/SOL/pull/130).
 **Last implementation commit:** `35048a560c7716d3ab8dd4b74dee024b26e121db`.
 
 ### Changed files
@@ -46,7 +46,7 @@ Write "None." rather than deleting a heading.
 ### Tests performed
 - Full suite: **1,313 OK**, 7 skipped, 4 expected failures, 156.856 s; isolated XDG paths. Focused sentence suite: 51 OK (4 expected failures), including all four original v1 compatibility fixtures. Docs and diff checks pass.
 - Read-only real CORE snapshot with an invented empty scope reproduces both pre-fix failures and confirms isolation/refusal after the fix. Combined probes confirm word, TF-IDF and both sentence provider versions also refuse method tampering without poisoning later studies.
-- All five proposed code patches applied to `/tmp/sol-b-final-review`; 102 focused combined tests pass. Combined full suite is running; its final result will be added before completion.
+- All five proposed code patches applied to `/tmp/sol-b-final-review`; 102 focused combined tests pass. Full combined suite: **1,333 OK**, 7 skipped, 4 expected failures, 156.233 s; isolated XDG paths. Combined docs and diff checks pass. Code, tests and all five batch records are mirrored into the supplied checkout without changing its read-only Git metadata.
 
 ### Outstanding issues
 No further observed in-lane defect remains after these batches. Frozen segmentation limitations require a separately adopted method to change; 40-column TUI navigation clipping belongs to Claude's lane. Publication clone: `/tmp/sol-codex-b-hunt`; no private text/artifacts committed.

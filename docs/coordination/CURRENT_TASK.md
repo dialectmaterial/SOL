@@ -66,7 +66,7 @@ suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 ## Codex B: legacy sentence method isolation
 
 **Status:** In review
-**Branch:** `codex/sentence-method-isolation`
+**Branch:** `codex/sentence-method-isolation` · [PR #132](https://github.com/dialectmaterial/SOL/pull/132)
 **Requested:** 25 October 2026, by the maintainer
 **Scope:** Detach v1 sentence result metadata from the engine's declared method,
 so a caller cannot poison later studies or defeat method checking. Authority:
@@ -75,6 +75,8 @@ so a caller cannot poison later studies or defeat method checking. Authority:
 Base `origin/main`; do not merge own PR.
 **Acceptance:** Failing metadata-mutation regression; legacy byte compatibility;
 full suite/docs; combined validation; commit, push, PR and HANDOFF.
+**Final combined validation:** all five patches, 1,333 tests OK (7 skipped,
+4 existing expected failures); docs check passes. No observed in-lane bug remains.
 Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123),
 [#125](https://github.com/dialectmaterial/SOL/pull/125),
 [#128](https://github.com/dialectmaterial/SOL/pull/128),
