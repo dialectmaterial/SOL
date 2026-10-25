@@ -15,6 +15,7 @@ from textual.message import Message
 from textual.widgets import Input, Label, Static
 
 from sol.essence.tui import words
+from sol.essence.tui.results import focus_now
 
 STUDIES = {"words": "words", "sentences": "sentences", "tfidf": "TF-IDF"}
 STUDY_KEYS = {"words": "w", "sentences": "s", "tfidf": "t"}
@@ -39,6 +40,9 @@ class StudyMenu(Vertical, can_focus=True):
 
     class Close(Message):
         """Escape: put the menu away without running anything."""
+
+    class Changed(Message):
+        """A choice changed; the header and the method shown follow it."""
 
     BINDINGS = [
         *(Binding(key, f"choose('study', '{name}')", STUDIES[name], show=False)
@@ -87,6 +91,7 @@ class StudyMenu(Vertical, can_focus=True):
         self.query_one("#reference-file-row").display = words_study and self.reference == "file"
         self.query_one("#tfidf-settings").display = self.study == "tfidf"
         self.query_one("#menu-summary", Static).update(self.summary())
+        self.post_message(self.Changed())
 
     def choices_text(self, width):
         """Three columns of keyed choices, or three stacked groups when narrow."""
@@ -149,11 +154,11 @@ class StudyMenu(Vertical, can_focus=True):
         self.refresh_menu()
         field = {"target": "#target-file", "reference": "#reference-file"}.get(group)
         if name == "file" and field is not None:
-            self.query_one(field).focus()
+            focus_now(self.query_one(field))
 
     def action_top_n(self):
         if self.study == "tfidf":
-            self.query_one("#top-n").focus()
+            focus_now(self.query_one("#top-n"))
 
     def action_run(self):
         self.post_message(self.Run())
@@ -168,6 +173,6 @@ class StudyMenu(Vertical, can_focus=True):
     def on_key(self, event):
         # Escape in a field returns to the choices; a second Escape closes.
         if event.key == "escape" and isinstance(self.app.focused, Input) and self.app.focused in self.query(Input):
-            self.focus()
+            focus_now(self)
             event.stop()
             event.prevent_default()

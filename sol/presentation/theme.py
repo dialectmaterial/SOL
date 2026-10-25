@@ -57,6 +57,13 @@ _PALETTES = {
               "selection": "#3b3150", "search": "#4d4230", "search_text": "#ece7da",
               "current": "#c3a6ee", "current_text": "#1b1820"},
 }
+
+
+def reader_palette(name):
+    """A preset's colors, for ESSENCE beside the reader; None for Terminal, which has none."""
+    return dict(_PALETTES[name]) if name in _PALETTES else None
+
+
 _HEX = re.compile(r"#[0-9a-f]{6}")
 _CUBE = (0, 95, 135, 175, 215, 255)
 

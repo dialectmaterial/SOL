@@ -140,8 +140,8 @@ class WorkflowTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 self.assertIn("Counts, denominators, saved artifacts and exports keep every word",
                               str(app.query_one("#summary").render()))
                 # Counts and totals still describe the whole study.
-                self.assertIn(f"{count.study['target']['summary']['token_count']:,} tokens",
-                              str(app.query_one("#result-metrics").render()))
+                totals = [count.study[side]["summary"]["token_count"] for side in ("target", "reference")]
+                self.assertIn(f"{totals[0]:,} ⇄ {totals[1]:,} tokens", str(app.query_one("#result-metrics").render()))
                 await pilot.press("f")
                 await pilot.pause()
                 self.assertIn("alpha", shown())

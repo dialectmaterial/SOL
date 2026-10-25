@@ -13,34 +13,68 @@ import base64
 import json
 
 from rich.text import Text
-from textual import work
+from textual import events, work
 from textual.app import App
 from textual.binding import Binding
 from textual.command import DiscoveryHit, Hit, Provider
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.theme import Theme
-from textual.widgets import ContentSwitcher, Footer, Input, Static
+from textual.widgets import ContentSwitcher, Footer, Input, Markdown, Static
 
 from sol.essence.encyclopedia import load_catalog
-from sol.essence.methods import load_methods
+from sol.essence.methods import load_methods, method_markdown
 from sol.essence.tui import sentences, tfidf, words
 from sol.essence.tui.context import load_state, save_state
 from sol.essence.tui.menu import STUDIES, SCOPES, StudyMenu
 from sol.essence.tui.reference import METHOD_STUDIES, ReferenceScreen
-from sol.essence.tui.results import OpenSource, SentencesView, Status, TfidfView, WordsView, WIDE
-from sol.presentation.theme import DEFAULT_READER_THEME
+from sol.essence.tui.results import OpenSource, SentencesView, Status, TfidfView, WordsView, WIDE, focus_now
+from sol.presentation.theme import BACKGROUNDS, DEFAULT_READER_THEME, READER_THEMES, reader_palette
 
-TEXTUAL_THEMES = {"mocha": "catppuccin-mocha", "latte": "catppuccin-latte", "paper": "sol-paper",
-                  "night": "sol-night", "terminal": "ansi-dark"}
-# SOL's own, matching the reader's Paper and Night (actualspirit.com).
-SOL_THEMES = (
-    Theme(name="sol-paper", primary="#55308a", secondary="#45424d", accent="#55308a", warning="#9b2c2c",
-          error="#9b2c2c", success="#3d6b3a", foreground="#17151c", background="#f3f0e6", surface="#ebe7d9",
-          panel="#e4dfcf", dark=False),
-    Theme(name="sol-night", primary="#c3a6ee", secondary="#a29cae", accent="#c3a6ee", warning="#e8a87c",
-          error="#e8a87c", success="#a6c99a", foreground="#ece7da", background="#1b1820", surface="#221e28",
-          panel="#2a2531", dark=True),
-)
+TEXTUAL_THEMES = {name: f"sol-{name}" for name in READER_THEMES if name != "terminal"} | {"terminal": "ansi-dark"}
+
+
+def blend(first, second, share):
+    """The #rrggbb color `share` of the way from `first` to `second`."""
+    one, two = (tuple(int(color[index:index + 2], 16) for index in (1, 3, 5)) for color in (first, second))
+    return "#" + "".join(f"{round(a + (b - a) * share):02x}" for a, b in zip(one, two))
+
+
+def reader_theme(name):
+    """ESSENCE in the reader's own colors: its page, ink, headings, rules and selection.
+
+    Terminal has no palette; Textual's ANSI theme inherits the terminal's colors as the reader does.
+    """
+    p = reader_palette(name)
+    return Theme(
+        name=TEXTUAL_THEMES[name], dark=BACKGROUNDS[name] == "dark",
+        foreground=p["text"], background=p["page"], surface=p["panel"], panel=p["selection"],
+        primary=p["heading"], secondary=p["muted"], accent=p["heading"],
+        warning=p["warning"], error=p["warning"], success=p["heading"],
+        variables={
+            "text-muted": p["muted"], "foreground-muted": p["muted"],
+            "border": p["heading"], "border-blurred": p["border"],
+            "block-cursor-foreground": p["text"], "block-cursor-background": p["selection"],
+            "block-cursor-text-style": "bold",
+            # Halfway to the selection: visible even where the panel is the page (Latte).
+            "block-cursor-blurred-foreground": p["text"],
+            "block-cursor-blurred-background": blend(p["page"], p["selection"], 0.5),
+            "input-cursor-foreground": p["page"], "input-cursor-background": p["text"],
+            "input-selection-background": p["selection"],
+            "footer-background": p["page"], "footer-foreground": p["muted"],
+            "footer-key-foreground": p["heading"], "footer-description-foreground": p["muted"],
+            "scrollbar": p["border"], "scrollbar-hover": p["muted"], "scrollbar-active": p["heading"],
+            "scrollbar-background": p["page"], "scrollbar-background-hover": p["page"],
+            "scrollbar-background-active": p["page"], "scrollbar-corner-color": p["page"],
+            # Headings and menu choices are not links: bold, not underlined; links keep their color.
+            "link-color": p["heading"], "link-color-hover": p["text"], "link-background-hover": p["selection"],
+            "link-style": "none", "link-style-hover": "underline",
+            "button-foreground": p["text"], "button-color-foreground": p["page"],
+            **{f"markdown-h{level}-{part}": value for level in range(1, 7)
+               for part, value in (("color", p["heading"]), ("background", "transparent"),
+                                   ("text-style", "bold"))},
+        })
+
+
 # Views a leaving session can return to; earlier screens map onto them.
 VIEWS = {"workspace": "workspace", "experiment": "workspace", "results": "workspace",
          "encyclopedia": "encyclopedia", "methods": "methods"}
@@ -99,53 +133,56 @@ class EssenceApp(App):
     ResultView { height: 1fr; padding: 0 1; }
     .metrics-row { height: 1; }
     #result-metrics, #sentence-metrics, #tfidf-metrics { width: 1fr; text-wrap: nowrap; text-overflow: ellipsis; }
-    #details-hint, .details-hint { width: auto; color: $text-muted; }
-    #word-filter { height: 1; border: none; padding: 0 1; background: $primary 18%; }
+    #details-hint, .details-hint { width: auto; padding-left: 2; color: $text-muted; }
+    #word-filter { height: 1; border: none; padding: 0 1; background: $surface; }
     #sort-status { height: 1; color: $text-muted; text-wrap: nowrap; text-overflow: ellipsis; }
     .result-layout { height: 1fr; layout: vertical; }
     ResultView.-wide .result-layout { layout: horizontal; }
     VimTable { background: $background; scrollbar-size-vertical: 1; }
     VimTable > .datatable--header { background: $background; color: $text-muted; text-style: bold; }
-    VimTable > .datatable--cursor { background: $primary 18%; color: $foreground; }
-    VimTable:focus > .datatable--cursor { background: $primary 35%; color: $foreground; text-style: bold; }
+    VimTable > .datatable--cursor { background: $block-cursor-blurred-background; color: $foreground; }
+    VimTable:focus > .datatable--cursor { background: $block-cursor-background; color: $block-cursor-foreground;
+        text-style: bold; }
     #frequencies { height: 1fr; min-height: 4; }
     #occurrences-pane { height: 1fr; min-height: 5; }
     #sources-label, #longest-label, #passages-label, #overall-label {
         height: 1; color: $text-muted; text-wrap: nowrap; text-overflow: ellipsis;
-        border-top: solid $primary 30%; height: 2; }
+        border-top: solid $border-blurred; height: 2; }
     #occurrences-pane:focus-within #sources-label, #longest-pane:focus-within #longest-label,
     #passages-pane:focus-within #passages-label, #overall-pane:focus-within #overall-label {
         color: $accent; border-top: solid $accent; }
     #sources { height: 1fr; }
     .details { display: none; height: auto; max-height: 45%; padding: 0 1;
-               border-top: solid $primary 30%; color: $text-muted; }
+               border-top: solid $border-blurred; color: $text-muted; }
     .details:focus { border-top: solid $accent; }
     ResultView.-wide .details { display: block; height: 1fr; max-height: 100%; width: 40;
-                                border-top: none; border-left: vkey $primary 30%; }
+                                border-top: none; border-left: vkey $border-blurred; }
     ResultView.-wide #frequencies { width: 86; height: 1fr; }
-    ResultView.-wide #occurrences-pane { width: 1fr; height: 1fr; border-left: vkey $primary 30%; padding-left: 1; }
+    ResultView.-wide #occurrences-pane { width: 1fr; height: 1fr; border-left: vkey $border-blurred; padding-left: 1; }
     ResultView.-wide #sources-label { border-top: none; height: 1; }
     #distribution { height: auto; max-height: 50%; }
     ResultView.-wide #distribution { width: 1fr; height: 1fr; max-height: 100%; }
     #longest-pane { height: 1fr; }
-    ResultView.-wide #longest-pane { width: 1fr; border-left: vkey $primary 30%; padding-left: 1; }
+    ResultView.-wide #longest-pane { width: 1fr; border-left: vkey $border-blurred; padding-left: 1; }
     #longest { height: 1fr; }
     #passages-pane { height: 1fr; }
     #overall-pane { height: 1fr; max-height: 40%; }
-    ResultView.-wide #overall-pane { width: 42; max-height: 100%; border-left: vkey $primary 30%; padding-left: 1; }
+    ResultView.-wide #overall-pane { width: 42; max-height: 100%; border-left: vkey $border-blurred; padding-left: 1; }
     #passages, #overall { height: 1fr; }
     StudyMenu { height: auto; max-height: 100%; overflow-y: auto; padding: 0 1;
-                border-top: solid $primary 40%; background: $background; }
+                border-top: solid $border-blurred; background: $background; }
     Screen.-short #intro { display: none; }
+    #primer { height: 1fr; padding: 0 1; border-top: solid $border-blurred; scrollbar-size-vertical: 1; }
+    #primer Markdown { padding: 0 1; color: $text-muted; }
     StudyMenu:focus-within { border-top: solid $accent; }
     #menu-choices { height: auto; }
     .menu-field { height: 1; }
     .menu-field Label { width: auto; color: $text-muted; }
-    .menu-field Input { height: 1; border: none; padding: 0 1; background: $primary 18%; width: 1fr; }
+    .menu-field Input { height: 1; border: none; padding: 0 1; background: $surface; width: 1fr; }
     #menu-summary { height: auto; margin-top: 1; }
     #status { height: auto; color: $warning; }
     #result-status { height: auto; max-height: 2; padding: 0 1; color: $text-muted; }
-    Footer { background: $surface; }
+    Footer { background: $footer-background; }
     /* Reference screen: the catalogs, as before. */
     #reference-header { height: 1; padding: 0 1; }
     #catalogs, ContentSwitcher { height: 1fr; }
@@ -155,10 +192,10 @@ class EssenceApp(App):
     TabPane { padding: 0 1; }
     .browser-tools { height: 1; margin-bottom: 1; }
     .browser-search { width: 1fr; height: 1; border: none; padding: 0 1; background: $surface; }
-    .browser-search:focus { border: none; background: $primary 18%; }
+    .browser-search:focus { border: none; background: $panel; }
     .browser-count { width: auto; padding-left: 1; color: $text-muted; }
     .browser-layout { height: 1fr; }
-    .browser-list, .browser-detail { border: round $primary 45%; background: $background;
+    .browser-list, .browser-detail { border: round $border-blurred; background: $background;
         border-title-color: $text-muted; border-title-style: bold; }
     .browser-list:focus, .browser-detail:focus { border: round $accent; border-title-color: $accent; }
     .browser-list { width: 32; height: 1fr; padding: 0 1; margin-right: 1; }
@@ -168,13 +205,15 @@ class EssenceApp(App):
     #method-availability { width: 1fr; color: $text-muted; }
     OptionList { background: $background; }
     OptionList > .option-list--option { padding: 0 1; }
-    OptionList > .option-list--option-highlighted { background: $primary 18%; color: $foreground; text-style: bold; }
-    OptionList:focus > .option-list--option-highlighted { background: $primary 30%; color: $foreground; }
+    OptionList > .option-list--option-highlighted { background: $block-cursor-blurred-background; color: $foreground;
+        text-style: bold; }
+    OptionList:focus > .option-list--option-highlighted { background: $block-cursor-background;
+        color: $block-cursor-foreground; }
     Markdown { padding: 0 1; }
     MarkdownH2 { margin-top: 0; }
     #genealogy-map { height: auto; border: none; background: transparent; padding: 0 1; }
     Screen.-compact .browser-layout { layout: vertical; }
-    Screen.-compact .browser-list { width: 1fr; height: 8; min-height: 4; max-height: 35%; margin: 0 0 1 0; }
+    Screen.-compact .browser-list { width: 1fr; height: auto; min-height: 4; max-height: 40%; margin: 0 0 1 0; }
     Screen.-compact .browser-detail { width: 1fr; }
     """
     # The private terminal sequence that asks the reader to open a source; the
@@ -183,7 +222,7 @@ class EssenceApp(App):
     BINDINGS = [
         Binding("r", "menu", "Study"),
         Binding("K", "method", "Method"),
-        Binding("M", "reference('encyclopedia')", "Catalogs", show=False),
+        Binding("M", "reference('encyclopedia')", "Encyclopedia"),
         Binding("R", "rerun", "Rerun", show=False),
         Binding("question_mark", "keys", "Keys"),
         # While counting, Escape cancels before any field or view can take it.
@@ -202,9 +241,9 @@ class EssenceApp(App):
 
     def __init__(self, context, theme=DEFAULT_READER_THEME, theme_file=None, position_file=None):
         super().__init__()
-        for sol_theme in SOL_THEMES:
-            self.register_theme(sol_theme)
-        # Textual's own Catppuccin themes; Terminal uses the terminal's ANSI colors.
+        for name in READER_THEMES:
+            if name != "terminal":
+                self.register_theme(reader_theme(name))
         self.theme = TEXTUAL_THEMES[theme]
         self.theme_file = theme_file
         self.position_file = position_file
@@ -216,6 +255,27 @@ class EssenceApp(App):
         self.state = load_state(self.state_file) if self.state_file else {}
         self.reading_moved = False
         self._function_words = None
+        self.key_targets = {}
+
+    # Keys typed in a burst -------------------------------------------------------------------
+    # Textual sends each key to the widget focused when it arrives, so a burst
+    # (the reader's terminal delivers typing so) is queued on one widget before
+    # its first key can move focus: after `/`, the filter never saw `d e t`.
+    # A key that reaches the app after focus moved goes to the new focus instead.
+    async def on_event(self, event):
+        if isinstance(event, events.Key) and not event.is_forwarded:
+            self.key_targets[id(event)] = self.focused
+            while len(self.key_targets) > 256:  # keys a priority binding took never come back
+                del self.key_targets[next(iter(self.key_targets))]
+        await super().on_event(event)
+
+    def _on_key(self, event):
+        # Textual runs each class's _on_key in turn; App's, which checks bindings, follows
+        # unless this one re-sends the key.
+        target = self.key_targets.pop(id(event), None)
+        if target is not None and self.focused is not None and self.focused is not target:
+            event.prevent_default()
+            self.focused._forward_event(events.Key(event.key, event.character))
 
     def get_system_commands(self, screen):
         # Theme and quit commands would bypass the reader's theme and ESSENCE's
@@ -231,6 +291,9 @@ class EssenceApp(App):
                 yield SentencesView(id="sentences-view")
                 yield TfidfView(id="tfidf-view")
             yield StudyMenu(id="menu")
+            # Until the first result, the chosen study's method fills the space below the menu.
+            with VerticalScroll(id="primer"):
+                yield Markdown("", id="primer-method")
         yield Static("", id="result-status")
         yield Footer(compact=True)
 
@@ -238,20 +301,25 @@ class EssenceApp(App):
         self.update_layout()
         self.query_one("#results").display = False
         self.update_header()
+        self.theme_changed_signal.subscribe(self, self.restyle_open_screens)
         if self.theme_file:
             # A stat-sized read twice a second; T in the reader shows here within half a second.
             self.set_interval(0.5, self.follow_reader_theme)
         if self.position_file:
             self.set_interval(0.5, self.follow_reader_position)
-        self.query_one("#menu").focus()
+        focus_now(self.query_one("#menu"))
         view = VIEWS.get(self.state.get("screen"), "workspace")
         if view != "workspace":
             self.action_reference(view)
 
     # The header ---------------------------------------------------------------------
+    def title_style(self):
+        """ESSENCE's name in the theme's heading color; Terminal's ANSI names become Rich's."""
+        return "bold " + self.theme_variables["primary"].removeprefix("ansi_")
+
     def update_header(self):
         header = Text()
-        header.append(" ESSENCE ", style="reverse bold")
+        header.append("ESSENCE", style=self.title_style())
         menu = self.query_one("#menu", StudyMenu)
         if self.last_run is not None:
             study, target, reference = self.last_run[:3]
@@ -267,11 +335,23 @@ class EssenceApp(App):
             header.append("  ↻ reading moved · R reruns", style="bold")
         self.query_one("#header", Static).update(header)
 
+    def on_study_menu_changed(self, event):
+        self.update_header()
+        primer = self.query_one("#primer-method", Markdown)
+        if self.last_count is None and self.methods is not None:
+            menu = self.query_one("#menu", StudyMenu)
+            method = "word-comparison" if menu.study == "words" and menu.reference != "none" else STUDY_METHODS[menu.study]
+            entry = next(item for item in self.methods["entries"] if item["id"] == method)
+            text = method_markdown(dict(entry, encyclopedia=None))
+            if text != getattr(primer, "shown", None):
+                primer.shown = text
+                primer.update(text + "\n\nK opens this method in full · M the Encyclopedia")
+
     # Study menu and runs ------------------------------------------------------------
     def action_menu(self):
         menu = self.query_one("#menu", StudyMenu)
         menu.display = True
-        menu.focus()
+        focus_now(menu)
 
     def on_study_menu_close(self, event):
         if self.counting:
@@ -292,7 +372,7 @@ class EssenceApp(App):
                 top_n = 0  # Also refuse values beyond Python's integer-string limit.
             if not 1 <= top_n <= 1000:
                 status.update("Not counted: top_n must be an integer from 1 to 1,000.")
-                menu.query_one("#top-n", Input).focus()
+                focus_now(menu.query_one("#top-n", Input))
                 return
         self.run_study(menu.study, menu.target, menu.reference, menu.query_one("#target-file", Input).value,
                        menu.query_one("#reference-file", Input).value, top_n)
@@ -374,6 +454,7 @@ class EssenceApp(App):
         switcher = self.query_one("#results", ContentSwitcher)
         switcher.display = True
         self.query_one("#intro").display = False
+        self.query_one("#primer").display = False
         switcher.current = view.id
         view.show(count, saved)
         self.query_one("#menu").display = False
@@ -392,7 +473,7 @@ class EssenceApp(App):
             return
         first = {"words-view": "#frequencies", "sentences-view": "#longest", "tfidf-view": "#passages"}
         view = self.result_view(self.last_count)
-        view.query_one(first[view.id]).focus()
+        focus_now(view.query_one(first[view.id]))
 
     # Messages from the result views -----------------------------------------------------
     def on_open_source(self, message: OpenSource):
@@ -507,7 +588,7 @@ class EssenceApp(App):
 
     def restore_focus(self):
         if self.query_one("#menu").display:
-            self.query_one("#menu").focus()
+            focus_now(self.query_one("#menu"))
         else:
             self.focus_result()
 
@@ -535,6 +616,14 @@ class EssenceApp(App):
             return
         if name in TEXTUAL_THEMES and self.theme != TEXTUAL_THEMES[name]:
             self.theme = TEXTUAL_THEMES[name]
+
+    def restyle_open_screens(self, theme):
+        """Textual restyles only the base screen; an open palette or modal keeps the old colors."""
+        for screen in self.screen_stack[1:]:
+            self.stylesheet.update(screen, animate=False)
+        self.update_header()
+        if isinstance(self.screen, ReferenceScreen):
+            self.screen.update_header()
 
     def follow_reader_position(self):
         """Take the reader's latest checked position; "this passage" then means it."""

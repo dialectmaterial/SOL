@@ -19,6 +19,33 @@ def context():
 
 @unittest.skipUnless(textual_available(), "needs the essence extra (Textual)")
 class PanelLayoutTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
+    async def test_large_counts_keep_a_space_before_them_and_the_strip_fits(self):
+        from rich.cells import cell_len
+        from sol.essence.tui import words
+        from sol.essence.tui.app import EssenceApp
+
+        with tempfile.TemporaryDirectory() as directory:
+            target, reference = Path(directory) / "t.txt", Path(directory) / "r.txt"
+            target.write_text("the being of nothing and " * 11600, encoding="utf-8")
+            reference.write_text("the becoming of being and " * 28400, encoding="utf-8")
+            count = words.run(context(), "file", "file", target_file=target, reference_file=reference)
+        app = EssenceApp(context())
+        async with app.run_test(size=(86, 48)) as pilot:
+            app.last_run = ("words", "file", "file", str(target), str(reference), 20)
+            app.show_result(count, None)
+            await pilot.pause()
+            await pilot.pause()
+            table = app.query_one("#frequencies")
+            widths = [column.width for column in table.columns.values() if str(column.label).strip() == "n"]
+            self.assertTrue(widths and all(width >= len("11,600") + 2 for width in widths), widths)
+            header = [str(column.label) for column in table.columns.values()]
+            self.assertTrue(all(cell_len(label) <= column.width
+                                for label, column in zip(header, table.columns.values())), header)
+            title = app.query_one("#sources-label").render()
+            self.assertLessEqual(cell_len(str(title)), app.query_one("#sources-label").size.width)
+            self.assertIn("where", str(title))
+            await pilot.press("q")
+
     async def test_catalog_reflows_without_losing_selection_or_keyboard_focus(self):
         from sol.essence.tui.app import EssenceApp
 

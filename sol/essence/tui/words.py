@@ -233,6 +233,20 @@ def sources(count, index, limit=None):
     return found
 
 
+def positions(count, index):
+    """Every target occurrence of row `index`'s word, at its input's middle, from 0 to 1.
+
+    The study saves how often the word occurs in each input, so this needs no text
+    and covers occurrences beyond those listed.
+    """
+    inputs = len(count.study["target"].get("inputs") or ())
+    if not inputs:
+        return []
+    return [(input_index + 0.5) / inputs
+            for input_index, occurrences, _, _ in count.study["frequencies"][index]["target"]["locations"]
+            for _ in range(occurrences)]
+
+
 OCCURRENCE_LIMIT = 1000  # entries listed for one word; a very common word lists its first ones
 
 

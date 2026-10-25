@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### ESSENCE in the reader's colors — 24 October 2026
+
+ESSENCE draws with the reader's own palette for every preset: the same page,
+text, headings, rules and selection, read from `sol.presentation.theme`. It
+no longer uses Textual's Catppuccin themes, whose darker page, pink cursor and
+grey footer did not match the reader. Terminal still inherits the terminal's
+colors.
+Buttons, blurred selections and an open command palette stay readable and
+follow theme changes. Before the first result, the chosen study's method
+fills the space below the menu, and the header follows the menu's study;
+`M Encyclopedia` is always in the footer; the Encyclopedia's contents list
+shows every entry, and its frame no longer repeats the entry's title.
+Keys typed in a burst (as the reader's terminal delivers them) reach the
+widget the previous key focused: `r s Enter` no longer opened a passage from
+the result behind the menu. Word counts keep a space before them at five
+digits; the metrics line reads target ⇄ reference; the occurrence strip and
+TF-IDF passage labels fit their columns; TF-IDF terms wrap between terms;
+sentences list their hundred longest.
+The occurrence strip covers every occurrence of a common word, not only the
+thousand listed ("the" showed only the book's opening). Fullscreen gives the
+concordance the room a single-source word table does not use, and bars may
+widen; details opened in fullscreen no longer stay open after shrinking to a
+narrow window; concordance headings shorten in narrow panes.
+Keys a view handles itself also survive a burst: `/det` typed at once now
+filters (the letters were lost on the table behind the filter).
+
 ### ESSENCE workspace — 24 October 2026
 
 ESSENCE opens on its study instead of four tabs. A one-key study menu (`w`/`s`/`t`,

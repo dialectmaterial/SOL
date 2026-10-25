@@ -125,6 +125,64 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             self.assertIs(app.focused, app.query_one("#menu"))
             await pilot.press("q")
 
+    async def test_the_opening_shows_the_chosen_studys_method_and_names_m(self):
+        from sol.essence.tui.app import EssenceApp
+
+        app = EssenceApp(context())
+        async with app.run_test(size=(86, 48)) as pilot:
+            await pilot.pause()
+            primer = app.query_one("#primer-method")
+            self.assertTrue(app.query_one("#primer").display)
+            self.assertIn("Word frequencies", primer.source)
+            footer = " ".join(active.binding.description for active in app.screen.active_bindings.values()
+                              if active.binding.show)
+            self.assertIn("Encyclopedia", footer)
+            # Choosing another study before any run updates the header and the method shown.
+            await pilot.press("s")
+            await pilot.pause()
+            self.assertIn("sentences", str(app.query_one("#header").render()))
+            self.assertNotIn("words", str(app.query_one("#header").render()).split("   ")[0])
+            self.assertIn("Sentence", primer.source)
+            await pilot.press("w", "B")
+            await pilot.pause()
+            self.assertIn("comparison", primer.source.lower())
+            # The reference frame names its catalog; the entry's heading names the entry.
+            await pilot.press("M")
+            await pilot.pause()
+            self.assertEqual(app.screen.query_one("#encyclopedia-detail").border_title, "Encyclopedia")
+            await pilot.press("q")
+
+    async def test_keys_typed_in_a_burst_reach_the_menu_r_just_opened(self):
+        from textual import events
+        from sol.essence.tui import words
+        from sol.essence.tui.app import EssenceApp
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invented.txt"
+            path.write_text("Being is nothing. Nothing is being.", encoding="utf-8")
+            count = words.run(context(), "file", "none", target_file=path)
+        app = EssenceApp(context())
+        async with app.run_test(size=(86, 48)) as pilot:
+            app.last_run = ("words", "file", "none", str(path), "", 20)
+            app.show_result(count, None)
+            await pilot.pause()
+            # The reader's terminal delivers `r s c` at once, before any refresh.
+            for key in ("r", "s", "c"):
+                app.post_message(events.Key(key, key))
+            await pilot.pause()
+            menu = app.query_one("#menu")
+            self.assertIs(app.focused, menu)
+            self.assertEqual((menu.study, menu.target), ("sentences", "section"))
+            # A view's own key moves focus too: `/` then the filter's text.
+            await pilot.press("escape")
+            await pilot.pause()
+            for key, character in (("slash", "/"), ("b", "b"), ("e", "e")):
+                app.post_message(events.Key(key, character))
+            await pilot.pause()
+            await pilot.pause()
+            self.assertEqual(app.query_one("#word-filter").value, "be")
+            await pilot.press("q")
+
     async def test_methods_screen_browses_every_method(self):
         from textual.widgets import Markdown, OptionList
         from sol.essence.tui.app import EssenceApp
@@ -184,6 +242,61 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(app.screen_stack), 1)
             await pilot.press("q")
 
+    async def test_draws_with_the_readers_own_palette(self):
+        from sol.essence.tui.app import EssenceApp, TEXTUAL_THEMES
+        from sol.presentation.theme import reader_palette
+
+        for name in ("mocha", "latte", "paper", "night"):
+            with self.subTest(theme=name):
+                app = EssenceApp(context(), theme=name)
+                async with app.run_test() as pilot:
+                    palette = reader_palette(name)
+                    colors = app.theme_variables
+                    self.assertEqual(app.theme, TEXTUAL_THEMES[name])
+                    for variable, role in (("background", "page"), ("foreground", "text"),
+                                           ("primary", "heading"), ("text-muted", "muted"),
+                                           ("block-cursor-background", "selection"),
+                                           ("border-blurred", "border"), ("footer-background", "page")):
+                        self.assertEqual(colors[variable].lower(), palette[role], variable)
+                    await pilot.press("q")
+
+    async def test_buttons_selections_and_an_open_palette_stay_visible_in_every_preset(self):
+        from textual.color import Color
+        from textual.command import CommandList
+        from textual.widgets import Button
+        from sol.essence.tui.app import EssenceApp, TEXTUAL_THEMES
+        from sol.presentation.theme import contrast
+
+        def hex_of(color):
+            return Color.parse(color).hex.lower()
+
+        for name in ("mocha", "latte", "paper", "night"):
+            with self.subTest(theme=name):
+                app = EssenceApp(context(), theme=name)
+                async with app.run_test(size=(120, 40)) as pilot:
+                    colors = app.theme_variables
+                    # A blurred selection differs from the page it sits on.
+                    self.assertNotEqual(hex_of(colors["block-cursor-blurred-background"]),
+                                        hex_of(colors["background"]))
+                    await pilot.press("K")
+                    await pilot.pause()
+                    button = app.screen.query_one("#use-method", Button)
+                    self.assertGreaterEqual(contrast(hex_of(button.styles.color.hex),
+                                                     hex_of(button.styles.background.hex)), 4.5)
+                    await pilot.press("escape")
+                    await pilot.pause()
+                    await pilot.press("colon")
+                    await pilot.pause(0.3)
+                    other = "latte" if name != "latte" else "mocha"
+                    app.theme = TEXTUAL_THEMES[other]
+                    await pilot.pause(0.3)
+                    # The open palette takes the new theme too.
+                    listing = app.screen.query_one(CommandList)
+                    self.assertEqual(listing.styles.background.hex.lower(),
+                                     hex_of(app.theme_variables["background"]))
+                    await pilot.press("escape")
+                    await pilot.press("q")
+
     async def test_follows_the_reader_theme_while_open(self):
         from sol.essence.tui.app import EssenceApp
 
@@ -191,10 +304,10 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
         theme_file.write_text("mocha", encoding="utf-8")
         app = EssenceApp(context(), theme="mocha", theme_file=str(theme_file))
         async with app.run_test() as pilot:
-            self.assertEqual(app.theme, "catppuccin-mocha")
+            self.assertEqual(app.theme, "sol-mocha")
             theme_file.write_text("latte", encoding="utf-8")
             await pilot.pause(0.8)
-            self.assertEqual(app.theme, "catppuccin-latte")
+            self.assertEqual(app.theme, "sol-latte")
             # Anything unknown, or a vanished file, leaves the theme as it is.
             for content in ("sepia", None):
                 if content is None:
@@ -202,7 +315,7 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 else:
                     theme_file.write_text(content, encoding="utf-8")
                 await pilot.pause(0.8)
-                self.assertEqual(app.theme, "catppuccin-latte")
+                self.assertEqual(app.theme, "sol-latte")
             await pilot.press("q")
 
 

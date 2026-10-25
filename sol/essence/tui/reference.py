@@ -17,6 +17,7 @@ from textual.widgets.option_list import Option
 
 from sol.essence.encyclopedia import entry_markdown, genealogy_rows
 from sol.essence.methods import method_markdown
+from sol.essence.tui.results import focus_now
 
 # Screens that browse a bundled catalog, with their one-line help.
 BROWSERS = {
@@ -83,9 +84,7 @@ class ReferenceScreen(Screen):
                 yield Static("Choose its sources in the study menu", id="method-availability")
 
     def on_mount(self):
-        self.query_one("#reference-header", Static).update(Text.assemble(
-            (" ESSENCE ", "reverse bold"), ("  reference", "bold"),
-            ("  ·  1 Encyclopedia · 2 Methods · / find · Esc back to the study", "dim")))
+        self.update_header()
         for name, title in {"encyclopedia-list": "Contents", "encyclopedia-detail": "Encyclopedia",
                             "methods-list": "Available methods", "methods-detail": "Method"}.items():
             self.query_one(f"#{name}").border_title = title
@@ -95,6 +94,11 @@ class ReferenceScreen(Screen):
             self.query_one(f"#{name}-detail").border_subtitle = "Esc contents"
             self.update_browser(name)
         self.apply_pending()
+
+    def update_header(self):
+        self.query_one("#reference-header", Static).update(Text.assemble(
+            ("ESSENCE", self.app.title_style()), ("  reference", "bold"),
+            ("  ·  1 Encyclopedia · 2 Methods · / find · Esc back to the study", "dim")))
 
     def apply_pending(self):
         tab, method = self.pending
@@ -114,7 +118,7 @@ class ReferenceScreen(Screen):
     def action_tab(self, name):
         self.set_focus(None)
         self.query_one("#catalogs", TabbedContent).active = name
-        self.query_one(f"#{name}-list").focus()
+        focus_now(self.query_one(f"#{name}-list"))
 
     def action_back(self):
         self.dismiss(None)
@@ -165,13 +169,10 @@ class ReferenceScreen(Screen):
         self.query_one(f"#{name}-count", Static).update(f"{shown} / {total}")
         detail = self.query_one(f"#{name}-detail", VerticalScroll)
         if index is None:
-            title = "No matches"
             content = "## No matches\n\nTry a shorter search, or press Escape in the search field to show all entries."
         else:
-            title = ("Genealogy" if name == "encyclopedia" and index == 0 else
-                     self.browser_items(name)[index - (name == "encyclopedia")]["title"])
             content = self.browser_markdown(name, index)
-        detail.border_title = Text(title)
+        detail.border_title = "Encyclopedia" if name == "encyclopedia" else "Method"
         self.query_one(f"#{name}-entry", Markdown).update(content)
         detail.scroll_home(animate=False)
         if name == "methods":
@@ -190,7 +191,6 @@ class ReferenceScreen(Screen):
         self.query_one("#use-method", Button).disabled = not supported
         self.query_one("#method-availability", Static).update(
             "Choose its sources in the study menu" if supported else "CLI operation · command shown above")
-        self.query_one("#methods-detail").border_title = Text(item["title"])
 
     def genealogy_options(self):
         """One line per method: year, line of descent, ● runs in ESSENCE, ○ a reading topic."""
@@ -232,15 +232,15 @@ class ReferenceScreen(Screen):
                 self.filter_browser("encyclopedia")
                 self.query_one("#encyclopedia-list", OptionList).highlighted = ids.index(entry) + 1
                 self.update_browser("encyclopedia")
-                self.query_one("#encyclopedia-detail").focus()
+                focus_now(self.query_one("#encyclopedia-detail"))
             return
         name = (event.option_list.id or "").removesuffix("-list")
         if name not in BROWSERS or event.option_id != str(self.browser_index(name)):
             return
         if name == "encyclopedia" and self.browser_index(name) == 0:
-            self.query_one("#genealogy-map", OptionList).focus()
+            focus_now(self.query_one("#genealogy-map", OptionList))
         else:
-            self.query_one(f"#{name}-detail").focus()
+            focus_now(self.query_one(f"#{name}-detail"))
 
     def on_input_changed(self, event):
         name = (event.input.id or "").removesuffix("-search")
@@ -250,7 +250,7 @@ class ReferenceScreen(Screen):
     def on_input_submitted(self, event):
         name = (event.input.id or "").removesuffix("-search")
         if name in BROWSERS and self.browser_index(name) is not None:
-            self.query_one(f"#{name}-list").focus()
+            focus_now(self.query_one(f"#{name}-list"))
 
     def on_button_pressed(self, event):
         if event.button.id == "use-method":
@@ -269,16 +269,16 @@ class ReferenceScreen(Screen):
                 if field.value:
                     field.value = ""
                 else:
-                    listing.focus()
+                    focus_now(listing)
                 event.stop()
                 event.prevent_default()
             return
         if event.key in ("slash", "/", "ctrl+f"):
-            field.focus()
+            focus_now(field)
             event.stop()
             event.prevent_default()
         elif event.key == "escape" and self.focused is not listing:
             # From an entry or the map, Escape returns to the list first.
-            listing.focus()
+            focus_now(listing)
             event.stop()
             event.prevent_default()

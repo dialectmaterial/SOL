@@ -58,11 +58,47 @@ class DrawingTests(unittest.TestCase):
         by_right = sorted(lines, key=lambda line: views.context_key(line, "right"))
         self.assertEqual(by_right, [lines[1], lines[0], None])  # "being" before "nothing"
 
+    def test_items_wrap_between_items_and_clip_to_fit(self):
+        items = ["being 0.25", "nothing 0.21", "becoming 0.19", "determinate 0.11"]
+        lines = views.wrap_items(items, 27, " · ")
+        self.assertEqual(lines, ["being 0.25 · nothing 0.21 ·", "becoming 0.19 ·", "determinate 0.11"])
+        self.assertTrue(all(len(line) <= 27 for line in lines))
+        self.assertEqual(views.wrap_items(["extraordinarily-long 0.5"], 10, " · "), ["extraordi…"])
+        self.assertEqual(views.wrap_items([], 10, " · "), [])
+        self.assertEqual(views.clip("Preface to the first edition", 12), "Preface to…")
+        self.assertEqual(views.clip("超長語超長語", 7), "超長語…")
+
     def test_histogram_rows_and_plurals(self):
         rows = [{"from": 1, "to": 10, "sentences": 4}, {"from": 11, "to": None, "sentences": 2}]
         self.assertEqual(views.histogram(rows, 4), [("1–10", "████", 4), ("11+", "██  ", 2)])
         self.assertEqual(views.plural(1, "word"), "1 word")
         self.assertEqual(views.plural(1200, "word"), "1,200 words")
+
+
+class LongestSentenceTests(unittest.TestCase):
+    def test_the_saved_twelve_come_first_then_the_rest_by_length(self):
+        from sol.essence.tui import sentences
+        lengths = [5, 40, 7, 33, 9, 21, 2, 30, 18, 27, 11, 25, 16, 3, 24, 8]
+        study = {"sentences": [[0, index, index + 1, length] for index, length in enumerate(lengths)]}
+        ranked = sorted(range(len(lengths)), key=lambda index: -lengths[index])
+        study["longest"] = ranked[:12]
+        self.assertEqual(sentences.longest(study), ranked)
+        self.assertEqual(sentences.longest(study, 3), ranked[:3])
+        # Equal lengths keep the source order.
+        study = {"sentences": [[0, 0, 1, 4], [0, 1, 2, 9], [0, 2, 3, 4]], "longest": [1]}
+        self.assertEqual(sentences.longest(study), [1, 0, 2])
+
+
+class PositionTests(unittest.TestCase):
+    def test_every_occurrence_counts_by_its_input(self):
+        from sol.essence.tui import words
+
+        class Count:
+            study = {"target": {"inputs": [{}, {}, {}, {}]},
+                     "frequencies": [{"target": {"locations": [[0, 2, 0, 3], [3, 1, 9, 12]]}}]}
+        self.assertEqual(words.positions(Count, 0), [0.125, 0.125, 0.875])
+        # Drawn, the last quarter shows too, though a listing might stop in the first.
+        self.assertEqual(views.dispersion(words.positions(Count, 0), 4), "█··▄")
 
 
 def context():
