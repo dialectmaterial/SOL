@@ -219,6 +219,11 @@ def _validate(result):
 
 def _count(loaded):
     totals, locations, inputs = Counter(), {}, []
+    # Every included type needs at least this frequency row, even before
+    # provenance, larger numbers, reference cells and additional locations.
+    minimum_fields = len(_json({"word": "", "target": {"count": 1, "denominator": 1,
+        "rate_per_10000_tokens": 0.0, "locations": [[0, 1, 0, 1]]}, "reference": None})) - 2
+    minimum_bytes = 0
     for index, row in enumerate(loaded.rows):
         counts, first = Counter(), {}
         for word, start, end in word_tokens(row["text"]):
@@ -227,6 +232,10 @@ def _count(loaded):
             if any(left <= start and end <= right for left, right in row["masks"]):
                 loaded.exclusions["masked_tokens"] += 1
                 continue
+            if word not in totals and word not in counts:
+                minimum_bytes += minimum_fields + len(_json(word)) + 1
+                if minimum_bytes > MAX_RESULT_BYTES:
+                    raise WordStudyError("Word study exceeds 16 MiB", code="size_limit")
             counts[word] += 1
             first.setdefault(word, (start, end))
         totals.update(counts)

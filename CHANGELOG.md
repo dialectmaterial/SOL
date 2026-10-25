@@ -141,6 +141,9 @@ top_n and its range. The encyclopedia acknowledges TF-IDF in Experiment.
 Returned v1 sentence studies own their method metadata. Editing an artifact’s
 abbreviation list cannot alter the engine’s declared method or later studies,
 and checking rejects the edited method. Existing artifact bytes are unchanged.
+- Refuse word and embedded TF-IDF studies as soon as their distinct vocabulary
+  cannot fit the existing 16 MiB result limit, before allocating the full frequency
+  table. Valid receipts, repeated words and scoped inputs remain unchanged.
 
 ### Sentence segmentation audit — 23 October 2026
 

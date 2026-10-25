@@ -289,6 +289,21 @@ counts against their rows. Authority: [ESSENCE §8](../ESSENCE.md#8-developer-ac
 **Acceptance:** Failing tampering regressions, unchanged valid v1 encodings;
 full suite/docs; commit, push, PR and handoff. Prior round-1 fixes remain separate.
 **Validation:** 1,316 tests pass (29 skipped, 4 expected failures); docs check passes.
+## Codex B: early oversized word-result refusal (round 2)
+
+**Status:** In review
+**Branch:** `codex/word-result-budget` · [PR #137](https://github.com/dialectmaterial/SOL/pull/137)
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** Stop impossible word/TF-IDF vocabularies before expanding the whole
+frequency table. Authority: [ESSENCE §8](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
+**Base:** `origin/main`; word counting does not overlap round-1 code changes.
+**Constraints:** Same 16 MiB limit, valid encodings, methods, schemas and flags;
+no private text, dependencies, TUI or SPECULATIVE changes.
+**Acceptance:** Failing early-refusal regression; exact-boundary/repeated-word/span
+compatibility; isolated large invented-input probe; full suite/docs; PR/handoff.
+**Validation:** 1,315 tests OK (29 skipped, 4 expected failures); docs/diff checks pass.
+Earlier round-2 batches: [#134](https://github.com/dialectmaterial/SOL/pull/134)
+(on #132), [#136](https://github.com/dialectmaterial/SOL/pull/136) (on #130).
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
