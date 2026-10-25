@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+### ESSENCE catalog navigation — 24 October 2026
+
+Encyclopedia and Methods have local search by title, identifier or description,
+with shown/total counts, clear empty matches and keyboard access through `/` or
+Ctrl-F. Filtered entries keep their correct reading and configuration actions;
+genealogy links reveal destinations outside the search. Search survives screen
+changes and resize without changing saved investigation state. Below 100
+columns, a one-line study selector gives source settings two more lines; full
+study labels and guidance remain in the wide sidebar and hover descriptions.
+
+### ESSENCE results and method workflow — 24 October 2026
+
+Results opens with compact totals and an `i Details` disclosure for the existing
+study summary, scope, formulas, exclusions and saved-artifact status; its badge
+counts existing method/source notes. `/` or Ctrl-F filters normalized word spellings before the
+display limit, Enter returns to the table, and Escape clears the filter. Sort
+and filter keep source rows aligned; the occurrence panel names its word.
+Counts, saved studies and full CSV/TSV exports retain the complete input.
+Methods offers Use this method for the shipped interactive studies, preserving
+form values; CLI-only operations remain labeled. Compact windows give tables
+more space and retain full comparison headings at 80 columns.
+
+### ESSENCE panel redesign — 24 October 2026
+
+ESSENCE has a new rounded-panel layout inspired by Posting: a compact masthead,
+numbered navigation, titled catalog/detail panes, a study sidebar with contextual
+guidance, framed source/settings controls and distinct summary, measurements and
+source-context panels. Catalogs and setup use columns in wide windows and stack
+inside reader splits; focus accents follow the reader's theme. Empty Results
+offers a keyboard-accessible route to choosing a study. Tables fold columns to
+fit their framed viewport, and browsing/form state survives layout changes.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary

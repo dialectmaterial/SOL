@@ -181,6 +181,68 @@ occurrence. New results start in engine order; the menu can also restore it.
 Sorting changes only presentation: saved artifacts and CSV/TSV exports retain
 all engine rows in their original order and with their unchanged content.
 
+**Panel redesign (24 October 2026):** a compact SOL / ESSENCE masthead and
+source line sit above numbered screens. Rounded, titled panels separate catalog
+contents from reading, study choice from source configuration, and a result's
+summary, measurements and source context. At 100 columns and above, catalogs
+and Experiment use a sidebar beside their detail/setup pane; below that they
+stack, preserving their existing widgets, selection, input values and focus.
+Below 60 columns the target and reference groups stack too. The wide study
+sidebar explains the selected operation; narrow windows keep its choices and
+give the configuration more space. Focused panels use the current theme's
+accent; Paper, Night, Catppuccin and Terminal remain supported. Results starts
+with a **Choose a study** action rather than empty tables. Result columns account
+for frame widths and fold at narrow widths. Existing controls, computations,
+source-return guards, artifacts, exports and screen/origin persistence are
+unchanged. Automated layout checks and rendered synthetic previews are visual
+and interaction evidence, not sustained human acceptance.
+
+**Results and method workflow (24 October 2026):** Results opens with compact
+totals: target/reference token denominators, sentence/word totals and mean, or
+TF-IDF token/input totals and top_n. **i Details** (also a button) opens the full
+existing scrollable summary, scope, method notes, exclusions and saved-artifact status;
+its parenthesized number counts existing method/source notes. `i` hides details
+again; Escape returns focus to the measurements without closing the disclosure.
+Each new result starts collapsed; layout changes preserve its current state.
+
+Word results offer a local display filter: `/` or Ctrl-F focuses it, Enter moves
+to the word table, Escape clears a nonempty filter and a further Escape returns
+to the table. Matching is a literal substring of normalized word spellings
+(NFC, case folding, curly-to-straight apostrophes), before the 2,000-row display
+limit. Sorting still uses all engine rows; sources follow the selected matching
+word, named on their panel. Empty matches clear old source rows and show an
+explicit status. Counts, token denominators, artifacts and complete exports are
+unfiltered. Filtering and the details disclosure are session presentation only;
+a new result clears the filter and the saved screen/origin format is unchanged.
+
+**Methods** offers **Use this method** for words, word comparison, TF-IDF and
+sentence lengths. It selects the matching Experiment study without running it
+or clearing existing paths/settings. Comparison supplies a book reference for
+a CORE session, or a file reference otherwise, only when none was selected.
+Prose export and saved-study checking remain labeled CLI operations with their
+documented commands. Catalog/detail panels and all existing reading controls
+remain available.
+
+**Catalog navigation (24 October 2026):** Encyclopedia and Methods have a compact
+search field and a shown/total entry count. `/` or Ctrl-F focuses the field;
+matching uses a normalized, case-insensitive literal substring of the title,
+identifier or description (the Encyclopedia's ESSENCE note or the Methods
+summary). Enter moves to matching entries, then Enter reads the chosen entry;
+Escape in a nonempty search clears it, and a further Escape returns to the
+list. Search fields retain their values while switching screens and resizing,
+without extending persisted investigation state. A search with no matches
+shows an explicit empty view and disables method configuration. Filtered rows
+retain their original catalog identity; genealogy links reveal their destination
+even when it falls outside the search. Attribution, excerpts, full method
+descriptions and CLI commands remain available in their original entries.
+
+Below 100 columns, the study choices become a single horizontal row labeled
+**Words**, **Sentences** and **TF-IDF**, giving source settings two more lines
+of vertical space. Left/Right or Up/Down chooses a study and Enter selects it;
+resizing preserves selection and form values. Wide windows retain the full
+labels and explanatory sidebar; hover text provides the study description at
+either size.
+
 **Proposed launch and return requirements:**
 
 | Event | Required behaviour |

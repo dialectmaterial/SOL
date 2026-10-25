@@ -33,6 +33,179 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## ESSENCE catalog navigation — 24 October 2026
+
+**Task:** [Codex A: ESSENCE catalog navigation](https://github.com/dialectmaterial/SOL/blob/e6e0fdc918baead91ce29b2b7a71b0bcbb5cacae/docs/coordination/CURRENT_TASK.md), requested directly by the maintainer: keep improving the interface.
+**Branch / PR:** `codex/essence-catalog-navigation`, stacked on `f604538`; not opened. Shell `gh pr list` still cannot connect to GitHub; the previously rejected integration write was not repeated. Integration search shows only open Codex PRs #117 and #76, with no open Claude implementation PR. No merge attempted.
+**Last implementation commit:** `e6e0fdc918baead91ce29b2b7a71b0bcbb5cacae` (this report is committed afterward).
+
+### Changed files
+
+- `sol/essence/tui/app.py` — local catalog search by normalized title, identifier or description; shown/total counts; empty-match guidance and disabled configuration; stable option identities for reading, method actions and genealogy destinations. `/` and Ctrl-F find, Enter browses/reads, Escape clears/returns. Search survives screen changes and resize without changing persisted state. Compact study choices share one line below 100 columns, giving source settings two more lines; full labels and descriptions remain in the wide sidebar and hover text. Rounded frames, engines, results, exports and source-return guards are retained.
+- `tests/test_essence_catalog_navigation.py` — four pilot regressions for filtered method identity and CLI-only actions, empty matches, Unicode/description search and queued edits, genealogy destinations outside a filter, retained search/focus and unclipped study controls at 40/80/120 columns.
+- `docs/ESSENCE.md`, `CHANGELOG.md`, `CURRENT_TASK.md` — record implemented controls and scope; only Codex A's coordination slot changes. No dependencies, contracts, logical placements or persistence changes.
+
+### Tests performed
+
+- Final full suite: **1,325 tests OK (7 skipped, 4 existing expected failures)**, 153.858 s; command `.venv/bin/python -B /tmp/sol_essence_test_runner.py`, log `/tmp/sol-essence-catalog-full-suite.log`. Uses isolated XDG directories and the same temporary 50 ms asyncio heartbeat described in the preceding UI reports; no test assertions or skips changed. Normal host command remains `.venv/bin/python -B -m unittest discover -s tests`.
+- Final new navigation tests: **four OK**, 7.275 s. Existing catalog, method, cancellation, source, sorting, settings, persistence, export, layout and packaging checks pass in the full suite. Documentation check and `git diff --check`: **OK**; external URLs are not network-checked.
+- Generated 24 synthetic SVG previews: Night 120×40 and 40×24, Paper 80×24, Mocha 60×24; catalogs, setup, filtered entries and empty matches. Inspected rasterized wide filtered Methods, compact empty matches/setup and narrow genealogy/setup. Selected PNGs: `/home/dima/Documents/Codex/2026-10-24/essence-navigation/`. No private corpus or workspace content is used.
+- Automatically built and installed the tested wheel into `/home/dima/.local/share/sol-app` using `--no-index --no-deps --force-reinstall`. Wheel: `/tmp/sol-essence-catalog-install-b0iiky_3/sol_organizes_logic-0.1.0-py3-none-any.whl`, SHA-256 `b7425fbbed6437a04e7f7691a71e044e6def4d0bac5020119f8bd954bd46ab43`. **All 110 installed package files match both the wheel and checkout byte-for-byte.**
+- Installed verification: `/home/dima/.local/share/sol-app/bin/python3 -I /tmp/sol_verify_installed_catalog.py` from `/tmp`: **passed**. No checkout on `sys.path`; UI imports from the launcher's `site-packages`. Real installed pilot covers catalog filtering, correct TF-IDF configuration, one-line unclipped choices at 40/80 columns, all four screens and existing rounded results/filter/details controls. Both launcher paths/shebangs, `sol --help`, `sol-window --help`, `sol essence --help` and `pip check`: **OK**. Dependency inventory is unchanged. Verification JSON and installed SVGs remain beside the wheel; installed PNGs were inspected and copied to the preview directory.
+
+### Outstanding issues
+
+Installation is complete. An already running ESSENCE retains its imported code;
+leave with `q`, then press `E` in the reader to load the update. The active
+reader was not terminated. At 40 columns source settings still scroll, with
+selection and all controls retained; automated previews do not establish
+sustained human acceptance. Publication awaits GitHub access:
+
+```sh
+git push --set-upstream origin codex/essence-catalog-navigation
+gh pr create --base main --head codex/essence-catalog-navigation --title "Refine ESSENCE's rounded research workspace" --body-file /tmp/sol-essence-navigation-pr.md
+```
+
+### Decisions requiring approval
+
+None reserved. Defaults: search matches a literal normalized substring in the
+catalog's title/ID/description; the shown count includes Genealogy; empty
+matches disable configuration; map navigation clears the search to reveal its
+destination. Compact study names are Words, Sentences and TF-IDF. These
+presentation choices may be revised after use.
+
+
+## Install verified SOL changes — 24 October 2026
+
+**Task:** [Codex A: install verified SOL changes](https://github.com/dialectmaterial/SOL/blob/205346f72169b0074fd3046e8c0c329cfd79ff2e/docs/coordination/CURRENT_TASK.md), requested directly after the installed interface still appeared old.
+**Branch / PR:** `codex/install-verified-changes`, stacked on local polish `37f7fd4`; not opened because the previously established GitHub DNS/write-access restriction remains. No merge attempted.
+**Last implementation commit:** `205346f72169b0074fd3046e8c0c329cfd79ff2e` (this report is committed afterward).
+
+### Changed files
+
+- `CONTRIBUTING.md`, `CLAUDE.md` — record the maintainer's standing authorization: install each completed, verified application change into the existing launcher environment, then verify outside the checkout. Preserve dependencies and active sessions. Local installation does not publish or merge a branch.
+- `CURRENT_TASK.md` — update only Codex A's slot. No application code, dependency, corpus or workspace change in this follow-up.
+- Local installation — replaced the old package in `/home/dima/.local/share/sol-app`, which both `~/.local/bin/sol` and `sol-window` launch. The old distribution pointed to a temporary `scratchpad/install-src` directory. The preceding reports' imports had run inside the checkout, masking the stale installed package; their installation claims were incorrect and are corrected below.
+
+### Tests performed
+
+- Built the tested checkout with `.venv/bin/python -I -m pip wheel --no-index --no-deps --no-build-isolation --wheel-dir /tmp/sol-local-install-inu0ub71 /home/dima/Projects/code/sol`. Installed with `/home/dima/.local/share/sol-app/bin/python3 -I -m pip install --no-index --no-deps --force-reinstall /tmp/sol-local-install-inu0ub71/sol_organizes_logic-0.1.0-py3-none-any.whl` from `/tmp`.
+- Wheel SHA-256: `5548552649cbf7bf45329917c451102850dfb49e5c4604310036272cac93792e`. All **110 installed package files match** the built wheel byte-for-byte. Application content includes redesign `c4c1d53` and polish `59904eb`; this follow-up changes operational documentation only.
+- `/home/dima/.local/share/sol-app/bin/python3 -I /tmp/sol_verify_installed_ui.py`, working directory `/tmp`: **passed**. No checkout directory on `sys.path`; imported UI is under the launcher's `site-packages`. Real installed Textual pilot verified all four screens, rounded borders, word filtering, expanded details and resizing from 120×40 to 80×24, with invented text and temporary XDG directories. SVG/PNG previews and `verification.json` remain in the wheel staging directory.
+- Both launcher paths/shebangs, `sol --help`, `sol-window --help`, `sol essence --help`: **OK** from outside the checkout. `pip check`: **no broken requirements**. Package inventory comparison confirms all dependencies unchanged, including Textual 8.2.8.
+- Documentation check and `git diff --check`: **OK**. No new application code; the installed application is the same code covered by the preceding **1,321-test** full-suite run, not a newly repeated full suite.
+
+### Outstanding issues
+
+An already open ESSENCE process retains its imported code: leave with `q`, then
+press `E` in the reader to start the installed version. The active reader was
+not terminated. GitHub publication is still unavailable; local installation is
+complete. When access is available:
+
+```sh
+git push --set-upstream origin codex/install-verified-changes
+gh pr create --base main --head codex/install-verified-changes --title "Install verified SOL changes and refine ESSENCE" --body-file /tmp/sol-install-workflow-pr.md
+```
+
+### Decisions requiring approval
+
+None. Automatic installation after appropriate verification is explicitly
+authorized by the maintainer for future application changes.
+
+
+## ESSENCE workflow polish — 24 October 2026
+
+**Task:** [Codex A: ESSENCE workflow polish](https://github.com/dialectmaterial/SOL/blob/59904eb455c57a1e414349ed1be2b763713f99bd/docs/coordination/CURRENT_TASK.md), requested directly after the maintainer accepted the redesigned appearance.
+**Branch / PR:** `codex/essence-workflow-polish`, stacked on local redesign `220c27b`; not opened. The preceding task established shell GitHub DNS failure and HTTP 403 for GitHub integration writes; no new access was provided and the rejected write was not repeated. No merge attempted.
+**Last implementation commit:** `59904eb455c57a1e414349ed1be2b763713f99bd` (this report is committed afterward).
+
+### Changed files
+
+- `sol/essence/tui/app.py` — compact result totals, expandable existing summary with a note count, literal presentation-only word filter before the display limit, explicit empty matches, selected-word occurrence titles, sort button and direct Methods-to-Experiment actions. Existing paths/settings survive method selection; no study runs until Run. Narrow frames account for the details panel and keep result tables/export controls inside the viewport; comparison headings fit at 80 columns. User filter text renders literally.
+- `tests/test_essence_workflow.py` — four real-engine invented-file pilot tests cover Unicode normalization/apostrophes, exact source mapping, byte-identical complete CSV after filtering, pre-limit and sorted filtering, empty-source clearing, new-result reset, all study totals/details, expanded-frame bounds at 40/80 columns, retained selection, method shortcuts and CLI-only availability.
+- `docs/ESSENCE.md`, `CHANGELOG.md`, `CURRENT_TASK.md` — document controls, semantics and current scope. No analytical method, artifact, persistence/workspace schema, dependency or logical placement changes.
+
+### Tests performed
+
+Python 3.14.8, Textual 8.2.8, checkout `.venv/bin/python -B`.
+
+- Final full suite: **1,321 tests OK (7 skipped, 4 existing expected failures)**, 139.577 s. Exact command: `.venv/bin/python -B /tmp/sol_essence_test_runner.py`; isolated XDG config/data/state/cache and Neovim log. Log: `/tmp/sol-essence-polish-full-suite-final.log`.
+- The temporary runner uses standard unittest discovery and the same 50 ms asyncio heartbeat documented in the preceding report, because restricted-shell socketpair writes return EPERM. It changes no tests/assertions/skips; no workaround was added to SOL. Normal host command remains `.venv/bin/python -B -m unittest discover -s tests`.
+- Focused UI suite: 50 tests OK. Final workflow/layout run: nine tests OK, including expanded details and source/export frame bounds. Existing sorting, CSV/TSV exports, source navigation, temporary-session writes, cancellation, theme and package checks pass in the final full suite.
+- Documentation check, `git diff --check` and `python -m sol essence --help`: OK. External documentation URLs are not network-checked.
+- Generated 36 invented-text SVG previews across Night 120×40 and 40×24, Paper 80×24 and Mocha 60×24: catalogs, setup, empty/results views, filtered results and expanded details. Inspected rasterized wide/compact results, method actions, filtering and expanded details, including 40-column frame bounds. Files remain outside Git in `/tmp/sol-essence-polish-preview`; selected PNGs are in `/home/dima/Documents/Codex/2026-10-24/essence-polish/`.
+- **Correction, 24 October:** the import check ran inside the checkout and masked the stale installed package. Reinstallation was required and is now complete; see the installation report above.
+
+### Outstanding issues
+
+Publication remains pending available GitHub access. Publish both the accepted
+redesign and this follow-up from the current local branch:
+
+```sh
+git push --set-upstream origin codex/essence-workflow-polish
+gh pr create --base main --head codex/essence-workflow-polish --title "Refine ESSENCE's rounded research workspace" --body-file /tmp/sol-essence-polish-pr.md
+```
+
+Automated checks and rendered previews do not substitute for sustained human
+use. At 40 columns, comparison cells wrap and vertically scroll; compact details
+is a small independently scrollable panel. No private corpus or workspace data
+is included in Git or the previews.
+
+### Decisions requiring approval
+
+None reserved. Presentation defaults: details collapsed for each new result;
+filtering applies to normalized literal word spellings, clears on a new result,
+and never changes complete exports or saved counts. Use this method selects a
+reference for comparison only when none was selected. Session presentation does
+not extend persisted investigation state. These defaults may be revised after use.
+
+
+## ESSENCE interface redesign — 24 October 2026
+
+**Task:** [Codex A: ESSENCE interface redesign](https://github.com/dialectmaterial/SOL/blob/c4c1d53af5b4c4b761df7e5fe9e6839a37cdfb91/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer with a Posting screenshot.
+**Branch / PR:** `codex/essence-interface-redesign` · not opened: shell Git cannot resolve `github.com`; the GitHub connection's create-tree request returned HTTP 403, `Resource not accessible by integration`. No merge attempted.
+**Last implementation commit:** `c4c1d53af5b4c4b761df7e5fe9e6839a37cdfb91` (this report is committed afterward).
+
+### Changed files
+
+- `sol/essence/tui/app.py` — Posting-inspired rounded/titled panels across all four screens; compact masthead/source line, numbered navigation, theme-aware focus, responsive catalog and study sidebars, framed source/settings controls, result panels and an actionable empty state. Width-aware table columns retain every measurement; layout updates also reach the workspace behind the sort modal. Existing analysis, source-return, save/export and persistence code paths are retained.
+- `tests/test_essence_layout.py` — five invented-input pilot tests protect catalog selection/focus, form values and reachable controls, empty-state navigation, all three result types at 40/60/120 columns, and resizing with the sort menu open. Existing UI tests remain intact.
+- `docs/ESSENCE.md`, `CHANGELOG.md` — document presentation and breakpoints; `CURRENT_TASK.md` changes only Codex A's slot. No dependencies, public APIs, artifact/workspace schemas or logical placements change.
+
+### Tests performed
+
+Python 3.14.8, Textual 8.2.8, using the checkout's `.venv/bin/python -B`.
+
+- Final full suite: **1,317 tests OK (7 skipped, 4 existing expected failures)**, 127.816 s; isolated XDG config/data/state/cache and Neovim log. Exact command: `.venv/bin/python -B /tmp/sol_essence_test_runner.py`; log `/tmp/sol-essence-redesign-full-suite-final.log`.
+- The restricted shell rejects even a local `socketpair().send` with `EPERM`, preventing asyncio's thread-safe wakeup. Stock unittest completed assertions but hung at runner shutdown on both unchanged main and the new interface. The temporary runner loads standard unittest discovery with a 50 ms event-loop heartbeat; it changes no tests, assertions or skips. On an unrestricted host, run the usual `.venv/bin/python -B -m unittest discover -s tests`. No environment workaround was added to SOL or its tests.
+- Final five new layout tests: OK, 8.767 s. Existing comparison sorting, undefined values, source navigation, cancellation, exports, themes and small-window tests pass in the final full suite. An earlier full run had 1,316 tests OK before adding the sort-modal resize regression and fix.
+- `scripts/check_docs.py`, `git diff --check` and `python -m sol essence --help`: OK. External documentation URLs are not network-checked.
+- Generated 28 synthetic Textual SVG previews: Night 120×40 and 40×24, Paper 80×24, Mocha 60×24; catalog, methods, setup, empty results, comparison, sentences and TF-IDF. Inspected rasterized wide Night catalog/setup/comparison, compact Paper setup/comparison and narrow Night TF-IDF; all use invented text. Preview files remain outside Git in `/tmp/sol-essence-redesign-preview`; selected PNGs are also in `/home/dima/Documents/Codex/2026-10-24/essence-redesign/`.
+- **Correction, 24 October:** the import check ran inside the checkout and did not verify the launcher's installed package. The actual installation has now been updated and verified outside the checkout; see the installation report above.
+
+### Outstanding issues
+
+Publication is unavailable in this session. Local commits and the working tree
+contain the completed change. Once GitHub access is available, publish with:
+
+```sh
+git push --set-upstream origin codex/essence-interface-redesign
+gh pr create --base main --head codex/essence-interface-redesign --title "Redesign ESSENCE with rounded responsive panels" --body-file /tmp/sol-essence-redesign-pr.md
+```
+
+Rendered previews and automated terminal/keyboard checks do not establish
+sustained human acceptance. No private corpus text, PDF or personal workspace
+is included in the change or previews. At very narrow widths, tables wrap cells
+and scroll vertically; the numbered tab bar scrolls horizontally as needed.
+
+### Decisions requiring approval
+
+None reserved. Provisional presentation defaults: catalog/setup sidebars at
+100 columns and above, stacked source groups below 60 columns, rounded panel
+borders with theme-derived accent focus, and a Choose a study empty-state action.
+The maintainer may revise these defaults after using the interface.
+
+
 ## Sentence segmentation audit — 23 October 2026
 
 **Task:** [Codex A: sentence segmentation audit](https://github.com/dialectmaterial/SOL/blob/da675a9e02b98a96fdf531ca89c382e55f0a24f1/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer.
