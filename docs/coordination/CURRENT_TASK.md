@@ -65,7 +65,7 @@ suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 
 ## Codex B: ESSENCE input refusals and saved artifacts
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `codex/essence-input-refusals`
 **Requested:** 25 October 2026, by the maintainer
 **Scope:** Validate malformed sentence checks before scope access; avoid orphaned
