@@ -1477,3 +1477,24 @@ based on unmerged #135 (and #126's popup cleanup); author does not merge.
 - Private configured corpus remains read-only; disposable workspace and captures
   stay under `/tmp`. No book text, PDF, workspace or analysis export is committed.
   No sol/essence, palette, public-contract, dependency or SPECULATIVE changes.
+
+## Codex A — background ESSENCE close focus — 25 October 2026
+
+**Branch / PR:** `codex/reader-essence-close-focus` / [#140](https://github.com/dialectmaterial/SOL/pull/140),
+based on unmerged #138 (and #135/#126); author does not merge.
+
+- Confirmed in real-corpus tmux: `q`, Alt-R, `c` leaves the visible context panel
+  with focus behind it once ESSENCE finishes exiting. The old exit callback
+  always focused the page and stopped Insert mode. It now restores the page
+  only when the closing ESSENCE window still owns focus, preserving a reader
+  panel or note editor already in use.
+- Two event-loop regressions failed first. A delayed raw-terminal stand-in
+  proves the context panel keeps focus and the note editor keeps both focus
+  and actual Insert mode across background exit. Existing foreground close,
+  selection restoration, E reopen, source opening and resize cases still pass.
+- 62 native reader checks pass; full suite: 1,318 tests OK (7 skipped,
+  4 expected failures); docs and whitespace checks pass. Real tmux
+  check after the fix keeps the context window current and visible. All
+  synthetic fixtures; real-corpus captures and disposable state remain under
+  `/tmp`. No private text, PDF, workspace or analysis export committed, and no
+  sol/essence, palette, public-contract, dependency or SPECULATIVE edits.
