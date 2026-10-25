@@ -1432,3 +1432,27 @@ shrinking, and q reaching ESSENCE after active resize. Captures outside Git;
 no private text/PDF/workspaces/exports, sol/essence edits, palette changes,
 contracts or dependencies. Previous batch: PR #124. Next: clean launcher
 failures, invalid help example, narrow opening animation.
+
+## Codex A — reader ESSENCE close/reopen, round 2 — 25 October 2026
+
+**Branch:** `codex/reader-essence-handoff`, based on the unmerged
+`codex/reader-essence-resize-focus` (#126), whose host file it extends.
+**PR:** [#135](https://github.com/dialectmaterial/SOL/pull/135), in review; author does not merge.
+
+- Confirmed on the configured read-only corpus in tmux: a rapid `q`, `E` loses
+  the reopen request while ESSENCE is still shutting down. Track the final typed
+  `E` without intercepting PTY input; reopen through the ordinary checked reader
+  request after a successful exit. Later typed keys cancel the intent.
+- Regression failed first with “E was lost during ESSENCE shutdown”; a delayed
+  raw-terminal stand-in proves a fresh request, unchanged reader position, new
+  focused terminal, and normal subsequent quitting. Existing scripted close
+  checks now dispatch their simulated physical quit key to Neovim's input hook.
+- 58 native reader tests and the full suite (1,314 tests; 7 skipped, 4 expected
+  failures) pass. `scripts/check_docs.py` and `git diff --check` pass. Live tmux
+  close/reopen and Alt-R checks at 190×50, 86×48, 80×24 and 40×24; theme/resize
+  checks continue. Captures remain private under `/tmp`; no corpus text, source
+  PDF, workspace or analysis export is committed. No dependencies, public
+  contracts, palette, SPECULATIVE or sol/essence edits.
+- Fullscreen source-opening report: checked separately with the newer ESSENCE
+  interface from #122 in a temporary integration checkout; investigating whether
+  #126 already addresses it. No speculative second fix in this batch.
