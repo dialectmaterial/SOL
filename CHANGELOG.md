@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### ESSENCE input refusals and saved artifacts — 25 October 2026
+
+Malformed scoped sentence checks now validate before accessing scope fields;
+invalid or interrupted sentence saves leave no empty/partial artifact. Missing
+independent file references ask for --reference-file; invalid TF-IDF limits name
+top_n and its range. The encyclopedia acknowledges TF-IDF in Experiment.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary

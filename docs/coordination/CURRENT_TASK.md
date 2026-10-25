@@ -63,36 +63,22 @@ lanes' slots unchanged; do not merge own PR.
 **Acceptance:** `restructuring/SENTENCE_AUDIT.md`, ESSENCE and CHANGELOG; full
 suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 
-## Codex B: landmark management
+## Codex B: ESSENCE input refusals and saved artifacts
 
-**Status:** Done (#113)
-**Branch:** `codex/landmark-management`
-**Requested:** 23 October 2026, by the maintainer
-
-### Goal
-
-Close the named-landmark rename and ordering limitation in
-[BEING §7](../BEING.md#7-boundaries-and-known-limitations).
-
-### Scope
-
-Add atomic rename with the existing name rules to the Neovim reader's `L`
-panel; preserve the saved target and metadata on success, and the old landmark
-on failure. Add a session-only toggle between name and whole-book passage
-order, with unavailable passages last. Update panel hints, `?` help, BEING and
-CHANGELOG. Cover workspace transactions, conflicts and unavailable targets,
-controller behavior and headless Neovim controls.
-
-### Constraints
-
-No workspace schema change or new persisted settings. Keep the three reader
-markers and other lanes' slots unchanged. Branch from `origin/main`; open a PR
-and do not merge it.
-
-### Acceptance
-
-Full suite, `tests/test_architecture.py`, `scripts/check_docs.py`; commit, push,
-open a PR against main, and record a HANDOFF report and PR URL.
+**Status:** In progress
+**Branch:** `codex/essence-input-refusals`
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** Validate malformed sentence checks before scope access; avoid orphaned
+sentence saves; explain missing file references and invalid TF-IDF limits; correct
+stale encyclopedia support guidance. Authority:
+[ESSENCE §8](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
+**Constraints:** No private text, dependencies, contracts, TUI or SPECULATIVE edits.
+Base `origin/main`; do not merge own PR.
+**Acceptance:** Failing invented regressions; full suite/docs; real tmux checks;
+commit, push, PR and HANDOFF. Prior batches:
+[#123](https://github.com/dialectmaterial/SOL/pull/123),
+[#125](https://github.com/dialectmaterial/SOL/pull/125),
+[#128](https://github.com/dialectmaterial/SOL/pull/128).
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.

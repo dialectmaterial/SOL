@@ -421,13 +421,13 @@ def check_sentence_result(snapshot, result):
         return check_provider_result(snapshot, result)
     if isinstance(snapshot, FileProvider):
         raise SentenceStudyError("File providers require a v2 sentence study", code="invalid_provider")
+    result = _validate(result)
     if isinstance(snapshot, CoreProvider):
         if snapshot.scope is not None and _json(snapshot.scope) != _json(result.get("scope")):
             raise SentenceStudyError("Provider scope differs from the saved study", status="mismatch", code="scope_mismatch")
         snapshot = snapshot.snapshot
     from sol.essence.essence_as_reflection_within_itself.corpus_inputs import _binding, _current, _fresh
 
-    result = _validate(result)
     fresh = _fresh(snapshot)
     expected_binding = _binding(fresh)
     if result["corpus"] != expected_binding["corpus"]:
@@ -482,6 +482,7 @@ def save_sentence_result(result, directory=None):
     import os
     from pathlib import Path
 
+    data = encode_sentence_result(result) + "\n"
     if directory is None:
         configured = os.environ.get("XDG_DATA_HOME")
         base = Path(configured).expanduser() if configured else Path.home() / ".local" / "share"
@@ -493,6 +494,10 @@ def save_sentence_result(result, directory=None):
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     path = directory / f"sentences-{stamp}.sol-analysis.json"
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
-    with os.fdopen(descriptor, "w", encoding="ascii") as stream:
-        stream.write(encode_sentence_result(result) + "\n")
+    try:
+        with os.fdopen(descriptor, "w", encoding="ascii") as stream:
+            stream.write(data)
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
     return path
