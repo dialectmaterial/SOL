@@ -277,23 +277,18 @@ full suite/docs; commit, push, PR and handoff.
 Earlier round-2 batch:
 [#134](https://github.com/dialectmaterial/SOL/pull/134), stacked on #132.
 ## Codex B: legacy sentence method isolation
+## Codex B: legacy sentence receipt invariants (round 2)
 
 **Status:** In review
-**Branch:** `codex/sentence-method-isolation` · [PR #132](https://github.com/dialectmaterial/SOL/pull/132)
+**Branch:** `codex/sentence-receipt-invariants` · [PR #134](https://github.com/dialectmaterial/SOL/pull/134)
 **Requested:** 25 October 2026, by the maintainer
-**Scope:** Detach v1 sentence result metadata from the engine's declared method,
-so a caller cannot poison later studies or defeat method checking. Authority:
-[ESSENCE §8](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
-**Constraints:** No private text, dependencies, contracts, TUI or SPECULATIVE edits.
-Base `origin/main`; do not merge own PR.
-**Acceptance:** Failing metadata-mutation regression; legacy byte compatibility;
-full suite/docs; combined validation; commit, push, PR and HANDOFF.
-**Final combined validation:** all five patches, 1,333 tests OK (7 skipped,
-4 existing expected failures); docs check passes. No observed in-lane bug remains.
-Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123),
-[#125](https://github.com/dialectmaterial/SOL/pull/125),
-[#128](https://github.com/dialectmaterial/SOL/pull/128),
-[#130](https://github.com/dialectmaterial/SOL/pull/130).
+**Scope:** Validate legacy sentence totals, distributions, rankings and per-passage
+counts against their rows. Authority: [ESSENCE §8](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
+**Base:** `codex/sentence-method-isolation` ([#132](https://github.com/dialectmaterial/SOL/pull/132)); same engine file.
+**Constraints:** No private text, dependencies, public contract, TUI or SPECULATIVE changes.
+**Acceptance:** Failing tampering regressions, unchanged valid v1 encodings;
+full suite/docs; commit, push, PR and handoff. Prior round-1 fixes remain separate.
+**Validation:** 1,316 tests pass (29 skipped, 4 expected failures); docs check passes.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.

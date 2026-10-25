@@ -45,6 +45,19 @@ Tmux checks at 86×48, 190×50, 80×24 and 40×24, theme changes and rapid scree
 private launch context and captures stay outside Git. The CLI refusals are clean
 at 40×24, including unknown-home source/reference/artifact and environment paths.
 [PR #136](https://github.com/dialectmaterial/SOL/pull/136). Previous round-2 batch is [#134](https://github.com/dialectmaterial/SOL/pull/134), stacked on #132.
+## Codex B round 2 — legacy sentence receipt invariants — 25 October 2026
+
+Branch `codex/sentence-receipt-invariants`, based on #132's
+`codex/sentence-method-isolation` because both touch the legacy sentence engine.
+The legacy decoder/encoder accepted totals, histograms, positional statistics,
+longest rankings and per-passage counts that contradicted sentence rows. Validate
+the derived fields with the existing measurement function and count rows per
+passage. Invented-fixture regressions failed before the fix (13 assertions);
+valid v1 fixture encodings remain byte-identical. No method/schema/flag changes,
+private corpus material, TUI changes or dependencies. Full suite: 1,316 tests OK
+(29 skipped, 4 expected failures); docs and diff checks pass. Read-only real-corpus
+CLI at 86×48, provider/legacy save → check and comparison CSV/TSV round trips
+at 190×50; no corpus/export material is in Git. [PR #134](https://github.com/dialectmaterial/SOL/pull/134).
 
 Claude Code adds one report per completed task, newest first, so a reviewer can
 judge the work from GitHub alone: the report says what to look at, the pull

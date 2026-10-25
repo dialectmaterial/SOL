@@ -132,6 +132,10 @@ Malformed scoped sentence checks now validate before accessing scope fields;
 invalid or interrupted sentence saves leave no empty/partial artifact. Missing
 independent file references ask for --reference-file; invalid TF-IDF limits name
 top_n and its range. The encyclopedia acknowledges TF-IDF in Experiment.
+- Reject inconsistent legacy sentence-study totals, histograms, positional statistics,
+  longest rankings and per-passage counts during decoding and encoding; valid v1
+  encodings remain unchanged.
+
 ### Legacy sentence method isolation — 25 October 2026
 
 Returned v1 sentence studies own their method metadata. Editing an artifact’s
