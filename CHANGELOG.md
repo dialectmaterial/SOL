@@ -101,6 +101,7 @@ ESSENCE workspace PR #121 before merging.
 - Launcher: report unusable/disappearing Neovim executables and sol-window font-cache/process failures without tracebacks; correct the window help's workspace option. Keep the opening animation inside a 40-column terminal.
 - Reader: detect equivalent source/destination key names in keys.json before applying remappings, warn and keep default controls instead of crashing startup or silently overwriting an action.
 - Reader outline: keep the close hint visible at 40 columns, retain current-section markers with wide Unicode titles, and bound deep indentation to avoid invalid highlight columns.
+- sol read: escape terminal controls and bidi characters in refused-input/runtime diagnostics, consistently with the main launcher; successful text/JSON output and exit codes are unchanged.
 
 ### Sentence segmentation audit — 23 October 2026
 

@@ -101,6 +101,24 @@ push, PR and HANDOFF report.
 ## Codex A: reader launcher and opening failures
 ## Codex A: equivalent reader key remappings
 ## Codex A: narrow and deep outline layout
+## Codex A: safe sol read diagnostics
+
+**Status:** In review
+**Branch:** `codex/read-command-diagnostics`
+**PR:** [#133](https://github.com/dialectmaterial/SOL/pull/133)
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** sol/app/commands.py, sol read errors under
+[BEING §2](../BEING.md#2-what-is-implemented): make controls in refused input
+visible without executing terminal escape sequences. Preserve stdout/exit codes.
+Prior batches: [#124](https://github.com/dialectmaterial/SOL/pull/124),
+[#126](https://github.com/dialectmaterial/SOL/pull/126),
+[#127](https://github.com/dialectmaterial/SOL/pull/127),
+[#129](https://github.com/dialectmaterial/SOL/pull/129),
+[#131](https://github.com/dialectmaterial/SOL/pull/131).
+**Constraints:** no private text/PDF/workspaces/exports, dependencies, palette or
+public-contract changes, sol/essence or SPECULATIVE edits.
+**Acceptance:** regression fails first; real-corpus tmux check, full suite/docs;
+commit, push, PR and HANDOFF; do not merge own PR.
 
 **Status:** In review
 **Branch:** `codex/reader-outline-width`
