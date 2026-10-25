@@ -535,7 +535,8 @@ return function(reader)
     reader.panels.follow_tick()
     reader.essence.follow_tick()
   end })
-  api.nvim_create_autocmd("VimResized", { group = group, callback = function()
+  -- Closing a note here must run its BufWipeout draft-recovery handler.
+  api.nvim_create_autocmd("VimResized", { group = group, nested = true, callback = function()
     if tree_view then tree_view.resize() else close_popup() end
     if api.nvim_win_is_valid(window) then api.nvim_win_set_config(window, window_config()) end
   end })

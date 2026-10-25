@@ -91,6 +91,8 @@ write positions or occupy the Python request channel. The reader passes
 `--position-file` alongside `--theme-file`; this requires Claude's companion
 ESSENCE workspace PR #121 before merging.
 - Reader: keep wrapped help descriptions aligned at 40 columns, and compact the status line before its mode, search count and quit hint are clipped.
+- Reader: resizing an open note keeps its draft and returns to Normal mode, so reading keys remain usable.
+
 - Reader: preserve `E` typed while ESSENCE is closing and reopen it after a successful exit.
 
 - Reader: resizing ESSENCE keeps keyboard focus in its terminal. Shrinking a split while reading hides ESSENCE instead of covering the focused reader.

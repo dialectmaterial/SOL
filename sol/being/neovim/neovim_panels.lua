@@ -18,7 +18,12 @@ return function(reader)
   local function close_popup()
     local closing, packet = panels.window, panels.return_packet
     panels.window, panels.context_open, panels.return_packet = nil, false, nil
-    if closing and api.nvim_win_is_valid(closing) then api.nvim_win_close(closing, true) end
+    if closing and api.nvim_win_is_valid(closing) then
+      -- A resize can close the note editor while it still has Insert mode.
+      -- Reading keys must not try to edit the read-only page after it closes.
+      vim.cmd('stopinsert')
+      api.nvim_win_close(closing, true)
+    end
     reader.view.set_side(0)
     if (closing or packet) and api.nvim_win_is_valid(window) then api.nvim_set_current_win(window) end
     if packet then restore(packet) end

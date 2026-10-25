@@ -1456,3 +1456,24 @@ failures, invalid help example, narrow opening animation.
 - Fullscreen source-opening report: checked separately with the newer ESSENCE
   interface from #122 in a temporary integration checkout; investigating whether
   #126 already addresses it. No speculative second fix in this batch.
+
+## Codex A — note editor resize mode and draft recovery — 25 October 2026
+
+**Branch / PR:** `codex/reader-note-resize-mode` / [#138](https://github.com/dialectmaterial/SOL/pull/138),
+based on unmerged #135 (and #126's popup cleanup); author does not merge.
+
+- Real-corpus tmux reproduction: resizing a note editor returns to the read-only
+  page still in Insert mode; the next reading key raises E21. Stop Insert mode
+  before closing a real popup.
+- The same resize loses an unfinished draft. VimResized suppressed the note's
+  BufWipeout handler. Allow nested cleanup events on the reader resize autocmd.
+  Confirmed lost draft before the fix, retained invented draft after it.
+- Two failing regressions first: actual Neovim event-loop Insert mode, then a
+  separate draft-recovery assertion. The mode test also reopens drafts through
+  80×24 → 40×24 → 86×48 → 190×50 and checks unchanged source position. The test
+  harness can run `-c luafile` for real mode transitions; existing `-l` tests keep
+  their behavior. 60 native reader tests pass. Full suite: 1,316 tests OK
+  (7 skipped, 4 expected failures); docs check and diff whitespace check pass.
+- Private configured corpus remains read-only; disposable workspace and captures
+  stay under `/tmp`. No book text, PDF, workspace or analysis export is committed.
+  No sol/essence, palette, public-contract, dependency or SPECULATIVE changes.

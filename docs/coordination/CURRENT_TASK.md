@@ -96,19 +96,18 @@ push, PR and HANDOFF report.
 ## Codex A: narrow reader layout bugs
 ## Codex A: ESSENCE resize focus from the reader
 ## Codex A: reader / ESSENCE handoff bug hunt (round 2)
+## Codex A: note editor resize returns to normal reading (round 2)
 
 **Status:** In review
-**Branch:** `codex/reader-essence-handoff`
+**Branch:** `codex/reader-note-resize-mode`
 **Requested:** 25 October 2026, by the maintainer
-**Scope:** Reader-owned ESSENCE lifecycle and source handoff under
-[BEING §2](../BEING.md#2-what-is-implemented). Confirm rapid close/reopen and
-fullscreen source visibility, then hunt reader/launcher glitches.
-**Base:** `codex/reader-essence-resize-focus` ([PR #126](https://github.com/dialectmaterial/SOL/pull/126)); do not redo round-1 fixes.
-**Constraints:** no sol/essence edits, private corpus data, palette changes,
-dependencies, public-contract changes or SPECULATIVE edits.
-**Acceptance:** failing regressions before fixes; real-corpus tmux checks at
-190×50, 86×48, 80×24 and 40×24; full suite and docs check per batch;
-commit, push, PR and HANDOFF; no self-merge.
+**Scope:** Reader popup lifecycle under [BEING §2](../BEING.md#2-what-is-implemented).
+Resizing a note editor must retain its draft and return normal reading keys.
+**Base:** `codex/reader-essence-handoff` ([PR #135](https://github.com/dialectmaterial/SOL/pull/135)), including unmerged #126's popup cleanup; no repeated round-1 fixes.
+**Constraints:** no sol/essence, private corpus data, palette, dependencies,
+public contracts or SPECULATIVE edits; other lanes unchanged.
+**Acceptance:** failing event-loop regression first; real-corpus tmux checks;
+full suite and docs check; commit, push, PR and HANDOFF; no self-merge.
 
 **Status:** In review
 **Branch:** `codex/reader-panel-resize`
