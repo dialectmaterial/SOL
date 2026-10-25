@@ -1196,8 +1196,8 @@ based on unmerged #135 (and #126's popup cleanup); author does not merge.
 
 ## Codex A — background ESSENCE close focus — 25 October 2026
 
-**Branch:** `codex/reader-essence-close-focus`, based on unmerged #138
-(and #135/#126); author does not merge.
+**Branch / PR:** `codex/reader-essence-close-focus` / [#140](https://github.com/dialectmaterial/SOL/pull/140),
+based on unmerged #138 (and #135/#126); author does not merge.
 
 - Confirmed in real-corpus tmux: `q`, Alt-R, `c` leaves the visible context panel
   with focus behind it once ESSENCE finishes exiting. The old exit callback
