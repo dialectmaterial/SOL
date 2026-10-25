@@ -50,6 +50,7 @@ Neovim for every section; fixed. Previous task (sections prepared ahead) done: #
 
 **Status:** In review
 **Branch:** `codex/read-command-diagnostics`
+**PR:** [#133](https://github.com/dialectmaterial/SOL/pull/133)
 **Requested:** 25 October 2026, by the maintainer
 **Scope:** sol/app/commands.py, sol read errors under
 [BEING §2](../BEING.md#2-what-is-implemented): make controls in refused input

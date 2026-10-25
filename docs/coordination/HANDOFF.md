@@ -1135,7 +1135,7 @@ Earlier reports are in Git history (trimmed 21 October 2026).
 
 ## Codex A — sol read diagnostics and audit closeout, 25 October 2026
 
-Branch `codex/read-command-diagnostics`; PR link follows publication. sol read's
+Branch `codex/read-command-diagnostics`; [PR #133](https://github.com/dialectmaterial/SOL/pull/133). sol read's
 separate dispatcher interpolated raw exception strings, unlike the main
 launcher: an invented invalid path with an ANSI colour sequence changed the
 terminal, and bidi/bell characters were also echoed. Use the existing safe_output
@@ -1150,8 +1150,8 @@ All lane A batches from origin/main, published for review without self-merging:
 [#126](https://github.com/dialectmaterial/SOL/pull/126) reader/ESSENCE resize focus;
 [#127](https://github.com/dialectmaterial/SOL/pull/127) startup failures/splash;
 [#129](https://github.com/dialectmaterial/SOL/pull/129) key aliases;
-[#131](https://github.com/dialectmaterial/SOL/pull/131) outline widths; this batch
-finishes the command diagnostic issue. Each branch has its own task slot update,
+[#131](https://github.com/dialectmaterial/SOL/pull/131) outline widths;
+[#133](https://github.com/dialectmaterial/SOL/pull/133) command diagnostics. Each branch has its own task slot update,
 HANDOFF, failing-first regressions, docs check and full-suite pass.
 
 Audit used the configured corpus read-only in tmux at 86×48, 190×50, 80×24 and
