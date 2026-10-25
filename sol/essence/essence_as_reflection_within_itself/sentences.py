@@ -358,6 +358,7 @@ def _validate(result):
             raise SentenceStudyError("Invalid passage row", code="invalid_rows")
     if sum(passage["sentences"] for passage in passages) != len(rows):
         raise SentenceStudyError("Sentence rows disagree with passage counts", code="invalid_rows")
+    counts = [0] * len(passages)
     previous = None
     for row in rows:
         if not isinstance(row, list) or len(row) != 4:
@@ -368,7 +369,14 @@ def _validate(result):
         if index >= len(passages) or start >= end or tokens < 1 or (
                 previous is not None and (index, start) <= (previous[0], previous[2] - 1)):
             raise SentenceStudyError("Sentence rows must be ordered, nonoverlapping and nonempty", code="invalid_rows")
+        counts[index] += 1
         previous = row
+    if counts != [passage["sentences"] for passage in passages]:
+        raise SentenceStudyError("Sentence counts disagree with passage rows", code="invalid_rows")
+    for key, expected in _measure(passages, rows).items():
+        if _json(result[key]) != _json(expected):
+            raise SentenceStudyError("Sentence statistics disagree with their rows",
+                                     status="mismatch", code="result_mismatch")
     longest = result["longest"]
     if (not isinstance(longest, list) or len(longest) > LONGEST
             or any(type(value) is not int or not 0 <= value < len(rows) for value in longest)):
