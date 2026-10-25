@@ -1,5 +1,26 @@
 # Handoff reports
 
+## Codex B round 2 — early word-result budget — 25 October 2026
+
+Branch `codex/word-result-budget`, from `origin/main`; word counting itself did
+not overlap the round-1 changes. A 1,799,999-byte invented file with 200,000
+distinct words expanded the whole table before the 16 MiB refusal, using about
+264 MiB peak RSS. Track a conservative serialized-frequency lower bound for
+included distinct words while counting, and stop once fitting is impossible.
+The bound omits provenance, extra locations and reference cells, so it cannot
+reject a valid receipt. Repeated words, masked/excluded tokens and words outside
+a span do not spend the bound again. Existing final exact-size validation stays.
+Early-refusal regressions fail before the fix for words and embedded TF-IDF;
+exact valid-size, repeated Unicode words, reference and span checks pass.
+Isolated fresh-process, warm-file probe without concurrent tests: peak RSS
+264 → 57 MiB; wall time 4.25 → 0.33 s, same size_limit refusal (one sample each,
+not a cross-machine timing guarantee). CLI refusal is clean in tmux; a large
+repeated-word file succeeds, and a Ctrl-C trial exits 130 without a traceback.
+Full suite: 1,315 tests OK (29 skipped, 4 expected failures); docs/diff checks pass.
+PR pending. Earlier round-2
+batches: [#134](https://github.com/dialectmaterial/SOL/pull/134) on #132 and
+[#136](https://github.com/dialectmaterial/SOL/pull/136) on #130.
+
 Claude Code adds one report per completed task, newest first, so a reviewer can
 judge the work from GitHub alone: the report says what to look at, the pull
 request shows the diff. Reports describe; they do not change what the five

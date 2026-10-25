@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Refuse word and embedded TF-IDF studies as soon as their distinct vocabulary
+  cannot fit the existing 16 MiB result limit, before allocating the full frequency
+  table. Valid receipts, repeated words and scoped inputs remain unchanged.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary
