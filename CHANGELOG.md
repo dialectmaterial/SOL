@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Legacy sentence method isolation — 25 October 2026
+
+Returned v1 sentence studies own their method metadata. Editing an artifact’s
+abbreviation list cannot alter the engine’s declared method or later studies,
+and checking rejects the edited method. Existing artifact bytes are unchanged.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary
