@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reader: an ESSENCE process finishing in the background keeps focus and typing in the reader panel already in use.
+
 - Reader: resizing an open note keeps its draft and returns to Normal mode, so reading keys remain usable.
 
 - Reader: preserve `E` typed while ESSENCE is closing and reopen it after a successful exit.

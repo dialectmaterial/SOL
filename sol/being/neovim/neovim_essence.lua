@@ -179,14 +179,17 @@ return function(reader)
 
   function state.closed(code, message)
     local window, buffer, reopen = state.window, state.buffer, state.reopen
+    local focused = window and api.nvim_get_current_win() == window
     state.reopen = nil
     vim.on_key(nil, input_namespace)
     state.job, state.window, state.buffer, state.layout = nil, nil, nil, nil
-    vim.cmd('stopinsert')
+    if focused then vim.cmd('stopinsert') end
     if window and api.nvim_win_is_valid(window) then api.nvim_win_close(window, true) end
     if buffer and api.nvim_buf_is_valid(buffer) then api.nvim_buf_delete(buffer, { force = true }) end
     relayout()
-    return_to_reader()
+    -- Alt-R may already have returned to a panel or a note editor. A delayed
+    -- background exit must not move focus behind it or stop its typing.
+    if focused then return_to_reader() else state.origin = nil end
     if reopen and code == 0 and not message then
       when_normal(function()
         local current = rawget(_G, 'SOLNvimReader')

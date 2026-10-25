@@ -46,18 +46,18 @@ steps 5–7). Rules for all three lanes:
 readable text in a real terminal. The measurement found `]c`/`[c` restarting
 Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
 
-## Codex A: note editor resize returns to normal reading (round 2)
+## Codex A: background ESSENCE exit preserves reader panel focus (round 2)
 
 **Status:** In review
-**Branch:** `codex/reader-note-resize-mode`
+**Branch:** `codex/reader-essence-close-focus`
 **Requested:** 25 October 2026, by the maintainer
-**Scope:** Reader popup lifecycle under [BEING §2](../BEING.md#2-what-is-implemented).
-Resizing a note editor must retain its draft and return normal reading keys.
-**Base:** `codex/reader-essence-handoff` ([PR #135](https://github.com/dialectmaterial/SOL/pull/135)), including unmerged #126's popup cleanup; no repeated round-1 fixes.
+**Scope:** Reader-owned ESSENCE lifecycle under [BEING §2](../BEING.md#2-what-is-implemented).
+After Alt-R, a delayed ESSENCE exit must preserve visible reader panels and typing.
+**Base:** `codex/reader-note-resize-mode` ([PR #138](https://github.com/dialectmaterial/SOL/pull/138)), including #135/#126 host fixes and event-loop test support.
 **Constraints:** no sol/essence, private corpus data, palette, dependencies,
 public contracts or SPECULATIVE edits; other lanes unchanged.
-**Acceptance:** failing event-loop regression first; real-corpus tmux checks;
-full suite and docs check; commit, push, PR and HANDOFF; no self-merge.
+**Acceptance:** failing regressions first; real-corpus tmux close/Alt-R/context
+checks; full suite and docs check; commit, push, PR and HANDOFF; no self-merge.
 
 ## Codex B: landmark management
 

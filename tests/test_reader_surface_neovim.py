@@ -1666,6 +1666,58 @@ while True:
         self.assertEqual(report, {"reopen": "essence_open", "position": True,
                                   "focused": True, "replaced": True, "requests": 2})
 
+    def essence_close_focus(self, *, editor):
+        stub = self.root / "essence_stub.py"
+        stub.write_text("import os, time, tty\ntty.setraw(0)\n"
+                        "print('ESSENCE STUB READY', flush=True)\n"
+                        "while os.read(0, 1) != b'q': pass\n"
+                        "time.sleep(.25)\n", encoding="utf-8")
+        paths = (f"local PYTHON, STUB = {json.dumps(sys.executable)}, {json.dumps(str(stub))}\n"
+                 f"local EDITOR = {'true' if editor else 'false'}\n")
+        return self.run_lua(paths + r'''
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  local payload = vim.deepcopy(data)
+  payload.personal = {persistent = true, notes = vim.empty_dict()}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(payload)
+  reader = SOLNvimReader
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  _G.SOLReaderChannel.pending[sent[1].id]({essence = {command = {PYTHON, STUB}}})
+  local essence = SOLEssence
+  assert(vim.wait(5000, function()
+    return table.concat(vim.api.nvim_buf_get_lines(essence.buffer, 0, -1, false), '\n'):find('ESSENCE STUB READY') ~= nil
+  end, 10))
+  vim._on_key('q', 'q')
+  vim.fn.chansend(essence.job, 'q')
+  essence.back_to_reader()
+  if EDITOR then reader.note() else reader.context() end
+  local focused = vim.api.nvim_get_current_win()
+  assert(focused ~= reader.window, 'the reader panel did not open')
+  if EDITOR then vim.api.nvim_buf_set_lines(0, 0, -1, false, {'An invented note while ESSENCE closes.'}) end
+  vim.defer_fn(function()
+    report.mode_before = vim.fn.mode(1)
+  end, 50)
+  vim.defer_fn(function()
+    report.closed = essence.window == nil
+    report.focus_kept = vim.api.nvim_get_current_win() == focused
+    report.panel_visible = vim.api.nvim_win_is_valid(focused)
+    report.mode_after = vim.fn.mode(1)
+    write_report()
+    vim.cmd('qa!')
+  end, 600)
+''', automatic_quit=False, event_loop=True)
+
+    def test_background_essence_exit_keeps_focus_in_the_visible_context_panel(self):
+        self.assertEqual(self.essence_close_focus(editor=False), {
+            "closed": True, "focus_kept": True, "panel_visible": True,
+            "mode_before": "n", "mode_after": "n"})
+
+    def test_background_essence_exit_keeps_typing_in_the_visible_note_editor(self):
+        self.assertEqual(self.essence_close_focus(editor=True), {
+            "closed": True, "focus_kept": True, "panel_visible": True,
+            "mode_before": "i", "mode_after": "i"})
+
     def test_essence_from_a_selection_returns_to_the_exact_selection(self):
         # Reported by Codex's review of PR #24.
         stub = self.root / "essence_stub.py"
