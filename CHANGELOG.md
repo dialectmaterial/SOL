@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reader: preserve `E` typed while ESSENCE is closing and reopen it after a successful exit.
+
 - Reader: resizing ESSENCE keeps keyboard focus in its terminal. Shrinking a split while reading hides ESSENCE instead of covering the focused reader.
 
 ### Sentence segmentation audit — 23 October 2026

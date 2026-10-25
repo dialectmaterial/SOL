@@ -18,6 +18,7 @@ return function(reader)
   local SOURCE_PREFIX = '\27]5379;sol-essence;'
   -- How long quitting the reader waits for ESSENCE to save its state.
   local SAVE_WAIT_MS = 2000
+  local input_namespace = api.nvim_create_namespace('SOLEssenceInput')
 
   local function alive()
     return state.window ~= nil and api.nvim_win_is_valid(state.window)
@@ -77,6 +78,8 @@ return function(reader)
 
   function state.focus()
     if not alive() then return end
+    -- E may refocus the old terminal just before its exit callback runs.
+    state.reopen = true
     if state.layout == 'hidden' then
       state.layout = vim.o.columns >= SPLIT_MINIMUM and 'split' or 'full'
       relayout()
@@ -175,13 +178,23 @@ return function(reader)
   end
 
   function state.closed(code, message)
-    local window, buffer = state.window, state.buffer
+    local window, buffer, reopen = state.window, state.buffer, state.reopen
+    state.reopen = nil
+    vim.on_key(nil, input_namespace)
     state.job, state.window, state.buffer, state.layout = nil, nil, nil, nil
     vim.cmd('stopinsert')
     if window and api.nvim_win_is_valid(window) then api.nvim_win_close(window, true) end
     if buffer and api.nvim_buf_is_valid(buffer) then api.nvim_buf_delete(buffer, { force = true }) end
     relayout()
     return_to_reader()
+    if reopen and code == 0 and not message then
+      when_normal(function()
+        local current = rawget(_G, 'SOLNvimReader')
+        if not current or api.nvim_get_current_win() ~= reader_window() then return end
+        state.origin = current.capture()
+        reader.requests.request('essence_open', nil, nil, state.origin)
+      end)
+    end
     if message or code ~= 0 then
       vim.notify(message or ('ESSENCE ended with exit code ' .. tostring(code) .. '; the reader is unchanged'),
         vim.log.levels.WARN)
@@ -222,6 +235,13 @@ return function(reader)
       return
     end
     state.job = job
+    state.reopen = nil
+    -- Preserve a final E typed while the child is shutting down. Still send
+    -- it to the PTY: in a live input field it is ordinary text, and the next
+    -- typed key cancels this intent. Programmatic restore keys do not count.
+    vim.on_key(function(_, typed)
+      if typed ~= '' and api.nvim_get_current_buf() == buffer then state.reopen = typed == 'E' end
+    end, input_namespace)
     -- Layout keys belong to Neovim; every other key goes to ESSENCE.
     for _, key_mode in ipairs({ 't', 'n' }) do
       vim.keymap.set(key_mode, '<M-f>', state.toggle, { buffer = buffer, silent = true })

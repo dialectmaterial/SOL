@@ -1115,6 +1115,7 @@ end
   vim.api.nvim_feedkeys('E', 'xt', false)
   report.refocus = {requests = #sent, focused = vim.api.nvim_get_current_win() == essence.window}
   local job = essence.job
+  vim._on_key('q', 'q')
   vim.fn.chansend(job, 'q\n')
   assert(vim.wait(5000, function() return SOLEssence.window == nil end, 10), 'ESSENCE did not close')
   report.closed = {focused_reader = vim.api.nvim_get_current_win() == SOLNvimReader.window,
@@ -1133,6 +1134,7 @@ end
   report.narrow.hidden = geometry(SOLEssence.window).hide
   vim.api.nvim_feedkeys('E', 'xt', false)
   report.narrow.after_e = SOLEssence.layout
+  vim._on_key('q', 'q')
   vim.fn.chansend(SOLEssence.job, 'q\n')
   assert(vim.wait(5000, function() return SOLEssence.window == nil end, 10))
   -- A command that cannot start leaves the reader usable and says why.
@@ -1538,6 +1540,58 @@ while True:
         self.assertTrue(report["exited"])
         self.assertEqual(saved.read_text(), "saved /invented/data")
 
+    def test_essence_reopens_when_e_arrives_before_its_process_finishes_closing(self):
+        # The child stays alive after q, as Textual can while restoring its
+        # terminal or waiting for an abandoned count. E still reaches that PTY.
+        stub = self.root / "essence_stub.py"
+        stub.write_text("import os, time, tty\ntty.setraw(0)\n"
+                        "print('ESSENCE STUB READY', flush=True)\n"
+                        "while os.read(0, 1) != b'q': pass\n"
+                        "time.sleep(.25)\n", encoding="utf-8")
+        paths = f"local PYTHON, STUB = {json.dumps(sys.executable)}, {json.dumps(str(stub))}\n"
+        report = self.run_lua(paths + r'''
+  vim.o.columns, vim.o.lines = 190, 50
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local before = reader.capture()
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  _G.SOLReaderChannel.pending[sent[1].id]({essence = {command = {PYTHON, STUB}}})
+  local essence = SOLEssence
+  local old_buffer = essence.buffer
+  assert(vim.wait(5000, function()
+    return table.concat(vim.api.nvim_buf_get_lines(old_buffer, 0, -1, false), '\n'):find('ESSENCE STUB READY') ~= nil
+  end, 10))
+  -- Physical keys run the on_key hooks before terminal input is sent. Headless
+  -- feedkeys cannot stay in terminal mode, so dispatch the same keys to the PTY.
+  vim._on_key('q', 'q')
+  vim.fn.chansend(essence.job, 'q')
+  vim._on_key('E', 'E')
+  vim.fn.chansend(essence.job, 'E')
+  assert(vim.wait(5000, function() return essence.window == nil end, 10))
+  assert(vim.wait(1000, function() return #sent == 2 end, 10), 'E was lost during ESSENCE shutdown')
+  report.reopen = sent[2].op
+  report.position = vim.deep_equal(sent[2].packet, before)
+  _G.SOLReaderChannel.pending[sent[2].id]({essence = {command = {PYTHON, STUB}}})
+  report.focused = vim.api.nvim_get_current_win() == essence.window
+  report.replaced = essence.buffer ~= old_buffer
+  assert(vim.wait(5000, function()
+    return table.concat(vim.api.nvim_buf_get_lines(essence.buffer, 0, -1, false), '\n'):find('ESSENCE STUB READY') ~= nil
+  end, 10))
+  -- A later q is an explicit close, including after E was used to refocus.
+  essence.back_to_reader()
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  vim._on_key('q', 'q')
+  vim.fn.chansend(essence.job, 'q')
+  assert(vim.wait(5000, function() return essence.window == nil end, 10))
+  vim.wait(100)
+  report.requests = #sent
+''')
+        self.assertEqual(report, {"reopen": "essence_open", "position": True,
+                                  "focused": True, "replaced": True, "requests": 2})
+
     def test_essence_from_a_selection_returns_to_the_exact_selection(self):
         # Reported by Codex's review of PR #24.
         stub = self.root / "essence_stub.py"
@@ -1573,7 +1627,8 @@ while True:
     local before = #sent
     vim.api.nvim_feedkeys('E', 'xt', false)
     case.refocused = #sent == before and vim.api.nvim_get_current_win() == SOLEssence.window
-    vim.fn.chansend(SOLEssence.job, 'q\n')
+    vim._on_key('q', 'q')
+  vim.fn.chansend(SOLEssence.job, 'q\n')
     assert(vim.wait(5000, function() return SOLEssence.window == nil end, 10))
     case.after_close = vim.deep_equal(SOLNvimReader.capture(), selected)
     case.cursor = SOLNvimReader.capture().cursor_offset

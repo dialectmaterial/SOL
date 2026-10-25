@@ -46,19 +46,20 @@ steps 5–7). Rules for all three lanes:
 readable text in a real terminal. The measurement found `]c`/`[c` restarting
 Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
 
-## Codex A: ESSENCE resize focus from the reader
+## Codex A: reader / ESSENCE handoff bug hunt (round 2)
 
 **Status:** In review
-**Branch:** `codex/reader-essence-resize-focus`
+**Branch:** `codex/reader-essence-handoff`
 **Requested:** 25 October 2026, by the maintainer
-**Scope:** Reader-owned ESSENCE window layout and popup lifecycle under
-[BEING §2](../BEING.md#2-what-is-implemented). Preserve keyboard focus on resize;
-when the reader has focus, shrinking a split must keep the reader visible.
-Previous batch: [PR #124](https://github.com/dialectmaterial/SOL/pull/124).
+**Scope:** Reader-owned ESSENCE lifecycle and source handoff under
+[BEING §2](../BEING.md#2-what-is-implemented). Confirm rapid close/reopen and
+fullscreen source visibility, then hunt reader/launcher glitches.
+**Base:** `codex/reader-essence-resize-focus` ([PR #126](https://github.com/dialectmaterial/SOL/pull/126)); do not redo round-1 fixes.
 **Constraints:** no sol/essence edits, private corpus data, palette changes,
 dependencies, public-contract changes or SPECULATIVE edits.
-**Acceptance:** failing native regressions first; tmux real-corpus resize/key
-checks, full suite and docs check; commit, push, PR and HANDOFF; no self-merge.
+**Acceptance:** failing regressions before fixes; real-corpus tmux checks at
+190×50, 86×48, 80×24 and 40×24; full suite and docs check per batch;
+commit, push, PR and HANDOFF; no self-merge.
 
 ## Codex B: landmark management
 
