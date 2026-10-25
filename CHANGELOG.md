@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Refuse excessively nested ESSENCE launch JSON without a traceback, and report
+  context serialization failures as input errors before creating any file; reject
+  nonfinite numbers and escaped surrogates consistently on read and write.
+
 ### ESSENCE context transport — 25 October 2026
 
 Context loading refuses FIFOs without blocking and checks the actual byte count

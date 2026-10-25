@@ -1,5 +1,32 @@
 # Handoff reports
 
+## Codex B round 2 — launch-context JSON errors — 25 October 2026
+
+Branch `codex/essence-context-json-errors`, based on #125's
+`codex/essence-context-transport`. A 200,001-byte nested JSON context (within the
+256 KiB byte limit) raised RecursionError through the launcher's ordinary input
+error handler. Turn decoder recursion failures into ValueError. Encoding deeply
+nested or non-JSON context objects likewise escaped as recursion/type errors;
+translate these before creating a directory/file. The reader also accepted NaN,
+overflowed floats and escaped surrogates that the writer cannot encode; apply
+the same finite UTF-8 serialization validation on read. Invented regressions failed
+before fixes; valid context bytes/permissions/shape stay unchanged. No TUI source,
+public contract, dependencies, corpus text or SPECULATIVE changes.
+Full branch suite: 1,323 tests OK (29 skipped, 4 expected failures); docs/diff
+checks pass. A real tmux launch of the malformed context returns 2 without a
+traceback. Combined focused checks and inert mutation probes pass; read-only
+whole-corpus words, TF-IDF, legacy and both provider sentence methods save/check
+successfully and have identical word/sentence token totals. Combined full suite
+running; PR pending. Earlier round-2 batches:
+[#134](https://github.com/dialectmaterial/SOL/pull/134) on #132,
+[#136](https://github.com/dialectmaterial/SOL/pull/136) on #130,
+[#137](https://github.com/dialectmaterial/SOL/pull/137) on main.
+
+**needs maintainer decision:** frozen punctuation methods still split initial
+chains separated by tabs/two spaces or containing combining-mark initials.
+Invented probes and the need for a versioned boundary policy are recorded in
+[#134](https://github.com/dialectmaterial/SOL/pull/134); no method changes made.
+
 Claude Code adds one report per completed task, newest first, so a reviewer can
 judge the work from GitHub alone: the report says what to look at, the pull
 request shows the diff. Reports describe; they do not change what the five

@@ -21,13 +21,20 @@ MAX_CONTEXT_BYTES = 256 * 1024
 _FIELDS = {"version", "reference", "cursor_offset", "selection", "label", "corpus", "state_file"}
 
 
+def _encode_context(context):
+    try:
+        return json.dumps(context, ensure_ascii=False, allow_nan=False).encode("utf-8")
+    except (ValueError, TypeError, RecursionError) as error:
+        raise ValueError("ESSENCE context must be finite UTF-8 JSON") from error
+
+
 def write_context(directory, *, reference, cursor_offset, selection, label, corpus, state_file):
     """Create a new owner-only context file in a private directory."""
     context = {"version": CONTEXT_VERSION, "reference": reference, "cursor_offset": cursor_offset,
                "selection": selection, "label": label, "corpus": corpus,
                "state_file": None if state_file is None else str(state_file)}
     check_context(context)
-    data = json.dumps(context, ensure_ascii=False, allow_nan=False).encode("utf-8")
+    data = _encode_context(context)
     if len(data) > MAX_CONTEXT_BYTES:
         raise ValueError("ESSENCE context must be a small regular file")
     directory = Path(directory)
@@ -77,7 +84,15 @@ def read_context(path):
         data = stream.read(MAX_CONTEXT_BYTES + 1)
     if len(data) > MAX_CONTEXT_BYTES:
         raise ValueError("ESSENCE context must be a small regular file")
-    return check_context(json.loads(data.decode("utf-8")))
+    try:
+        context = json.loads(data.decode("utf-8"))
+    except RecursionError as error:
+        raise ValueError("ESSENCE context JSON is too deeply nested") from error
+    context = check_context(context)
+    # A read must not admit NaN, overflowed floats or escaped surrogates that
+    # the writer cannot represent as finite UTF-8 JSON.
+    _encode_context(context)
+    return context
 
 
 TEXTUAL_HINT = ("ESSENCE needs Textual, from the essence extra: "

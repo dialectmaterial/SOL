@@ -63,18 +63,23 @@ lanes' slots unchanged; do not merge own PR.
 **Acceptance:** `restructuring/SENTENCE_AUDIT.md`, ESSENCE and CHANGELOG; full
 suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 
-## Codex B: ESSENCE context transport
+## Codex B: malformed launch-context JSON refusals (round 2)
 
 **Status:** In review
-**Branch:** `codex/essence-context-transport` · [PR #125](https://github.com/dialectmaterial/SOL/pull/125)
+**Branch:** `codex/essence-context-json-errors`
 **Requested:** 25 October 2026, by the maintainer
-**Scope:** `sol/interchange/essence.py` and invented context regression tests:
-nonblocking special-file refusal, consistent byte limits, strict integer versions
-and cleanup after interrupted writes. Authority: [ESSENCE §8](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
-**Constraints:** No private text, dependencies, schema changes, TUI or SPECULATIVE edits.
-Base `origin/main`; do not merge own PR.
-**Acceptance:** Red/green regressions; real tmux use; full suite and docs check;
-commit, push, PR and HANDOFF. Prior batch: [#123](https://github.com/dialectmaterial/SOL/pull/123).
+**Scope:** Translate context JSON decoder/encoder resource and type failures
+into clean input refusals. Authority: [ESSENCE §8](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
+**Base:** `codex/essence-context-transport` ([#125](https://github.com/dialectmaterial/SOL/pull/125)); same interchange code.
+**Constraints:** No private material, dependencies, TUI source, public formats,
+CLI flags or SPECULATIVE changes.
+**Acceptance:** Failing deep-file/launcher/encoder regressions; valid byte/permission
+round trips; full suite/docs; combined validation; commit, push, PR and handoff.
+**Validation:** 1,323 tests OK (29 skipped, 4 expected failures); docs/diff checks pass.
+Combined full suite running; all focused and real-corpus round trips pass.
+Earlier round-2 batches: [#134](https://github.com/dialectmaterial/SOL/pull/134)
+(on #132), [#136](https://github.com/dialectmaterial/SOL/pull/136) (on #130),
+[#137](https://github.com/dialectmaterial/SOL/pull/137) (main).
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
