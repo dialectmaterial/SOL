@@ -63,14 +63,18 @@ return function(reader)
     message.id, message.op, message.packet, message.mode = channel.serial, operation, packet or current_packet(), mode
     message.focus = data.focus == true
     if data.theme then message.theme = data.theme.active end
-    -- Following the reader in Zathura is background work: it never holds back a key.
-    if operation ~= 'marker_set' and operation ~= 'marker_clear' and operation ~= 'source_follow' then
+    -- Following does not take the navigation lock. Python still services these
+    -- captures and subsequent navigation requests on the same serial channel.
+    if operation ~= 'marker_set' and operation ~= 'marker_clear' and operation ~= 'source_follow'
+        and operation ~= 'essence_position' then
       channel.navigation_pending = message.id
     end
     channel.pending[message.id] = function(result, problem)
       if channel.navigation_pending == message.id then channel.navigation_pending = nil end
       if not result then
-        if operation == 'source_follow' then reader.panels.stop_follow()
+        if operation == 'essence_position' then
+          if callback then callback(nil) end
+        elseif operation == 'source_follow' then reader.panels.stop_follow()
         else vim.notify(tostring(problem), vim.log.levels.ERROR) end
         return
       end

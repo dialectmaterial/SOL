@@ -167,7 +167,25 @@ I/O and Textual availability probe live in `sol.interchange.essence`, outside
 the logical hierarchy ([Architecture §9, I1](ARCHITECTURE.md#launch-exchange-outside-the-logical-hierarchy-i1)).
 BEING writes it and the TUI entry point reads it; the reader removes its private
 context directory at exit. Saved investigation state remains owned by
-`sol.essence.tui.context`. The format, lifetime and source-return OSC are unchanged.
+`sol.essence.tui.context`. The launch context and source-return OSC are unchanged.
+
+**Decision (maintainer, 24 October 2026): ESSENCE follows the reader while open.**
+The reader also passes `--position-file <context>.position`, beside `--theme-file`.
+The version-1 object has exactly `version: 1`, the current passage's checked CORE
+v1 `reference` envelope, `cursor_offset` (a nonnegative codepoint integer),
+`selection` (IDs, offsets and digests, or null), and a heading/page `label`.
+It carries no passage text or investigation state. BEING validates the reader
+packet and freshly captures the passage as for `E`; passage/section changes
+(including search, marker and history jumps) publish a new position, and cursor
+moves and selection changes within a passage never publish. The offset and
+selection are snapshots at opening or passage/section entry. Failed captures
+leave the last complete file untouched and do not interrupt reading. The
+stdlib-only exchange validates the shape and limits the owner-only, no-follow
+file to 256 KiB; writes use a private temporary file and atomic rename. Claude's
+companion ESSENCE workspace change reads it twice a second. Following stops
+when ESSENCE closes, and the reader removes the file with its private context
+directory at exit. The opening context stays available as a separate return
+anchor.
 
 **Decisions (maintainer, 18 October 2026)**, from the [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf). They direct the work; how far each is implemented is recorded below and in the dated sections that follow.
 

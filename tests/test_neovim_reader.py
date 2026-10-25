@@ -1521,7 +1521,8 @@ assert 'textual' not in sys.modules
             self.assertEqual(command[5], "--theme")
             self.assertIn(command[6], THEMES)
             # And follows T through an owner-only file the reader rewrites.
-            self.assertEqual(command[7:], ["--theme-file", launch["theme_file"]])
+            self.assertEqual(command[7:], ["--theme-file", launch["theme_file"],
+                                           "--position-file", launch["position_file"]])
             theme_file = Path(launch["theme_file"])
             self.assertEqual(theme_file.parent, path.parent)
             self.assertEqual(theme_file.read_text(encoding="utf-8"), command[6])
@@ -1582,6 +1583,87 @@ assert 'textual' not in sys.modules
                 patch.object(neovim, "launch_payload", side_effect=native):
             self.assertEqual(self.run_view(service), 0)
         self.assertEqual(service.store.get_state()["current_id"], self.book.passages[0].identifier)
+
+    def test_essence_follows_another_passage_in_the_same_view_without_saving(self):
+        from sol.being.surface import selection_packet
+        from sol.interchange.essence import read_position, write_position
+
+        self.extend(3)
+        service = self.service()
+        self.position(service, 4)
+        saved = service.store.get_state()
+
+        def native(payload, _, on_request):
+            packet = selection_packet(self.book, self.book.passages[1].identifier, 2, 8)
+            with patch("sol.interchange.essence.write_position", wraps=write_position) as write:
+                on_request({"op": "essence_position", "packet": packet, "mode": "continuous"})
+                write.assert_not_called()  # No exchange before ESSENCE is opened.
+            launch = on_request({"op": "essence_open", "packet": payload["restore"], "mode": "continuous"})["essence"]
+            on_request({"op": "essence_position", "packet": packet, "mode": "continuous"})
+            position = read_position(launch["position_file"])
+            self.assertEqual(position["reference"], packet["reference"])
+            self.assertEqual(position["cursor_offset"], packet["cursor_offset"])
+            self.assertEqual(position["selection"], {key: value for key, value in packet["selection"].items() if key != "text"})
+            self.assertNotIn(packet["selection"]["text"], Path(launch["position_file"]).read_text())
+            self.assertEqual(service.store.get_state(), saved)
+            return 1, None
+
+        with patch("sol.interchange.essence.textual_available", return_value=True), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 1)
+
+    def test_essence_follows_checked_passages_and_failed_capture_publishes_nothing(self):
+        from sol.interchange.essence import read_position, write_position
+
+        self.extend(3)
+        service = self.service()
+        self.position(service, 4)
+
+        def native(payload, _, on_request):
+            launch = on_request({"op": "essence_open", "packet": payload["restore"], "mode": "continuous"})["essence"]
+            path = Path(launch["position_file"])
+            self.assertEqual(str(path), launch["command"][4] + ".position")
+            first = read_position(path)
+            self.assertEqual(first["reference"], payload["restore"]["reference"])
+            # Cross a section through the same navigation channel as search,
+            # history and marker jumps, then send the new view's resting cursor.
+            shown = on_request({"op": "next", "packet": payload["restore"], "mode": "continuous"})["payload"]
+            packet = deepcopy(shown["restore"])
+            packet["cursor_offset"] = 6
+            saved = service.store.get_state()
+            with patch.object(neovim_reader, "capture_reference", wraps=core.capture_reference) as capture:
+                self.assertEqual(on_request({"op": "essence_position", "packet": packet, "mode": "continuous"}), {})
+                capture.assert_called_once_with(self.book.corpus_snapshot,
+                                               packet["reference"]["reference"]["requested_id"])
+            position = read_position(path)
+            self.assertNotEqual(position["reference"], first["reference"])
+            self.assertEqual(core.check_reference(self.book.corpus_snapshot, position["reference"]).target_id,
+                             packet["reference"]["reference"]["target_id"])
+            self.assertEqual(position["cursor_offset"], 6)
+            self.assertEqual(service.store.get_state(), saved)
+            before = path.read_bytes()
+            with patch.object(neovim_reader, "capture_reference", side_effect=ValueError("capture failed")), \
+                    patch("sol.interchange.essence.write_position", wraps=write_position) as write:
+                with self.assertRaisesRegex(ValueError, "capture failed"):
+                    on_request({"op": "essence_position", "packet": packet, "mode": "continuous"})
+                write.assert_not_called()
+            self.assertEqual(path.read_bytes(), before)
+            broken = deepcopy(packet)
+            broken["cursor_offset"] = -1
+            with self.assertRaises(ValueError):
+                on_request({"op": "essence_position", "packet": broken, "mode": "continuous"})
+            self.assertEqual(path.read_bytes(), before)
+            source = self.corpus / "sample.md"
+            source.write_text(source.read_text() + "\nAn unindexed edit.\n")
+            with self.assertRaises(ValueError):
+                on_request({"op": "essence_position", "packet": packet, "mode": "continuous"})
+            self.assertEqual(path.read_bytes(), before)
+            return 1, None
+
+        with patch("sol.interchange.essence.textual_available", return_value=True), \
+                patch.object(neovim_reader, "SECTION_BUDGET", 1), \
+                patch.object(neovim, "launch_payload", side_effect=native):
+            self.assertEqual(self.run_view(service), 1)
 
     def test_temporary_session_gives_essence_no_state_file(self):
         from sol.interchange.essence import read_context

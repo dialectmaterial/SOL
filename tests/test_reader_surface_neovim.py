@@ -1064,6 +1064,85 @@ end
         self.assertIn("Revision 2 (edited), Invented reader, 2026-10-18T09:00:00Z\n  My revised\n  thought", history)
         self.assertLess(history.index("Revision 2"), history.index("Revision 1"))
 
+    def test_essence_position_follows_only_passage_or_section_changes_and_stops_on_close(self):
+        stub = self.root / "essence_follow_stub.py"
+        stub.write_text("import time\nprint('READY', flush=True)\ntime.sleep(30)\n")
+        paths = (f"local PYTHON, STUB, POSITION = {json.dumps(sys.executable)}, {json.dumps(str(stub))}, "
+                 f"{json.dumps(str(self.root / 'context.json.position'))}\n")
+        report = self.run_lua(paths + r'''
+  local sent, notifications = {}, {}
+  vim.notify = function(message) notifications[#notifications + 1] = tostring(message) end
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line)
+      local message = vim.json.decode(line)
+      sent[#sent + 1] = message
+      -- A response is deliberately left pending until the test acknowledges it.
+    end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local essence, channel = SOLEssence, SOLReaderChannel
+  essence.origin = reader.capture('n', reader.source_point(data.records[1].id, 0),
+                                 reader.source_point(data.records[1].id, 0))  -- E's opening packet
+  essence.open({command = {PYTHON, STUB}, position_file = POSITION})
+  essence.back_to_reader()
+  vim.cmd('stopinsert')
+  local function move(id, offset)
+    reader.restore(reader.capture('n', reader.source_point(id, offset), reader.source_point(id, offset)))
+    essence.follow_tick()
+  end
+  local function ack(success)
+    local message = sent[#sent]
+    local callback = channel.pending[message.id]
+    channel.pending[message.id] = nil
+    callback(success and {} or nil, 'invented capture failure')
+  end
+  move(data.records[1].id, 1)
+  move(data.records[1].id, 2)
+  vim.wait(700, function() return false end, 10)
+  assert(#sent == 0, 'opening position or within-passage cursor was published again')
+  move(data.records[2].id, 4)
+  assert(#sent == 1 and sent[1].op == 'essence_position')
+  assert(sent[1].packet.reference.reference.target_id == data.records[2].id)
+  assert(channel.navigation_pending == nil, 'background follow blocked navigation')
+  move(data.records[2].id, 5)
+  assert(#sent == 1, 'queued a second capture while the first was pending')
+  ack(false)
+  assert(#notifications == 0, 'background failure interrupted reading')
+  assert(vim.wait(1200, function() return #sent == 2 end, 10), 'failed passage change was not retried')
+  assert(sent[2].packet.cursor_offset == 5, 'retry did not capture the latest packet')
+  ack(true)
+  move(data.records[2].id, 6)
+  -- Selection changes within the same passage must also stay off the channel.
+  reader.restore(reader.capture('v', reader.source_point(data.records[2].id, 1),
+                                 reader.source_point(data.records[2].id, 4)))
+  essence.follow_tick()
+  vim.wait(700, function() return false end, 10)
+  assert(#sent == 2, 'same-passage cursor or selection triggered a write')
+  move(data.records[1].id, 3)
+  assert(#sent == 3, 'return to an earlier passage did not publish')
+  ack(true)
+  local changed = vim.deepcopy(data)
+  changed.restore = sent[3].packet
+  table.remove(changed.records, #changed.records)
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(changed)
+  reader = SOLNvimReader
+  SOLEssence.follow_tick()
+  assert(#sent == 4, 'section/view change was lost across reload')
+  ack(true)
+  local job = essence.job
+  vim.fn.jobstop(job)
+  assert(vim.wait(1500, function() return not essence.job end, 10))
+  local count = #sent
+  move(data.records[1].id, 2)
+  vim.wait(600, function() return false end, 10)
+  report = {count = count, after_close = #sent, timer_stopped = essence.position_timer == nil,
+            last_op = sent[count].op}
+''')
+        self.assertEqual(report["count"], 4)
+        self.assertEqual(report["after_close"], 4)
+        self.assertTrue(report["timer_stopped"])
+        self.assertEqual(report["last_op"], "essence_position")
+
     def test_essence_opens_beside_toggles_returns_and_closes_without_moving_the_reader(self):
         stub = self.root / "essence_stub.py"
         stub.write_text("import sys\nprint('ESSENCE STUB READY', flush=True)\nsys.stdin.readline()\n", encoding="utf-8")

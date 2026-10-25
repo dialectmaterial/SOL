@@ -269,6 +269,38 @@ The supplied checkout has read-only Git metadata. Review follow-up branch, commi
 ### Decisions requiring approval
 
 None reserved: the maintainer approved the optional display-only choice on 24 October. Defaults the maintainer may overrule: include `am/are/be/been/is/was/were` for copular/auxiliary uses while excluding nominal `being`; include `have/has/had/having` and do forms for auxiliary uses. Preserve whole contractions, assign each spelling once, and version membership changes after release.
+## ESSENCE follows the reader — 24 October 2026
+
+**Task:** [Codex B: ESSENCE follows the reader](https://github.com/dialectmaterial/SOL/blob/5f5bdfbdcbbbf91d8241e25989a9cad406bfa8eb/docs/coordination/CURRENT_TASK.md#codex-b-essence-follows-the-reader), assigned directly by the maintainer.
+**Branch / PR:** `codex/essence-follows-reader` · [#120](https://github.com/dialectmaterial/SOL/pull/120); author does not merge.
+**Last implementation commit:** `63c5a708128718e9931ac3ca6aecf683eb3e3f40` (this report is committed afterward).
+
+### Changed files
+
+- `sol/interchange/essence.py` — stdlib-only `POSITION_VERSION = 1`, shape/version/size validation, owner-only no-follow reads, and private temporary-file/atomic-replace writes. No passage text; failed validation/replacement preserves the previous file. An existing temporary-name collision is never followed or removed.
+- `sol/being/neovim/reader.py` — opening and following share a fresh CORE capture after reader-packet validation. Launch initializes `<context>.position` and passes `--position-file` beside `--theme-file`; following writes no workspace state and strips selection text. The existing reader-owned private directory cleanup includes the position file.
+- `neovim_essence.lua`, `neovim_controls.lua`, `neovim_requests.lua` — asynchronous follow requests only while ESSENCE is open and the passage or loaded section changes. Opening seeds the last published location from the packet sent by `E`; cursor/selection changes inside a passage never send a request. One capture stays in flight; a 100 ms sampler retries failed changes at half-second intervals and survives reloads; close stops its timer. Follow requests do not take the navigation lock, but Python services captures and navigation serially.
+- `tests/test_position_exchange.py`, `test_neovim_reader.py`, `test_reader_surface_neovim.py` — exchange round trips/atomic concurrent reads, permissions/links/owner/FIFOs/size, failed replacement/temp collisions, checked same-view and cross-section passage updates, capture refusal, selection privacy, no workspace writes, no within-passage cursor/selection writes (including after 700 ms), no duplicate opening write, quiet retries, return to an earlier passage, reload survival and close lifecycle.
+- `docs/BEING.md` §6, `docs/ESSENCE.md` §4 and `CHANGELOG.md` — passage-only position exchange and measured `n`/`b` key-to-text latency with ESSENCE closed/open; the offset and selection are snapshots at entry. `CURRENT_TASK.md` changes only Codex B's slot, now In review. `sol/essence/tui/` and `tests/test_essence_*.py` are untouched.
+
+### Tests performed
+
+Python commands use `/home/dima/Projects/code/sol/.venv/bin/python -B` (Python 3.14.8).
+
+- Final `-m unittest discover -s tests` — **1,322 tests OK (7 skipped, 4 existing expected failures)**, 174.614 s; isolated XDG directories and Neovim log. Log outside Git: `/tmp/sol-pr120-full-suite.log`.
+- Focused `test_essence_position_follows_only_passage_or_section_changes_and_stops_on_close` — **1 test OK**, 2.710 s. Its real-terminal stub and invented passages verify zero cursor/selection traffic after the old throttle interval, passage/section updates, failed-capture retry, reload and close. The full suite also covers the existing exchange and controller guards.
+- Real book in tmux 140×40, real companion Textual app at #121 commit `99f4c6d`, 8 measured presses per key/condition after a discarded warmup: loaded-passage `n`/`b` medians closed **37.1/38.3 ms**, open **37.2/38.0 ms**; across the loaded-section boundary closed **356.5/379.5 ms**, open **365.1/357.8 ms**. BEING §6 records ranges, method and limits. Exactly **36 follow requests for 36 transitions**, and **zero requests** from six within-passage cursor moves over 0.9 s plus a one-second wait. Timing harness and private raw data remain outside Git in `/tmp/sol-pr120-latency.py` and `/tmp/sol-pr120-latency-final/`. Corpus index SHA-256 remains `91b1d25a60a914bd3644df038179583c8690b396cecb2e676ddfc2d6a6f36269`.
+- `scripts/check_docs.py` and `git diff --check` — OK; external URLs are not network-checked. `git merge origin/main` was already up to date; `origin/main` remained `b2a5fb7` at final validation. All stacked HANDOFF/CHANGELOG entries are retained. No private corpus, PDF, workspace or analysis export is committed.
+
+### Outstanding issues
+
+**Merge order: this PR must not merge before Claude's [ESSENCE workspace PR #121](https://github.com/dialectmaterial/SOL/pull/121) adding `--position-file`.** Current main's TUI does not accept that option; this PR supplies only the BEING side and exchange, as assigned. The latency probe uses the real companion app from a fixed private checkout snapshot; it does not put that app on this branch. No manual Alacritty/Kitty reading trial is claimed. Captures still share the serial Python request channel, so a section key pressed during a legitimate passage-change capture can wait for it; the settled-key measurements in BEING §6 do not claim otherwise.
+
+The supplied checkout has read-only Git metadata. Work/publication uses `/tmp/sol-pr120-review`, cloned from the published branch; task files are mirrored to the supplied workspace without changing its Git metadata. Review the published branch.
+
+### Decisions requiring approval
+
+None reserved: the maintainer approved following on 24 October. Defaults the maintainer may overrule: 100 ms Lua sampling, no same-passage writes, one follow request in flight, silent half-second retry after a failed passage/section change, and retaining the opening context as the separate return anchor. CORE remains responsible for source authority; the stdlib-only exchange checks its transient envelope shape rather than importing either interface or CORE.
 
 
 ## Sentence segmentation audit — 23 October 2026
