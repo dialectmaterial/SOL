@@ -14,6 +14,7 @@ def main(arguments=None):
     parser.add_argument("--theme", choices=READER_THEMES, default=DEFAULT_READER_THEME,
                         help="the reader's theme, which ESSENCE follows")
     parser.add_argument("--theme-file", help="private file the reader rewrites when its theme changes")
+    parser.add_argument("--position-file", help="private file the reader replaces when its passage changes")
     options = parser.parse_args(arguments)
     if not textual_available():
         print(f"sol: {TEXTUAL_HINT}", file=sys.stderr)
@@ -24,7 +25,8 @@ def main(arguments=None):
         print(f"sol: cannot open ESSENCE: {error}", file=sys.stderr)
         return 2
     from sol.essence.tui.app import EssenceApp
-    return EssenceApp(context, theme=options.theme, theme_file=options.theme_file).run() or 0
+    return EssenceApp(context, theme=options.theme, theme_file=options.theme_file,
+                      position_file=options.position_file).run() or 0
 
 
 if __name__ == "__main__":

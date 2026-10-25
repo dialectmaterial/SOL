@@ -15,7 +15,7 @@ BEING is the place to **read Hegel's *Science of Logic***, locate source evidenc
 
 ## 2. What is implemented
 
-`sol` invokes a **single native Neovim 0.11+ reader** with a private SOL configuration. Personal Neovim/LazyVim settings are neither loaded nor changed. The reader uses only its integrated mode; checkout surface experiments and the separate research-export mode have been removed. `sol` and `sol being` open it; there is no other engine.
+`sol` invokes a **single native Neovim 0.11+ reader** with a private SOL configuration. Personal Neovim/LazyVim settings are neither loaded nor changed. An unusable editor executable is reported with a reinstall hint, including if it disappears between preflight and launch. The reader uses only its integrated mode; checkout surface experiments and the separate research-export mode have been removed. `sol` and `sol being` open it; there is no other engine.
 
 Python owns source verification and IDs (CORE), lineage, actions and workspace persistence (BEING). Neovim owns disposable buffers, layout, input, motions and visual styling. A view contains **at most 64 canonical paragraphs**, divided into bounded reading sections; the reading position is a UUID plus source-codepoint offset, *never* a Neovim buffer address or screen row. Reloading a section in the same native Neovim process preserves the semantic contract. The reader can display adjacent passages continuously or one passage at a time. The book is **not** one unbounded editor buffer.
 
@@ -93,7 +93,7 @@ passages come last in book order. The order lasts only for the reader session,
 with nothing new saved in the workspace. Naming, renaming and sorting leave the
 reading position unchanged. The three quick markers keep their existing controls.
 
-**Your own keys:** `~/.config/sol/keys.json` (under `XDG_CONFIG_HOME` when set) moves reader keys: `{"version": 1, "keys": {"n": "J", "b": "K"}}` makes `J` do what `n` does, and `n` then does nothing. Keys are written in Neovim's notation (`<C-n>`, `gp`); two keys can swap. Only reader keys move, not keys inside panels such as Enter or `D`. Checked in a real terminal on the book (tmux, 20 October): `/` with "770 matches in 305 passages", `Ctrl-N` about 0.25 s within a passage and about 1 s to the next, `gp`/a remapped `P` to pages 100, 240 and 500, `M`/`L` naming, listing and reopening, and `S` opening one Zathura window that the next `S` turned from PDF page 158 to 372. `?` lists your keys under their own heading, and a key SOL does not use is named in a warning. A malformed file stops SOL with its path rather than guessing. The file is data passed to the private Neovim configuration; it cannot run commands, and the user's own Neovim configuration still never loads.
+**Your own keys:** `~/.config/sol/keys.json` (under `XDG_CONFIG_HOME` when set) moves reader keys: `{"version": 1, "keys": {"n": "J", "b": "K"}}` makes `J` do what `n` does, and `n` then does nothing. Keys are written in Neovim's notation (`<C-n>`, `gp`); two keys can swap. Only reader keys move, not keys inside panels such as Enter or `D`. Checked in a real terminal on the book (tmux, 20 October): `/` with "770 matches in 305 passages", `Ctrl-N` about 0.25 s within a passage and about 1 s to the next, `gp`/a remapped `P` to pages 100, 240 and 500, `M`/`L` naming, listing and reopening, and `S` opening one Zathura window that the next `S` turned from PDF page 158 to 372. `?` lists your keys under their own heading, and a key SOL does not use is named in a warning. A malformed file stops SOL with its path rather than guessing. If different spellings name an equivalent source or destination key (for example `<C-n>`/`<c-N>` or `<C-i>`/`<Tab>`), the reader warns and keeps all default keys for that session; it does not partially apply the remappings. The file is data passed to the private Neovim configuration; it cannot run commands, and the user's own Neovim configuration still never loads.
 
 **Complete book search:** `/` lists every matching passage and gives the total
 occurrence count. Enter opens a passage's
@@ -153,11 +153,16 @@ readable text takes about 2.0–2.3 s.
 
 The note path is limited to eight distinct notes; links back to an open note are marked as cycles. A view accepts at most 64 body paragraphs, lists up to 128 further links, and refuses text over 1 MiB or a presentation over 4 MiB. Limits are disclosed rather than silently truncating source text. Missing/unlinked notes are refused without substituted text; the corpus contract already refuses broken canonical note links on load. Backspace revisits the checked panel already shown, while following a new link makes a new checked request. These are presentation defaults. Controller and headless Neovim checks cover both modes, forward/reverse selections, styling, callouts, nested links, refusal and narrow widths; sustained manual terminal reading remains untested.
 
+**ESSENCE window resizing:** resizing keeps the active ESSENCE terminal focused.
+If a split becomes too narrow while the reader or its outline has focus,
+ESSENCE hides until `E` reopens the same process; when ESSENCE itself has
+focus it becomes fullscreen. Keyboard input stays with the visible active view.
+
 **Native motions and outline:** use `j/k` for wrapped rows. Up/Down retain native Neovim buffer-line motion; they are not currently mapped to the same visual-row actions. The single vertical outline has no shipped horizontal-layout switch.
 
-**Help and outline:** `?` groups the keys under Reading, Finding your way, Text, sources and notes, ESSENCE and Leaving, with headed sections and descriptions that wrap under their own column. `t` opens the outline as a centred panel at most 84 columns wide with ▾/▸ for open and closed branches, ● and the heading colour on the current section, and each section's printed page at the right; titles too long for a line end in an ellipsis. Screenshot-checked in foot on the book.
+**Help and outline:** `?` groups the keys under Reading, Finding your way, Text, sources and notes, ESSENCE and Leaving, with headed sections and descriptions that wrap under their own column. `t` opens the outline as a centred panel at most 84 columns wide with ▾/▸ for open and closed branches, ● and the heading colour on the current section, and each section's printed page at the right; titles too long for a line end in an ellipsis measured in display cells. Deep indentation is bounded to keep fold/current markers visible, and a compact key hint keeps Esc visible at 40 columns. Screenshot-checked in foot on the book.
 
-**Opening screen:** while the reader loads the book and prepares its first view, the terminal shows SOL's title (the maintainer's SOL / ORGANIZES / LOGIC lettering, SOL's recursive name) in the reader theme's colours. Beneath it the first movement of the *Logic* plays: the full ● of Being and the empty ○ of Nothing travel toward each other, vanish into ◉, Becoming, and part again, while the words *Being · Nothing · Becoming* light in turn. It is drawn on the alternate screen by one thread from the moment the reader is chosen until Neovim takes the screen, which draws over its last frame. It steps aside for any question (actor, workspace, first corpus) and for errors, which print on the ordinary screen. Keys typed meanwhile are not echoed and are discarded, so they cannot act in the reader. Small terminals get a compact title; `SOL_NO_SPLASH=1` turns it off. Measured with Codex's #47 on this machine: about 1.2–1.8 s before Neovim starts.
+**Opening screen:** while the reader loads the book and prepares its first view, the terminal shows SOL's title (the maintainer's SOL / ORGANIZES / LOGIC lettering, SOL's recursive name) in the reader theme's colours. Beneath it the first movement of the *Logic* plays: the full ● of Being and the empty ○ of Nothing travel toward each other, vanish into ◉, Becoming, and part again, while the words *Being · Nothing · Becoming* light in turn. It is drawn on the alternate screen by one thread from the moment the reader is chosen until Neovim takes the screen, which draws over its last frame. It steps aside for any question (actor, workspace, first corpus) and for errors, which print on the ordinary screen. Keys typed meanwhile are not echoed and are discarded, so they cannot act in the reader. Small terminals get a compact title and an animation track that fits their columns; `SOL_NO_SPLASH=1` turns it off. Measured with Codex's #47 on this machine: about 1.2–1.8 s before Neovim starts.
 
 **Refused moves:** every move in the reader (sections, `b/n` across sections, tree, markers, search results, history and sources opened from ESSENCE) first accepts the position the screen shows, then prepares the destination's view, and saves the destination only once that view is ready. A jump within the current paragraph is its own history entry, so Alt-Left returns to the earlier cursor. On refusal the shown view and history remain in place; the outgoing displayed cursor may already be checkpointed. There is no claim of one transaction across that checkpoint and the destination. A recoverable preparation/storage failure permits retry, history return and reopen at the accepted UUID/codepoint. Another session's newer save remains authoritative and is never overwritten; moves stay refused until SOL is reopened. A stale generation requires resolving the corpus mismatch before retrying. Editor publication failures have the §7 recovery limit.
 
@@ -167,7 +172,7 @@ Controller tests inject failures in destination view preparation, position captu
 
 **Quitting:** `q` and `Ctrl-q` only show quitting instructions, since they are easy to hit by accident: `:q` or `:qa` (also `:wq`, `:x`) save the exact position, a selection included, and quit; `:qa!` still quits without saving. Popups, the outline and ESSENCE keep `q` for closing.
 
-**Panels and status line:** the `c` panel opens beside the page when the reader's columns leave at least 34 spare (the page moves left; the panel takes at most 64 columns and the page's height), and over the page when they do not; footnotes, search results, help and the note editor (`a`, `e`) open the same way; the editor then takes the page's full height. The panel names the passage, its place in the book and its pages, then Footnotes, Your notes (dates in local time), Markers and About this text as separate headed sections. The status line shows the cursor's place in the book (a breadcrumb of section titles and the page), the reading mode, focus, how far through the book the cursor is, and `? keys · :q quit`. Clipboard, quitting and panel placement are tested in headless Neovim and through a real session in tmux on the book (copy read back with `wl-paste`, `:q` exit 0, panel placement); not yet checked by hand in Alacritty or Kitty.
+**Panels and status line:** the `c` panel opens beside the page when the reader's columns leave at least 34 spare (the page moves left; the panel takes at most 64 columns and the page's height), and over the page when they do not; footnotes, search results, help and the note editor (`a`, `e`) open the same way; the editor then takes the page's full height. The panel names the passage, its place in the book and its pages, then Footnotes, Your notes (dates in local time), Markers and About this text as separate headed sections. The status line shows the cursor's place in the book (a breadcrumb of section titles and the page), the reading mode, focus, how far through the book the cursor is, and `? keys · :q quit`. At narrow widths, the status shortens its mode/help labels and omits book progress (then the mode label) when needed to keep the search occurrence count and quit hint readable. Help continuations retain their description column at 40 columns. Clipboard, quitting and panel placement are tested in headless Neovim and through a real session in tmux on the book (copy read back with `wl-paste`, `:q` exit 0, panel placement); not yet checked by hand in Alacritty or Kitty.
 
 **Personal notes:** `a` writes a note on the whole passage through the workspace service (actor, content digest, revision history). A selection appears above the editor as context but is not stored: no workspace schema records spans. `Ctrl-S` or `:w` saves; `Ctrl-C` discards. Temporary `-n` sessions refuse personal notes. In `c`, each workspace note shows its author, date and revision, and says when its passage has changed since it was written or when it was written on a retired record ID. `e` opens the note under the cursor (or the only one) in the same editor as `a`; `r` lists its versions, newest first. A save goes through the workspace's edit service: only the note's author can edit it, a newer revision saved from another session refuses the save, and so does a corpus that changed since the reader opened. The note keeps its ID, target and original source digest, so an edit never rebinds it to newer text; a save that changes nothing adds no revision. A refused save keeps the draft for the next `e`. Notes cannot be deleted, hidden or retracted; that needs a retention decision. Tested in headless Neovim and through the controller; not yet used by hand.
 
@@ -289,8 +294,61 @@ A narrow, demonstrable first scenario: read a chapter → select scope → initi
 **Launch boundary (stage D):** `sol.being.neovim.reader` uses the stdlib-only
 `sol.interchange.essence` context format and Textual probe, so opening ESSENCE
 does not import its interface into the reader. The context directory belongs
-to the reader and is removed at its exit; format, messages and return behavior
-are unchanged ([Architecture §9, I1](ARCHITECTURE.md#launch-exchange-outside-the-logical-hierarchy-i1)).
+to the reader and is removed at its exit
+([Architecture §9, I1](ARCHITECTURE.md#launch-exchange-outside-the-logical-hierarchy-i1)).
+
+**Decision (maintainer, 24 October 2026): ESSENCE follows the reader while open.**
+Beside the opening context, the reader publishes `<context>.position` and passes
+its path as `--position-file`, next to `--theme-file`. Version 1 has exactly
+`version`, a fresh checked CORE v1 `reference` envelope, nonnegative codepoint
+`cursor_offset`, `selection` (an object of IDs, offsets and digests, or null),
+and a heading/page `label`; it contains no passage text. Passage and section
+changes, including search, marker and history jumps, trigger an update; cursor
+motion and selection changes within a passage never trigger a write. The offset
+and selection describe the opening or latest passage/section transition, not a
+live caret. The opening position is already published, so returning focus to
+the reader does not write it again.
+A background action validates the editor packet and freshly captures its CORE
+reference through the same boundary used by `E`. A failed capture publishes
+nothing, keeps the last complete position and does not interrupt reading.
+Files are owner-only, bounded to 256 KiB and read without following a symlink;
+the writer uses a private temporary file and atomic rename. ESSENCE polls the
+position twice a second (Claude's companion workspace change). Closing ESSENCE
+stops following; reader exit removes the private directory and its position
+file. The opening context remains the separate return anchor.
+
+**Passage-key latency (24 October 2026, after review):** real private corpus
+(4,629 records / 1,803 passages), Neovim 0.12.6, Python 3.14.8, tmux 140×40,
+width 72, one-paragraph mode and a disposable workspace. The probe sends a key
+with `tmux send-keys` and polls `capture-pane` every 5 ms until the destination
+passage's first seven words are visible. Times include tmux command/polling
+overhead. Eight samples per key/condition follow one discarded warmup; each key
+has a one-second settling interval. Loaded-passage steps use the last two
+passages of one section; the section steps cross its genuine loaded boundary.
+
+| Boundary / key | ESSENCE closed, median (range), ms | ESSENCE open, median (range), ms |
+| --- | ---: | ---: |
+| Within loaded section, `n` | 37.1 (21.5–38.6) | 37.2 (24.1–50.0) |
+| Within loaded section, `b` | 38.3 (37.0–51.5) | 38.0 (25.5–41.0) |
+| Across loaded-section boundary, `n` | 356.5 (332.5–383.2) | 365.1 (347.4–592.6) |
+| Across loaded-section boundary, `b` | 379.5 (338.5–397.0) | 357.8 (340.5–606.3) |
+
+Both columns cross a passage boundary. ESSENCE was the real Textual app beside
+the reader, using [companion PR #121](https://github.com/dialectmaterial/SOL/pull/121)
+at commit `99f4c6d` through
+only the child process's `PYTHONPATH`; BEING, CORE checks and the inherited
+request channel ran from this branch. The companion is not yet on `main`, so
+this is an integration measurement with that prerequisite, not a claim that
+main already accepts `--position-file`. No test suite ran alongside this probe;
+other host load was uncontrolled. Six cursor moves over 0.9 s within a settled
+passage, then a further one-second wait, added **zero Python requests**.
+The 36 passage transitions with ESSENCE open produced 36 follow requests
+(median Python handling 208.3 ms). Those legitimate captures still occupy the
+serial Python channel; these settled-key measurements do not bound a rapid
+section key queued behind one. This is automated terminal evidence, not a human reading trial. Probe,
+raw samples and temporary workspace stay outside Git under
+`/tmp/sol-pr120-latency.py` and `/tmp/sol-pr120-latency-final/`; no private
+passage text is published.
 
 **Opening and returning from ESSENCE:** `E` (in normal or visual mode) captures the reader's exact position and selection first, then asks Python to check the reader's position against the corpus and write a private context file (reference, cursor, the selection's offsets and digests, a heading label; no book text), then opens ESSENCE in a Neovim terminal float on the right, the page re-centring in the remaining columns. Below 100 columns it opens fullscreen. In ESSENCE, Alt-F toggles fullscreen and beside, Alt-R returns to the reader (leaving ESSENCE beside it, or hiding it when there is no room), and `E` in the reader returns to ESSENCE; these are Neovim terminal-mode mappings, and every other key goes to ESSENCE. ESSENCE survives section changes in the reader. Alt-R and leaving (`q`) return to that captured position and selection, endpoints and direction included (once; after a section change the reader stays where it is). Leaving ends the process, closes its window and re-widens the page; a process that fails to start or exits with an error is reported and the reader stays where it was. Without Textual, `E` explains how to install the extra. Tested in headless Neovim with a real terminal process; the real app was also run inside Neovim's terminal, with keys typed through terminal mode. **Not yet tried by hand** in Alacritty or Kitty.
 

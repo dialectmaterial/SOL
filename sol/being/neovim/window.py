@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 
+from sol.presentation.text import safe_output
 from sol.presentation.theme import READER_THEMES
 from sol.presentation.theme import _PALETTES
 
@@ -82,7 +83,7 @@ def terminal_command(terminal, inner, *, size=DEFAULT_SIZE, theme=DEFAULT_THEME,
 def main(arguments=None, *, which=shutil.which, popen=subprocess.Popen):
     parser = argparse.ArgumentParser(
         prog="sol-window", description="Open the SOL reader in its own window, in a book face.",
-        epilog="Other options are passed to sol, e.g. sol-window -w NAME.")
+        epilog="Other options are passed to sol, e.g. sol-window --workspace NAME.")
     parser.add_argument("--terminal", choices=TERMINALS, help="default: the first of foot, kitty, alacritty found")
     parser.add_argument("--font-size", type=int, default=DEFAULT_SIZE, metavar="POINTS")
     parser.add_argument("--theme", choices=READER_THEMES, default=DEFAULT_THEME,
@@ -98,10 +99,18 @@ def main(arguments=None, *, which=shutil.which, popen=subprocess.Popen):
     inner = [sys.executable, "-m", "sol", "--theme", options.theme, *rest]
     command = terminal_command(terminal, inner, size=options.font_size, theme=options.theme,
                                colors_section=_foot_colors_section(which) if terminal == "foot" else "")
-    environment = {**os.environ, "FONTCONFIG_FILE": str(font_config())}
+    try:
+        environment = {**os.environ, "FONTCONFIG_FILE": str(font_config())}
+    except OSError as error:
+        print("sol-window: cannot prepare the reading font: " + safe_output(error), file=sys.stderr)
+        return 2
     # The window outlives this command, which returns to the shell at once.
-    popen(command, env=environment, start_new_session=True,
-          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        popen(command, env=environment, start_new_session=True,
+              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as error:
+        print(f"sol-window: cannot open {terminal}: " + safe_output(error), file=sys.stderr)
+        return 2
     return 0
 
 

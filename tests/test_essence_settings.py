@@ -37,16 +37,13 @@ class StudySettingsTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
         self.addCleanup(env.stop)
 
     async def run_study(self, app, pilot):
-        app.query_one("#run").focus()
-        # A held/just-pressed button suppresses another Enter during its
-        # activation animation; each attempt must actually press Run.
-        await pilot.pause(0.25)
+        app.action_menu()
         await pilot.press("enter")
         await app.workers.wait_for_complete()
         await pilot.pause()
 
     async def choose_sort(self, app, pilot, option):
-        from sol.essence.tui.app import WordSort
+        from sol.essence.tui.results import WordSort
         app.query_one("#frequencies").focus()
         await pilot.press("s")
         self.assertIsInstance(app.screen, WordSort)
@@ -66,20 +63,23 @@ class StudySettingsTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
         app = EssenceApp(file_context(self.state))
         with patch("sol.essence.analyze_tfidf", wraps=analyze_tfidf) as analyze:
             async with app.run_test(size=(80, 24)) as pilot:
-                await pilot.press("3", "down", "down", "enter")
+                await pilot.press("t")
                 self.assertTrue(app.query_one("#tfidf-settings").display)
                 self.assertEqual(app.query_one("#top-n").value, "20")
-                app.query_one("#target").focus()
-                await pilot.press("down", "down", "down", "enter")
+                await pilot.press("f")
                 app.query_one("#target-file").value = str(self.target)
                 for value in ("2", "1", "1000"):
-                    await pilot.press("3")
+                    app.action_menu()
+                    await pilot.press("n")
                     top = app.query_one("#top-n")
-                    top.focus()
-                    await pilot.press("ctrl+shift+a", *value)
-                    await self.run_study(app, pilot)
+                    self.assertIs(app.focused, top)
+                    top.value = value
+                    await pilot.press("enter")  # Enter in a menu field runs the study.
+                    await app.workers.wait_for_complete()
+                    await pilot.pause()
                     self.assertEqual(analyze.call_args.kwargs, {"top_n": int(value)})
-                    self.assertIn(f"top {value} terms each", str(app.query_one("#summary").render()))
+                    self.assertIn(f"top {value} terms each", str(app.query_one("#tfidf-metrics").render()))
+                    self.assertIn(f"top {value} terms each", str(app.query_one("#tfidf-summary").render()))
                     self.assertEqual(app.last_count.study["top_n"], int(value))
                     artifact = json.loads(app.last_saved.read_text(encoding="utf-8"))
                     self.assertEqual(artifact["top_n"], int(value))
@@ -87,7 +87,7 @@ class StudySettingsTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 await pilot.press("ctrl+q")
         # Investigation v1 has never stored study choices. Preserve its shape.
         self.assertEqual(json.loads(self.state.read_text()),
-                         {"version": 1, "screen": "results", "origin": "bbbbbbbb-0000-4000-8000-000000000002"})
+                         {"version": 1, "screen": "workspace", "origin": "bbbbbbbb-0000-4000-8000-000000000002"})
         app = EssenceApp(file_context(self.state))
         async with app.run_test() as pilot:
             self.assertEqual(app.query_one("#top-n").value, "20")
@@ -99,22 +99,22 @@ class StudySettingsTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
         app = EssenceApp(file_context(self.state))
         with patch("sol.essence.analyze_tfidf") as analyze:
             async with app.run_test(size=(100, 36)) as pilot:
-                await pilot.press("3", "down", "down", "enter")
+                await pilot.press("t")
                 for value in ("", "0", "-1", "1001", "2.5", "word", "1e2", "9" * 5000):
                     with self.subTest(value=value[:12]):
                         app.query_one("#top-n").value = value
                         await self.run_study(app, pilot)
                         self.assertIn("integer from 1 to 1,000", str(app.query_one("#status").render()))
                         self.assertIs(app.focused, app.query_one("#top-n"))
-                        self.assertEqual(app.query_one("#screens").active, "experiment")
+                        self.assertTrue(app.query_one("#menu").display)
                         self.assertEqual(app.count_serial, 0)
-                        self.assertTrue(app.query_one("#cancel").disabled)
+                        self.assertFalse(app.counting)
                 analyze.assert_not_called()
                 self.assertIsNone(app.last_count)
                 self.assertFalse((self.root / "data").exists())
                 # Hidden TF-IDF settings cannot block the other studies.
-                app.query_one("#study").focus()
-                await pilot.press("up", "up", "enter")
+                app.query_one("#menu").focus()
+                await pilot.press("w")
                 self.assertFalse(app.query_one("#tfidf-settings").display)
                 app.exit()
 
@@ -152,24 +152,28 @@ class StudySettingsTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                         # A sorted row navigates to that word, never its old row number.
                         await pilot.press(*(["up"] * table.row_count), "down", "enter")
                         self.assertIs(app.focused, app.query_one("#sources"))
-                        self.assertTrue(app.shown_sources)
-                        for item in app.shown_sources:
+                        view = app.query_one("#words-view")
+                        self.assertTrue(view.shown_sources)
+                        for item in view.shown_sources:
                             self.assertEqual(item["context"]["word"], expected.split()[1])
                         await pilot.press("escape")
                         self.assertIs(app.focused, table)
-            self.assertEqual(table.get_row_at(4)[-1], "absent in reference")
-            self.assertEqual(table.get_row_at(5)[-1], "absent in target")
+            self.assertIn("∅ reference", str(table.get_row_at(4)[-1]))
+            self.assertIn("∅ target", str(table.get_row_at(5)[-1]))
             selected_word = table.get_row_at(table.cursor_row)[0]
             await pilot.resize_terminal(120, 40)
             await pilot.pause()
+            await pilot.pause()
+            view = app.query_one("#words-view")
             self.assertEqual(table.get_row_at(table.cursor_row)[0], selected_word)
-            self.assertEqual(app.word_sort, (6, True))
+            self.assertEqual(view.word_sort, (6, True))
             # Escape cancels a menu; engine order can be restored explicitly.
             await pilot.press("s", "home", "escape")
-            self.assertEqual(app.word_sort, (6, True))
+            self.assertEqual(view.word_sort, (6, True))
             await self.choose_sort(app, pilot, 0)
             self.assertEqual([table.get_row_at(i)[0] for i in range(table.row_count)], engine_order)
-            self.assertIn("Engine order (default)", str(app.query_one("#sort-status").render()))
+            self.assertEqual(view.word_sort, (None, False))
+            self.assertNotIn("ascending", str(app.query_one("#sort-status").render()))
             self.assertEqual(json.dumps(count.comparison, sort_keys=True), original)
             app.exit()
 
@@ -191,13 +195,16 @@ class StudySettingsTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                     for descending in (0, 1):
                         await self.choose_sort(app, pilot, 1 + column * 2 + descending)
                         self.assertEqual([table.get_row_at(i)[0] for i in range(table.row_count)], expected)
-                        self.assertEqual(table.get_row_at(0)[column],
-                                         "undefined" if column < 5 else f"empty {empty_side}")
+                        labels = [str(label.label).strip() for label in table.columns.values()]
+                        rates = [index for index, label in enumerate(labels) if label == "/10k"]
+                        cells = table.get_row_at(0)
+                        self.assertEqual(str(cells[rates[1 if empty_side == "reference" else 0]]).strip(), "undefined")
+                        self.assertIn(f"empty {empty_side}", str(cells[-1]))
             empty = words.run(file_context(), "file", "file", target_file=self.reference, reference_file=self.reference)
             app.show_result(empty, None)
             await self.choose_sort(app, pilot, 14)
             self.assertEqual(table.row_count, 0)
-            self.assertEqual(app.shown_sources, ())
+            self.assertEqual(app.query_one("#words-view").shown_sources, ())
             app.exit()
 
     async def test_sort_is_before_display_limit_exports_keep_exact_engine_content_and_new_runs_reset(self):
@@ -218,8 +225,8 @@ class StudySettingsTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(table.row_count, 3)
                     self.assertEqual(table.get_row_at(0)[0], "low" if option == 13 else "zeta")
                     for fmt in ("csv", "tsv"):
-                        app.query_one(f"#export-{fmt}").focus()
-                        await pilot.press("enter")
+                        table.focus()
+                        await pilot.press("e" if fmt == "csv" else "E")
                         await app.workers.wait_for_complete()
                         await pilot.pause()
                         status = app.query_one("#result-status").content
@@ -230,5 +237,5 @@ class StudySettingsTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 new_count = words.run(file_context(), "file", "file", target_file=self.target,
                                       reference_file=self.reference)
                 app.show_result(new_count, None)
-                self.assertEqual(app.word_sort, (None, False))
+                self.assertEqual(app.query_one("#words-view").word_sort, (None, False))
                 app.exit()

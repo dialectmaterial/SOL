@@ -70,42 +70,117 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
         self.addCleanup(temporary.cleanup)
         self.state = Path(temporary.name) / "state" / "investigation.json"
 
-    async def test_screens_switch_and_leaving_saves_only_the_open_screen(self):
+    async def test_views_switch_and_leaving_saves_only_the_open_view(self):
+        from textual.widgets import TabbedContent
         from sol.essence.tui.app import EssenceApp
+        from sol.essence.tui.reference import ReferenceScreen
 
         app = EssenceApp(context(self.state))
         async with app.run_test(size=(60, 24)) as pilot:
-            origin = str(app.query_one("#origin").render())
-            self.assertIn("Invented section | p. 7", origin)
-            self.assertIn(TARGET[:8], origin)
-            for key, screen in (("3", "experiment"), ("1", "encyclopedia"), ("4", "results")):
-                await pilot.press(key)
-                self.assertEqual(app.query_one("#screens").active, screen)
+            self.assertIn("Invented section | p. 7", str(app.query_one("#header").render()))
+            # The study menu is home until a study has run.
+            self.assertIs(app.focused, app.query_one("#menu"))
+            await pilot.press("M")
+            self.assertIsInstance(app.screen, ReferenceScreen)
+            self.assertEqual(app.screen.query_one("#catalogs", TabbedContent).active, "encyclopedia")
+            await pilot.press("2")
+            self.assertEqual(app.screen.query_one("#catalogs", TabbedContent).active, "methods")
             await pilot.press("q")
         self.assertEqual(json.loads(self.state.read_text()),
-                         {"version": 1, "screen": "results", "origin": TARGET})
+                         {"version": 1, "screen": "methods", "origin": TARGET})
         self.assertEqual(self.state.stat().st_mode & 0o777, 0o600)
-        # The next opening returns to the same screen, at any size.
+        # The next opening returns to the same view, at any size.
         app = EssenceApp(context(self.state))
         async with app.run_test(size=(140, 40)) as pilot:
             await pilot.pause()
-            self.assertEqual(app.query_one("#screens").active, "results")
+            self.assertIsInstance(app.screen, ReferenceScreen)
+            self.assertEqual(app.screen.query_one("#catalogs", TabbedContent).active, "methods")
+            await pilot.press("escape")
+            self.assertNotIsInstance(app.screen, ReferenceScreen)
             await pilot.press("ctrl+q")
         self.assertFalse(app.is_running)
+        self.assertEqual(json.loads(self.state.read_text())["screen"], "workspace")
+        # A state from the former four screens opens the workspace.
+        self.state.write_text(json.dumps({"version": 1, "screen": "results", "origin": TARGET}))
+        app = EssenceApp(context(self.state))
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            self.assertNotIsInstance(app.screen, ReferenceScreen)
+            await pilot.press("q")
 
     async def test_temporary_sessions_save_nothing_and_unreadable_state_is_ignored(self):
         from sol.essence.tui.app import EssenceApp
+        from sol.essence.tui.reference import ReferenceScreen
 
         app = EssenceApp(context())
         async with app.run_test() as pilot:
-            await pilot.press("2", "q")
+            await pilot.press("M", "q")
         self.assertFalse(self.state.exists())
         self.state.parent.mkdir(parents=True)
         self.state.write_text("not json", encoding="utf-8")
         app = EssenceApp(context(self.state))
         async with app.run_test() as pilot:
             await pilot.pause()
-            self.assertEqual(app.query_one("#screens").active, "encyclopedia")
+            self.assertNotIsInstance(app.screen, ReferenceScreen)
+            self.assertIs(app.focused, app.query_one("#menu"))
+            await pilot.press("q")
+
+    async def test_the_opening_shows_the_chosen_studys_method_and_names_m(self):
+        from sol.essence.tui.app import EssenceApp
+
+        app = EssenceApp(context())
+        async with app.run_test(size=(86, 48)) as pilot:
+            await pilot.pause()
+            primer = app.query_one("#primer-method")
+            self.assertTrue(app.query_one("#primer").display)
+            self.assertIn("Word frequencies", primer.source)
+            footer = " ".join(active.binding.description for active in app.screen.active_bindings.values()
+                              if active.binding.show)
+            self.assertIn("Encyclopedia", footer)
+            # Choosing another study before any run updates the header and the method shown.
+            await pilot.press("s")
+            await pilot.pause()
+            self.assertIn("sentences", str(app.query_one("#header").render()))
+            self.assertNotIn("words", str(app.query_one("#header").render()).split("   ")[0])
+            self.assertIn("Sentence", primer.source)
+            await pilot.press("w", "B")
+            await pilot.pause()
+            self.assertIn("comparison", primer.source.lower())
+            # The reference frame names its catalog; the entry's heading names the entry.
+            await pilot.press("M")
+            await pilot.pause()
+            self.assertEqual(app.screen.query_one("#encyclopedia-detail").border_title, "Encyclopedia")
+            await pilot.press("q")
+
+    async def test_keys_typed_in_a_burst_reach_the_menu_r_just_opened(self):
+        from textual import events
+        from sol.essence.tui import words
+        from sol.essence.tui.app import EssenceApp
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invented.txt"
+            path.write_text("Being is nothing. Nothing is being.", encoding="utf-8")
+            count = words.run(context(), "file", "none", target_file=path)
+        app = EssenceApp(context())
+        async with app.run_test(size=(86, 48)) as pilot:
+            app.last_run = ("words", "file", "none", str(path), "", 20)
+            app.show_result(count, None)
+            await pilot.pause()
+            # The reader's terminal delivers `r s c` at once, before any refresh.
+            for key in ("r", "s", "c"):
+                app.post_message(events.Key(key, key))
+            await pilot.pause()
+            menu = app.query_one("#menu")
+            self.assertIs(app.focused, menu)
+            self.assertEqual((menu.study, menu.target), ("sentences", "section"))
+            # A view's own key moves focus too: `/` then the filter's text.
+            await pilot.press("escape")
+            await pilot.pause()
+            for key, character in (("slash", "/"), ("b", "b"), ("e", "e")):
+                app.post_message(events.Key(key, character))
+            await pilot.pause()
+            await pilot.pause()
+            self.assertEqual(app.query_one("#word-filter").value, "be")
             await pilot.press("q")
 
     async def test_methods_screen_browses_every_method(self):
@@ -114,15 +189,16 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
 
         app = EssenceApp(context())
         async with app.run_test(size=(100, 30)) as pilot:
-            await pilot.press("2")
-            listing = app.query_one("#methods-list", OptionList)
+            await pilot.press("M", "2")
+            screen = app.screen
+            listing = screen.query_one("#methods-list", OptionList)
             self.assertIs(app.focused, listing)
             methods = app.methods["entries"]
             self.assertEqual(listing.option_count, len(methods))
             titles = {entry["id"]: entry["title"] for entry in app.catalog["entries"]}
             for number, method in enumerate(methods):
                 await pilot.pause()
-                shown = app.query_one("#methods-entry", Markdown).source
+                shown = screen.query_one("#methods-entry", Markdown).source
                 self.assertIn(method["title"], shown)
                 self.assertIn(method["cli"], shown)
                 if method["encyclopedia"] is not None:
@@ -131,19 +207,95 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 if number < len(methods) - 1:
                     await pilot.press("down")
             await pilot.press("enter")
-            self.assertIs(app.focused, app.query_one("#methods-detail"))
+            self.assertIs(app.focused, screen.query_one("#methods-detail"))
             await pilot.press("escape")
             self.assertIs(app.focused, listing)
             await pilot.press("q")
 
-    async def test_the_command_palette_is_off(self):
+    async def test_k_opens_the_current_study_method(self):
+        from textual.widgets import OptionList, TabbedContent
+        from sol.essence.tui.app import EssenceApp
+
+        app = EssenceApp(context())
+        async with app.run_test(size=(100, 30)) as pilot:
+            await pilot.press("t", "K")
+            await pilot.pause()
+            self.assertEqual(app.screen.query_one("#catalogs", TabbedContent).active, "methods")
+            option = app.screen.query_one("#methods-list", OptionList).highlighted_option
+            self.assertEqual(app.methods["entries"][int(option.id)]["id"], "tfidf")
+            await pilot.press("q")
+
+    async def test_the_command_palette_opens_with_a_colon_and_offers_only_essence(self):
+        from textual.command import CommandPalette
         from sol.essence.tui.app import EssenceApp
 
         app = EssenceApp(context())
         async with app.run_test() as pilot:
             await pilot.press("ctrl+p")
             self.assertEqual(len(app.screen_stack), 1)
+            await pilot.press("colon")
+            await pilot.pause()
+            self.assertIsInstance(app.screen, CommandPalette)
+            self.assertEqual(list(app.get_system_commands(app.screen)), [])
+            await pilot.press("escape")
+            await pilot.pause()
+            self.assertEqual(len(app.screen_stack), 1)
             await pilot.press("q")
+
+    async def test_draws_with_the_readers_own_palette(self):
+        from sol.essence.tui.app import EssenceApp, TEXTUAL_THEMES
+        from sol.presentation.theme import reader_palette
+
+        for name in ("mocha", "latte", "paper", "night"):
+            with self.subTest(theme=name):
+                app = EssenceApp(context(), theme=name)
+                async with app.run_test() as pilot:
+                    palette = reader_palette(name)
+                    colors = app.theme_variables
+                    self.assertEqual(app.theme, TEXTUAL_THEMES[name])
+                    for variable, role in (("background", "page"), ("foreground", "text"),
+                                           ("primary", "heading"), ("text-muted", "muted"),
+                                           ("block-cursor-background", "selection"),
+                                           ("border-blurred", "border"), ("footer-background", "page")):
+                        self.assertEqual(colors[variable].lower(), palette[role], variable)
+                    await pilot.press("q")
+
+    async def test_buttons_selections_and_an_open_palette_stay_visible_in_every_preset(self):
+        from textual.color import Color
+        from textual.command import CommandList
+        from textual.widgets import Button
+        from sol.essence.tui.app import EssenceApp, TEXTUAL_THEMES
+        from sol.presentation.theme import contrast
+
+        def hex_of(color):
+            return Color.parse(color).hex.lower()
+
+        for name in ("mocha", "latte", "paper", "night"):
+            with self.subTest(theme=name):
+                app = EssenceApp(context(), theme=name)
+                async with app.run_test(size=(120, 40)) as pilot:
+                    colors = app.theme_variables
+                    # A blurred selection differs from the page it sits on.
+                    self.assertNotEqual(hex_of(colors["block-cursor-blurred-background"]),
+                                        hex_of(colors["background"]))
+                    await pilot.press("K")
+                    await pilot.pause()
+                    button = app.screen.query_one("#use-method", Button)
+                    self.assertGreaterEqual(contrast(hex_of(button.styles.color.hex),
+                                                     hex_of(button.styles.background.hex)), 4.5)
+                    await pilot.press("escape")
+                    await pilot.pause()
+                    await pilot.press("colon")
+                    await pilot.pause(0.3)
+                    other = "latte" if name != "latte" else "mocha"
+                    app.theme = TEXTUAL_THEMES[other]
+                    await pilot.pause(0.3)
+                    # The open palette takes the new theme too.
+                    listing = app.screen.query_one(CommandList)
+                    self.assertEqual(listing.styles.background.hex.lower(),
+                                     hex_of(app.theme_variables["background"]))
+                    await pilot.press("escape")
+                    await pilot.press("q")
 
     async def test_follows_the_reader_theme_while_open(self):
         from sol.essence.tui.app import EssenceApp
@@ -152,10 +304,10 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
         theme_file.write_text("mocha", encoding="utf-8")
         app = EssenceApp(context(), theme="mocha", theme_file=str(theme_file))
         async with app.run_test() as pilot:
-            self.assertEqual(app.theme, "catppuccin-mocha")
+            self.assertEqual(app.theme, "sol-mocha")
             theme_file.write_text("latte", encoding="utf-8")
             await pilot.pause(0.8)
-            self.assertEqual(app.theme, "catppuccin-latte")
+            self.assertEqual(app.theme, "sol-latte")
             # Anything unknown, or a vanished file, leaves the theme as it is.
             for content in ("sepia", None):
                 if content is None:
@@ -163,7 +315,7 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 else:
                     theme_file.write_text(content, encoding="utf-8")
                 await pilot.pause(0.8)
-                self.assertEqual(app.theme, "catppuccin-latte")
+                self.assertEqual(app.theme, "sol-latte")
             await pilot.press("q")
 
 
@@ -307,7 +459,7 @@ class WordChoiceTests(unittest.TestCase):
 
 @unittest.skipUnless(essence_launch.textual_available(), "the essence extra (Textual) is not installed")
 class WordScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
-    async def test_count_fills_results_and_failures_stay_on_the_experiment_screen(self):
+    async def test_count_fills_results_and_failures_keep_the_menu_open(self):
         from sol.essence.tui.app import EssenceApp
 
         temporary = tempfile.TemporaryDirectory(prefix="sol-essence-screen-")
@@ -317,27 +469,31 @@ class WordScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
         with patch.object(tui_words, "engine", return_value=(FakeWords, FakeInputs)):
             app = EssenceApp({**context(), "corpus": ""})
             async with app.run_test(size=(100, 40)) as pilot:
-                await pilot.press("3")
+                # f chooses a text file and moves to its path; Enter there runs.
+                await pilot.press("f")
+                self.assertIs(app.focused, app.query_one("#target-file"))
                 app.query_one("#target-file").value = str(text)
-                for button in app.query("#target RadioButton"):
-                    button.value = button.name == "file"
-                await pilot.pause()
-                await pilot.click("#run")
+                await pilot.press("enter")
                 await app.workers.wait_for_complete()
                 await pilot.pause()
-                self.assertEqual(app.query_one("#screens").active, "results")
+                self.assertFalse(app.query_one("#menu").display)
                 table = app.query_one("#frequencies")
                 self.assertEqual(table.row_count, 2)
+                self.assertIs(app.focused, table)
                 self.assertIn("Not saved", str(app.query_one("#summary").render()))
-                # A count that cannot run says why and keeps the previous results.
-                await pilot.press("3")
+                # A count that cannot run says why and keeps the previous result.
+                await pilot.press("r")
                 app.query_one("#target-file").value = ""
-                await pilot.click("#run")
+                await pilot.press("enter")
                 await app.workers.wait_for_complete()
                 await pilot.pause()
-                self.assertEqual(app.query_one("#screens").active, "experiment")
+                self.assertTrue(app.query_one("#menu").display)
                 self.assertIn("Name a UTF-8 text file", str(app.query_one("#status").render()))
                 self.assertEqual(table.row_count, 2)
+                # Escape puts the menu away and returns to the result.
+                await pilot.press("escape")
+                self.assertFalse(app.query_one("#menu").display)
+                self.assertIs(app.focused, table)
                 app.exit()
 
 
@@ -420,13 +576,13 @@ class CountOrderTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 patch.object(EssenceApp, "show_result", lambda self, result, path: shown.append(result["label"])):
             app = EssenceApp(context(Path(tempfile.mkdtemp(prefix="sol-essence-order-")) / "state.json"))
             async with app.run_test() as pilot:
-                await pilot.press("3")
+                await pilot.press("f")
                 field = app.query_one("#target-file")
                 field.value = "a"
-                await pilot.click("#run")
-                await pilot.pause(0.4)  # A button ignores presses while it shows the last one.
+                await pilot.press("enter")
+                await pilot.pause(0.2)
                 field.value = "b"
-                await pilot.click("#run")
+                await pilot.press("enter")
                 await pilot.pause(0.2)
                 release.set()
                 await pilot.pause(0.3)
@@ -435,9 +591,9 @@ class CountOrderTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 # A count still running when ESSENCE is left publishes nothing.
                 release.clear()
                 field.value = "a"
-                await pilot.pause(0.4)
-                await pilot.click("#run")
-                await pilot.press("q")
+                field.focus()
+                await pilot.press("enter")
+                await pilot.press("ctrl+q")
             release.set()
             await asyncio.sleep(0.3)
             self.assertEqual(shown, ["b"])
@@ -468,8 +624,9 @@ def comparison_count():
 @unittest.skipUnless(essence_launch.textual_available(), "the essence extra (Textual) is not installed")
 class ComparisonScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def counted(self, app, pilot):
-        await pilot.press("3")
-        await pilot.click("#run")
+        # ESSENCE opens on the study menu; Enter runs the chosen study.
+        app.query_one("#menu").focus()
+        await pilot.press("enter")
         await app.workers.wait_for_complete()
         await pilot.pause()
 
@@ -485,9 +642,8 @@ class ComparisonScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 app._driver.write = lambda data: (written.append(data), original(data))[1]
                 await self.counted(app, pilot)
                 table = app.query_one("#frequencies")
-                self.assertEqual([str(column.label) for column in table.columns.values()][-2:],
-                                 ["Difference", "Log₂ ratio"])
-                self.assertEqual(table.get_row_at(0)[-2:], ["+1666.67", "+0.42"])
+                self.assertEqual(str(list(table.columns.values())[-1].label).strip(), "log₂ ratio")
+                self.assertTrue(str(table.get_row_at(0)[-1]).endswith("+0.42"))
                 self.assertIn(tui_words.METHOD_LINE, str(app.query_one("#summary").render()))
                 sources = app.query_one("#sources")
                 self.assertEqual(sources.row_count, 2)
@@ -507,18 +663,26 @@ class ComparisonScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                                  {"version": 1, "op": "open_source",
                                   "source": {"id": TARGET, "start": 4, "content_sha256": digest}})
                 # The text file's occurrence is listed but cannot open in the reader.
-                await pilot.press("down", "enter")
+                await pilot.press("j", "enter")
                 await pilot.pause()
                 self.assertEqual(len([data for data in written if data.startswith("\x1b]5379;")]), 1)
                 self.assertIn("cannot be opened", str(app.query_one("#result-status").render()))
                 await pilot.press("escape")
                 await pilot.pause()
                 self.assertIs(app.focused, table)
-                # Switching screens starts on that screen's first control.
-                await pilot.press("3")
-                self.assertEqual(app.focused.id, "study")
-                await pilot.press("4")
+                # r brings the study menu over the result; Escape returns to it.
+                await pilot.press("r")
+                self.assertIs(app.focused, app.query_one("#menu"))
+                await pilot.press("escape")
                 self.assertIs(app.focused, table)
+                # Fullscreen adds the difference, and the details stay beside.
+                await pilot.resize_terminal(190, 50)
+                await pilot.pause()
+                await pilot.pause()
+                labels = [str(column.label).strip() for column in table.columns.values()]
+                self.assertIn("difference", labels)
+                self.assertEqual(str(table.get_row_at(0)[labels.index("difference")]).strip(), "+1666.67")
+                self.assertTrue(app.query_one("#summary-box").display)
                 app.exit()
 
     async def test_export_writes_only_in_workspace_sessions(self):
@@ -536,7 +700,7 @@ class ComparisonScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 app = EssenceApp(context(state_file))
                 async with app.run_test(size=(120, 40)) as pilot:
                     await self.counted(app, pilot)
-                    await pilot.click("#export-tsv")
+                    await pilot.press("E")
                     await app.workers.wait_for_complete()
                     await pilot.pause()
                     status = str(app.query_one("#result-status").render())
@@ -552,13 +716,20 @@ class ComparisonScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
         from sol.essence.tui.app import EssenceApp
 
         study = FakeWords.analyze_words(object())
+        exported = []
         with patch.object(tui_words, "run", return_value=tui_words.Count(study, None, object(), None)), \
-                patch.object(tui_words, "save", return_value=None):
-            app = EssenceApp(context())
+                patch.object(tui_words, "save", return_value=None), \
+                patch.object(tui_words, "export", side_effect=lambda *arguments: exported.append(arguments)):
+            app = EssenceApp(context(Path(tempfile.mkdtemp(prefix="sol-essence-noexport-")) / "state.json"))
             async with app.run_test(size=(120, 40)) as pilot:
                 await self.counted(app, pilot)
-                self.assertTrue(app.query_one("#export-csv").disabled)
-                self.assertEqual(len(app.query_one("#frequencies").columns), 3)
+                await pilot.press("e")
+                await pilot.pause()
+                self.assertEqual(exported, [])
+                self.assertIn("Nothing to export", str(app.query_one("#result-status").render()))
+                labels = [str(column.label).strip() for column in app.query_one("#frequencies").columns.values()]
+                self.assertNotIn("log₂ ratio", labels)
+                self.assertNotIn("reference", labels)
                 app.exit()
 
     async def test_a_cancelled_count_shows_and_saves_nothing(self):
@@ -574,19 +745,162 @@ class ComparisonScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 patch.object(EssenceApp, "show_result", lambda self, count, path: shown.append(count)):
             app = EssenceApp(context(Path(tempfile.mkdtemp(prefix="sol-essence-cancel-")) / "state.json"))
             async with app.run_test(size=(120, 40)) as pilot:
-                await pilot.press("3")
-                await pilot.click("#run")
+                await pilot.press("enter")
                 await pilot.pause(0.2)
-                self.assertFalse(app.query_one("#cancel").disabled)
-                await pilot.click("#cancel")
+                self.assertIn("Esc cancels", str(app.query_one("#status").render()))
+                await pilot.press("escape")
                 await pilot.pause()
                 release.set()
                 await app.workers.wait_for_complete()
                 await pilot.pause()
                 self.assertEqual((shown, saved), ([], []))
                 self.assertIn("Cancelled", str(app.query_one("#status").render()))
-                self.assertTrue(app.query_one("#cancel").disabled)
+                self.assertFalse(app.counting)
                 app.exit()
+
+    async def test_escape_cancels_from_a_path_field_and_from_a_result(self):
+        # Review of #121: an Input or a result view must not swallow the cancelling Escape.
+        import threading
+        from sol.essence.tui.app import EssenceApp
+
+        release, shown, saved = threading.Event(), [], []
+        def run(*arguments, **files):
+            release.wait(5)
+            return comparison_count()[0]
+        with patch.object(tui_words, "run", side_effect=run), \
+                patch.object(tui_words, "save", side_effect=lambda count: saved.append(count)):
+            app = EssenceApp(context(Path(tempfile.mkdtemp(prefix="sol-essence-cancel-")) / "state.json"))
+            async with app.run_test(size=(86, 48)) as pilot:
+                await pilot.press("f")
+                app.query_one("#target-file").value = "/invented/a.txt"
+                await pilot.press("enter")  # Runs from the path field, which keeps the focus.
+                await pilot.pause(0.1)
+                self.assertTrue(app.counting)
+                self.assertIs(app.focused, app.query_one("#target-file"))
+                await pilot.press("escape")
+                self.assertFalse(app.counting)
+                release.set()
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual((app.last_count, saved), (None, []))
+                # A finished result, then a rerun cancelled from the concordance.
+                release.set()
+                app.query_one("#menu").focus()
+                await pilot.press("enter")
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                shown_count = app.last_count
+                self.assertIsNotNone(shown_count)
+                release.clear()
+                await pilot.press("enter")
+                self.assertIs(app.focused, app.query_one("#sources"))
+                await pilot.press("R")
+                await pilot.pause(0.1)
+                self.assertTrue(app.counting)
+                await pilot.press("escape")
+                self.assertFalse(app.counting)
+                self.assertIs(app.focused, app.query_one("#sources"))  # Escape only cancelled.
+                release.set()
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertIs(app.last_count, shown_count)
+                self.assertEqual(len(saved), 1)
+                self.assertIn("Cancelled", str(app.query_one("#result-status").render()))
+                app.exit()
+
+    async def test_rerun_repeats_the_request_that_ran_not_unrun_menu_edits(self):
+        # Review of #121: R reran with a path edited in the menu but never run.
+        from sol.essence.tui.app import EssenceApp
+
+        calls = []
+        def run(context, target, reference, **files):
+            calls.append((target, reference, files["target_file"], files["reference_file"]))
+            return comparison_count()[0]
+        with patch.object(tui_words, "run", side_effect=run), patch.object(tui_words, "save", return_value=None):
+            app = EssenceApp(context())
+            async with app.run_test(size=(86, 48)) as pilot:
+                await pilot.press("f")
+                app.query_one("#target-file").value = "/invented/a.txt"
+                await pilot.press("enter")
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                await pilot.press("r", "f")
+                app.query_one("#target-file").value = "/invented/b.txt"
+                await pilot.press("escape", "escape")  # Out of the field, then the menu: nothing ran.
+                self.assertFalse(app.query_one("#menu").display)
+                await pilot.press("R")
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual([call[2] for call in calls], ["/invented/a.txt", "/invented/a.txt"])
+                app.exit()
+
+    async def test_a_second_export_waits_for_the_first_even_across_a_resize(self):
+        # Review of #121: the buttons' disabled state used to prevent a second file.
+        import threading
+        from sol.essence.tui.app import EssenceApp
+
+        count, _ = comparison_count()
+        release, exported = threading.Event(), []
+        def export(chosen, table_format):
+            exported.append(table_format)
+            release.wait(5)
+            return Path("/invented/words.csv")
+        with patch.object(tui_words, "run", return_value=count), patch.object(tui_words, "save", return_value=None), \
+                patch.object(tui_words, "export", side_effect=export):
+            app = EssenceApp(context(Path(tempfile.mkdtemp(prefix="sol-essence-export-")) / "state.json"))
+            async with app.run_test(size=(86, 48)) as pilot:
+                await self.counted(app, pilot)
+                await pilot.press("e")
+                await pilot.pause(0.1)
+                await pilot.resize_terminal(190, 50)
+                await pilot.pause()
+                app.query_one("#frequencies").focus()
+                await pilot.press("e")
+                await pilot.press("E")
+                self.assertIn("still running", str(app.query_one("#result-status").render()))
+                release.set()
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual(exported, ["csv"])
+                self.assertIn("Exported:", str(app.query_one("#result-status").render()))
+                # Once finished, the next export may run.
+                await pilot.press("E")
+                await app.workers.wait_for_complete()
+                await pilot.pause()
+                self.assertEqual(exported, ["csv", "tsv"])
+                app.exit()
+
+    async def test_a_palette_entry_opens_that_topic_even_under_a_search(self):
+        # Review of #121: the palette used an unfiltered index as a filtered position.
+        from textual.widgets import Markdown
+        from sol.essence.tui.app import EssenceApp
+        from sol.essence.tui.reference import ReferenceScreen
+
+        app = EssenceApp(context())
+        async with app.run_test(size=(86, 48)) as pilot:
+            target = next(entry for entry in app.catalog["entries"] if entry["id"] == "tf-idf")
+            for search in ("Word counts", "no such topic"):
+                await pilot.press("M", "/")
+                app.screen.query_one("#encyclopedia-search").value = search
+                await pilot.pause()
+                # Enter to the list (or stay, with no matches), then Escape: the search stays.
+                await pilot.press("enter")
+                if search == "no such topic":
+                    app.screen.query_one("#encyclopedia-list").focus()
+                await pilot.press("escape")
+                self.assertNotIsInstance(app.screen, ReferenceScreen)
+                self.assertEqual(app.get_screen("reference").query_one("#encyclopedia-search").value, search)
+                await pilot.press("colon")
+                await pilot.pause()
+                await pilot.press(*f"Encyclopedia: {target['title']}")
+                await pilot.pause(0.5)
+                await pilot.press("enter")
+                await pilot.pause()
+                await pilot.pause()
+                self.assertIsInstance(app.screen, ReferenceScreen)
+                self.assertIn(target["title"], app.screen.query_one("#encyclopedia-entry", Markdown).source)
+                await pilot.press("escape")
+            app.exit()
 
     async def test_ctrl_q_leaves_and_saves_even_from_a_text_field(self):
         # Quitting the reader sends Ctrl-Q; a focused input must not swallow it.
@@ -595,11 +909,11 @@ class ComparisonScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
         state_file = Path(tempfile.mkdtemp(prefix="sol-essence-quit-")) / "state.json"
         app = EssenceApp(context(state_file))
         async with app.run_test(size=(120, 40)) as pilot:
-            await pilot.press("3")
-            app.query_one("#target-file").focus()
+            await pilot.press("f")
+            self.assertIs(app.focused, app.query_one("#target-file"))
             await pilot.press("ctrl+q")
             await pilot.pause()
-        self.assertEqual(json.loads(state_file.read_text())["screen"], "experiment")
+        self.assertEqual(json.loads(state_file.read_text())["screen"], "workspace")
 
 
 @unittest.skipUnless(_engine_installed(), "the ESSENCE stage 2 engine is not merged yet")
@@ -800,7 +1114,7 @@ class SentenceStudyTests(unittest.TestCase):
 
 @unittest.skipUnless(essence_launch.textual_available() and _engine_installed(), "needs Textual and the ESSENCE engines")
 class SentenceScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
-    async def test_sentence_results_list_the_longest_and_open_one_in_the_reader(self):
+    async def test_sentence_results_draw_the_distribution_and_open_the_longest(self):
         from sol.essence.tui import sentences as tui_sentences
         from sol.essence.tui.app import EssenceApp
 
@@ -808,7 +1122,7 @@ class SentenceScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
         study = {"version": 2, "summary": {"sentences": 2, "tokens": 11, "mean": 5.5, "median": 5.5,
                                            "p10": 3, "p90": 8, "max": 8},
                  "histogram": [{"from": 1, "to": 10, "sentences": 2}, {"from": 11, "to": None, "sentences": 0}],
-                 "by_position": {name: {"mean": 5.5} for name in ("first", "middle", "last", "only")},
+                 "by_position": {name: {"mean": 5.5, "sentences": 1} for name in ("first", "middle", "last", "only")},
                  "longest": [1, 0], "sentences": [[0, 0, 12, 3], [1, 4, 40, 8]],
                  "input": {"provider": "core", "scope": {"kind": "corpus"},
                            "inputs": [{"id": TARGET, "content_sha256": digest, "reader_path": "/BEING/a.txt",
@@ -826,21 +1140,28 @@ class SentenceScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             async with app.run_test(size=(120, 40)) as pilot:
                 original = app._driver.write
                 app._driver.write = lambda data: (written.append(data), original(data))[1]
-                await pilot.press("3")
-                self.assertEqual(app.focused.id, "study")
-                await pilot.press("down", "enter")  # Sentence lengths
-                await pilot.click("#run")
+                self.assertIs(app.focused, app.query_one("#menu"))
+                await pilot.press("s")  # Sentence lengths
+                self.assertEqual(app.query_one("#menu").study, "sentences")
+                # Reference choices belong to word frequencies only.
+                await pilot.press("B")
+                self.assertEqual(app.query_one("#menu").reference, "none")
+                await pilot.press("enter")
                 await app.workers.wait_for_complete()
                 await pilot.pause()
                 self.assertEqual(calls[0][0][1], "passage")
-                self.assertEqual(app.query_one("#screens").active, "results")
-                table = app.query_one("#frequencies")
-                self.assertEqual([str(column.label) for column in table.columns.values()], ["Words", "Beginning", "Where"])
-                self.assertEqual([str(cell) for cell in table.get_row_at(0)[::2]], ["8", "/BEING/b.txt"])
-                self.assertEqual([str(cell) for cell in table.get_row_at(1)[::2]], ["3", "First heading\np. 7"])
-                self.assertFalse(app.query_one("#sources").display)
-                self.assertFalse(app.query_one("#export-row").display)
-                summary = str(app.query_one("#summary").render())
+                self.assertEqual(app.query_one("#results").current, "sentences-view")
+                # The distribution is the result itself, drawn as bars.
+                histogram = str(app.query_one("#histogram").render())
+                self.assertIn("1–10", histogram)
+                self.assertIn("█", histogram)
+                self.assertIn("median 5.5", histogram)
+                table = app.query_one("#longest")
+                self.assertEqual([str(column.label).strip() for column in table.columns.values()],
+                                 ["words", "beginning", "where"])
+                self.assertEqual([str(cell).strip() for cell in table.get_row_at(0)[::2]], ["8", "/BEING/b.txt"])
+                self.assertEqual([str(cell).strip() for cell in table.get_row_at(1)[::2]], ["3", "p.7"])
+                summary = str(app.query_one("#sentence-summary").render())
                 self.assertIn("2 sentences, 11 words", summary)
                 self.assertIs(app.focused, table)
                 await pilot.press("enter")
@@ -856,64 +1177,61 @@ class SentenceScreenTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
 @unittest.skipUnless(essence_launch.textual_available(), "needs Textual")
 class RefinedLayoutTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
     async def test_conditional_fields_and_reference_free_columns(self):
-        from sol.essence.tui.app import EssenceApp, BROWSERS
+        from sol.essence.tui.app import EssenceApp
+        from sol.essence.tui.reference import BROWSERS
         app = EssenceApp(context())
         async with app.run_test(size=(100, 36)) as pilot:
-            await pilot.press('3')
-            self.assertFalse(app.query_one('#target-file').display)
-            self.assertFalse(app.query_one('#reference-file').display)
+            self.assertFalse(app.query_one('#target-file-row').display)
+            self.assertFalse(app.query_one('#reference-file-row').display)
+            self.assertFalse(app.query_one('#tfidf-settings').display)
             self.assertTrue(BROWSERS['encyclopedia'].startswith('Encyclopedia'))
-            for button in app.query('#target RadioButton'):
-                button.value = button.name == 'file'
-            for button in app.query('#reference RadioButton'):
-                button.value = button.name == 'file'
+            await pilot.press('f')
+            app.query_one('#menu').focus()
+            await pilot.press('F')
             await pilot.pause()
-            self.assertTrue(app.query_one('#target-file').display)
-            self.assertTrue(app.query_one('#reference-file').display)
-            for button in app.query('#study RadioButton'):
-                button.value = button.name == 'tfidf'
+            self.assertTrue(app.query_one('#target-file-row').display)
+            self.assertTrue(app.query_one('#reference-file-row').display)
+            self.assertIs(app.focused, app.query_one('#reference-file'))
+            await pilot.press('escape')
+            self.assertIs(app.focused, app.query_one('#menu'))
+            await pilot.press('t')
             await pilot.pause()
-            self.assertFalse(app.query_one('#reference-group').display)
-            self.assertFalse(app.query_one('#reference-file').display)
+            self.assertFalse(app.query_one('#reference-file-row').display)
+            self.assertTrue(app.query_one('#tfidf-settings').display)
+            self.assertNotIn('Compare with', str(app.query_one('#menu-choices').render()))
             count = tui_words.Count(FakeWords.analyze_words(object()), None, object(), None)
             app.show_result(count, None)
             await pilot.pause()
-            self.assertEqual([str(c.label) for c in app.query_one('#frequencies').columns.values()],
-                             ['Word', 'Target', 'per 10k'])
+            self.assertEqual([str(c.label).strip() for c in app.query_one('#frequencies').columns.values()],
+                             ['word', 'n', '/10k', 'target'])
             self.assertNotIn('Reference:', str(app.query_one('#summary').render()))
             self.assertIn('1 input (', str(app.query_one('#summary').render()))
-            self.assertFalse(app.query_one('#export-row').display)
 
-    async def test_context_keeps_boundary_spaces_and_folds_with_location_visible(self):
-        from rich.console import Console
-        from sol.essence.tui.app import EssenceApp, in_context
+    async def test_concordance_aligns_the_word_and_keeps_its_spaces(self):
+        from sol.essence.tui import views
+        from sol.essence.tui.app import EssenceApp
         text = 'This objective thinking is thus the content of pure science.'
         start = text.index('is thus')
-        context_text = tui_words._context(text, start, start + 2)
-        rendered = in_context(context_text)
-        self.assertEqual(rendered.plain, text)
-        self.assertEqual(rendered.plain[rendered.spans[0].start:rendered.spans[0].end], ' is ')
-        lines = Console().render_lines(rendered, Console().options.update(width=28), pad=False)
-        folded = ' '.join(''.join(segment.text for segment in line) for line in lines).replace('\u00a0', ' ')
-        self.assertIn('thinking is thus', ' '.join(folded.split()))
-        self.assertNotIn('isthus', folded)
+        left, word, right = views.kwic(tui_words._context(text, start, start + 2), 30, 30)
+        self.assertEqual((left.strip(), word, right), ('This objective thinking', 'is', 'thus the content of pure scie…'))
+        self.assertEqual(len(left), 30)
         count, _ = comparison_count()
         app = EssenceApp(context())
         async with app.run_test(size=(90, 36)) as pilot:
             app.show_result(count, None)
             await pilot.pause()
             table = app.query_one('#sources')
-            self.assertEqual([str(c.label) for c in table.columns.values()][2], 'Where')
-            self.assertIn('p. 7', table.get_row_at(0)[2].plain)
-            self.assertGreaterEqual(next(iter(table.rows.values())).height, 2)
+            labels = [str(c.label).strip() for c in table.columns.values()]
+            self.assertEqual(labels[1:], ['left context', '', 'right context', 'where'])
+            self.assertEqual(table.get_row_at(0)[4].plain.strip(), 'p.7')
+            # One line per occurrence, so the word stays in one column.
+            self.assertEqual({row.height for row in table.rows.values()}, {1})
             app.query_one('#result-status').update('Checking sources and exporting…')
-            app.query_one('#export-csv').disabled = True
             await pilot.resize_terminal(70, 30)
             await pilot.pause()
-            self.assertTrue(app.query_one('#export-csv').disabled)
+            await pilot.pause()
             self.assertIn('exporting', str(app.query_one('#result-status').render()))
-            columns = list(table.columns.values())
-            self.assertLessEqual(sum(c.width + 2 for c in columns), 70)
+            self.assertEqual(table.max_scroll_x, 0)
 
 
 @unittest.skipUnless(essence_launch.textual_available() and _engine_installed(), "needs Textual and engines")
@@ -945,16 +1263,15 @@ class TfidfStudyTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             real_run = tfidf.run
             with patch.object(tfidf, 'run', return_value=count):
                 async with app.run_test(size=(100, 36)) as pilot:
-                    await pilot.press('3', 'down', 'down', 'enter')
-                    await pilot.pause()
-                    self.assertEqual(app.choice('study'), 'tfidf')
-                    await pilot.click('#run')
+                    await pilot.press('t')
+                    self.assertEqual(app.query_one('#menu').study, 'tfidf')
+                    await pilot.press('enter')
                     await app.workers.wait_for_complete()
                     await pilot.pause()
-                    self.assertEqual(app.query_one('#screens').active, 'results')
-                    self.assertEqual(app.query_one('#frequencies').row_count, len(count.study['documents']))
+                    self.assertEqual(app.query_one('#results').current, 'tfidf-view')
+                    self.assertEqual(app.query_one('#passages').row_count, len(count.study['documents']))
                     self.assertTrue(app.query_one('#overall').display)
-                    self.assertFalse(app.query_one('#sources').display)
+                    self.assertIs(app.focused, app.query_one('#passages'))
                     with patch.object(app, 'open_in_reader') as opened:
                         await pilot.press('enter')
                         opened.assert_called_once_with(source)
@@ -967,7 +1284,8 @@ class TfidfStudyTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                     await pilot.press('enter')
                     self.assertIn('cannot be opened', str(app.query_one('#result-status').render()))
                     app.show_result(tui_words.run({**context(), 'corpus': ''}, 'file', 'none', target_file=str(path)), None)
-                    self.assertFalse(app.query_one('#overall').display)
+                    await pilot.pause()
+                    self.assertEqual(app.query_one('#results').current, 'words-view')
             with self.assertRaisesRegex(ValueError, 'no CORE corpus'):
                 tfidf.run({**context(), 'corpus': ''}, 'book')
             file = corpus / 'sample.md'
@@ -998,13 +1316,14 @@ class PresentationHelperTests(unittest.TestCase):
 
 @unittest.skipUnless(essence_launch.textual_available() and _engine_installed(), "needs Textual and engines")
 class SmallResultsTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
-    async def test_each_study_fits_and_opens_sources_at_both_sizes(self):
+    async def test_each_study_fits_and_opens_sources_at_every_size(self):
         from fixtures_corpus import write_runtime_corpus
         from sol import core
         from sol.corpus import contract
         from sol.essence.tui import sentences, tfidf
         from sol.essence.tui.app import EssenceApp
 
+        first = {"words-view": "#frequencies", "sentences-view": "#longest", "tfidf-view": "#passages"}
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             corpus = root / 'corpus'
@@ -1020,33 +1339,34 @@ class SmallResultsTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                     receipt = json.dumps(count.study, sort_keys=True)
                     app.show_result(count, None)
                     await pilot.pause()
-                    table = app.query_one('#frequencies')
-                    for width, height in ((80, 24), (120, 40), (80, 24)):
+                    view = app.result_view(count)
+                    table = view.query_one(first[view.id])
+                    # Beside the reader (86 and 40 columns), fullscreen, and back.
+                    for width, height in ((86, 48), (40, 24), (190, 50), (80, 24)):
                         with self.subTest(study=type(count).__name__, size=(width, height)):
-                            table.move_cursor(row=1)
+                            table.focus()
+                            if table.row_count > 1:
+                                table.move_cursor(row=1)
                             row = table.cursor_row
                             await pilot.resize_terminal(width, height)
                             await pilot.pause()
+                            await pilot.pause()
                             self.assertEqual(table.cursor_row, row)
                             self.assertIs(app.focused, table)
-                            bottom = app.query_one('#layout-hint').region.y
-                            for selector in ('#frequencies', '#sources', '#overall', '#export-row'):
-                                widget = app.query_one(selector)
-                                if not widget.display:
+                            bottom = app.query_one('#result-status').region.y
+                            for widget in view.query('VimTable'):
+                                if not widget.display or not widget.region.height:
                                     continue
                                 self.assertLessEqual(widget.region.bottom, bottom)
-                                self.assertGreater(widget.region.height, 0)
-                                if selector != '#export-row':
-                                    self.assertEqual(widget.max_scroll_x, 0)
-                                    self.assertGreaterEqual(widget.region.height, 3)
+                                self.assertLessEqual(widget.region.right, width)
+                                self.assertEqual(widget.max_scroll_x, 0, widget.id)
                             with patch.object(app, 'open_in_reader') as opened:
                                 await pilot.press('enter')
                                 if isinstance(count, tui_words.Count):
-                                    sources = app.query_one('#sources')
+                                    sources = view.query_one('#sources')
                                     self.assertIs(app.focused, sources)
-                                    self.assertGreater(sources.region.height, 3)
                                     await pilot.press('enter')
-                                    opened.assert_called_once_with(app.shown_sources[sources.cursor_row]['open'])
+                                    opened.assert_called_once_with(view.shown_sources[sources.cursor_row]['open'])
                                     await pilot.press('escape')
                                     self.assertIs(app.focused, table)
                                 else:
@@ -1065,22 +1385,20 @@ class SmallResultsTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 async with app.run_test(size=(120, 40)) as pilot:
                     app.show_result(count, None)
                     await pilot.pause()
-                    await pilot.press('enter', 'down')
+                    await pilot.press('enter', 'j')
                     sources = app.query_one('#sources')
                     source_row = sources.cursor_row
                     app.query_one('#result-status').update('Checking sources and exporting…')
-                    app.query_one('#export-csv').disabled = True
                     await pilot.resize_terminal(80, 24)
+                    await pilot.pause()
                     await pilot.pause()
                     table = app.query_one('#frequencies')
                     self.assertEqual(table.max_scroll_x, 0)
                     self.assertEqual(sources.max_scroll_x, 0)
                     self.assertIs(app.focused, sources)
                     self.assertEqual(sources.cursor_row, source_row)
-                    self.assertTrue(app.query_one('#export-csv').disabled)
                     self.assertIn('exporting', str(app.query_one('#result-status').render()))
-                    self.assertIn('empty reference', table.get_row_at(0)[-1])
-                    self.assertGreater(table.get_row_height(table.ordered_rows[0].key), 1)
-                    self.assertLessEqual(sources.region.bottom, app.query_one('#layout-hint').region.y)
+                    self.assertIn('empty reference', str(table.get_row_at(0)[-1]))
+                    self.assertLessEqual(sources.region.bottom, app.query_one('#result-status').region.y)
                     await pilot.press('escape')
                     self.assertIs(app.focused, table)

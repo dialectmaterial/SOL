@@ -59,6 +59,9 @@ def validate_environment(width=72):
                                     check=False, timeout=5, cwd=root, env=environment)
     except subprocess.TimeoutExpired as error:
         raise RuntimeError("Neovim version check timed out; the reader was not launched") from error
+    except OSError as error:
+        raise RuntimeError(f"Cannot run Neovim at {executable}: {error}. "
+                           "Check the executable or reinstall with python3 scripts/install.py.") from error
     match = re.match(r"NVIM v(\d+)\.(\d+)(?:\.|\b)", result.stdout)
     if result.returncode or match is None or tuple(map(int, match.groups())) < (0, 11):
         raise ValueError("SOL requires Neovim 0.11 or newer. Run python3 scripts/install.py from the checkout.")
@@ -446,6 +449,9 @@ def launch_payload(payload, executable, *, on_request=None):
             else:
                 from sol.being.neovim.channel import run_native
                 code = run_native(command, cwd=root, env=environment, handler=on_request)
+        except OSError as error:
+            raise RuntimeError(f"Cannot launch Neovim at {executable}: {error}. "
+                               "Check the executable or reinstall with python3 scripts/install.py.") from error
         except KeyboardInterrupt:
             splash.forget()
             return 130, None

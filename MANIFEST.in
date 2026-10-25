@@ -6,6 +6,7 @@ recursive-include sol *.py *.lua
 include sol/being/neovim/fonts/LibertinusMono-Regular.ttf sol/being/neovim/fonts/OFL.txt
 include sol/essence/encyclopedia.json
 include sol/essence/methods.json
+include sol/essence/function_words.json
 recursive-include tests *.py
 recursive-include scripts *.py
 exclude AGENTS.md

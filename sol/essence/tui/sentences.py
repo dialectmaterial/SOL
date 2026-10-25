@@ -13,7 +13,7 @@ from pathlib import Path
 
 from sol.essence.tui import words
 
-ROW_LIMIT = 12  # the study keeps its twelve longest sentences
+ROW_LIMIT = 100  # shown; the study saves its twelve longest, and every sentence's length
 BAR = 24  # columns of the widest histogram bar
 POSITIONS = (("first", "First in paragraph"), ("middle", "Middle"), ("last", "Last"),
              ("only", "Only sentence"))
@@ -117,10 +117,21 @@ def _beginning(text, limit=60):
     return cut.rstrip(" ,;:") + "…"
 
 
+def longest(study, limit=ROW_LIMIT):
+    """Sentence indexes, longest first: the study's own twelve, then the rest by length."""
+    saved = list(study["longest"][:limit])
+    if len(saved) >= limit:
+        return saved
+    chosen = set(saved)
+    rest = sorted((index for index in range(len(study["sentences"])) if index not in chosen),
+                  key=lambda index: (-study["sentences"][index][3], index))
+    return saved + rest[:limit - len(saved)]
+
+
 def rows(count, limit=ROW_LIMIT):
     """The longest sentences: words, how each begins, and where."""
     study, table = count.study, []
-    for index in study["longest"][:limit]:
+    for index in longest(study, limit):
         input_index, start, end, tokens = study["sentences"][index]
         item = study["input"]["inputs"][input_index]
         text = count.texts.get(item.get("id"))
@@ -132,7 +143,7 @@ def rows(count, limit=ROW_LIMIT):
 def source(count, row):
     """What the reader needs to open row `row`, or None for a text file."""
     study = count.study
-    input_index, start, _, _ = study["sentences"][study["longest"][row]]
+    input_index, start, _, _ = study["sentences"][longest(study)[row]]
     item = study["input"]["inputs"][input_index]
     if "id" not in item:
         return None

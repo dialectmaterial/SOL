@@ -38,25 +38,34 @@ function M.open(structure, callbacks)
   end
   local function draw()
     local inner = width()
-    local lines, marks = {'j/k move · h/l fold · Enter read · Esc back', ''}, {{1, 'NonText'}}
+    local hint = 'j/k move · h/l fold · Enter read · Esc back'
+    if vim.fn.strdisplaywidth(hint) > inner then hint = 'j/k · h/l · Enter read · Esc back' end
+    local lines, marks = {hint, ''}, {{1, 'NonText'}}
     local cursor_row
     rows = {}
     local function visit(key, level)
       local node = nodes[key]
       local fold = #node.children == 0 and '  ' or expanded[key] and '▾ ' or '▸ '
       local here = key == current.key and '● ' or '  '
-      local label = string.rep('  ', level) .. fold .. here .. node.title:gsub('%s+', ' ')
       local page = node.page and ('p. ' .. node.page) or ''
       -- The page sits at the right edge; a long title gives way with an ellipsis.
       local room = inner - vim.fn.strdisplaywidth(page) - 2
+      -- Deep branches still leave room for the fold/current marks and title.
+      local indent = string.rep('  ', math.min(level, math.max(0, math.floor((room - 8) / 2))))
+      local label = indent .. fold .. here .. node.title:gsub('%s+', ' ')
       if vim.fn.strdisplaywidth(label) > room then
-        label = vim.fn.strcharpart(label, 0, math.max(1, vim.fn.strchars(label) - (vim.fn.strdisplaywidth(label) - room) - 1)) .. '…'
+        local shortened = ''
+        for _, char in ipairs(vim.fn.split(label, '\\zs')) do
+          if vim.fn.strdisplaywidth(shortened .. char .. '…') > room then break end
+          shortened = shortened .. char
+        end
+        label = shortened .. '…'
       end
       local line = label .. string.rep(' ', math.max(1, inner - vim.fn.strdisplaywidth(label) - vim.fn.strdisplaywidth(page))) .. page
       lines[#lines + 1] = line
       rows[#lines] = key
-      local glyphs = #(string.rep('  ', level) .. fold)
-      if fold ~= '  ' then marks[#marks + 1] = {#lines, 'NonText', #string.rep('  ', level), glyphs} end
+      local glyphs = #(indent .. fold)
+      if fold ~= '  ' then marks[#marks + 1] = {#lines, 'NonText', #indent, glyphs} end
       if key == current.key then marks[#marks + 1] = {#lines, 'SOLSourceHeading', glyphs, #label} end
       if page ~= '' then marks[#marks + 1] = {#lines, 'NonText', #line - #page, #line} end
       if key == selected then cursor_row = #lines end

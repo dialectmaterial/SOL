@@ -1,8 +1,11 @@
-"""ESSENCE interface: four logical screens and reproducible lexical studies.
+"""ESSENCE interface: one workspace where a study's result is home.
 
 Neovim owns the outer layout (beside the reader or fullscreen, Alt-F, and
 Alt-R back to the reader); this app owns only what is inside its window.
-Leaving saves which screen was open and for which passage, nothing else.
+A one-line header names the study and the reader's passage; below it the
+result, the study menu (`r`) and a status line. The Encyclopedia and Methods
+are reference, opened over the study (`K`, `M`, or `:`). Leaving saves which
+view was open and for which passage, nothing else.
 """
 from __future__ import annotations
 
@@ -10,367 +13,401 @@ import base64
 import json
 
 from rich.text import Text
-from textual.app import App, ComposeResult
+from textual import events, work
+from textual.app import App
 from textual.binding import Binding
-from textual.screen import ModalScreen
+from textual.command import DiscoveryHit, Hit, Provider
+from textual.containers import Vertical, VerticalScroll
 from textual.theme import Theme
-from textual import work
-from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets.option_list import Option
-from textual.widgets import (Button, DataTable, Footer, Input, Label, Markdown, OptionList, RadioButton, RadioSet, Static,
-                             TabbedContent, TabPane)
+from textual.widgets import ContentSwitcher, Footer, Input, Markdown, Static
 
-from sol.essence.encyclopedia import entry_markdown, genealogy_rows, load_catalog
+from sol.essence.encyclopedia import load_catalog
 from sol.essence.methods import load_methods, method_markdown
 from sol.essence.tui import sentences, tfidf, words
 from sol.essence.tui.context import load_state, save_state
-from sol.presentation.theme import DEFAULT_READER_THEME
+from sol.essence.tui.menu import STUDIES, SCOPES, StudyMenu
+from sol.essence.tui.reference import METHOD_STUDIES, ReferenceScreen
+from sol.essence.tui.results import OpenSource, SentencesView, Status, TfidfView, WordsView, WIDE, focus_now
+from sol.presentation.theme import BACKGROUNDS, DEFAULT_READER_THEME, READER_THEMES, reader_palette
 
-TEXTUAL_THEMES = {"mocha": "catppuccin-mocha", "latte": "catppuccin-latte", "paper": "sol-paper",
-                  "night": "sol-night", "terminal": "ansi-dark"}
-# SOL's own, matching the reader's Paper and Night (actualspirit.com).
-SOL_THEMES = (
-    Theme(name="sol-paper", primary="#55308a", secondary="#45424d", accent="#55308a", warning="#9b2c2c",
-          error="#9b2c2c", success="#3d6b3a", foreground="#17151c", background="#f3f0e6", surface="#ebe7d9",
-          panel="#e4dfcf", dark=False),
-    Theme(name="sol-night", primary="#c3a6ee", secondary="#a29cae", accent="#c3a6ee", warning="#e8a87c",
-          error="#e8a87c", success="#a6c99a", foreground="#ece7da", background="#1b1820", surface="#221e28",
-          panel="#2a2531", dark=True),
-)
-
-SOURCES_HELP = "Occurrences · Enter opens in reader · Escape returns to words"
-
-# Screens that browse a bundled catalog, with their one-line help.
-BROWSERS = {
-    "encyclopedia": "Encyclopedia · arrows browse · Enter reads (on Genealogy, moves through the map) · "
-                    "Escape returns to the list. Links open only when selected.",
-    "methods": "What ESSENCE runs: inputs, settings, output, limits and the command line · arrows browse · "
-               "Enter reads · Escape returns to the list.",
-}
-
-SCREENS = {
-    "encyclopedia": ("Encyclopedia", None),
-    "methods": ("Methods", None),
-    "experiment": ("Experiment", None),
-    "results": ("Results", None),
-}
+TEXTUAL_THEMES = {name: f"sol-{name}" for name in READER_THEMES if name != "terminal"} | {"terminal": "ansi-dark"}
 
 
-def in_context(context):
-    """The words around an occurrence, the word itself in bold."""
-    if context is None:
-        return Text("(the text has changed since the count)", style="dim")
-    # Keep the word's boundary spaces in the same styled segment. This also
-    # preserves their placement in SVG screenshots, where separate runs may
-    # otherwise collapse or visually shift a space beside the bold glyphs.
-    left, word, right = context["left"], context["word"], context["right"]
-    if left.endswith(" "):
-        left, word = left[:-1], " " + word
-    if right.startswith(" "):
-        word, right = word + " ", right[1:]
-    return Text.assemble(left, (word, "bold"), right)
+def blend(first, second, share):
+    """The #rrggbb color `share` of the way from `first` to `second`."""
+    one, two = (tuple(int(color[index:index + 2], 16) for index in (1, 3, 5)) for color in (first, second))
+    return "#" + "".join(f"{round(a + (b - a) * share):02x}" for a, b in zip(one, two))
 
 
-class WordSort(ModalScreen):
-    """A keyboard menu with explicit column and direction choices."""
+def reader_theme(name):
+    """ESSENCE in the reader's own colors: its page, ink, headings, rules and selection.
 
-    BINDINGS = [("escape", "cancel", "Cancel")]
-    DEFAULT_CSS = """
-    WordSort { align: center middle; }
-    #sort-dialog { width: 52; max-width: 100%; height: 22; max-height: 90%;
-                   background: $surface; border: solid $accent; padding: 1; }
-    #sort-options { height: 1fr; }
-    #sort-help { height: auto; }
+    Terminal has no palette; Textual's ANSI theme inherits the terminal's colors as the reader does.
     """
+    p = reader_palette(name)
+    return Theme(
+        name=TEXTUAL_THEMES[name], dark=BACKGROUNDS[name] == "dark",
+        foreground=p["text"], background=p["page"], surface=p["panel"], panel=p["selection"],
+        primary=p["heading"], secondary=p["muted"], accent=p["heading"],
+        warning=p["warning"], error=p["warning"], success=p["heading"],
+        variables={
+            "text-muted": p["muted"], "foreground-muted": p["muted"],
+            "border": p["heading"], "border-blurred": p["border"],
+            "block-cursor-foreground": p["text"], "block-cursor-background": p["selection"],
+            "block-cursor-text-style": "bold",
+            # Halfway to the selection: visible even where the panel is the page (Latte).
+            "block-cursor-blurred-foreground": p["text"],
+            "block-cursor-blurred-background": blend(p["page"], p["selection"], 0.5),
+            "input-cursor-foreground": p["page"], "input-cursor-background": p["text"],
+            "input-selection-background": p["selection"],
+            "footer-background": p["page"], "footer-foreground": p["muted"],
+            "footer-key-foreground": p["heading"], "footer-description-foreground": p["muted"],
+            "scrollbar": p["border"], "scrollbar-hover": p["muted"], "scrollbar-active": p["heading"],
+            "scrollbar-background": p["page"], "scrollbar-background-hover": p["page"],
+            "scrollbar-background-active": p["page"], "scrollbar-corner-color": p["page"],
+            # Headings and menu choices are not links: bold, not underlined; links keep their color.
+            "link-color": p["heading"], "link-color-hover": p["text"], "link-background-hover": p["selection"],
+            "link-style": "none", "link-style-hover": "underline",
+            "button-foreground": p["text"], "button-color-foreground": p["page"],
+            **{f"markdown-h{level}-{part}": value for level in range(1, 7)
+               for part, value in (("color", p["heading"]), ("background", "transparent"),
+                                   ("text-style", "bold"))},
+        })
 
-    def __init__(self, current):
-        super().__init__()
-        self.current = current
-        self.choices = [(None, False), *((column, descending)
-                        for column in range(len(words.SORT_COLUMNS)) for descending in (False, True))]
 
-    def compose(self) -> ComposeResult:
-        with Vertical(id="sort-dialog"):
-            yield Static("Sort words · undefined values always last\n"
-                         "Arrows choose · Enter applies · Escape cancels", id="sort-help")
-            yield OptionList("Engine order (default)",
-                             *(f"{words.SORT_COLUMNS[column]} · {'descending' if descending else 'ascending'}"
-                               for column, descending in self.choices[1:]), id="sort-options")
+# Views a leaving session can return to; earlier screens map onto them.
+VIEWS = {"workspace": "workspace", "experiment": "workspace", "results": "workspace",
+         "encyclopedia": "encyclopedia", "methods": "methods"}
+# The method each study's `K` opens.
+STUDY_METHODS = {"words": "words", "sentences": "sentences", "tfidf": "tfidf"}
+INTRO = ("Choose a study below: its result appears here, with every measurement's passages one Enter away.\n"
+         "K explains the method · M opens the Encyclopedia and Methods · ? lists every key · "
+         "Alt-F fullscreen ⇄ beside · Alt-R back to the reader")
 
-    def on_mount(self) -> None:
-        options = self.query_one(OptionList)
-        options.highlighted = self.choices.index(self.current)
-        options.focus()
 
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        self.dismiss(self.choices[event.option_index])
+class EssenceCommands(Provider):
+    """The command palette (`:`): ESSENCE's own actions and every catalog entry."""
 
-    def action_cancel(self) -> None:
-        self.dismiss(None)
+    def commands(self):
+        app = self.app
+        found = [("Choose a study", app.action_menu, "Study, target and reference (r)"),
+                 ("Encyclopedia", lambda: app.action_reference("encyclopedia"), "Methods' history and sources (M)"),
+                 ("Methods", lambda: app.action_reference("methods"), "What each study computes"),
+                 ("Leave ESSENCE", app.action_leave, "Save the open view and close (q)")]
+        if isinstance(app.last_count, words.Count) and app.last_count.reference is not None:
+            found += [("Export CSV", lambda: app.export("csv"), "The complete comparison table (e)"),
+                      ("Export TSV", lambda: app.export("tsv"), "The complete comparison table (E)")]
+        for item in app.methods["entries"]:
+            found.append((f"Method: {item['title']}",
+                          lambda identifier=item["id"]: app.action_reference("methods", identifier), item["summary"]))
+        for index, item in enumerate(app.catalog["entries"]):
+            found.append((f"Encyclopedia: {item['title']}",
+                          lambda position=index: app.action_reference("encyclopedia", entry=position), None))
+        return found
+
+    async def discover(self):
+        for title, command, help_text in self.commands()[:6]:
+            yield DiscoveryHit(title, command, help=help_text)
+
+    async def search(self, query):
+        matcher = self.matcher(query)
+        for title, command, help_text in self.commands():
+            score = matcher.match(title)
+            if score > 0:
+                yield Hit(score, matcher.highlight(title), command, help=help_text)
 
 
 class EssenceApp(App):
     """One investigation, shown in whatever space Neovim gives it."""
 
     TITLE = "SOL ESSENCE"
-    ENABLE_COMMAND_PALETTE = False
+    COMMANDS = {EssenceCommands}
+    COMMAND_PALETTE_BINDING = "colon"
     CSS = """
-    TabPane { padding: 1 1 0 1; }
-    .browser-list { height: 11; max-height: 40%; border: none; background: $surface; padding: 1; }
-    .browser-help { height: auto; padding: 0 0 1 0; color: $text-muted; }
-    .browser-detail { height: 1fr; margin-top: 1; }
-    #origin, #layout-hint { padding: 0 2; color: $text-muted; }
-    Markdown { padding: 0 1; }
-    #genealogy-map { height: auto; border: none; background: transparent; padding: 0 1; }
-    .choices { height: auto; }
-    .choice-group { height: auto; width: 1fr; margin-top: 1; }
-    .section-label { color: $text-muted; text-style: bold; height: 1; }
-    RadioSet { border: none; padding: 0; background: transparent; height: auto; }
-    RadioButton { border: none; padding: 0 1; background: transparent; }
-    RadioButton:focus { text-style: bold; }
-    /* The chosen option's dot in the theme's accent; the others stay visible on dark pages. */
-    RadioButton > .toggle--button { background: transparent; color: $text-muted; }
-    RadioButton.-on > .toggle--button { color: $accent; }
-    Input { margin-top: 1; }
-    #run-row { height: auto; padding-top: 1; }
-    Button { min-width: 12; height: 3; margin-right: 1; border: none; }
-    #cancel { background: transparent; }
-    #status { padding-top: 1; color: $text-muted; }
+    Screen { background: $background; }
+    #header { height: 1; padding: 0 1; text-wrap: nowrap; text-overflow: ellipsis; }
+    #workspace { height: 1fr; }
+    #intro { height: auto; padding: 1 2; color: $text-muted; }
     #results { height: 1fr; }
-    #summary { padding: 0; }
-    #summary-box { height: auto; max-height: 20%; }
-    #sort-status { height: auto; color: $text-muted; }
-    #frequencies { height: 1fr; min-height: 3; }
-    DataTable { background: $background; }
-    #sources-label, #overall-label { color: $text-muted; height: auto; max-height: 2; }
-    #sources { height: 1fr; min-height: 4; }
-    #overall { height: 1fr; min-height: 3; max-height: 30%; }
-    #export-row { height: 1; }
-    #export-row Button { height: 1; }
-    #result-status { color: $text-muted; height: auto; }
+    #results.-empty { height: auto; }
+    ResultView { height: 1fr; padding: 0 1; }
+    .metrics-row { height: 1; }
+    #result-metrics, #sentence-metrics, #tfidf-metrics { width: 1fr; text-wrap: nowrap; text-overflow: ellipsis; }
+    #details-hint, .details-hint { width: auto; padding-left: 2; color: $text-muted; }
+    #word-filter { height: 1; border: none; padding: 0 1; background: $surface; }
+    #sort-status { height: 1; color: $text-muted; text-wrap: nowrap; text-overflow: ellipsis; }
+    .result-layout { height: 1fr; layout: vertical; }
+    ResultView.-wide .result-layout { layout: horizontal; }
+    VimTable { background: $background; scrollbar-size-vertical: 1; }
+    VimTable > .datatable--header { background: $background; color: $text-muted; text-style: bold; }
+    VimTable > .datatable--cursor { background: $block-cursor-blurred-background; color: $foreground; }
+    VimTable:focus > .datatable--cursor { background: $block-cursor-background; color: $block-cursor-foreground;
+        text-style: bold; }
+    #frequencies { height: 1fr; min-height: 4; }
+    #occurrences-pane { height: 1fr; min-height: 5; }
+    #sources-label, #longest-label, #passages-label, #overall-label {
+        height: 1; color: $text-muted; text-wrap: nowrap; text-overflow: ellipsis;
+        border-top: solid $border-blurred; height: 2; }
+    #occurrences-pane:focus-within #sources-label, #longest-pane:focus-within #longest-label,
+    #passages-pane:focus-within #passages-label, #overall-pane:focus-within #overall-label {
+        color: $accent; border-top: solid $accent; }
+    #sources { height: 1fr; }
+    .details { display: none; height: auto; max-height: 45%; padding: 0 1;
+               border-top: solid $border-blurred; color: $text-muted; }
+    .details:focus { border-top: solid $accent; }
+    ResultView.-wide .details { display: block; height: 1fr; max-height: 100%; width: 40;
+                                border-top: none; border-left: vkey $border-blurred; }
+    ResultView.-wide #frequencies { width: 86; height: 1fr; }
+    ResultView.-wide #occurrences-pane { width: 1fr; height: 1fr; border-left: vkey $border-blurred; padding-left: 1; }
+    ResultView.-wide #sources-label { border-top: none; height: 1; }
+    #distribution { height: auto; max-height: 50%; }
+    ResultView.-wide #distribution { width: 1fr; height: 1fr; max-height: 100%; }
+    #longest-pane { height: 1fr; }
+    ResultView.-wide #longest-pane { width: 1fr; border-left: vkey $border-blurred; padding-left: 1; }
+    #longest { height: 1fr; }
+    #passages-pane { height: 1fr; }
+    #overall-pane { height: 1fr; max-height: 40%; }
+    ResultView.-wide #overall-pane { width: 42; max-height: 100%; border-left: vkey $border-blurred; padding-left: 1; }
+    #passages, #overall { height: 1fr; }
+    StudyMenu { height: auto; max-height: 100%; overflow-y: auto; padding: 0 1;
+                border-top: solid $border-blurred; background: $background; }
+    Screen.-short #intro { display: none; }
+    #primer { height: 1fr; padding: 0 1; border-top: solid $border-blurred; scrollbar-size-vertical: 1; }
+    #primer Markdown { padding: 0 1; color: $text-muted; }
+    StudyMenu:focus-within { border-top: solid $accent; }
+    #menu-choices { height: auto; }
+    .menu-field { height: 1; }
+    .menu-field Label { width: auto; color: $text-muted; }
+    .menu-field Input { height: 1; border: none; padding: 0 1; background: $surface; width: 1fr; }
+    #menu-summary { height: auto; margin-top: 1; }
+    #status { height: auto; color: $warning; }
+    #result-status { height: auto; max-height: 2; padding: 0 1; color: $text-muted; }
+    Footer { background: $footer-background; }
+    /* Reference screen: the catalogs, as before. */
+    #reference-header { height: 1; padding: 0 1; }
+    #catalogs, ContentSwitcher { height: 1fr; }
+    ContentTabs { background: $background; }
+    Tab { color: $text-muted; padding: 0 2; }
+    Tab.-active { color: $accent; text-style: bold; }
+    TabPane { padding: 0 1; }
+    .browser-tools { height: 1; margin-bottom: 1; }
+    .browser-search { width: 1fr; height: 1; border: none; padding: 0 1; background: $surface; }
+    .browser-search:focus { border: none; background: $panel; }
+    .browser-count { width: auto; padding-left: 1; color: $text-muted; }
+    .browser-layout { height: 1fr; }
+    .browser-list, .browser-detail { border: round $border-blurred; background: $background;
+        border-title-color: $text-muted; border-title-style: bold; }
+    .browser-list:focus, .browser-detail:focus { border: round $accent; border-title-color: $accent; }
+    .browser-list { width: 32; height: 1fr; padding: 0 1; margin-right: 1; }
+    .browser-detail { width: 1fr; height: 1fr; padding: 0 1; }
+    #method-actions { height: 1; margin-top: 1; }
+    #method-actions Button { height: 1; border: none; min-width: 20; }
+    #method-availability { width: 1fr; color: $text-muted; }
+    OptionList { background: $background; }
+    OptionList > .option-list--option { padding: 0 1; }
+    OptionList > .option-list--option-highlighted { background: $block-cursor-blurred-background; color: $foreground;
+        text-style: bold; }
+    OptionList:focus > .option-list--option-highlighted { background: $block-cursor-background;
+        color: $block-cursor-foreground; }
+    Markdown { padding: 0 1; }
+    MarkdownH2 { margin-top: 0; }
+    #genealogy-map { height: auto; border: none; background: transparent; padding: 0 1; }
+    Screen.-compact .browser-layout { layout: vertical; }
+    Screen.-compact .browser-list { width: 1fr; height: auto; min-height: 4; max-height: 40%; margin: 0 0 1 0; }
+    Screen.-compact .browser-detail { width: 1fr; }
     """
     # The private terminal sequence that asks the reader to open a source; the
     # reader checks it and navigates only through its own guarded actions.
     SOURCE_SEQUENCE = "\x1b]5379;sol-essence;{}\x07"
     BINDINGS = [
-        Binding("q", "leave", "Leave ESSENCE"),
+        Binding("r", "menu", "Study"),
+        Binding("K", "method", "Method"),
+        Binding("M", "reference('encyclopedia')", "Encyclopedia"),
+        Binding("R", "rerun", "Rerun", show=False),
+        Binding("question_mark", "keys", "Keys"),
+        # While counting, Escape cancels before any field or view can take it.
+        Binding("escape", "cancel_count", "Cancel", show=False, priority=True),
+        Binding("q", "leave", "Leave"),
         # Priority: the reader sends Ctrl-Q when it quits, whatever has focus.
         Binding("ctrl+q", "leave", "Leave ESSENCE", show=False, priority=True),
-        *(Binding(str(number), f"screen('{name}')", label, show=False)
-          for number, (name, (label, _)) in enumerate(SCREENS.items(), 1)),
     ]
 
-    def __init__(self, context, theme=DEFAULT_READER_THEME, theme_file=None):
+    count_serial = 0
+    last_count = None
+    last_saved = None
+    last_run = None
+    counting = False
+    exporting = False
+
+    def __init__(self, context, theme=DEFAULT_READER_THEME, theme_file=None, position_file=None):
         super().__init__()
-        for sol_theme in SOL_THEMES:
-            self.register_theme(sol_theme)
-        # Textual's own Catppuccin themes; Terminal uses the terminal's ANSI colors.
+        for name in READER_THEMES:
+            if name != "terminal":
+                self.register_theme(reader_theme(name))
         self.theme = TEXTUAL_THEMES[theme]
         self.theme_file = theme_file
+        self.position_file = position_file
+        self.position_seen = None
         self.catalog = load_catalog()
         self.methods = load_methods()
         self.context = context
         self.state_file = context["state_file"]
         self.state = load_state(self.state_file) if self.state_file else {}
-        self.word_sort = (None, False)
-        self.word_order = []
+        self.reading_moved = False
+        self._function_words = None
+        self.key_targets = {}
 
-    def compose(self) -> ComposeResult:
-        target = self.context["reference"]["reference"]["target_id"]
-        yield Static(f"From the reader: {self.context['label']} · record {target[:8]}", id="origin")
-        with Vertical():
-            with TabbedContent(id="screens"):
-                for name, (label, text) in SCREENS.items():
-                    with TabPane(label, id=name):
-                        if name in BROWSERS:
-                            yield from self.compose_browser(name)
-                        elif name == "experiment":
-                            yield from self.compose_experiment()
-                        elif name == "results":
-                            yield from self.compose_results()
-                        else:
-                            yield Markdown(text)
-        yield Static("Alt-F fullscreen ⇄ beside · Alt-R back to the reader · 1–4 screens",
-                     id="layout-hint")
-        yield Footer()
+    # Keys typed in a burst -------------------------------------------------------------------
+    # Textual sends each key to the widget focused when it arrives, so a burst
+    # (the reader's terminal delivers typing so) is queued on one widget before
+    # its first key can move focus: after `/`, the filter never saw `d e t`.
+    # A key that reaches the app after focus moved goes to the new focus instead.
+    async def on_event(self, event):
+        if isinstance(event, events.Key) and not event.is_forwarded:
+            self.key_targets[id(event)] = self.focused
+            while len(self.key_targets) > 256:  # keys a priority binding took never come back
+                del self.key_targets[next(iter(self.key_targets))]
+        await super().on_event(event)
 
-    # Encyclopedia and Methods: a list of entries above the highlighted one's text.
-    def browser_items(self, name):
-        return (self.catalog if name == "encyclopedia" else self.methods)["entries"]
+    def _on_key(self, event):
+        # Textual runs each class's _on_key in turn; App's, which checks bindings, follows
+        # unless this one re-sends the key.
+        target = self.key_targets.pop(id(event), None)
+        if target is not None and self.focused is not None and self.focused is not target:
+            event.prevent_default()
+            self.focused._forward_event(events.Key(event.key, event.character))
 
-    def browser_markdown(self, name, index):
-        if name == "encyclopedia":
-            if index == 0:
-                return self.genealogy_markdown()
-            return entry_markdown(self.catalog, self.browser_items(name)[index - 1])
-        item = self.browser_items(name)[index]
-        # Name the encyclopedia entry, not its ID, and say how to get there.
-        titles = {entry["id"]: entry["title"] for entry in self.catalog["entries"]}
-        reference = item["encyclopedia"]
-        return method_markdown(dict(item, encyclopedia=None if reference is None else
-                                    f"*{titles.get(reference, reference)}*, on the Encyclopedia screen (1)."))
+    def get_system_commands(self, screen):
+        # Theme and quit commands would bypass the reader's theme and ESSENCE's
+        # own leaving; the palette offers only ESSENCE's commands.
+        return iter(())
 
-    def compose_browser(self, name) -> ComposeResult:
-        yield Static(BROWSERS[name], classes="browser-help")
-        # The encyclopedia opens on its genealogy, a map of where the methods come from.
-        first = ["Genealogy"] if name == "encyclopedia" else []
-        yield OptionList(*first, *(item["title"] for item in self.browser_items(name)), id=f"{name}-list",
-                         classes="browser-list")
-        with VerticalScroll(id=f"{name}-detail", classes="browser-detail"):
-            yield Markdown(self.browser_markdown(name, 0), id=f"{name}-entry")
-            if name == "encyclopedia":
-                yield OptionList(*self.genealogy_options(), id="genealogy-map")
-                yield Markdown(self.genealogy_sources(), id="genealogy-sources")
-
-    def genealogy_options(self):
-        """One line per method: year, line of descent, ● runs in ESSENCE, ○ a reading topic."""
-        options = []
-        for row in genealogy_rows(self.catalog):
-            mark = "● " if row["runs"] else "○ " if row["entry"] else ""
-            line = Text.assemble((f"{row['year']:>5}  ", "dim"), (row["prefix"], "dim"), (mark, "bold"),
-                                 (row["label"], "" if row["entry"] else "italic"),
-                                 ((" · " + row["detail"]) if row["detail"] else "", "dim"))
-            options.append(Option(line, disabled=row["entry"] is None))
-        return options
-
-    def genealogy_markdown(self):
-        genealogy = self.catalog["genealogy"]
-        return (f"## {genealogy['title']}\n\n{genealogy['note']}\n\n"
-                "● ESSENCE runs it · ○ a reading topic. Arrows move through the map; Enter opens a method.\n")
-
-    def genealogy_sources(self):
-        sources = ", ".join(f"[{row['label']}]({row['source']})" for row in genealogy_rows(self.catalog)
-                            if row["source"])
-        return f"Dates from Wikipedia, accessed {self.catalog['genealogy']['accessed']}: {sources}."
-
-    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
-        name = (event.option_list.id or "").removesuffix("-list")
-        if name in BROWSERS:
-            self.query_one(f"#{name}-entry", Markdown).update(self.browser_markdown(name, event.option_index))
-            self.query_one(f"#{name}-detail", VerticalScroll).scroll_home(animate=False)
-            if name == "encyclopedia":
-                for part in ("#genealogy-map", "#genealogy-sources"):
-                    self.query_one(part).display = event.option_index == 0
-
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if event.option_list.id == "genealogy-map":
-            # A method on the map opens its entry, as if chosen from the list.
-            entry = genealogy_rows(self.catalog)[event.option_index]["entry"]
-            ids = [item["id"] for item in self.catalog["entries"]]
-            if entry in ids:
-                self.query_one("#encyclopedia-list", OptionList).highlighted = ids.index(entry) + 1
-                self.query_one("#encyclopedia-detail").focus()
-            return
-        name = (event.option_list.id or "").removesuffix("-list")
-        if name == "encyclopedia" and event.option_index == 0:
-            self.query_one("#genealogy-map", OptionList).focus()
-        elif name in BROWSERS:
-            self.query_one(f"#{name}-detail").focus()
-
-    def compose_experiment(self) -> ComposeResult:
-        # Tab goes straight to the choices, not to the scrolling container.
-        with VerticalScroll(can_focus=False):
-            yield Label("Choose a study and its source.", classes="browser-help")
-            yield Label("Study", classes="section-label")
-            with RadioSet(id="study"):
-                yield RadioButton("Word frequencies", value=True, name="words")
-                yield RadioButton("Sentence lengths", name="sentences")
-                yield RadioButton("TF-IDF · top terms by passage", name="tfidf")
-            with Horizontal(classes="choices"):
-                with Vertical(classes="choice-group"):
-                    yield Label("Target", classes="section-label")
-                    with RadioSet(id="target"):
-                        for key, label in words.TARGETS.items():
-                            yield RadioButton(label, value=key == "passage", name=key)
-                with Vertical(id="reference-group", classes="choice-group"):
-                    yield Label("Compare with", classes="section-label")
-                    with RadioSet(id="reference"):
-                        for key, label in words.REFERENCES.items():
-                            yield RadioButton(label, value=key == "none", name=key)
-            yield Input(placeholder="Target file · UTF-8 path", id="target-file")
-            yield Input(placeholder="Reference file · UTF-8 path", id="reference-file")
-            with Vertical(id="tfidf-settings", classes="choices"):
-                yield Label("Top terms per passage and overall · integer 1–1,000 (default 20)",
-                            classes="section-label")
-                yield Input("20", id="top-n", placeholder="TF-IDF top_n · 1–1,000", type="integer")
-            with Horizontal(id="run-row"):
-                yield Button("Run study", id="run")
-                yield Button("Cancel", id="cancel", disabled=True)
-            yield Static("", id="status")
-
-    def compose_results(self) -> ComposeResult:
-        # Denominators, formulas and warnings can run long; they scroll so the
-        # table keeps most of the height.
-        with VerticalScroll(id="summary-box"):
-            yield Static("Nothing yet. Choose a study and a target in Experiment, then press Run.", id="summary")
-        yield Static("", id="sort-status")
-        yield DataTable(id="frequencies", zebra_stripes=True, cursor_type="row")
-        yield Static("Overall · mean passage weights", id="overall-label")
-        yield DataTable(id="overall", cursor_type="row", zebra_stripes=True)
-        yield Static(SOURCES_HELP, id="sources-label")
-        yield DataTable(id="sources", cursor_type="row")
-        with Horizontal(id="export-row"):
-            yield Button("Export CSV", id="export-csv", disabled=True)
-            yield Button("Export TSV", id="export-tsv", disabled=True)
+    def compose(self):
+        yield Static("", id="header")
+        with Vertical(id="workspace"):
+            yield Static(INTRO, id="intro")
+            with ContentSwitcher(id="results", initial=None):
+                yield WordsView(id="words-view")
+                yield SentencesView(id="sentences-view")
+                yield TfidfView(id="tfidf-view")
+            yield StudyMenu(id="menu")
+            # Until the first result, the chosen study's method fills the space below the menu.
+            with VerticalScroll(id="primer"):
+                yield Markdown("", id="primer-method")
         yield Static("", id="result-status")
+        yield Footer(compact=True)
 
-    def choice(self, name: str) -> str:
-        pressed = self.query_one(f"#{name}", RadioSet).pressed_button
-        return pressed.name if pressed is not None else {"target": "passage", "study": "words"}.get(name, "none")
+    def on_mount(self):
+        self.update_layout()
+        self.query_one("#results").display = False
+        self.update_header()
+        self.theme_changed_signal.subscribe(self, self.restyle_open_screens)
+        if self.theme_file:
+            # A stat-sized read twice a second; T in the reader shows here within half a second.
+            self.set_interval(0.5, self.follow_reader_theme)
+        if self.position_file:
+            self.set_interval(0.5, self.follow_reader_position)
+        focus_now(self.query_one("#menu"))
+        view = VIEWS.get(self.state.get("screen"), "workspace")
+        if view != "workspace":
+            self.action_reference(view)
 
-    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
-        self.update_choices()
+    # The header ---------------------------------------------------------------------
+    def title_style(self):
+        """ESSENCE's name in the theme's heading color; Terminal's ANSI names become Rich's."""
+        return "bold " + self.theme_variables["primary"].removeprefix("ansi_")
 
-    def update_choices(self) -> None:
-        comparison = self.choice("study") == "words"
-        self.query_one("#reference-group").display = comparison
-        self.query_one("#target-file").display = self.choice("target") == "file"
-        self.query_one("#reference-file").display = comparison and self.choice("reference") == "file"
-        self.query_one("#tfidf-settings").display = self.choice("study") == "tfidf"
+    def update_header(self):
+        header = Text()
+        header.append("ESSENCE", style=self.title_style())
+        menu = self.query_one("#menu", StudyMenu)
+        if self.last_run is not None:
+            study, target, reference = self.last_run[:3]
+            header.append(f"  {STUDIES[study]}", style="bold")
+            header.append(f" · {SCOPES[target].removeprefix('the ')}")
+            if study == "words" and reference != "none":
+                header.append(f" ⇄ {SCOPES[reference].removeprefix('the ')}")
+        else:
+            header.append(f"  {STUDIES[menu.study]}", style="bold")
+        header.append("   ")
+        header.append(self.context["label"], style="dim")
+        if self.reading_moved:
+            header.append("  ↻ reading moved · R reruns", style="bold")
+        self.query_one("#header", Static).update(header)
 
-    count_serial = 0
-    last_count = None
-    shown_sources = ()
+    def on_study_menu_changed(self, event):
+        self.update_header()
+        primer = self.query_one("#primer-method", Markdown)
+        if self.last_count is None and self.methods is not None:
+            menu = self.query_one("#menu", StudyMenu)
+            method = "word-comparison" if menu.study == "words" and menu.reference != "none" else STUDY_METHODS[menu.study]
+            entry = next(item for item in self.methods["entries"] if item["id"] == method)
+            text = method_markdown(dict(entry, encyclopedia=None))
+            if text != getattr(primer, "shown", None):
+                primer.shown = text
+                primer.update(text + "\n\nK opens this method in full · M the Encyclopedia")
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "run":
-            top_n = 20
-            if self.choice("study") == "tfidf":
-                value = self.query_one("#top-n", Input).value.strip()
-                try:
-                    top_n = int(value) if value.isascii() and value.isdecimal() else 0
-                except ValueError:
-                    top_n = 0  # Also refuse values beyond Python's integer-string limit.
-                if not 1 <= top_n <= 1000:
-                    self.query_one("#status", Static).update("Not counted: top_n must be an integer from 1 to 1,000.")
-                    self.query_one("#top-n", Input).focus()
-                    return
-            # Read the choices here, on the interface thread; each count has a
-            # number, and only the latest one may save or show anything.
-            self.count_serial += 1
-            self.query_one("#status", Static).update("Counting…")
-            self.query_one("#cancel", Button).disabled = False
-            self.count_words(self.count_serial, self.choice("target"), self.choice("reference"),
-                             self.query_one("#target-file", Input).value,
-                             self.query_one("#reference-file", Input).value, self.choice("study"), top_n)
-        elif event.button.id == "cancel":
-            # The engine cannot be interrupted midway: the count finishes in
-            # the background, and its result is discarded like a replaced one.
-            self.count_serial += 1
-            event.button.disabled = True
-            self.query_one("#status", Static).update("Cancelled; nothing was saved.")
-        elif event.button.id in ("export-csv", "export-tsv") and self.last_count is not None:
-            if not self.state_file:
-                self.query_one("#result-status", Static).update(
-                    "Not exported: this reader session has no workspace, so ESSENCE writes nothing.")
+    # Study menu and runs ------------------------------------------------------------
+    def action_menu(self):
+        menu = self.query_one("#menu", StudyMenu)
+        menu.display = True
+        focus_now(menu)
+
+    def on_study_menu_close(self, event):
+        if self.counting:
+            self.cancel_count()
+        elif self.last_count is not None:
+            self.query_one("#menu").display = False
+            self.focus_result()
+
+    def on_study_menu_run(self, event):
+        menu = self.query_one("#menu", StudyMenu)
+        status = menu.query_one("#status", Static)
+        top_n = 20
+        if menu.study == "tfidf":
+            value = menu.query_one("#top-n", Input).value.strip()
+            try:
+                top_n = int(value) if value.isascii() and value.isdecimal() else 0
+            except ValueError:
+                top_n = 0  # Also refuse values beyond Python's integer-string limit.
+            if not 1 <= top_n <= 1000:
+                status.update("Not counted: top_n must be an integer from 1 to 1,000.")
+                focus_now(menu.query_one("#top-n", Input))
                 return
-            for button in self.query("#export-row Button"):
-                button.disabled = True
-            self.query_one("#result-status", Static).update("Checking the sources again and exporting…")
-            self.export_table(self.last_count, event.button.id.removeprefix("export-"))
+        self.run_study(menu.study, menu.target, menu.reference, menu.query_one("#target-file", Input).value,
+                       menu.query_one("#reference-file", Input).value, top_n)
+
+    def run_study(self, study, target, reference, target_file, reference_file, top_n):
+        """Count one complete request; `R` repeats exactly this, with the reader's present position."""
+        menu = self.query_one("#menu", StudyMenu)
+        status = menu.query_one("#status", Static)
+        # Read the choices here, on the interface thread; each count has a
+        # number, and only the latest one may save or show anything.
+        self.count_serial += 1
+        self.counting = True
+        self.pending_run = (study, target, reference, target_file, reference_file, top_n)
+        status.update("Counting… Esc cancels")
+        if not menu.display:  # A rerun from the result: say so where it shows.
+            self.query_one("#result-status", Static).update("Counting… Esc cancels")
+        self.count_words(self.count_serial, target, reference, target_file, reference_file, study, top_n)
+
+    def action_rerun(self):
+        if self.last_run is not None and not self.counting:
+            self.reading_moved = False
+            self.update_header()
+            self.run_study(*self.last_run)
+
+    def cancel_count(self):
+        # The engine cannot be interrupted midway: the count finishes in
+        # the background, and its result is discarded like a replaced one.
+        self.count_serial += 1
+        self.counting = False
+        self.query_one("#menu").query_one("#status", Static).update("Cancelled; nothing was saved.")
+        if not self.query_one("#menu").display:
+            self.query_one("#result-status", Static).update("Cancelled; nothing was saved.")
 
     @work(thread=True, exclusive=True)
-    def count_words(self, serial, target, reference, target_file, reference_file, study="words", top_n=20) -> None:
+    def count_words(self, serial, target, reference, target_file, reference_file, study="words", top_n=20):
         # The engine reads the corpus or files; keep the interface responsive.
         try:
             if study == "tfidf":
@@ -387,199 +424,65 @@ class EssenceApp(App):
         except RuntimeError:
             pass  # ESSENCE has closed; nothing is left to update.
 
-    def finish_count(self, serial, outcome) -> None:
+    def finish_count(self, serial, outcome):
         # A replaced or abandoned count saves nothing and shows nothing.
         if serial != self.count_serial:
             return
-        self.query_one("#cancel", Button).disabled = True
-        status = self.query_one("#status", Static)
+        self.counting = False
+        status = self.query_one("#menu").query_one("#status", Static)
         if isinstance(outcome, Exception):
             status.update(f"Not counted: {outcome}")
+            self.query_one("#result-status", Static).update("")
+            self.action_menu()  # The choices that failed, with the reason, ready to change.
             return
+        status.update("")
         try:
             module = (tfidf if isinstance(outcome, tfidf.TfidfCount) else
                       sentences if isinstance(outcome, sentences.SentenceCount) else words)
             saved = module.save(outcome) if self.state_file else None
         except (words.EngineMissing, ValueError, OSError) as error:
-            status.update(f"Counted, but not saved: {error}")
+            self.query_one("#result-status", Static).update(f"Counted, but not saved: {error}")
             saved = None
+        else:
+            self.query_one("#result-status", Static).update("")
+        self.last_run = self.pending_run
         self.show_result(outcome, saved)
 
-    def show_result(self, count, saved) -> None:
-        if count is not self.last_count:
-            self.word_sort = (None, False)
+    def show_result(self, count, saved):
+        self.last_count, self.last_saved = count, saved
+        view = self.result_view(count)
+        switcher = self.query_one("#results", ContentSwitcher)
+        switcher.display = True
+        self.query_one("#intro").display = False
+        self.query_one("#primer").display = False
+        switcher.current = view.id
+        view.show(count, saved)
+        self.query_one("#menu").display = False
+        self.update_header()
+        self.focus_result()
+
+    def result_view(self, count):
         if isinstance(count, tfidf.TfidfCount):
-            return self.show_tfidf(count, saved)
+            return self.query_one("#tfidf-view", TfidfView)
         if isinstance(count, sentences.SentenceCount):
-            return self.show_sentences(count, saved)
-        self.set_word_widgets(True)
-        table = self.query_one("#frequencies", DataTable)
-        table.clear(columns=True)
-        columns = [("Target", 6), ("per 10k", 8)]
-        if count.reference is not None:
-            columns += [("Reference", 9), ("per 10k", 8)]
-        if count.comparison is not None:
-            columns += [("Difference", 10), ("Log₂ ratio", 10)]
-        budget = self.result_width(len(columns) + 1)
-        table.add_column("Word", width=max(1, budget - sum(width for _, width in columns)))
-        for label, width in columns:
-            table.add_column(label, width=width)
-        self.word_order = words.row_order(count, *self.word_sort)[:words.ROW_LIMIT]
-        shown, total = words.rows(count, order=self.word_order)
-        for index, row in zip(self.word_order, shown):
-            cells = row if count.reference is not None else row[:3]
-            table.add_row(*cells, key=str(index), height=None)
-        column, descending = self.word_sort
-        sort_status = self.query_one("#sort-status", Static)
-        sort_status.display = count.comparison is not None
-        sort_status.update("s sort · " + ("Engine order (default)" if column is None else
-                           f"{words.SORT_COLUMNS[column]} · {'descending' if descending else 'ascending'}") +
-                           " · undefined last")
-        lines = words.summary(count)
-        if len(shown) < total:
-            lines.append(f"Showing the first {len(shown):,} of {total:,} words in the selected order.")
-        lines.append(f"Saved: {saved} (check with: sol essence check FILE)" if saved else
-                     "Not saved: this reader session has no workspace.")
-        self.query_one("#summary", Static).update("\n".join(lines))
-        self.query_one("#result-status", Static).update("")
-        self.query_one("#status", Static).update(f"Counted {total:,} distinct words; see Results (4).")
-        self.last_count = count
-        self.last_saved = saved
-        for button in self.query("#export-row Button"):
-            button.disabled = count.reference is None
-        self.query_one("#export-row").display = count.reference is not None
-        self.show_sources(self.word_order[0] if self.word_order else None)
-        self.query_one("#screens", TabbedContent).active = "results"
-        # Words first: arrows choose a word, Enter goes to its sources.
-        table.focus()
+            return self.query_one("#sentences-view", SentencesView)
+        return self.query_one("#words-view", WordsView)
 
-    def result_width(self, columns):
-        """Cell budget: pane padding, scrollbar, then DataTable cell padding.
-
-        Use the viewport, never content widths, so a resize cannot make long
-        words, paths or undefined measures force sideways scrolling.
-        """
-        return max(columns, self.size.width - 4 - 2 * columns)
-
-    def set_word_widgets(self, shown) -> None:
-        self.query_one("#sort-status").display = False
-        self.query_one("#overall").display = False
-        self.query_one("#overall-label").display = False
-        # Sources and export belong to word counts only.
-        for selector in ("#sources-label", "#sources", "#export-row"):
-            self.query_one(selector).display = shown
-
-    def show_sentences(self, count, saved) -> None:
-        self.set_word_widgets(False)
-        table = self.query_one("#frequencies", DataTable)
-        table.clear(columns=True)
-        table.add_column("Words", width=7)
-        table.add_column("Beginning", width=self.result_width(3) - 7 - 24)
-        table.add_column("Where", width=24)
-        for row in sentences.rows(count):
-            table.add_row(row[0], Text(row[1], overflow="fold"),
-                          Text(row[2].replace(" | p. ", "\np. "), overflow="fold"), height=None)
-        lines = sentences.summary(count)
-        if count.study["longest"]:
-            lines.append("The longest sentences are below; Enter opens one in the reader (Alt-Left there returns).")
-        lines.append(f"Saved: {saved} (check with: sol essence check FILE)" if saved else
-                     "Not saved: this reader session has no workspace.")
-        # The length bars take the theme's accent rather than the full ink colour.
-        summary = Text("\n".join(lines))
-        summary.highlight_regex(r"█+", style=self.current_theme.accent or "bold")
-        self.query_one("#summary", Static).update(summary)
-        self.query_one("#result-status", Static).update("")
-        self.query_one("#status", Static).update(
-            f"Measured {count.study['summary']['sentences']:,} sentences; see Results (4).")
-        self.last_count = count
-        self.last_saved = saved
-        self.shown_sources = ()
-        self.query_one("#screens", TabbedContent).active = "results"
-        table.focus()
-
-    def show_tfidf(self, count, saved) -> None:
-        self.set_word_widgets(False)
-        table = self.query_one("#frequencies", DataTable)
-        table.clear(columns=True)
-        passage_width = min(34, max(20, self.result_width(2) // 3))
-        table.add_column("Passage · Enter to open", width=passage_width)
-        table.add_column("Top terms · weight", width=self.result_width(2) - passage_width)
-        for label, terms in tfidf.rows(count):
-            table.add_row(Text(label, overflow="fold"), Text(terms, overflow="fold"), height=None)
-        overall = self.query_one("#overall", DataTable)
-        overall.clear(columns=True)
-        overall.add_column("Term", width=self.result_width(2) - 12)
-        overall.add_column("Mean weight", width=12)
-        for row in count.study["overall"]:
-            overall.add_row(Text(row["word"], overflow="fold"), f"{row['score']:.4f}", height=None)
-        overall.display = self.query_one("#overall-label").display = True
-        lines = tfidf.summary(count)
-        lines.append(f"Saved: {saved}" if saved else "Not saved: this reader session has no workspace.")
-        self.query_one("#summary", Static).update("\n".join(lines))
-        self.query_one("#result-status", Static).update("")
-        self.query_one("#status", Static).update("Ranked top terms; see Results (4).")
-        self.last_count = count
-        self.last_saved = saved
-        self.shown_sources = ()
-        self.query_one("#screens", TabbedContent).active = "results"
-        table.focus()
-
-    def show_sources(self, index) -> None:
-        table = self.query_one("#sources", DataTable)
-        table.clear(columns=True)
-        table.add_column("Side", width=9)
-        table.add_column("Occurrence", width=10)
-        where_width = min(30, self.result_width(4) // 4)
-        table.add_column("Where", width=where_width)
-        table.add_column("In context", width=self.result_width(4) - 19 - where_width)
-        self.shown_sources = () if index is None else tuple(words.sources(self.last_count, index))
-        for item in self.shown_sources:
-            label = item["label"].replace(" | p. ", "\np. ")
-            table.add_row(item["side"], f"{item['number']} of {item['count']}" if item["number"]
-                          else f"{item['count']} here", Text(label, overflow="fold"),
-                          in_context(item["context"]), height=None)
-        if index is not None:
-            row = self.last_count.study["frequencies"][index]
-            total = sum(row[side]["count"] for side in ("target", "reference") if row[side] is not None)
-            # Fewer rows than occurrences: the list was cut short, or some
-            # passage's later occurrences could not be confirmed.
-            self.query_one("#sources-label", Static).update(SOURCES_HELP if len(self.shown_sources) == total else
-                f"Listing {len(self.shown_sources):,} of {total:,} occurrences. " + SOURCES_HELP)
-
-    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
-        if (event.data_table.id == "frequencies" and self.last_count is not None
-                and isinstance(self.last_count, words.Count)):
-            self.show_sources(int(event.row_key.value))
-
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        if event.data_table.id == "frequencies":
-            if isinstance(self.last_count, tfidf.TfidfCount):
-                source = tfidf.source(self.last_count, event.cursor_row)
-                if source is None:
-                    self.query_one("#result-status", Static).update("A text file cannot be opened in the reader.")
-                else:
-                    self.open_in_reader(source)
-                return
-            if isinstance(self.last_count, sentences.SentenceCount):
-                if not 0 <= event.cursor_row < len(self.last_count.study["longest"][:sentences.ROW_LIMIT]):
-                    return
-                source = sentences.source(self.last_count, event.cursor_row)
-                if source is None:
-                    self.query_one("#result-status", Static).update("A text file's sentences cannot be opened in the reader.")
-                else:
-                    self.open_in_reader(source)
-                return
-            self.query_one("#sources", DataTable).focus()
+    def focus_result(self):
+        if self.last_count is None:
             return
-        if event.data_table.id != "sources" or not 0 <= event.cursor_row < len(self.shown_sources):
-            return
-        source = self.shown_sources[event.cursor_row]["open"]
-        if source is None:
-            self.query_one("#result-status", Static).update("A text file's words cannot be opened in the reader.")
-            return
-        self.open_in_reader(source)
+        first = {"words-view": "#frequencies", "sentences-view": "#longest", "tfidf-view": "#passages"}
+        view = self.result_view(self.last_count)
+        focus_now(view.query_one(first[view.id]))
 
-    def open_in_reader(self, source) -> None:
+    # Messages from the result views -----------------------------------------------------
+    def on_open_source(self, message: OpenSource):
+        self.open_in_reader(message.source)
+
+    def on_status(self, message: Status):
+        self.query_one("#result-status", Static).update(message.text)
+
+    def open_in_reader(self, source):
         """Ask the reader, through Neovim's terminal, to open a source."""
         request = json.dumps({"version": 1, "op": "open_source", "source": source},
                              ensure_ascii=True, separators=(",", ":"))
@@ -590,8 +493,25 @@ class EssenceApp(App):
             self._driver.write(self.SOURCE_SEQUENCE.format(encoded))
         self.query_one("#result-status", Static).update("Asked the reader to open this passage.")
 
+    # Export -------------------------------------------------------------------------------
+    def export(self, table_format):
+        count, status = self.last_count, self.query_one("#result-status", Static)
+        if not isinstance(count, words.Count) or count.reference is None:
+            status.update("Nothing to export: a comparison with a reference is what is exported.")
+            return
+        if not self.state_file:
+            status.update("Not exported: this reader session has no workspace, so ESSENCE writes nothing.")
+            return
+        if self.exporting:
+            # The engine cannot be stopped midway; a second export would write a second file.
+            status.update("An export is still running; wait for it to finish.")
+            return
+        self.exporting = True
+        status.update("Checking the sources again and exporting…")
+        self.export_table(count, table_format)
+
     @work(thread=True, exclusive=True, group="export")
-    def export_table(self, count, table_format) -> None:
+    def export_table(self, count, table_format):
         try:
             outcome = words.export(count, table_format)
         except (words.EngineMissing, ValueError, OSError) as error:
@@ -601,68 +521,93 @@ class EssenceApp(App):
         except RuntimeError:
             pass
 
-    def finish_export(self, count, outcome) -> None:
+    def finish_export(self, count, outcome):
+        self.exporting = False
         if count is not self.last_count:
             return
-        for button in self.query("#export-row Button"):
-            button.disabled = False
         self.query_one("#result-status", Static).update(
             f"Not exported: {outcome}" if isinstance(outcome, Exception) else f"Exported: {outcome}")
 
-    def on_resize(self) -> None:
-        if self.last_count is not None:
-            self.call_after_refresh(self.reflow_result)
+    # Function words (a declared display list; counts never change) --------------------
+    def function_words(self):
+        """The bundled list, or None when this installation does not have it."""
+        if self._function_words is None:
+            try:
+                from sol.essence.function_words import load_function_words
+            except ImportError:
+                self._function_words = False
+            else:
+                self._function_words = load_function_words()
+        return self._function_words or None
 
-    def reflow_result(self) -> None:
-        table = self.query_one("#frequencies", DataTable)
-        screen = self.query_one("#screens", TabbedContent).active
-        focused = self.focused
-        row = table.cursor_row
-        word_index = (self.word_order[row] if isinstance(self.last_count, words.Count)
-                      and row < len(self.word_order) else None)
-        sources = self.query_one("#sources", DataTable)
-        source_row = sources.cursor_row
-        export_disabled = [button.disabled for button in self.query("#export-row Button")]
-        messages = [(widget, widget.content) for widget in
-                    (self.query_one("#status", Static), self.query_one("#result-status", Static))]
-        # Rebuilding posts highlight events for row zero. Suppress those
-        # intermediate events so they cannot reset the restored occurrence.
-        with self.prevent(DataTable.RowHighlighted):
-            self.show_result(self.last_count, self.last_saved)
-            if word_index is not None:
-                row = self.word_order.index(word_index) if word_index in self.word_order else 0
-            table.move_cursor(row=row)
-            if isinstance(self.last_count, words.Count):
-                self.show_sources(self.word_order[row] if table.row_count else None)
-                sources.move_cursor(row=source_row)
-        for button, disabled in zip(self.query("#export-row Button"), export_disabled):
-            button.disabled = disabled
-        for widget, content in messages:
-            widget.update(content)
-        self.query_one("#screens", TabbedContent).active = screen
-        if focused is not None and focused.display:
-            focused.focus()
+    # Reference ---------------------------------------------------------------------------
+    def action_reference(self, tab="encyclopedia", method=None, entry=None):
+        # One reference screen for the session: its searches and selections
+        # stay as they were left between openings.
+        if "reference" not in self._installed_screens:
+            self.install_screen(ReferenceScreen(), "reference")
+        screen = self.get_screen("reference")
+        screen.open(tab, method)
+        if not isinstance(self.screen, ReferenceScreen):
+            self.push_screen(screen, self.use_method)
+            self.update_layout()
+        if entry is not None:
+            self.call_after_refresh(lambda: self.reveal_entry(screen, entry))
 
-    def on_key(self, event) -> None:
-        active = self.query_one("#screens", TabbedContent).active
-        if (event.key == "s" and active == "results"
-                and self.focused is self.query_one("#frequencies", DataTable)
-                and isinstance(self.last_count, words.Count) and self.last_count.comparison is not None):
-            self.push_screen(WordSort(self.word_sort), self.sort_words)
-            event.stop()
-        if event.key == "escape" and active in BROWSERS:
-            self.query_one(f"#{active}-list").focus()
-            event.stop()
-        if event.key == "escape" and self.focused is self.query_one("#sources", DataTable):
-            self.query_one("#frequencies", DataTable).focus()
-            event.stop()
+    @staticmethod
+    def reveal_entry(screen, entry):
+        """Show catalog entry `entry`, by its stable option ID, even outside a search."""
+        from textual.widgets import OptionList
+        field = screen.query_one("#encyclopedia-search", Input)
+        if field.value:
+            with screen.prevent(Input.Changed):
+                field.value = ""
+            screen.filter_browser("encyclopedia")
+        listing = screen.query_one("#encyclopedia-list", OptionList)
+        listing.highlighted = listing.get_option_index(str(entry + 1))
+        screen.update_browser("encyclopedia")
 
-    def sort_words(self, choice) -> None:
-        if choice is not None:
-            self.word_sort = choice
-            self.reflow_result()
+    def action_method(self):
+        study = self.last_run[0] if self.last_run else self.query_one("#menu", StudyMenu).study
+        method = ("word-comparison" if study == "words" and self.last_run and self.last_run[2] != "none"
+                  else STUDY_METHODS[study])
+        self.action_reference("methods", method)
 
-    def follow_reader_theme(self) -> None:
+    def use_method(self, method):
+        if method is None:
+            self.call_after_refresh(self.restore_focus)
+            return
+        menu = self.query_one("#menu", StudyMenu)
+        study = METHOD_STUDIES[method]
+        choices = {"study": study}
+        if method == "word-comparison" and menu.reference == "none":
+            choices["reference"] = "book" if self.context["corpus"] else "file"
+        menu.set_choices(**choices)
+        self.update_header()
+        self.action_menu()
+
+    def restore_focus(self):
+        if self.query_one("#menu").display:
+            focus_now(self.query_one("#menu"))
+        else:
+            self.focus_result()
+
+    def action_keys(self):
+        if self.screen.query("HelpPanel"):
+            self.action_hide_help_panel()
+        else:
+            self.action_show_help_panel()
+
+    def check_action(self, action, parameters):
+        if action == "cancel_count":
+            return self.counting and not isinstance(self.screen, ReferenceScreen)
+        return True
+
+    def action_cancel_count(self):
+        self.cancel_count()
+
+    # Following the reader ------------------------------------------------------------------
+    def follow_reader_theme(self):
         """Take the theme the reader last wrote; anything unreadable or unknown is ignored."""
         try:
             with open(self.theme_file, encoding="utf-8") as stream:
@@ -672,29 +617,61 @@ class EssenceApp(App):
         if name in TEXTUAL_THEMES and self.theme != TEXTUAL_THEMES[name]:
             self.theme = TEXTUAL_THEMES[name]
 
-    def on_mount(self) -> None:
-        self.update_choices()
-        self.set_word_widgets(False)
-        if self.theme_file:
-            # A stat-sized read twice a second; T in the reader shows here within half a second.
-            self.set_interval(0.5, self.follow_reader_theme)
-        screen = self.state.get("screen")
-        self.action_screen(screen if screen in SCREENS else "encyclopedia")
+    def restyle_open_screens(self, theme):
+        """Textual restyles only the base screen; an open palette or modal keeps the old colors."""
+        for screen in self.screen_stack[1:]:
+            self.stylesheet.update(screen, animate=False)
+        self.update_header()
+        if isinstance(self.screen, ReferenceScreen):
+            self.screen.update_header()
 
-    def action_screen(self, name: str) -> None:
-        # Let go of focus first: a focused widget on the old screen would pull
-        # it back to the front.
-        self.set_focus(None)
-        self.query_one("#screens", TabbedContent).active = name
-        # Then start on the screen's first control.
-        first = {"encyclopedia": "#encyclopedia-list", "methods": "#methods-list", "experiment": "#study", "results": "#frequencies"}.get(name)
-        if first:
-            self.query_one(first).focus()
+    def follow_reader_position(self):
+        """Take the reader's latest checked position; "this passage" then means it."""
+        try:
+            from sol.interchange.essence import read_position
+            position = read_position(self.position_file)
+        except (ImportError, OSError, ValueError):
+            return
+        key = (position["reference"]["reference"]["target_id"], position["cursor_offset"])
+        if key == self.position_seen:
+            return
+        self.position_seen = key
+        moved = position["reference"]["reference"]["target_id"] != self.context["reference"]["reference"]["target_id"]
+        self.context = dict(self.context, reference=position["reference"], cursor_offset=position["cursor_offset"],
+                            selection=position["selection"], label=position["label"])
+        if moved and self.last_run is not None and self.last_run[1] in ("passage", "section"):
+            self.reading_moved = True
+        self.update_header()
 
-    def action_leave(self) -> None:
+    # Layout ----------------------------------------------------------------------------------
+    def on_resize(self, event):
+        # App.size is updated by Textual after this handler; use the event's
+        # destination width so the breakpoint changes on this resize.
+        self.update_layout(event.size.width, event.size.height)
+        self.call_after_refresh(self.reflow)
+
+    def update_layout(self, width=None, height=None):
+        width = self.size.width if width is None else width
+        height = self.size.height if height is None else height
+        for screen in self.screen_stack:
+            screen.set_class(width < 100, "-compact")
+            screen.set_class(width < 60, "-small")
+            screen.set_class(height < 30, "-short")
+
+    def reflow(self):
+        self.query_one("#menu", StudyMenu).refresh_menu()
+        if self.last_count is not None:
+            self.result_view(self.last_count).reflow()
+
+    def action_leave(self):
         self.count_serial += 1  # A count still running is abandoned.
         if self.state_file:
+            if isinstance(self.screen, ReferenceScreen):
+                from textual.widgets import TabbedContent
+                view = self.screen.query_one("#catalogs", TabbedContent).active
+            else:
+                view = "workspace"
             save_state(self.state_file, {
-                "version": 1, "screen": self.query_one("#screens", TabbedContent).active,
+                "version": 1, "screen": view,
                 "origin": self.context["reference"]["reference"]["target_id"]})
         self.exit(0)

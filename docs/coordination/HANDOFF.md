@@ -1,5 +1,84 @@
 # Handoff reports
 
+## Codex B round 2 — launch-context JSON errors — 25 October 2026
+
+Branch `codex/essence-context-json-errors`, based on #125's
+`codex/essence-context-transport`. A 200,001-byte nested JSON context (within the
+256 KiB byte limit) raised RecursionError through the launcher's ordinary input
+error handler. Turn decoder recursion failures into ValueError. Encoding deeply
+nested or non-JSON context objects likewise escaped as recursion/type errors;
+translate these before creating a directory/file. The reader also accepted NaN,
+overflowed floats and escaped surrogates that the writer cannot encode; apply
+the same finite UTF-8 serialization validation on read. Invented regressions failed
+before fixes; valid context bytes/permissions/shape stay unchanged. No TUI source,
+public contract, dependencies, corpus text or SPECULATIVE changes.
+Full branch suite: 1,323 tests OK (29 skipped, 4 expected failures); docs/diff
+checks pass. A real tmux launch of the malformed context returns 2 without a
+traceback. Combined focused checks and inert mutation probes pass; read-only
+whole-corpus words, TF-IDF, legacy and both provider sentence methods save/check
+successfully and have identical word/sentence token totals. Combined full suite:
+1,353 tests OK (29 skipped, 4 expected failures); corpus binding/generation
+unchanged from the start. [PR #139](https://github.com/dialectmaterial/SOL/pull/139). Earlier round-2 batches:
+[#134](https://github.com/dialectmaterial/SOL/pull/134) on #132,
+[#136](https://github.com/dialectmaterial/SOL/pull/136) on #130,
+[#137](https://github.com/dialectmaterial/SOL/pull/137) on main.
+
+**needs maintainer decision:** frozen punctuation methods still split initial
+chains separated by tabs/two spaces or containing combining-mark initials.
+Invented probes and the need for a versioned boundary policy are recorded in
+[#134](https://github.com/dialectmaterial/SOL/pull/134); no method changes made.
+## Codex B round 2 — CLI diagnostics and measurement properties — 25 October 2026
+
+Branch `codex/essence-cli-diagnostics`, based on #130's
+`codex/essence-input-refusals` because the CLI files overlap. Fix early-closing
+pipes (spurious error or interpreter flush warning), truncated saved JSON
+(misreported as an unsupported protocol), and unknown-home paths (uncaught
+RuntimeError). Regressions failed before changes. Explicit file inputs and
+artifact paths use a typed expansion refusal; corpus discovery translates its
+home-resolution failure. Both CLI entry points flush inside quiet pipe handling.
+Added deterministic properties over invented combining marks, apostrophes, CJK,
+RTL, soft hyphens and ligatures: counts, sentence token totals, rates/log ratios,
+every small span, declared boundary exceptions, independent TF-IDF formulas,
+L2 norms and encode/decode/check. No methods/schemas/flags/dependencies changed.
+Full suite: 1,329 tests OK (29 skipped, 4 expected failures); docs/diff checks pass.
+Tmux checks at 86×48, 190×50, 80×24 and 40×24, theme changes and rapid screen keys;
+private launch context and captures stay outside Git. The CLI refusals are clean
+at 40×24, including unknown-home source/reference/artifact and environment paths.
+[PR #136](https://github.com/dialectmaterial/SOL/pull/136). Previous round-2 batch is [#134](https://github.com/dialectmaterial/SOL/pull/134), stacked on #132.
+## Codex B round 2 — legacy sentence receipt invariants — 25 October 2026
+
+Branch `codex/sentence-receipt-invariants`, based on #132's
+`codex/sentence-method-isolation` because both touch the legacy sentence engine.
+The legacy decoder/encoder accepted totals, histograms, positional statistics,
+longest rankings and per-passage counts that contradicted sentence rows. Validate
+the derived fields with the existing measurement function and count rows per
+passage. Invented-fixture regressions failed before the fix (13 assertions);
+valid v1 fixture encodings remain byte-identical. No method/schema/flag changes,
+private corpus material, TUI changes or dependencies. Full suite: 1,316 tests OK
+(29 skipped, 4 expected failures); docs and diff checks pass. Read-only real-corpus
+CLI at 86×48, provider/legacy save → check and comparison CSV/TSV round trips
+at 190×50; no corpus/export material is in Git. [PR #134](https://github.com/dialectmaterial/SOL/pull/134).
+## Codex B round 2 — early word-result budget — 25 October 2026
+
+Branch `codex/word-result-budget`, from `origin/main`; word counting itself did
+not overlap the round-1 changes. A 1,799,999-byte invented file with 200,000
+distinct words expanded the whole table before the 16 MiB refusal, using about
+264 MiB peak RSS. Track a conservative serialized-frequency lower bound for
+included distinct words while counting, and stop once fitting is impossible.
+The bound omits provenance, extra locations and reference cells, so it cannot
+reject a valid receipt. Repeated words, masked/excluded tokens and words outside
+a span do not spend the bound again. Existing final exact-size validation stays.
+Early-refusal regressions fail before the fix for words and embedded TF-IDF;
+exact valid-size, repeated Unicode words, reference and span checks pass.
+Isolated fresh-process, warm-file probe without concurrent tests: peak RSS
+264 → 57 MiB; wall time 4.25 → 0.33 s, same size_limit refusal (one sample each,
+not a cross-machine timing guarantee). CLI refusal is clean in tmux; a large
+repeated-word file succeeds, and a Ctrl-C trial exits 130 without a traceback.
+Full suite: 1,315 tests OK (29 skipped, 4 expected failures); docs/diff checks pass.
+[PR #137](https://github.com/dialectmaterial/SOL/pull/137). Earlier round-2
+batches: [#134](https://github.com/dialectmaterial/SOL/pull/134) on #132 and
+[#136](https://github.com/dialectmaterial/SOL/pull/136) on #130.
+
 Claude Code adds one report per completed task, newest first, so a reviewer can
 judge the work from GitHub alone: the report says what to look at, the pull
 request shows the diff. Reports describe; they do not change what the five
@@ -31,6 +110,379 @@ Write "None." rather than deleting a heading.
 ### Decisions requiring approval
 - <decision, the options, and what was assumed meanwhile>
 -->
+
+
+## ESSENCE workspace — 24 October 2026
+
+**Task:** [Claude Code: ESSENCE workspace](https://github.com/dialectmaterial/SOL/blob/claude/essence-workspace/docs/coordination/CURRENT_TASK.md), requested by the maintainer after the ESSENCE visual audit, with all five decisions approved.
+**Branch / PR:** `claude/essence-workspace`, stacked on #118 (Codex's unpublished ESSENCE stack, published by Claude) · PR linked below.
+**Last implementation commit:** `50cf51d` (review fixes; this report is updated after it)
+
+### Changed files
+- `sol/essence/tui/views.py` (new) — bars, diverging log-ratio bars, dispersion strips, concordance lines and context sort keys in block characters; pure functions.
+- `sol/essence/tui/results.py` (new) — one view per study (words with concordance, sentences with distribution first, TF-IDF with weight bars), stacked beside the reader and side by side from 150 columns; tables size themselves from their pane and drop bars, then rates, before scrolling sideways.
+- `sol/essence/tui/menu.py` (new) — the Transient-style study menu (`w s t`, `p c b f`, `0 C B F`, `n`, Enter).
+- `sol/essence/tui/reference.py` (new) — the Encyclopedia and Methods browsers moved unchanged into one session-long screen over the study.
+- `sol/essence/tui/app.py` — the workspace: header, intro, menu, result views, status line, footer; `K`/`M` reference, `:` palette with ESSENCE's own commands, `R` rerun, `?` keys, `--position-file` following, function-word switch via `load_function_words()` when installed. Workers, count ordering, cancellation, saving, export and the source-return OSC are kept.
+- `sol/essence/tui/words.py` — each listed occurrence's place in its scope (display only); `__main__.py` — `--position-file`.
+- Tests: the six ESSENCE interface test files rewritten for the workspace, keeping each protected behaviour; `tests/test_essence_views.py` (new) for drawings, the function-word switch and following the reader.
+- `docs/ESSENCE.md` §4 — the maintainer's decisions of 24 October and the implemented workspace; `CHANGELOG.md`; this slot in `CURRENT_TASK.md`.
+
+### Tests performed
+- `.venv/bin/python -B -m unittest discover -s tests` — **1,339 tests OK** (7 skipped, 4 expected failures), 193 s, after the review fixes.
+- Codex's review found four faults, now fixed with regression tests that fail without the fix: Escape taken by a path field or the concordance instead of cancelling a count; `R` rerunning unrun menu edits; a palette Encyclopedia command landing on the wrong topic under a search; a second export starting while the first ran.
+- `.venv/bin/python -B scripts/check_docs.py` — OK.
+- Real terminal: the reader from this checkout in tmux (190×50, `sol -n`), `E` on p. 345 of the book: menu, `c B Enter` counted the section (5,711 tokens) against the book (312,481) with bars, log ratios and the concordance; Alt-F gave the three fullscreen panes; Enter on an occurrence moved the reader to p. 341. No book text is in Git or this report.
+- Installed into `~/.local/share/sol-app` (the `sol`/`sol-window` launchers) with `pip install --no-deps --force-reinstall`; all 114 package files match the wheel; `pip check` clean; an isolated-mode pilot smoke test from `/tmp` ran a comparison, the concordance, `K`, a sentence study and fullscreen on the installed code.
+
+### Outstanding issues
+- An ESSENCE already open keeps its old code: leave with `q` and press `E` again.
+- `f` works once #119 is merged (until then it says the list is not installed); following the reader works once #120 is merged. Merge order: #118, then this PR, then #119 and #120.
+- Saved studies are not yet listed or reopened from ESSENCE (`S` in the audit); reopening needs the providers rebuilt from a saved artifact and is left for a follow-up.
+- SVG previews render bold runs slightly wider than terminals; the real-terminal check above is the reference.
+
+### Decisions requiring approval
+- None reserved. Defaults: fullscreen panes from 150 columns; the difference column only fullscreen; Ctrl-P unbound and the palette on `:` without Textual's theme/quit commands; the function-word switch resets to off each session; a moved reading marks only passage and section results stale.
+
+
+## ESSENCE catalog navigation — 24 October 2026
+
+**Task:** [Codex A: ESSENCE catalog navigation](https://github.com/dialectmaterial/SOL/blob/e6e0fdc918baead91ce29b2b7a71b0bcbb5cacae/docs/coordination/CURRENT_TASK.md), requested directly by the maintainer: keep improving the interface.
+**Branch / PR:** `codex/essence-catalog-navigation`, stacked on `f604538`; not opened. Shell `gh pr list` still cannot connect to GitHub; the previously rejected integration write was not repeated. Integration search shows only open Codex PRs #117 and #76, with no open Claude implementation PR. No merge attempted.
+**Last implementation commit:** `e6e0fdc918baead91ce29b2b7a71b0bcbb5cacae` (this report is committed afterward).
+
+### Changed files
+
+- `sol/essence/tui/app.py` — local catalog search by normalized title, identifier or description; shown/total counts; empty-match guidance and disabled configuration; stable option identities for reading, method actions and genealogy destinations. `/` and Ctrl-F find, Enter browses/reads, Escape clears/returns. Search survives screen changes and resize without changing persisted state. Compact study choices share one line below 100 columns, giving source settings two more lines; full labels and descriptions remain in the wide sidebar and hover text. Rounded frames, engines, results, exports and source-return guards are retained.
+- `tests/test_essence_catalog_navigation.py` — four pilot regressions for filtered method identity and CLI-only actions, empty matches, Unicode/description search and queued edits, genealogy destinations outside a filter, retained search/focus and unclipped study controls at 40/80/120 columns.
+- `docs/ESSENCE.md`, `CHANGELOG.md`, `CURRENT_TASK.md` — record implemented controls and scope; only Codex A's coordination slot changes. No dependencies, contracts, logical placements or persistence changes.
+
+### Tests performed
+
+- Final full suite: **1,325 tests OK (7 skipped, 4 existing expected failures)**, 153.858 s; command `.venv/bin/python -B /tmp/sol_essence_test_runner.py`, log `/tmp/sol-essence-catalog-full-suite.log`. Uses isolated XDG directories and the same temporary 50 ms asyncio heartbeat described in the preceding UI reports; no test assertions or skips changed. Normal host command remains `.venv/bin/python -B -m unittest discover -s tests`.
+- Final new navigation tests: **four OK**, 7.275 s. Existing catalog, method, cancellation, source, sorting, settings, persistence, export, layout and packaging checks pass in the full suite. Documentation check and `git diff --check`: **OK**; external URLs are not network-checked.
+- Generated 24 synthetic SVG previews: Night 120×40 and 40×24, Paper 80×24, Mocha 60×24; catalogs, setup, filtered entries and empty matches. Inspected rasterized wide filtered Methods, compact empty matches/setup and narrow genealogy/setup. Selected PNGs: `/home/dima/Documents/Codex/2026-10-24/essence-navigation/`. No private corpus or workspace content is used.
+- Automatically built and installed the tested wheel into `/home/dima/.local/share/sol-app` using `--no-index --no-deps --force-reinstall`. Wheel: `/tmp/sol-essence-catalog-install-b0iiky_3/sol_organizes_logic-0.1.0-py3-none-any.whl`, SHA-256 `b7425fbbed6437a04e7f7691a71e044e6def4d0bac5020119f8bd954bd46ab43`. **All 110 installed package files match both the wheel and checkout byte-for-byte.**
+- Installed verification: `/home/dima/.local/share/sol-app/bin/python3 -I /tmp/sol_verify_installed_catalog.py` from `/tmp`: **passed**. No checkout on `sys.path`; UI imports from the launcher's `site-packages`. Real installed pilot covers catalog filtering, correct TF-IDF configuration, one-line unclipped choices at 40/80 columns, all four screens and existing rounded results/filter/details controls. Both launcher paths/shebangs, `sol --help`, `sol-window --help`, `sol essence --help` and `pip check`: **OK**. Dependency inventory is unchanged. Verification JSON and installed SVGs remain beside the wheel; installed PNGs were inspected and copied to the preview directory.
+
+### Outstanding issues
+
+Installation is complete. An already running ESSENCE retains its imported code;
+leave with `q`, then press `E` in the reader to load the update. The active
+reader was not terminated. At 40 columns source settings still scroll, with
+selection and all controls retained; automated previews do not establish
+sustained human acceptance. Publication awaits GitHub access:
+
+```sh
+git push --set-upstream origin codex/essence-catalog-navigation
+gh pr create --base main --head codex/essence-catalog-navigation --title "Refine ESSENCE's rounded research workspace" --body-file /tmp/sol-essence-navigation-pr.md
+```
+
+### Decisions requiring approval
+
+None reserved. Defaults: search matches a literal normalized substring in the
+catalog's title/ID/description; the shown count includes Genealogy; empty
+matches disable configuration; map navigation clears the search to reveal its
+destination. Compact study names are Words, Sentences and TF-IDF. These
+presentation choices may be revised after use.
+
+
+## Install verified SOL changes — 24 October 2026
+
+**Task:** [Codex A: install verified SOL changes](https://github.com/dialectmaterial/SOL/blob/205346f72169b0074fd3046e8c0c329cfd79ff2e/docs/coordination/CURRENT_TASK.md), requested directly after the installed interface still appeared old.
+**Branch / PR:** `codex/install-verified-changes`, stacked on local polish `37f7fd4`; not opened because the previously established GitHub DNS/write-access restriction remains. No merge attempted.
+**Last implementation commit:** `205346f72169b0074fd3046e8c0c329cfd79ff2e` (this report is committed afterward).
+
+### Changed files
+
+- `CONTRIBUTING.md`, `CLAUDE.md` — record the maintainer's standing authorization: install each completed, verified application change into the existing launcher environment, then verify outside the checkout. Preserve dependencies and active sessions. Local installation does not publish or merge a branch.
+- `CURRENT_TASK.md` — update only Codex A's slot. No application code, dependency, corpus or workspace change in this follow-up.
+- Local installation — replaced the old package in `/home/dima/.local/share/sol-app`, which both `~/.local/bin/sol` and `sol-window` launch. The old distribution pointed to a temporary `scratchpad/install-src` directory. The preceding reports' imports had run inside the checkout, masking the stale installed package; their installation claims were incorrect and are corrected below.
+
+### Tests performed
+
+- Built the tested checkout with `.venv/bin/python -I -m pip wheel --no-index --no-deps --no-build-isolation --wheel-dir /tmp/sol-local-install-inu0ub71 /home/dima/Projects/code/sol`. Installed with `/home/dima/.local/share/sol-app/bin/python3 -I -m pip install --no-index --no-deps --force-reinstall /tmp/sol-local-install-inu0ub71/sol_organizes_logic-0.1.0-py3-none-any.whl` from `/tmp`.
+- Wheel SHA-256: `5548552649cbf7bf45329917c451102850dfb49e5c4604310036272cac93792e`. All **110 installed package files match** the built wheel byte-for-byte. Application content includes redesign `c4c1d53` and polish `59904eb`; this follow-up changes operational documentation only.
+- `/home/dima/.local/share/sol-app/bin/python3 -I /tmp/sol_verify_installed_ui.py`, working directory `/tmp`: **passed**. No checkout directory on `sys.path`; imported UI is under the launcher's `site-packages`. Real installed Textual pilot verified all four screens, rounded borders, word filtering, expanded details and resizing from 120×40 to 80×24, with invented text and temporary XDG directories. SVG/PNG previews and `verification.json` remain in the wheel staging directory.
+- Both launcher paths/shebangs, `sol --help`, `sol-window --help`, `sol essence --help`: **OK** from outside the checkout. `pip check`: **no broken requirements**. Package inventory comparison confirms all dependencies unchanged, including Textual 8.2.8.
+- Documentation check and `git diff --check`: **OK**. No new application code; the installed application is the same code covered by the preceding **1,321-test** full-suite run, not a newly repeated full suite.
+
+### Outstanding issues
+
+An already open ESSENCE process retains its imported code: leave with `q`, then
+press `E` in the reader to start the installed version. The active reader was
+not terminated. GitHub publication is still unavailable; local installation is
+complete. When access is available:
+
+```sh
+git push --set-upstream origin codex/install-verified-changes
+gh pr create --base main --head codex/install-verified-changes --title "Install verified SOL changes and refine ESSENCE" --body-file /tmp/sol-install-workflow-pr.md
+```
+
+### Decisions requiring approval
+
+None. Automatic installation after appropriate verification is explicitly
+authorized by the maintainer for future application changes.
+
+
+## ESSENCE workflow polish — 24 October 2026
+
+**Task:** [Codex A: ESSENCE workflow polish](https://github.com/dialectmaterial/SOL/blob/59904eb455c57a1e414349ed1be2b763713f99bd/docs/coordination/CURRENT_TASK.md), requested directly after the maintainer accepted the redesigned appearance.
+**Branch / PR:** `codex/essence-workflow-polish`, stacked on local redesign `220c27b`; not opened. The preceding task established shell GitHub DNS failure and HTTP 403 for GitHub integration writes; no new access was provided and the rejected write was not repeated. No merge attempted.
+**Last implementation commit:** `59904eb455c57a1e414349ed1be2b763713f99bd` (this report is committed afterward).
+
+### Changed files
+
+- `sol/essence/tui/app.py` — compact result totals, expandable existing summary with a note count, literal presentation-only word filter before the display limit, explicit empty matches, selected-word occurrence titles, sort button and direct Methods-to-Experiment actions. Existing paths/settings survive method selection; no study runs until Run. Narrow frames account for the details panel and keep result tables/export controls inside the viewport; comparison headings fit at 80 columns. User filter text renders literally.
+- `tests/test_essence_workflow.py` — four real-engine invented-file pilot tests cover Unicode normalization/apostrophes, exact source mapping, byte-identical complete CSV after filtering, pre-limit and sorted filtering, empty-source clearing, new-result reset, all study totals/details, expanded-frame bounds at 40/80 columns, retained selection, method shortcuts and CLI-only availability.
+- `docs/ESSENCE.md`, `CHANGELOG.md`, `CURRENT_TASK.md` — document controls, semantics and current scope. No analytical method, artifact, persistence/workspace schema, dependency or logical placement changes.
+
+### Tests performed
+
+Python 3.14.8, Textual 8.2.8, checkout `.venv/bin/python -B`.
+
+- Final full suite: **1,321 tests OK (7 skipped, 4 existing expected failures)**, 139.577 s. Exact command: `.venv/bin/python -B /tmp/sol_essence_test_runner.py`; isolated XDG config/data/state/cache and Neovim log. Log: `/tmp/sol-essence-polish-full-suite-final.log`.
+- The temporary runner uses standard unittest discovery and the same 50 ms asyncio heartbeat documented in the preceding report, because restricted-shell socketpair writes return EPERM. It changes no tests/assertions/skips; no workaround was added to SOL. Normal host command remains `.venv/bin/python -B -m unittest discover -s tests`.
+- Focused UI suite: 50 tests OK. Final workflow/layout run: nine tests OK, including expanded details and source/export frame bounds. Existing sorting, CSV/TSV exports, source navigation, temporary-session writes, cancellation, theme and package checks pass in the final full suite.
+- Documentation check, `git diff --check` and `python -m sol essence --help`: OK. External documentation URLs are not network-checked.
+- Generated 36 invented-text SVG previews across Night 120×40 and 40×24, Paper 80×24 and Mocha 60×24: catalogs, setup, empty/results views, filtered results and expanded details. Inspected rasterized wide/compact results, method actions, filtering and expanded details, including 40-column frame bounds. Files remain outside Git in `/tmp/sol-essence-polish-preview`; selected PNGs are in `/home/dima/Documents/Codex/2026-10-24/essence-polish/`.
+- **Correction, 24 October:** the import check ran inside the checkout and masked the stale installed package. Reinstallation was required and is now complete; see the installation report above.
+
+### Outstanding issues
+
+Publication remains pending available GitHub access. Publish both the accepted
+redesign and this follow-up from the current local branch:
+
+```sh
+git push --set-upstream origin codex/essence-workflow-polish
+gh pr create --base main --head codex/essence-workflow-polish --title "Refine ESSENCE's rounded research workspace" --body-file /tmp/sol-essence-polish-pr.md
+```
+
+Automated checks and rendered previews do not substitute for sustained human
+use. At 40 columns, comparison cells wrap and vertically scroll; compact details
+is a small independently scrollable panel. No private corpus or workspace data
+is included in Git or the previews.
+
+### Decisions requiring approval
+
+None reserved. Presentation defaults: details collapsed for each new result;
+filtering applies to normalized literal word spellings, clears on a new result,
+and never changes complete exports or saved counts. Use this method selects a
+reference for comparison only when none was selected. Session presentation does
+not extend persisted investigation state. These defaults may be revised after use.
+
+
+## ESSENCE interface redesign — 24 October 2026
+
+**Task:** [Codex A: ESSENCE interface redesign](https://github.com/dialectmaterial/SOL/blob/c4c1d53af5b4c4b761df7e5fe9e6839a37cdfb91/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer with a Posting screenshot.
+**Branch / PR:** `codex/essence-interface-redesign` · not opened: shell Git cannot resolve `github.com`; the GitHub connection's create-tree request returned HTTP 403, `Resource not accessible by integration`. No merge attempted.
+**Last implementation commit:** `c4c1d53af5b4c4b761df7e5fe9e6839a37cdfb91` (this report is committed afterward).
+
+### Changed files
+
+- `sol/essence/tui/app.py` — Posting-inspired rounded/titled panels across all four screens; compact masthead/source line, numbered navigation, theme-aware focus, responsive catalog and study sidebars, framed source/settings controls, result panels and an actionable empty state. Width-aware table columns retain every measurement; layout updates also reach the workspace behind the sort modal. Existing analysis, source-return, save/export and persistence code paths are retained.
+- `tests/test_essence_layout.py` — five invented-input pilot tests protect catalog selection/focus, form values and reachable controls, empty-state navigation, all three result types at 40/60/120 columns, and resizing with the sort menu open. Existing UI tests remain intact.
+- `docs/ESSENCE.md`, `CHANGELOG.md` — document presentation and breakpoints; `CURRENT_TASK.md` changes only Codex A's slot. No dependencies, public APIs, artifact/workspace schemas or logical placements change.
+
+### Tests performed
+
+Python 3.14.8, Textual 8.2.8, using the checkout's `.venv/bin/python -B`.
+
+- Final full suite: **1,317 tests OK (7 skipped, 4 existing expected failures)**, 127.816 s; isolated XDG config/data/state/cache and Neovim log. Exact command: `.venv/bin/python -B /tmp/sol_essence_test_runner.py`; log `/tmp/sol-essence-redesign-full-suite-final.log`.
+- The restricted shell rejects even a local `socketpair().send` with `EPERM`, preventing asyncio's thread-safe wakeup. Stock unittest completed assertions but hung at runner shutdown on both unchanged main and the new interface. The temporary runner loads standard unittest discovery with a 50 ms event-loop heartbeat; it changes no tests, assertions or skips. On an unrestricted host, run the usual `.venv/bin/python -B -m unittest discover -s tests`. No environment workaround was added to SOL or its tests.
+- Final five new layout tests: OK, 8.767 s. Existing comparison sorting, undefined values, source navigation, cancellation, exports, themes and small-window tests pass in the final full suite. An earlier full run had 1,316 tests OK before adding the sort-modal resize regression and fix.
+- `scripts/check_docs.py`, `git diff --check` and `python -m sol essence --help`: OK. External documentation URLs are not network-checked.
+- Generated 28 synthetic Textual SVG previews: Night 120×40 and 40×24, Paper 80×24, Mocha 60×24; catalog, methods, setup, empty results, comparison, sentences and TF-IDF. Inspected rasterized wide Night catalog/setup/comparison, compact Paper setup/comparison and narrow Night TF-IDF; all use invented text. Preview files remain outside Git in `/tmp/sol-essence-redesign-preview`; selected PNGs are also in `/home/dima/Documents/Codex/2026-10-24/essence-redesign/`.
+- **Correction, 24 October:** the import check ran inside the checkout and did not verify the launcher's installed package. The actual installation has now been updated and verified outside the checkout; see the installation report above.
+
+### Outstanding issues
+
+Publication is unavailable in this session. Local commits and the working tree
+contain the completed change. Once GitHub access is available, publish with:
+
+```sh
+git push --set-upstream origin codex/essence-interface-redesign
+gh pr create --base main --head codex/essence-interface-redesign --title "Redesign ESSENCE with rounded responsive panels" --body-file /tmp/sol-essence-redesign-pr.md
+```
+
+Rendered previews and automated terminal/keyboard checks do not establish
+sustained human acceptance. No private corpus text, PDF or personal workspace
+is included in the change or previews. At very narrow widths, tables wrap cells
+and scroll vertically; the numbered tab bar scrolls horizontally as needed.
+
+### Decisions requiring approval
+
+None reserved. Provisional presentation defaults: catalog/setup sidebars at
+100 columns and above, stacked source groups below 60 columns, rounded panel
+borders with theme-derived accent focus, and a Choose a study empty-state action.
+The maintainer may revise these defaults after using the interface.
+
+## Declared English function words — 24 October 2026
+
+**Task:** [Codex A: declared English function words](https://github.com/dialectmaterial/SOL/blob/1e401e2d358ae007e566e75f1fd63bd55aeafc27/docs/coordination/CURRENT_TASK.md#codex-a-declared-english-function-words), assigned directly by the maintainer.
+**Branch / PR:** `codex/function-words` · [#119](https://github.com/dialectmaterial/SOL/pull/119); author does not merge.
+**Initial implementation commit:** `1e401e2d358ae007e566e75f1fd63bd55aeafc27` (review follow-up is recorded below).
+
+### Changed files
+
+- `sol/essence/function_words.json`, `function_words.py` — original `english-closed-class-v1`, version 1: 260 sorted, unique tokens in nine grammatical categories, written inclusion criteria, fresh metadata/categories and a `frozenset` union. Standard library only; no corpus/UI imports.
+- `pyproject.toml`, `MANIFEST.in`, `tests/test_packaging.py` — include the JSON in wheels and source archives; rerun the vocabulary tests against the unpacked wheel in an isolated process outside the checkout, refusing CORE and optional runtime imports.
+- `tests/test_function_words.py` — exact shared-tokenizer round trips, sorting, category uniqueness, identity/version, representative category coverage, philosophical exclusions and independent loads.
+- `docs/ESSENCE.md`, `CHANGELOG.md` — declare the off-by-default, display-only method choice, be/have policy and unchanged counts, denominators, scores, artifacts and exports. `CURRENT_TASK.md` changes only Codex A's slot to In review.
+
+### Tests performed
+
+Review follow-up runs in `/tmp/sol-lane-a-pr119` using `/tmp/sol-function-words/.venv/bin/python -B` (the existing Python 3.14 environment).
+
+- `scripts/check_docs.py` — OK; external URLs are not network-checked.
+- `-m unittest discover -s tests` — **1,317 tests OK (7 skipped, 4 existing expected failures)**, 168.111 s. Log outside Git: `/tmp/sol-lane-a-pr119-suite.log`.
+- The full suite includes `test_function_words.py` (**4 tests**) and `test_packaging.py` (**23 tests**), including wheel and source archive checks and the extended vocabulary tests against the wheel.
+- `git diff --check` — OK. No changes under `sol/essence/tui/` or to `tests/test_essence_*.py`. `origin/main` remains at `b2a5fb7b84c88dc8306aed86d9568a6e654e051a`.
+
+### Outstanding issues
+
+Claude wires the interface switch separately, as assigned. The vocabulary is bounded and matches spellings, without context-sensitive part-of-speech tagging: enabling it can also hide lexical/philosophical uses of included spellings. Closed-class spellings that name logical determinations in the CORE edition stay visible: `being`, `other`, `one`, `many`, `beyond` and `itself` are explicitly excluded. `itself` carries “in itself” / “for itself”; Claude’s review is addressed without changing the unreleased id/version. No engine or artifact behavior changes.
+
+The supplied checkout has read-only Git metadata. Review follow-up branch, commits and publication use `/tmp/sol-lane-a-pr119`, cloned from origin; the supplied workspace remains on `main` with unchanged Git metadata. Review the published branch.
+
+### Decisions requiring approval
+
+None reserved: the maintainer approved the optional display-only choice on 24 October. Defaults the maintainer may overrule: include `am/are/be/been/is/was/were` for copular/auxiliary uses while excluding nominal `being`; include `have/has/had/having` and do forms for auxiliary uses. Preserve whole contractions, assign each spelling once, and version membership changes after release.
+## ESSENCE follows the reader — 24 October 2026
+
+**Task:** [Codex B: ESSENCE follows the reader](https://github.com/dialectmaterial/SOL/blob/5f5bdfbdcbbbf91d8241e25989a9cad406bfa8eb/docs/coordination/CURRENT_TASK.md#codex-b-essence-follows-the-reader), assigned directly by the maintainer.
+**Branch / PR:** `codex/essence-follows-reader` · [#120](https://github.com/dialectmaterial/SOL/pull/120); author does not merge.
+**Last implementation commit:** `63c5a708128718e9931ac3ca6aecf683eb3e3f40` (this report is committed afterward).
+
+### Changed files
+
+- `sol/interchange/essence.py` — stdlib-only `POSITION_VERSION = 1`, shape/version/size validation, owner-only no-follow reads, and private temporary-file/atomic-replace writes. No passage text; failed validation/replacement preserves the previous file. An existing temporary-name collision is never followed or removed.
+- `sol/being/neovim/reader.py` — opening and following share a fresh CORE capture after reader-packet validation. Launch initializes `<context>.position` and passes `--position-file` beside `--theme-file`; following writes no workspace state and strips selection text. The existing reader-owned private directory cleanup includes the position file.
+- `neovim_essence.lua`, `neovim_controls.lua`, `neovim_requests.lua` — asynchronous follow requests only while ESSENCE is open and the passage or loaded section changes. Opening seeds the last published location from the packet sent by `E`; cursor/selection changes inside a passage never send a request. One capture stays in flight; a 100 ms sampler retries failed changes at half-second intervals and survives reloads; close stops its timer. Follow requests do not take the navigation lock, but Python services captures and navigation serially.
+- `tests/test_position_exchange.py`, `test_neovim_reader.py`, `test_reader_surface_neovim.py` — exchange round trips/atomic concurrent reads, permissions/links/owner/FIFOs/size, failed replacement/temp collisions, checked same-view and cross-section passage updates, capture refusal, selection privacy, no workspace writes, no within-passage cursor/selection writes (including after 700 ms), no duplicate opening write, quiet retries, return to an earlier passage, reload survival and close lifecycle.
+- `docs/BEING.md` §6, `docs/ESSENCE.md` §4 and `CHANGELOG.md` — passage-only position exchange and measured `n`/`b` key-to-text latency with ESSENCE closed/open; the offset and selection are snapshots at entry. `CURRENT_TASK.md` changes only Codex B's slot, now In review. `sol/essence/tui/` and `tests/test_essence_*.py` are untouched.
+
+### Tests performed
+
+Python commands use `/home/dima/Projects/code/sol/.venv/bin/python -B` (Python 3.14.8).
+
+- Final `-m unittest discover -s tests` — **1,322 tests OK (7 skipped, 4 existing expected failures)**, 174.614 s; isolated XDG directories and Neovim log. Log outside Git: `/tmp/sol-pr120-full-suite.log`.
+- Focused `test_essence_position_follows_only_passage_or_section_changes_and_stops_on_close` — **1 test OK**, 2.710 s. Its real-terminal stub and invented passages verify zero cursor/selection traffic after the old throttle interval, passage/section updates, failed-capture retry, reload and close. The full suite also covers the existing exchange and controller guards.
+- Real book in tmux 140×40, real companion Textual app at #121 commit `99f4c6d`, 8 measured presses per key/condition after a discarded warmup: loaded-passage `n`/`b` medians closed **37.1/38.3 ms**, open **37.2/38.0 ms**; across the loaded-section boundary closed **356.5/379.5 ms**, open **365.1/357.8 ms**. BEING §6 records ranges, method and limits. Exactly **36 follow requests for 36 transitions**, and **zero requests** from six within-passage cursor moves over 0.9 s plus a one-second wait. Timing harness and private raw data remain outside Git in `/tmp/sol-pr120-latency.py` and `/tmp/sol-pr120-latency-final/`. Corpus index SHA-256 remains `91b1d25a60a914bd3644df038179583c8690b396cecb2e676ddfc2d6a6f36269`.
+- `scripts/check_docs.py` and `git diff --check` — OK; external URLs are not network-checked. `git merge origin/main` was already up to date; `origin/main` remained `b2a5fb7` at final validation. All stacked HANDOFF/CHANGELOG entries are retained. No private corpus, PDF, workspace or analysis export is committed.
+
+### Outstanding issues
+
+**Merge order: this PR must not merge before Claude's [ESSENCE workspace PR #121](https://github.com/dialectmaterial/SOL/pull/121) adding `--position-file`.** Current main's TUI does not accept that option; this PR supplies only the BEING side and exchange, as assigned. The latency probe uses the real companion app from a fixed private checkout snapshot; it does not put that app on this branch. No manual Alacritty/Kitty reading trial is claimed. Captures still share the serial Python request channel, so a section key pressed during a legitimate passage-change capture can wait for it; the settled-key measurements in BEING §6 do not claim otherwise.
+
+The supplied checkout has read-only Git metadata. Work/publication uses `/tmp/sol-pr120-review`, cloned from the published branch; task files are mirrored to the supplied workspace without changing its Git metadata. Review the published branch.
+
+### Decisions requiring approval
+
+None reserved: the maintainer approved following on 24 October. Defaults the maintainer may overrule: 100 ms Lua sampling, no same-passage writes, one follow request in flight, silent half-second retry after a failed passage/section change, and retaining the opening context as the separate return anchor. CORE remains responsible for source authority; the stdlib-only exchange checks its transient envelope shape rather than importing either interface or CORE.
+
+## ESSENCE sentence scope refusals — 25 October 2026
+
+**Task:** Codex B, maintainer's bounded bug hunt; see CURRENT_TASK.md.
+**Branch / PR:** `codex/essence-cli-scope-validation` · [#123](https://github.com/dialectmaterial/SOL/pull/123).
+**Last implementation commit:** `aaa12794edb42e489f7ef998823441048e4b79b1`.
+
+### Changed files
+- `sol/essence/cli.py`, `essence_as_reflection_within_itself/sentences.py` — refuse new empty/unknown CLI paths; type-check malformed saved scopes before set operations. Preserve legacy empty-path API/artifacts.
+- `tests/test_analysis_cli.py`, `test_sentence_study.py` — invented-text regressions, run failing before fixes.
+- ESSENCE, CHANGELOG and this lane's coordination slot — behavior and evidence.
+
+### Tests performed
+- `.venv/bin/python -B -m unittest discover -s tests` — **1,314 OK**, 7 skipped, 4 expected failures, 174.286 s; isolated XDG directories. First full run exposed an original empty-path fixture; the fix was restricted to CLI creation, then all four original fixtures passed unchanged.
+- Sentence tests: 51 OK (4 expected failures); CLI tests: 6 OK. `scripts/check_docs.py` and `git diff --check` pass.
+- Read-only real-corpus tmux use: words, sentences, TF-IDF, saved checks, TSV comparison export, prose summary, invalid paths, missing files and Ctrl-C. Checkout ESSENCE launched directly with a private real CORE context: word study, rapid screen switches, Paper→Night and 86×48 / 190×50 / 80×24 / 40×24 resizes. No text/artifacts committed. Index SHA-256 unchanged.
+
+### Outstanding issues
+40-column navigation clipping belongs to the UI lane. FIFO context hangs and pathological sentence regex latency are reproduced for subsequent batches. Work/publication clone: `/tmp/sol-codex-b-hunt` (supplied checkout has read-only Git metadata).
+
+### Decisions requiring approval
+None. No dependency, schema, flag, method or segmentation change.
+## ESSENCE context transport — 25 October 2026
+
+**Task:** Codex B, maintainer's bounded bug hunt; CURRENT_TASK.md.
+**Branch / PR:** `codex/essence-context-transport` · [#125](https://github.com/dialectmaterial/SOL/pull/125). Prior batch: [#123](https://github.com/dialectmaterial/SOL/pull/123).
+**Last implementation commit:** `00aec538c0a25a4498b2a14cece0d9499f972493`.
+
+### Changed files
+- `sol/interchange/essence.py` — nonblocking special-file refusal; enforce the same UTF-8 byte limit before writing and after reading; integer version validation; remove newly created partial files after write failures.
+- `tests/test_essence_interchange.py` — five failing regressions and exact-limit Unicode acceptance, all invented input. CHANGELOG and this lane's coordination slot describe the batch.
+
+### Tests performed
+- Full suite: **1,318 OK**, 7 skipped, 4 expected failures, 177.343 s; isolated XDG paths. Six focused transport tests and 36 existing ESSENCE UI tests pass. `scripts/check_docs.py` and `git diff --check` pass.
+- FIFO subprocess regression timed out before the fix; now finishes immediately. Real tmux launcher at 86 and 40 columns reports a clear refusal. Original private real-corpus context remains readable; CORE provider sentence recomputation agrees. No private text/artifacts committed.
+
+### Outstanding issues
+Sentence-regex slow path and saved-study malformed-input/failed-save diagnostics remain for subsequent batches. Work/publication clone: `/tmp/sol-codex-b-hunt` because supplied Git metadata is read-only. No TUI edits.
+
+### Decisions requiring approval
+None. Existing exchange fields/encoding, flags and dependencies unchanged.
+## Sentence suffix performance — 25 October 2026
+
+**Task:** Codex B, maintainer's bounded bug hunt; CURRENT_TASK.md.
+**Branch / PR:** `codex/sentence-suffix-performance` · [#128](https://github.com/dialectmaterial/SOL/pull/128). Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123), [#125](https://github.com/dialectmaterial/SOL/pull/125).
+**Last implementation commit:** `86cb60d960f68ba3de4ab34ecff84d6a39ac39e8`.
+
+### Changed files
+- `sol/essence/essence_as_reflection_within_itself/sentences.py` — scan only the final token; cache first non-whitespace per sentence; avoid token scanning when punctuation cannot be a boundary. No rule or method changes.
+- `tests/test_sentence_performance.py` — three timeout regressions, all run failing before fixes, plus original-regex equivalence on fixed-seed invented Unicode suffixes. CHANGELOG and this lane's coordination slot record the batch.
+
+### Tests performed
+- Final full suite: **1,316 OK**, 7 skipped, 4 expected failures, 177.901 s; isolated XDG paths. Focused sentence suite: 54 OK (4 expected failures). Docs and diff checks pass.
+- Both complete segmenters equal `origin/main` on 30,000 invented random strings. Real-corpus boundary digests over all 1,757 eligible passages are unchanged: 9,283 v1 raw segments and 9,146 v2 raw segments. No private text/artifacts committed.
+- Locally: 100,002-character long-word input about 12 ms; 400,000-character abbreviation sequence about 0.2 s; 90,000-character padding and 120,000-character period chains below 0.1 s. Each timeout regression exceeded three seconds before its fix. Real-corpus segmentation about 0.27–0.28 s. Slow input also completes through tmux CLI at 40×24.
+- Actual checkout reader/ESSENCE round trip also exercised beside at about 86×48 and fullscreen at 190×50, with explicit checkout PYTHONPATH so the editable installation cannot shadow the child module.
+
+### Outstanding issues
+Saved-study refusal/failed-save diagnostics and stale TF-IDF encyclopedia guidance remain for the next batch. Existing frozen segmentation limitations and out-of-lane 40-column UI clipping remain. Clone: `/tmp/sol-codex-b-hunt`.
+
+### Decisions requiring approval
+None. No dependencies, schemas, flags, method IDs or segmentation results changed.
+## ESSENCE input refusals and saved artifacts — 25 October 2026
+
+**Task:** Codex B, maintainer's bounded bug hunt; CURRENT_TASK.md.
+**Branch / PR:** `codex/essence-input-refusals` · [#130](https://github.com/dialectmaterial/SOL/pull/130). Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123), [#125](https://github.com/dialectmaterial/SOL/pull/125), [#128](https://github.com/dialectmaterial/SOL/pull/128).
+**Last implementation commit:** `a1c65a9effc1a3cb9eea62f8f9e42efd2649de1e`.
+
+### Changed files
+- Sentence engine: validate scoped check envelopes before field access; encode before save-side mutations; remove partial artifacts on write errors/interrupts.
+- Word CLI: missing independent file references ask for `--reference-file`, preserving same-file reuse. TF-IDF: invalid limits consistently name top_n and 1–1000, retaining `invalid_number`.
+- Encyclopedia: correct stale “TUI integration pending” SOL note; quotations and attribution unchanged. Eight invented-input tests, CHANGELOG and this lane's coordination slot cover the batch.
+
+### Tests performed
+- Full suite: **1,320 OK**, 7 skipped, 4 expected failures, 175.273 s; isolated XDG paths. Eight new tests pass; focused comparison 17, TF-IDF 11 and sentences 50 (4 expected failures) pass. Docs and diff checks pass.
+- Reproduced defect regressions before fixes. Save tests cover OSError and KeyboardInterrupt cleanup plus unchanged valid encoding/permissions. CLI diagnostics used in tmux at 40×24; corrected catalog note observed in actual reader/ESSENCE split. Real corpus index hash unchanged; no private text/artifacts committed.
+- All four proposed code patches also applied cleanly to a temporary review checkout; 101 focused combined tests pass. Combined full validation follows the final batch.
+
+### Outstanding issues
+A final API probe found a legacy sentence method-list alias: mutating a returned abbreviation list changes later studies' method metadata. Isolated for the next batch. Frozen segmentation limitations and out-of-lane narrow TUI clipping remain. Clone: `/tmp/sol-codex-b-hunt`.
+
+### Decisions requiring approval
+None. No dependencies, flags, formats, method IDs or measurement changes.
+## Legacy sentence method isolation — 25 October 2026
+
+**Task:** Codex B, maintainer's bounded bug hunt; CURRENT_TASK.md.
+**Branch / PR:** `codex/sentence-method-isolation` · [#132](https://github.com/dialectmaterial/SOL/pull/132). Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123), [#125](https://github.com/dialectmaterial/SOL/pull/125), [#128](https://github.com/dialectmaterial/SOL/pull/128), [#130](https://github.com/dialectmaterial/SOL/pull/130).
+**Last implementation commit:** `35048a560c7716d3ab8dd4b74dee024b26e121db`.
+
+### Changed files
+- Sentence engine: return the existing validator's detached result instead of the shallow method copy. One-line production fix prevents caller mutations from changing the declared method or defeating checking.
+- `tests/test_sentence_study.py` — invented mutation regression fails twice before the fix: later encodings change and tampered method checking succeeds. Restores globals even on failure. CHANGELOG and this lane's slot record the batch.
+
+### Tests performed
+- Full suite: **1,313 OK**, 7 skipped, 4 expected failures, 156.856 s; isolated XDG paths. Focused sentence suite: 51 OK (4 expected failures), including all four original v1 compatibility fixtures. Docs and diff checks pass.
+- Read-only real CORE snapshot with an invented empty scope reproduces both pre-fix failures and confirms isolation/refusal after the fix. Combined probes confirm word, TF-IDF and both sentence provider versions also refuse method tampering without poisoning later studies.
+- All five proposed code patches applied to `/tmp/sol-b-final-review`; 102 focused combined tests pass. Full combined suite: **1,333 OK**, 7 skipped, 4 expected failures, 156.233 s; isolated XDG paths. Combined docs and diff checks pass. Code, tests and all five batch records are mirrored into the supplied checkout without changing its read-only Git metadata.
+
+### Outstanding issues
+No further observed in-lane defect remains after these batches. Frozen segmentation limitations require a separately adopted method to change; 40-column TUI navigation clipping belongs to Claude's lane. Publication clone: `/tmp/sol-codex-b-hunt`; no private text/artifacts committed.
+
+### Decisions requiring approval
+None reserved. No dependencies, flags, schemas, method IDs or saved bytes changed.
 
 
 ## Sentence segmentation audit — 23 October 2026
@@ -142,7 +594,7 @@ None reserved. Defaults: `r` renames, `o` toggles order; an unchanged name is a 
 
 ## Reader latency on screen; section keys use the channel — 23 October 2026
 
-**Task:** [Claude Code: measure reader latency on screen](CURRENT_TASK.md#claude-code-measure-reader-latency-on-screen).
+**Task:** [Claude Code: measure reader latency on screen](https://github.com/dialectmaterial/SOL/blob/e6e0fdc918baead91ce29b2b7a71b0bcbb5cacae/docs/coordination/CURRENT_TASK.md).
 **Branch / PR:** `claude/section-keys-use-channel` · pull request from this branch.
 **Last implementation commit:** the commit before this report.
 
@@ -1132,3 +1584,174 @@ initial timing probe, so use the clean medians above for outcome claims.
 - **(reserved; proposal only)** Consider separately approving action-scoped fingerprint batching with a mandatory final verification before persistence/output and explicit semantics for edits during an action. This would change CORE's per-reference fingerprint policy and needs its own design/tests and maintainer approval. The current policy remains unchanged; this PR does not implement or depend on that proposal.
 
 Earlier reports are in Git history (trimmed 21 October 2026).
+
+## Codex A — narrow reader layouts, 25 October 2026
+
+Branch `codex/reader-panel-resize`; [PR #124](https://github.com/dialectmaterial/SOL/pull/124). Fixed help
+continuations drifting left at 40 columns (Neovim's default 20-column minimum
+clamped the hanging indent), and clipped status text in paragraph/search views
+(status only budgeted the location half). Explicit help indentation and compact
+status labels preserve descriptions, occurrence count and quit hint. Both new
+regressions failed first; 58 native-reader tests passed, final narrow checks
+passed, docs check and diff check passed. Full suite: 1,314 tests, OK (7 skipped,
+4 expected failures). Read-only real-corpus tmux runs at 86×48, 190×50, 80×24,
+40×24; fixed help/status rechecked at 40×24. Captures stayed under /tmp, with no
+corpus text, workspaces, PDFs or exports in Git. No contracts/dependencies/palette
+changes. Do not merge own PR. Next: reader-side ESSENCE focus on resize and
+launcher failure paths.
+## Codex A — ESSENCE resize focus, 25 October 2026
+
+Branch `codex/reader-essence-resize-focus`; [PR #126](https://github.com/dialectmaterial/SOL/pull/126).
+Fixed resizing stealing focus from ESSENCE (closing a nonexistent popup always
+focused the reader), and shrinking a reader-focused split covering that reader
+with fullscreen ESSENCE. Popup cleanup now changes focus only for an actual
+popup; a too-narrow inactive ESSENCE split hides until E reopens its process.
+Native regression failed first; final native suite: 57 passed. Full suite:
+1,313 tests OK (7 skipped, 4 expected failures). Docs and diff checks passed.
+Real-corpus read-only tmux: E, Alt-F, Alt-R, q, repeated theme/mode/movement keys,
+190×50 → 86×48 → 40×24; verified reader focus/hidden layout after Alt-R and
+shrinking, and q reaching ESSENCE after active resize. Captures outside Git;
+no private text/PDF/workspaces/exports, sol/essence edits, palette changes,
+contracts or dependencies. Previous batch: PR #124. Next: clean launcher
+failures, invalid help example, narrow opening animation.
+
+## Codex A — reader ESSENCE close/reopen, round 2 — 25 October 2026
+
+**Branch:** `codex/reader-essence-handoff`, based on the unmerged
+`codex/reader-essence-resize-focus` (#126), whose host file it extends.
+**PR:** [#135](https://github.com/dialectmaterial/SOL/pull/135), in review; author does not merge.
+
+- Confirmed on the configured read-only corpus in tmux: a rapid `q`, `E` loses
+  the reopen request while ESSENCE is still shutting down. Track the final typed
+  `E` without intercepting PTY input; reopen through the ordinary checked reader
+  request after a successful exit. Later typed keys cancel the intent.
+- Regression failed first with “E was lost during ESSENCE shutdown”; a delayed
+  raw-terminal stand-in proves a fresh request, unchanged reader position, new
+  focused terminal, and normal subsequent quitting. Existing scripted close
+  checks now dispatch their simulated physical quit key to Neovim's input hook.
+- 58 native reader tests and the full suite (1,314 tests; 7 skipped, 4 expected
+  failures) pass. `scripts/check_docs.py` and `git diff --check` pass. Live tmux
+  close/reopen and Alt-R checks at 190×50, 86×48, 80×24 and 40×24; theme/resize
+  checks continue. Captures remain private under `/tmp`; no corpus text, source
+  PDF, workspace or analysis export is committed. No dependencies, public
+  contracts, palette, SPECULATIVE or sol/essence edits.
+- Fullscreen source-opening report: checked separately with the newer ESSENCE
+  interface from #122 in a temporary integration checkout; investigating whether
+  #126 already addresses it. No speculative second fix in this batch.
+
+## Codex A — note editor resize mode and draft recovery — 25 October 2026
+
+**Branch / PR:** `codex/reader-note-resize-mode` / [#138](https://github.com/dialectmaterial/SOL/pull/138),
+based on unmerged #135 (and #126's popup cleanup); author does not merge.
+
+- Real-corpus tmux reproduction: resizing a note editor returns to the read-only
+  page still in Insert mode; the next reading key raises E21. Stop Insert mode
+  before closing a real popup.
+- The same resize loses an unfinished draft. VimResized suppressed the note's
+  BufWipeout handler. Allow nested cleanup events on the reader resize autocmd.
+  Confirmed lost draft before the fix, retained invented draft after it.
+- Two failing regressions first: actual Neovim event-loop Insert mode, then a
+  separate draft-recovery assertion. The mode test also reopens drafts through
+  80×24 → 40×24 → 86×48 → 190×50 and checks unchanged source position. The test
+  harness can run `-c luafile` for real mode transitions; existing `-l` tests keep
+  their behavior. 60 native reader tests pass. Full suite: 1,316 tests OK
+  (7 skipped, 4 expected failures); docs check and diff whitespace check pass.
+- Private configured corpus remains read-only; disposable workspace and captures
+  stay under `/tmp`. No book text, PDF, workspace or analysis export is committed.
+  No sol/essence, palette, public-contract, dependency or SPECULATIVE changes.
+
+## Codex A — background ESSENCE close focus — 25 October 2026
+
+**Branch / PR:** `codex/reader-essence-close-focus` / [#140](https://github.com/dialectmaterial/SOL/pull/140),
+based on unmerged #138 (and #135/#126); author does not merge.
+
+- Confirmed in real-corpus tmux: `q`, Alt-R, `c` leaves the visible context panel
+  with focus behind it once ESSENCE finishes exiting. The old exit callback
+  always focused the page and stopped Insert mode. It now restores the page
+  only when the closing ESSENCE window still owns focus, preserving a reader
+  panel or note editor already in use.
+- Two event-loop regressions failed first. A delayed raw-terminal stand-in
+  proves the context panel keeps focus and the note editor keeps both focus
+  and actual Insert mode across background exit. Existing foreground close,
+  selection restoration, E reopen, source opening and resize cases still pass.
+- 62 native reader checks pass; full suite: 1,318 tests OK (7 skipped,
+  4 expected failures); docs and whitespace checks pass. Real tmux
+  check after the fix keeps the context window current and visible. All
+  synthetic fixtures; real-corpus captures and disposable state remain under
+  `/tmp`. No private text, PDF, workspace or analysis export committed, and no
+  sol/essence, palette, public-contract, dependency or SPECULATIVE edits.
+## Codex A — launcher startup failures, 25 October 2026
+
+Branch `codex/launcher-startup-errors`; [PR #127](https://github.com/dialectmaterial/SOL/pull/127). Cleaned
+unusable Neovim preflight and disappearing-executable launch failures, sol-window
+font-cache/terminal process failures, its invalid -w help example, and the
+41-column splash track overflowing onto labels at 40 columns. Each regression
+failed first; 29 host, 8 window and 8 splash checks passed. Full suite: 1,318
+tests OK (7 skipped, 4 expected failures); docs and diff checks passed. Manual
+tmux reproductions/rechecks used an invented non-executable managed runtime,
+unavailable /proc cache path, and a 40×24 splash. Real corpus was used only
+read-only in earlier reading sessions; no corpus/PDF/workspace/export contents
+in Git. No dependencies, palettes or public contracts changed. Previous batches
+#124 and #126. Next: equivalent key-name remappings crashing native startup.
+## Codex A — equivalent key remappings, 25 October 2026
+
+Branch `codex/reader-key-alias-conflicts`; [PR #129](https://github.com/dialectmaterial/SOL/pull/129). Equivalent
+source spellings removed one native mapping twice and crashed startup; equivalent
+destination spellings silently overwrote an action. Compare Neovim keycodes
+before applying any remapping; warn once and retain default controls when aliases
+conflict. The config format is unchanged. Both native regressions failed first;
+58 native tests passed, final alias/reload checks and 3 user-key checks passed.
+Full suite: 1,314 tests OK (7 skipped, 4 expected failures); docs/diff checks OK.
+Real-corpus tmux, temporary config copy only: reproduced E31 at startup and
+rechecked startup/mode change with default keys and one warning. Also completed
+real-corpus guide/read/reference capture/check and missing-file smoke checks;
+40-column guide fits. Interrupted startup restored canonical input and echo.
+No private content, workspace, PDF, exports, dependencies, palette or public
+contract changes. Previous PRs #124, #126, #127. Next: clipped narrow outline
+header and deep-indent layout edge cases.
+## Codex A — outline widths and deep branches, 25 October 2026
+
+Branch `codex/reader-outline-width`; [PR #131](https://github.com/dialectmaterial/SOL/pull/131). Fixed the
+43-cell outline hint clipped at 40×24; wide Unicode titles losing their current
+marker through over-truncation; and deep branches failing with invalid highlight
+columns after truncating their indentation. Compact hint, bounded indentation
+and display-cell prefix fitting keep markers/pages intact. New native checks
+failed first, including an actual Invalid col error on an invented 24-level
+outline. Native suite: 58 passed; full suite: 1,314 tests OK (7 skipped, 4
+expected failures); docs/diff checks OK. Read-only configured corpus in tmux:
+standalone depth-6 outline at 40×24, compact hint rechecked, folds/motions/resizes
+through 80×24, 86×48 and 190×50, Esc exits. No private contents in Git, no public
+contracts, dependencies, palettes or sol/essence changes. Previous PRs #124,
+#126, #127, #129. One final confirmed issue: sol read errors can echo raw terminal
+control sequences from an invalid path; fixing separately in sol/app.
+## Codex A — sol read diagnostics and audit closeout, 25 October 2026
+
+Branch `codex/read-command-diagnostics`; [PR #133](https://github.com/dialectmaterial/SOL/pull/133). sol read's
+separate dispatcher interpolated raw exception strings, unlike the main
+launcher: an invented invalid path with an ANSI colour sequence changed the
+terminal, and bidi/bell characters were also echoed. Use the existing safe_output
+policy for both input/runtime errors; stdout and exit codes remain unchanged.
+Both regressions failed first; 9 native command checks OK (1 external Zsh check
+skipped), full suite: 1,314 tests OK (7 skipped, 4 expected failures), docs and
+diff checks OK. Real-corpus read-only tmux repro/recheck shows the invented ANSI
+sequence visibly after the fix, rather than applying it.
+
+All lane A batches from origin/main, published for review without self-merging:
+[#124](https://github.com/dialectmaterial/SOL/pull/124) narrow help/status;
+[#126](https://github.com/dialectmaterial/SOL/pull/126) reader/ESSENCE resize focus;
+[#127](https://github.com/dialectmaterial/SOL/pull/127) startup failures/splash;
+[#129](https://github.com/dialectmaterial/SOL/pull/129) key aliases;
+[#131](https://github.com/dialectmaterial/SOL/pull/131) outline widths;
+[#133](https://github.com/dialectmaterial/SOL/pull/133) command diagnostics. Each branch has its own task slot update,
+HANDOFF, failing-first regressions, docs check and full-suite pass.
+
+Audit used the configured corpus read-only in tmux at 86×48, 190×50, 80×24 and
+40×24: navigation, search/no matches, panels/outline, theme/mode keys, E/Alt-F/
+Alt-R, missing paths, malformed key config, and interrupted startup (canonical
+input and echo restored). guide/read/reference capture/check smoke checks passed.
+No further confirmed lane A bugs remain from this pass. The four baseline
+sentence-segmentation expected failures belong to ESSENCE and remain untouched;
+GUI/sustained human reading acceptance is not claimed. No public-contract or
+palette changes, dependencies, sol/essence or SPECULATIVE edits. All fixtures
+invented, captures outside Git, no private text/PDF/workspaces/exports committed.
+Work/publication clone: /tmp/sol-lane-a-hunt (original checkout Git is read-only).

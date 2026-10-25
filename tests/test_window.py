@@ -1,5 +1,9 @@
 """sol-window: its command lines and private font configuration, without opening a window."""
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 from pathlib import Path
+import re
+import shlex
 import sys
 import tempfile
 import unittest
@@ -37,13 +41,45 @@ class WindowTests(unittest.TestCase):
         def popen(command, **options):
             launched.append((command, options))
         with tempfile.TemporaryDirectory() as cache, patch.dict("os.environ", {"XDG_CACHE_HOME": cache}):
-            status = window.main(["--terminal", "foot", "-w", "study"], which=lambda name: f"/usr/bin/{name}",
+            status = window.main(["--terminal", "foot", "--workspace", "study"], which=lambda name: f"/usr/bin/{name}",
                                  popen=popen)
             self.assertTrue(Path(launched[0][1]["env"]["FONTCONFIG_FILE"]).is_file())
         self.assertEqual(status, 0)
         command, options = launched[0]
-        self.assertEqual(command[-6:], [sys.executable, "-m", "sol", "--theme", "paper", "-w", "study"][-6:])
+        self.assertEqual(command[-6:], [sys.executable, "-m", "sol", "--theme", "paper", "--workspace", "study"][-6:])
         self.assertTrue(options["start_new_session"])
+
+    def test_font_cache_failure_is_reported_without_starting_a_window(self):
+        error = StringIO()
+        with patch.object(window, "font_config", side_effect=PermissionError("invented font cache refusal")), \
+                redirect_stderr(error), patch.object(window.subprocess, "Popen") as launched:
+            status = window.main(["--terminal", "kitty"], which=lambda name: "/invented/kitty", popen=launched)
+        self.assertEqual(status, 2)
+        self.assertIn("sol-window:", error.getvalue())
+        self.assertIn("invented font cache refusal", error.getvalue())
+        launched.assert_not_called()
+
+    def test_terminal_launch_failure_is_reported_without_a_traceback(self):
+        error = StringIO()
+        with tempfile.TemporaryDirectory() as cache, patch.dict("os.environ", {"XDG_CACHE_HOME": cache}), \
+                redirect_stderr(error), patch.object(window.subprocess, "Popen", side_effect=FileNotFoundError(
+                    "invented missing terminal")) as launched:
+            status = window.main(["--terminal", "kitty"], which=lambda name: "/invented/kitty", popen=launched)
+        self.assertEqual(status, 2)
+        self.assertIn("sol-window:", error.getvalue())
+        self.assertIn("invented missing terminal", error.getvalue())
+        self.assertNotIn("Traceback", error.getvalue())
+
+    def test_help_workspace_example_is_accepted_by_sol(self):
+        from sol.app.options import build_parser, validate_options
+        output = StringIO()
+        with redirect_stdout(output), self.assertRaises(SystemExit) as caught:
+            window.main(["--help"])
+        self.assertEqual(caught.exception.code, 0)
+        example = re.search(r"e\.g\. (sol-window .*?)\.", output.getvalue()).group(1)
+        args = build_parser().parse_args(shlex.split(example)[1:])
+        validate_options(args)
+        self.assertEqual(args.workspace, "NAME")
 
     def test_no_supported_terminal_is_reported(self):
         self.assertEqual(window.main([], which=lambda name: None, popen=lambda *a, **k: None), 2)

@@ -106,6 +106,24 @@ def render_sentences(result: dict) -> str:
 
 
 def main(arguments: list[str] | None = None) -> int:
+    """Analyze or verify, treating an early-closing output pipe as normal exit."""
+    try:
+        status = _run(arguments)
+        sys.stdout.flush()
+        return status
+    except BrokenPipeError:
+        # Keep the interpreter's final flush from reporting the same pipe again.
+        import os
+
+        try:
+            with open(os.devnull, "w") as sink:
+                os.dup2(sink.fileno(), sys.stdout.fileno())
+        except (OSError, AttributeError, ValueError):
+            pass
+        return 0
+
+
+def _run(arguments: list[str] | None = None) -> int:
     """Analyze or verify without opening BEING, a workspace, or a source PDF."""
     options = build_parser().parse_args(arguments)
     try:
@@ -132,8 +150,8 @@ def main(arguments: list[str] | None = None) -> int:
             # must not route a word artifact through a corpus-only study.
             try:
                 header = json.loads(data)
-            except (ValueError, UnicodeError, RecursionError):
-                header = None
+            except (ValueError, UnicodeError, RecursionError) as error:
+                raise ValueError("Invalid ESSENCE artifact JSON") from error
             if isinstance(header, dict) and header.get("protocol") == "sol.tfidf":
                 from sol.essence.essence_as_reflection_within_itself.tfidf import decode_tfidf_result
                 from sol.essence.tfidf_cli import run as run_tfidf
@@ -145,15 +163,17 @@ def main(arguments: list[str] | None = None) -> int:
                 from sol.essence.sentence_cli import run as run_sentences
                 return run_sentences(options, decode_sentence_result(data))
             raise ValueError("Unsupported ESSENCE artifact protocol")
-        from sol.core import MAX_REFERENCE_BYTES, decode_reference, discover_corpus, load_snapshot
+        from sol.core import MAX_REFERENCE_BYTES, decode_reference, load_snapshot
+        from sol.essence.word_cli import _discover_corpus
+        from sol.essence.essence_as_reflection_within_itself.word_inputs import _expanduser
         from sol.core.wire import read_json_input
         from sol.essence.essence_as_reflection_within_itself import sentences as sentence_study
 
         origin = None
         # Reject unsafe references before discovery.
         if options.action == "sentences" and options.reference is not None:
-            origin = decode_reference(read_json_input(options.reference, MAX_REFERENCE_BYTES))
-        directory = discover_corpus(options.corpus)
+            origin = decode_reference(read_json_input(str(_expanduser(options.reference)), MAX_REFERENCE_BYTES))
+        directory = _discover_corpus(options.corpus)
         if directory is None:
             raise ValueError("No canonical corpus configured; use --corpus DIRECTORY or sol --set-corpus DIRECTORY")
         snapshot = load_snapshot(directory)
@@ -167,10 +187,16 @@ def main(arguments: list[str] | None = None) -> int:
                 "Canonical ancestry, headings and source references remain in metadata.\n"
                 "Use sol essence prose --json to export the complete input."))
         elif options.action == "sentences":
-            scope = {"kind": "within", "path": options.within} if options.within else None
+            scope = {"kind": "within", "path": options.within} if options.within is not None else None
+            if scope is not None:
+                sentence_study._scope(scope)
+                if not any(sentence_study._in_scope(record, scope) for record in snapshot.records):
+                    raise sentence_study.SentenceStudyError("Reader path names no records", code="invalid_scope")
             result = sentence_study.analyze_sentences(snapshot, scope=scope, origin=origin)
             print(sentence_study.encode_sentence_result(result) if options.json else render_sentences(result))
         return 0
+    except BrokenPipeError:
+        raise
     except (ValueError, OSError) as error:
         message = _safe(error)
         if options.json:

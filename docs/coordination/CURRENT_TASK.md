@@ -38,61 +38,24 @@ steps 5–7). Rules for all three lanes:
    the PR, update module paths in ARCHITECTURE §2 and the component document,
    and add a CHANGELOG line.
 
-## Claude Code: measure reader latency on screen
+## Claude Code: none assigned
 
-**Status:** Done (#115)
-**Branch:** `claude/section-keys-use-channel`
-**Scope:** reader backlog item "measured navigation latency": time from key to
-readable text in a real terminal. The measurement found `]c`/`[c` restarting
-Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
+**Status:** Done (25 October 2026). The ESSENCE workspace (#121) and its
+colors and real-book glitch fixes (#122) are merged with both Codex lanes'
+bug-hunt rounds in one integration merge; see HANDOFF.
 
-## Codex A: sentence segmentation audit (ESSENCE Experiment A)
+## Codex A: none assigned
 
-**Status:** In review
-**Branch:** `codex/sentence-segmentation-audit`
-**Requested:** 23 October 2026, by the maintainer
-**Scope:** [ESSENCE Experiment A](../ESSENCE.md#experiment-a--syntax-and-positionality-highest-priority):
-audit `punctuation-rules-v1` against every boundary in 60 reproducibly sampled
-private-corpus passages, read-only; state hand-check rules, boundary precision/
-recall and errors by type. Publish counts and abbreviation strings, no corpus
-sentences/passages. If material, add separately named `punctuation-rules-v2`,
-keep v1 selectable/checkable and existing artifacts valid, test with invented
-text, and remeasure the same sample. Document any interface default choice.
-**Constraints:** no dependencies, canonical edits or private text in Git; other
-lanes' slots unchanged; do not merge own PR.
-**Acceptance:** `restructuring/SENTENCE_AUDIT.md`, ESSENCE and CHANGELOG; full
-suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
+**Status:** Done (25 October 2026). Reader and launcher bug hunt, rounds 1–2:
+#124, #126, #127, #129, #131, #133, #135, #138, #140, merged. Known open:
+opening a source from fullscreen ESSENCE leaves ESSENCE covering the reader
+while the reader has focus.
 
-## Codex B: landmark management
+## Codex B: none assigned
 
-**Status:** Done (#113)
-**Branch:** `codex/landmark-management`
-**Requested:** 23 October 2026, by the maintainer
-
-### Goal
-
-Close the named-landmark rename and ordering limitation in
-[BEING §7](../BEING.md#7-boundaries-and-known-limitations).
-
-### Scope
-
-Add atomic rename with the existing name rules to the Neovim reader's `L`
-panel; preserve the saved target and metadata on success, and the old landmark
-on failure. Add a session-only toggle between name and whole-book passage
-order, with unavailable passages last. Update panel hints, `?` help, BEING and
-CHANGELOG. Cover workspace transactions, conflicts and unavailable targets,
-controller behavior and headless Neovim controls.
-
-### Constraints
-
-No workspace schema change or new persisted settings. Keep the three reader
-markers and other lanes' slots unchanged. Branch from `origin/main`; open a PR
-and do not merge it.
-
-### Acceptance
-
-Full suite, `tests/test_architecture.py`, `scripts/check_docs.py`; commit, push,
-open a PR against main, and record a HANDOFF report and PR URL.
+**Status:** Done (25 October 2026). ESSENCE measurement core and CLI bug hunt,
+rounds 1–2: #123, #125, #128, #130, #132, #134, #136, #137, #139, merged; also
+#119 (function words) and #120 (following the reader).
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.

@@ -18,9 +18,14 @@ return function(reader)
   local function close_popup()
     local closing, packet = panels.window, panels.return_packet
     panels.window, panels.context_open, panels.return_packet = nil, false, nil
-    if closing and api.nvim_win_is_valid(closing) then api.nvim_win_close(closing, true) end
+    if closing and api.nvim_win_is_valid(closing) then
+      -- A resize can close the note editor while it still has Insert mode.
+      -- Reading keys must not try to edit the read-only page after it closes.
+      vim.cmd('stopinsert')
+      api.nvim_win_close(closing, true)
+    end
     reader.view.set_side(0)
-    if api.nvim_win_is_valid(window) then api.nvim_set_current_win(window) end
+    if (closing or packet) and api.nvim_win_is_valid(window) then api.nvim_set_current_win(window) end
     if packet then restore(packet) end
   end
   -- Where a panel goes beside the page, moving the page left to make room;
@@ -62,7 +67,7 @@ return function(reader)
     panels.window = api.nvim_open_win(panel, true, config)
     vim.wo[panels.window].wrap, vim.wo[panels.window].linebreak = true, true
     if hanging then
-      vim.wo[panels.window].breakindent, vim.wo[panels.window].breakindentopt = true, 'shift:' .. hanging
+      vim.wo[panels.window].breakindent, vim.wo[panels.window].breakindentopt = true, 'min:0,shift:' .. hanging
     end
     vim.wo[panels.window].winhighlight = "NormalFloat:SOLPanel,FloatBorder:SOLPanelBorder"
     panels.return_packet = return_packet

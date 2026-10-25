@@ -22,7 +22,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_FILES = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol").rglob("*.py")}
 PACKAGE_ASSETS = {path.relative_to(ROOT).as_posix() for path in (ROOT / "sol" / "being" / "neovim").glob("*.lua")}
-PACKAGE_ASSETS.update({"sol/essence/encyclopedia.json", "sol/essence/methods.json",
+PACKAGE_ASSETS.update({"sol/essence/encyclopedia.json", "sol/essence/methods.json", "sol/essence/function_words.json",
                        "sol/being/neovim/fonts/LibertinusMono-Regular.ttf", "sol/being/neovim/fonts/OFL.txt"})
 ENTRY_POINTS = {
     "sol": "sol:cli",
@@ -164,6 +164,32 @@ print(catalog['license'])
                                 cwd=self.temporary.name, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(result.stdout.strip(), "CC BY-SA 4.0")
+
+    def test_installed_function_words(self):
+        installed = Path(self.temporary.name) / "installed-function-words"
+        with zipfile.ZipFile(self.wheel) as archive:
+            archive.extractall(installed)
+        program = """
+import builtins, sys, unittest
+from pathlib import Path
+sys.path[:0] = [sys.argv[1], sys.argv[2]]
+original_import = builtins.__import__
+def guarded(name, *args, **kwargs):
+    if name.startswith(('sol.core', 'sol.corpus', 'textual', 'torch', 'transformers')):
+        raise AssertionError(name)
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = guarded
+import sol.essence.function_words as vocabulary
+assert Path(sys.argv[1]) in Path(vocabulary.__file__).parents
+suite = unittest.defaultTestLoader.loadTestsFromName('test_function_words')
+result = unittest.TextTestRunner().run(suite)
+sys.exit(not result.wasSuccessful())
+"""
+        result = subprocess.run(
+            [sys.executable, "-I", "-B", "-c", program, str(installed), str(ROOT / "tests")],
+            cwd=self.temporary.name, capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_metadata_and_console_entry_points(self):
         with zipfile.ZipFile(self.wheel) as archive:

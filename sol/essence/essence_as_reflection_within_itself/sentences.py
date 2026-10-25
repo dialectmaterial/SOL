@@ -46,6 +46,7 @@ _METHOD = {
 }
 _END = re.compile(r"(?:(?:\. ){2,}\.|[.!?…]+)[”’\"')\]]*")
 _OPENERS = "“‘\"'([–—"
+_WORD_CHARACTER = re.compile(r"[^\W\d_]")
 
 
 class SentenceStudyError(TermExperimentError):
@@ -72,14 +73,32 @@ def _initial(text, token, position, end):
             or re.search(r"(?:^|[\s(])[^\W\d_]\. $", text[max(0, position - 5):position - 1]) is not None)
 
 
+def _ending_token(text, start, end):
+    # Walk only the final token: no end-anchored regex retries or whole-prefix
+    # copies. Preserve the original regex's optional single final newline.
+    if end > start and text[end - 1] == "\n":
+        end -= 1
+    left = end
+    while left > start:
+        if _WORD_CHARACTER.fullmatch(text, left - 1, left):
+            left -= 1
+        elif (left < end and left > start + 1 and text[left - 1] == "."
+              and _WORD_CHARACTER.fullmatch(text, left - 2, left - 1)):
+            left -= 1
+        else:
+            break
+    return text[left:end]
+
+
 def segment(text):
     """Half-open sentence spans over ``text``, trimmed of surrounding spaces."""
     # Open brackets, by position: one opened inside the current sentence (a
     # citation or aside) blocks a split; one that opens the sentence does not.
     spans, start, opened, position = [], 0, [], 0
+    first = None
 
     def close(end):
-        nonlocal start
+        nonlocal start, first
         left, right = start, end
         while left < right and text[left].isspace():
             left += 1
@@ -87,7 +106,7 @@ def segment(text):
             right -= 1
         if left < right:
             spans.append((left, right))
-        start = end
+        start, first = end, None
 
     while position < len(text):
         character = text[position]
@@ -107,16 +126,16 @@ def segment(text):
         for closer in match.group():
             if closer in ")]" and opened:
                 opened.pop()
-        first = start
-        while first < position and text[first].isspace():
-            first += 1
-        word = re.search(r"([^\W\d_]+(?:\.[^\W\d_]+)*)$", text[start:position])
-        token = word.group(1) if word else ""
+        if first is None:
+            first = start
+            while first < position and text[first].isspace():
+                first += 1
         followed = end == len(text) or text[end].isspace()
-        boundary = (followed and not any(at > first for at in opened) and _starts_sentence(text, end)
-                    and not (match.group().startswith(".") and len(match.group().rstrip("”’\"')]")) == 1
-                             and ((token.casefold() in _ABBREVIATIONS and (len(token) > 1 or token.islower()))
-                                  or _initial(text, token, position, end))))
+        boundary = followed and not any(at > first for at in opened) and _starts_sentence(text, end)
+        if boundary and match.group().startswith(".") and len(match.group().rstrip("”’\"')]")) == 1:
+            token = _ending_token(text, start, position)
+            boundary = not ((token.casefold() in _ABBREVIATIONS and (len(token) > 1 or token.islower()))
+                            or _initial(text, token, position, end))
         if boundary:
             close(end)
         position = end
@@ -142,10 +161,11 @@ def segment_v2(text):
     guesses footnotes from arbitrary numbers elsewhere in the prose.
     """
     spans, start, opened, position = [], 0, [], 0
+    first = None
     markers = {match.end() - 1 for match in re.finditer(r"(?m)^[ \t]*[0-9]+\.(?=[ \t])", text)}
 
     def close(end):
-        nonlocal start
+        nonlocal start, first
         left, right = start, end
         while left < right and text[left].isspace():
             left += 1
@@ -153,7 +173,7 @@ def segment_v2(text):
             right -= 1
         if left < right:
             spans.append((left, right))
-        start = end
+        start, first = end, None
 
     while position < len(text):
         character = text[position]
@@ -173,11 +193,10 @@ def segment_v2(text):
         for closer in match.group():
             if closer in ")]" and opened:
                 opened.pop()
-        first = start
-        while first < position and text[first].isspace():
-            first += 1
-        word = re.search(r"([^\W\d_]+(?:\.[^\W\d_]+)*)$", text[start:position])
-        token = word.group(1) if word else ""
+        if first is None:
+            first = start
+            while first < position and text[first].isspace():
+                first += 1
         # Consume a callout before testing whitespace/capitalization. Its end,
         # not the punctuation's end, is the source boundary. Do not reinterpret
         # a decimal point followed by digits as terminal punctuation.
@@ -191,10 +210,11 @@ def segment_v2(text):
                 end += 1
         followed = end == len(text) or text[end].isspace()
         boundary = (position not in markers and followed and not any(at > first for at in opened)
-                    and _starts_sentence(text, end)
-                    and not (match.group().startswith(".") and len(match.group().rstrip("”’\"')]")) == 1
-                             and ((token.casefold() in _ABBREVIATIONS_V2 and (len(token) > 1 or token.islower()))
-                                  or _initial(text, token, position, end))))
+                    and _starts_sentence(text, end))
+        if boundary and match.group().startswith(".") and len(match.group().rstrip("”’\"')]")) == 1:
+            token = _ending_token(text, start, position)
+            boundary = not ((token.casefold() in _ABBREVIATIONS_V2 and (len(token) > 1 or token.islower()))
+                            or _initial(text, token, position, end))
         if boundary:
             close(end)
         position = end
@@ -203,7 +223,8 @@ def segment_v2(text):
 
 
 def _scope(scope):
-    if not isinstance(scope, dict) or scope.get("kind") not in {"corpus", "within", "passages"}:
+    if (not isinstance(scope, dict) or not isinstance(scope.get("kind"), str)
+            or scope["kind"] not in {"corpus", "within", "passages"}):
         raise SentenceStudyError("Scope must be corpus, within PATH, or ordered passage IDs", code="invalid_scope")
     if scope["kind"] == "corpus":
         _keys(scope, {"kind"}, "Corpus scope")
@@ -216,8 +237,8 @@ def _scope(scope):
     else:
         _keys(scope, {"kind", "ids"}, "Passage scope")
         ids = scope["ids"]
-        if (not isinstance(ids, list) or not 1 <= len(ids) <= 4096 or len(set(ids)) != len(ids)
-                or not all(isinstance(value, str) for value in ids)):
+        if (not isinstance(ids, list) or not 1 <= len(ids) <= 4096
+                or not all(isinstance(value, str) for value in ids) or len(set(ids)) != len(ids)):
             raise SentenceStudyError("Passage scope needs 1–4096 distinct record IDs", code="invalid_scope")
     return scope
 
@@ -323,7 +344,7 @@ def _analyze(snapshot, scope, origin):
     result = {"protocol": "sol.sentence-study", "version": 1, **binding, "method": dict(_METHOD),
               "scope": scope, "origin": origin, **_measure(passages, rows),
               "passages": passages, "sentences": rows, "exclusions": exclusions}
-    _validate(result)
+    result = _validate(result)
     _current(snapshot)
     return result
 
@@ -358,6 +379,7 @@ def _validate(result):
             raise SentenceStudyError("Invalid passage row", code="invalid_rows")
     if sum(passage["sentences"] for passage in passages) != len(rows):
         raise SentenceStudyError("Sentence rows disagree with passage counts", code="invalid_rows")
+    counts = [0] * len(passages)
     previous = None
     for row in rows:
         if not isinstance(row, list) or len(row) != 4:
@@ -368,7 +390,14 @@ def _validate(result):
         if index >= len(passages) or start >= end or tokens < 1 or (
                 previous is not None and (index, start) <= (previous[0], previous[2] - 1)):
             raise SentenceStudyError("Sentence rows must be ordered, nonoverlapping and nonempty", code="invalid_rows")
+        counts[index] += 1
         previous = row
+    if counts != [passage["sentences"] for passage in passages]:
+        raise SentenceStudyError("Sentence counts disagree with passage rows", code="invalid_rows")
+    for key, expected in _measure(passages, rows).items():
+        if _json(result[key]) != _json(expected):
+            raise SentenceStudyError("Sentence statistics disagree with their rows",
+                                     status="mismatch", code="result_mismatch")
     longest = result["longest"]
     if (not isinstance(longest, list) or len(longest) > LONGEST
             or any(type(value) is not int or not 0 <= value < len(rows) for value in longest)):
@@ -421,13 +450,13 @@ def check_sentence_result(snapshot, result):
         return check_provider_result(snapshot, result)
     if isinstance(snapshot, FileProvider):
         raise SentenceStudyError("File providers require a v2 sentence study", code="invalid_provider")
+    result = _validate(result)
     if isinstance(snapshot, CoreProvider):
         if snapshot.scope is not None and _json(snapshot.scope) != _json(result.get("scope")):
             raise SentenceStudyError("Provider scope differs from the saved study", status="mismatch", code="scope_mismatch")
         snapshot = snapshot.snapshot
     from sol.essence.essence_as_reflection_within_itself.corpus_inputs import _binding, _current, _fresh
 
-    result = _validate(result)
     fresh = _fresh(snapshot)
     expected_binding = _binding(fresh)
     if result["corpus"] != expected_binding["corpus"]:
@@ -482,6 +511,7 @@ def save_sentence_result(result, directory=None):
     import os
     from pathlib import Path
 
+    data = encode_sentence_result(result) + "\n"
     if directory is None:
         configured = os.environ.get("XDG_DATA_HOME")
         base = Path(configured).expanduser() if configured else Path.home() / ".local" / "share"
@@ -493,6 +523,10 @@ def save_sentence_result(result, directory=None):
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     path = directory / f"sentences-{stamp}.sol-analysis.json"
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
-    with os.fdopen(descriptor, "w", encoding="ascii") as stream:
-        stream.write(encode_sentence_result(result) + "\n")
+    try:
+        with os.fdopen(descriptor, "w", encoding="ascii") as stream:
+            stream.write(data)
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
     return path

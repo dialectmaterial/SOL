@@ -287,6 +287,24 @@ class NeovimHostTests(fixtures.CorpusFixture, unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "timed out"):
             neovim.validate_environment()
 
+    def test_unusable_neovim_is_an_actionable_prelaunch_refusal(self):
+        runner = self.terminal()
+        for error in (PermissionError("invented permission refusal"),
+                      FileNotFoundError("invented missing executable"), OSError("invented bad executable")):
+            runner.side_effect = error
+            with self.subTest(error=error):
+                with self.assertRaisesRegex(RuntimeError, "Cannot run Neovim") as caught:
+                    neovim.validate_environment()
+                self.assertIn("scripts/install.py", str(caught.exception))
+
+    def test_executable_disappearing_after_preflight_is_a_clean_launch_failure(self):
+        for channel in (False, True):
+            target = "sol.being.neovim.channel.run_native" if channel else "sol.being.neovim.host.subprocess.run"
+            with self.subTest(channel=channel), patch(target, side_effect=FileNotFoundError("invented missing executable")), \
+                    self.assertRaisesRegex(RuntimeError, "Cannot launch Neovim"):
+                neovim.launch_payload({"records": []}, "/invented/missing/nvim",
+                                      on_request=(lambda request: {}) if channel else None)
+
     def test_native_launch_inherits_tty_and_has_isolated_private_files(self):
         before = self.files()
         result, observed = self.launch(packet=self.packet())

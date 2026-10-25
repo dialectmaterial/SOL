@@ -132,6 +132,34 @@ In particular, avoid these errors:
 5. Silently concatenating paragraphs, ignoring section boundaries, or truncating input beyond model limits.
 6. Calling distances or embeddings ontological relationships without an independent argument.
 
+### Optional presentation choice: hide function words
+
+**Decision (maintainer, 24 October 2026):** an optional **Hide function words**
+switch is off by default and declared as a method choice. Its bundled vocabulary
+is `english-closed-class-v1` (version 1), loaded by
+`sol.essence.function_words.load_function_words()` from `function_words.json`.
+This change supplies the list; the interface redesign wires the switch.
+
+SOL composed the list from grammatical categories, without copying a third-party
+stop-word list: articles/determiners and common quantifiers; personal, possessive,
+reflexive, relative, interrogative and demonstrative pronouns; single-token
+prepositions and conjunctions; auxiliary/modal forms; negation, common whole
+contractions and particles. The JSON carries the full inclusion criteria and
+sorted categories; each spelling occurs once, in ESSENCE's normalized token form
+with straight apostrophes. This is a bounded spelling list, without contextual
+part-of-speech analysis, stemming or multiword expressions. After release,
+changed membership requires a new list version/id.
+
+`am`, `are`, `be`, `been`, `is`, `was`, `were` are included for their copular and
+auxiliary uses. **Closed-class spellings that name logical determinations in the
+CORE edition stay visible.** Exclude `being`, `other`, `one`, `many`, `beyond`
+and `itself`; the last carries the determinations “in itself” / “for itself”.
+`have`, `has`, `had`, `having` are included for their auxiliary uses. Matching cannot distinguish those from lexical or
+philosophically significant uses of the same spellings; this limitation is why
+the choice is explicit and off by default. It is **presentation only**: analysis
+inputs, counts, denominators, scores, saved artifacts and exports never change.
+The projection and counting engines do not remove these words.
+
 ## 4. Interaction model and inquiry contract
 
 **Implemented (stage D):** the private launch-file schema, validation, owner-only
@@ -139,14 +167,32 @@ I/O and Textual availability probe live in `sol.interchange.essence`, outside
 the logical hierarchy ([Architecture §9, I1](ARCHITECTURE.md#launch-exchange-outside-the-logical-hierarchy-i1)).
 BEING writes it and the TUI entry point reads it; the reader removes its private
 context directory at exit. Saved investigation state remains owned by
-`sol.essence.tui.context`. The format, lifetime and source-return OSC are unchanged.
+`sol.essence.tui.context`. The launch context and source-return OSC are unchanged.
+
+**Decision (maintainer, 24 October 2026): ESSENCE follows the reader while open.**
+The reader also passes `--position-file <context>.position`, beside `--theme-file`.
+The version-1 object has exactly `version: 1`, the current passage's checked CORE
+v1 `reference` envelope, `cursor_offset` (a nonnegative codepoint integer),
+`selection` (IDs, offsets and digests, or null), and a heading/page `label`.
+It carries no passage text or investigation state. BEING validates the reader
+packet and freshly captures the passage as for `E`; passage/section changes
+(including search, marker and history jumps) publish a new position, and cursor
+moves and selection changes within a passage never publish. The offset and
+selection are snapshots at opening or passage/section entry. Failed captures
+leave the last complete file untouched and do not interrupt reading. The
+stdlib-only exchange validates the shape and limits the owner-only, no-follow
+file to 256 KiB; writes use a private temporary file and atomic rename. Claude's
+companion ESSENCE workspace change reads it twice a second. Following stops
+when ESSENCE closes, and the reader removes the file with its private context
+directory at exit. The opening context stays available as a separate return
+anchor.
 
 **Decisions (maintainer, 18 October 2026)**, from the [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf). They direct the work; how far each is implemented is recorded below and in the dated sections that follow.
 
 1. **Hybrid surfaces.** Neovim remains the persistent BEING reader. ESSENCE gets its own interactive application, built with **Textual**, launched only when ESSENCE is requested. **Textual is an optional extra** (`sol-organizes-logic[essence]`, decided 18 October 2026): the reader installs and runs without it, and ESSENCE explains how to install it when it is missing.
 2. **On-demand lifecycle.** No Textual process exists while the reader is idle. Entering ESSENCE starts it in a Neovim terminal buffer; leaving ESSENCE saves the investigation state and ends the process. ESSENCE remains an ordinary application inside a terminal Neovim provides, not a terminal emulator.
 3. **Two presentations, one investigation.** ESSENCE appears either **beside** BEING (one split, the reader still visible) or **fullscreen**. Switching between them reuses the same process and investigation; it does not restart anything. Together with plain reading there are three visible states.
-4. **Outer versus inner layout.** Neovim owns the outer geometry (split or fullscreen); Textual owns the layout inside its terminal buffer. Textual screens are logical views *within* ESSENCE (encyclopedia, method, experiment, results), not the two outer presentations.
+4. **Outer versus inner layout.** Neovim owns the outer geometry (split or fullscreen); Textual owns the layout inside its terminal buffer. Textual screens are logical views *within* ESSENCE (encyclopedia, method, experiment, results), not the two outer presentations. *Revised 24 October 2026 (decisions below):* the views are one result-first workspace, with the Encyclopedia and Methods as reference over it.
 5. **Interface before analytical breadth.** First prove launch, both presentations, focus, state preservation, close and return; then add the smallest real operation, a word tokenizer and frequency table ([§5](#5-prioritized-experiments)).
 6. **One capability, interactive and headless.** Every analytical operation the interface offers also runs from the CLI with the same inputs and the same artifact, so results can be scripted, checked and reproduced without the UI. The read-only encyclopedia browser has no CLI.
 7. **CORE is optional for ESSENCE.** ESSENCE accepts ordinary text files; CORE is the provider that adds verified identity, provenance and source return when present. The path is staged in [Architecture §2](ARCHITECTURE.md#2-logical-divisions-and-component-responsibilities); this is implemented for the word, sentence and TF-IDF studies, whose CLI and interface accept a UTF-8 text file without CORE (`FileProvider`). File results cannot open in the reader, and BEING still needs a CORE corpus.
@@ -180,6 +226,90 @@ Source navigation follows the sorted word; resizing retains that word and its
 occurrence. New results start in engine order; the menu can also restore it.
 Sorting changes only presentation: saved artifacts and CSV/TSV exports retain
 all engine rows in their original order and with their unchanged content.
+
+**Panel redesign (24 October 2026):** a compact SOL / ESSENCE masthead and
+source line sit above numbered screens. Rounded, titled panels separate catalog
+contents from reading, study choice from source configuration, and a result's
+summary, measurements and source context. At 100 columns and above, catalogs
+and Experiment use a sidebar beside their detail/setup pane; below that they
+stack, preserving their existing widgets, selection, input values and focus.
+Below 60 columns the target and reference groups stack too. The wide study
+sidebar explains the selected operation; narrow windows keep its choices and
+give the configuration more space. Focused panels use the current theme's
+accent; Paper, Night, Catppuccin and Terminal remain supported. Results starts
+with a **Choose a study** action rather than empty tables. Result columns account
+for frame widths and fold at narrow widths. Existing controls, computations,
+source-return guards, artifacts, exports and screen/origin persistence are
+unchanged. Automated layout checks and rendered synthetic previews are visual
+and interaction evidence, not sustained human acceptance.
+
+**Results and method workflow (24 October 2026):** Results opens with compact
+totals: target/reference token denominators, sentence/word totals and mean, or
+TF-IDF token/input totals and top_n. **i Details** (also a button) opens the full
+existing scrollable summary, scope, method notes, exclusions and saved-artifact status;
+its parenthesized number counts existing method/source notes. `i` hides details
+again; Escape returns focus to the measurements without closing the disclosure.
+Each new result starts collapsed; layout changes preserve its current state.
+
+Word results offer a local display filter: `/` or Ctrl-F focuses it, Enter moves
+to the word table, Escape clears a nonempty filter and a further Escape returns
+to the table. Matching is a literal substring of normalized word spellings
+(NFC, case folding, curly-to-straight apostrophes), before the 2,000-row display
+limit. Sorting still uses all engine rows; sources follow the selected matching
+word, named on their panel. Empty matches clear old source rows and show an
+explicit status. Counts, token denominators, artifacts and complete exports are
+unfiltered. Filtering and the details disclosure are session presentation only;
+a new result clears the filter and the saved screen/origin format is unchanged.
+
+**Methods** offers **Use this method** for words, word comparison, TF-IDF and
+sentence lengths. It selects the matching Experiment study without running it
+or clearing existing paths/settings. Comparison supplies a book reference for
+a CORE session, or a file reference otherwise, only when none was selected.
+Prose export and saved-study checking remain labeled CLI operations with their
+documented commands. Catalog/detail panels and all existing reading controls
+remain available.
+
+**Catalog navigation (24 October 2026):** Encyclopedia and Methods have a compact
+search field and a shown/total entry count. `/` or Ctrl-F focuses the field;
+matching uses a normalized, case-insensitive literal substring of the title,
+identifier or description (the Encyclopedia's ESSENCE note or the Methods
+summary). Enter moves to matching entries, then Enter reads the chosen entry;
+Escape in a nonempty search clears it, and a further Escape returns to the
+list. Search fields retain their values while switching screens and resizing,
+without extending persisted investigation state. A search with no matches
+shows an explicit empty view and disables method configuration. Filtered rows
+retain their original catalog identity; genealogy links reveal their destination
+even when it falls outside the search. Attribution, excerpts, full method
+descriptions and CLI commands remain available in their original entries.
+
+Below 100 columns, the study choices become a single horizontal row labeled
+**Words**, **Sentences** and **TF-IDF**, giving source settings two more lines
+of vertical space. Left/Right or Up/Down chooses a study and Enter selects it;
+resizing preserves selection and form values. Wide windows retain the full
+labels and explanatory sidebar; hover text provides the study description at
+either size.
+
+**Decisions (maintainer, 24 October 2026)**, from the ESSENCE visual audit of the same day (shared with the maintainer), which measured ESSENCE at the sizes it gets on the maintainer's machine (about 86×48 beside the reader, 190×50 fullscreen) and compared terminal frameworks and research interfaces:
+
+1. **Textual stays**, with no new dependency: ESSENCE runs in Neovim's terminal, which shows no image protocol, so drawings are Unicode block characters; the engines stay in-process. Ratatui, Bubble Tea, OpenTUI and the like would mean a rewrite and a bridge to the Python engines.
+2. **One result-first workspace** replaces the four tabbed screens. The Encyclopedia and Methods become reference, opened from the study (`K`), from `M`, or from the command palette.
+3. **A one-key study menu** (after magit's Transient) replaces the Experiment form.
+4. **An optional "hide function words" display switch**, off by default and declared as a method choice; counts, denominators, saved artifacts and exports never change.
+5. **ESSENCE follows the reader's position** while it is open.
+
+**Implemented (24 October 2026), the workspace:** ESSENCE opens on a one-line header (study, scope, the reader's passage), an introduction and the **study menu**: `w`/`s`/`t` choose words, sentences or TF-IDF; `p`/`c`/`b`/`f` the target (this passage, this section, the whole book, a text file); `0`/`C`/`B`/`F` the reference (words only); `n` TF-IDF's top_n; the chosen keys are marked and a sentence says what will run ("Will compare word rates in this section with the whole book."); Enter runs, also from a path field. The result replaces the introduction in place and takes the focus; `r` brings the menu back over it, Escape puts it away, Escape while counting cancels (the engine finishes in the background and its result is discarded, as before). A failed count reopens the menu with the reason. `R` reruns the last study.
+
+Each study has its own view (`sol.essence.tui.results`), drawn with block characters (`sol.essence.tui.views`) for the width it gets:
+
+- **Words:** one table row per word with counts, rates per 10,000 tokens and a bar per side scaled to the largest shown rate, and the log₂ ratio as a bar left or right of a centre tick with its value; an undefined measure says why in a few characters (`∅ reference`). What does not fit goes in a fixed order (bars, then rates, then the ratio's bar; counts always stay); the difference column appears fullscreen. Below the words, the selected word's **concordance**: one line per occurrence, the word in an aligned column between its left and right contexts, the page (or `@offset` for a file) in a gutter, a mark for target or reference, and a strip showing where the occurrences fall across the scope (from the per-occurrence offsets, display only). `<` and `>` sort the lines by their left or right context, nearest word first; pressing again returns to reading order. `/` filters, `s` sorts (comparisons), `f` hides function words, `i` details, `e`/`E` export CSV/TSV, `h`/`l` move between panes.
+- **Sentences:** the length distribution as bars and the mean length by place in the paragraph are the result itself; the hundred longest sentences follow, one line each, Enter opening one at its first letter (the study saves its twelve longest; the rest are ranked from the sentence lengths it saves).
+- **TF-IDF:** terms by passage, then the overall mean weights with bars.
+
+Every table moves with `j`/`k`, `g`/`G` and Ctrl-D/Ctrl-U as well as the arrows. Beside the reader the parts stack and `i` shows the details; from 150 columns (fullscreen) the panes sit side by side and the details (summary, formulas, notes, saved-artifact status) stay visible in a third column. `?` lists every key; `:` opens a command palette with ESSENCE's own commands, every method and encyclopedia entry and the exports (Textual's theme and quit commands are left out, so the reader's theme and ESSENCE's leaving stay authoritative); Ctrl-P stays unbound. Leaving saves the open view (`workspace`, `encyclopedia` or `methods`) and the origin record in the same version-1 state file; a state from the former four screens opens the workspace. The catalog screens keep their search, genealogy map and "Use this method", which now chooses the study in the menu without running it. Nothing here changes an engine, an artifact, an export or the source-return request.
+
+**Function words (24 October 2026):** with the declared list of [§3](#3-proper-model-inputs-projections-not-destructive-cleaning) installed, `f` in a word result hides its spellings from the display and says so above the table and in the details, naming the list; `f` again shows them. Off by default for each session; filtering, sorting and the concordance apply to what is shown, while counts, totals, saved studies and exports keep every word. Without the list, `f` says it is not installed.
+
+**Following the reader (24 October 2026):** given `--position-file`, ESSENCE reads the reader's checked position twice a second (as it reads the theme) and takes it as "this passage" and "this section" for the next count; the header shows the new passage. A result for this passage or section is marked "↻ reading moved · R reruns" when the reader leaves its passage; a book or file result is not. Unreadable or invalid positions are ignored. The reader's side writes the file ([BEING §6](BEING.md#6-being--essence-without-terminal-dogma)).
 
 **Proposed launch and return requirements:**
 
@@ -456,7 +586,9 @@ artifact. The CLI reconstructs the recorded scope after decoding, but file
 checks always require `--input-file PATH`. V2 is bounded to 16 MiB, allowing
 whole-book provenance, and files to the shared 64 MiB input bound. V1 keeps
 its 1 MiB bound and original encoding/method; bare-snapshot calls, existing
-artifacts and ordinary corpus CLI output remain v1 (as did the reader's `S` until its removal on 19 October).
+artifacts and ordinary corpus CLI output remain v1 (as did the reader's `S` until its removal on 19 October). New CLI sentence studies refuse
+empty or unknown `--within` reader paths. Legacy v1 empty-path studies retain
+their original API/checking behavior.
 
 ```sh
 sol essence sentences --file /absolute/path/to/text.txt

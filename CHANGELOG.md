@@ -2,6 +2,149 @@
 
 ## Unreleased
 
+### ESSENCE in the reader's colors — 24 October 2026
+
+ESSENCE draws with the reader's own palette for every preset: the same page,
+text, headings, rules and selection, read from `sol.presentation.theme`. It
+no longer uses Textual's Catppuccin themes, whose darker page, pink cursor and
+grey footer did not match the reader. Terminal still inherits the terminal's
+colors.
+Buttons, blurred selections and an open command palette stay readable and
+follow theme changes. Before the first result, the chosen study's method
+fills the space below the menu, and the header follows the menu's study;
+`M Encyclopedia` is always in the footer; the Encyclopedia's contents list
+shows every entry, and its frame no longer repeats the entry's title.
+Keys typed in a burst (as the reader's terminal delivers them) reach the
+widget the previous key focused: `r s Enter` no longer opened a passage from
+the result behind the menu. Word counts keep a space before them at five
+digits; the metrics line reads target ⇄ reference; the occurrence strip and
+TF-IDF passage labels fit their columns; TF-IDF terms wrap between terms;
+sentences list their hundred longest.
+The occurrence strip covers every occurrence of a common word, not only the
+thousand listed ("the" showed only the book's opening). Fullscreen gives the
+concordance the room a single-source word table does not use, and bars may
+widen; details opened in fullscreen no longer stay open after shrinking to a
+narrow window; concordance headings shorten in narrow panes.
+Keys a view handles itself also survive a burst: `/det` typed at once now
+filters (the letters were lost on the table behind the filter).
+
+### ESSENCE workspace — 24 October 2026
+
+ESSENCE opens on its study instead of four tabs. A one-key study menu (`w`/`s`/`t`,
+`p`/`c`/`b`/`f`, `0`/`C`/`B`/`F`, Enter) says what it will run; the result
+replaces it in place. Words show bars for rates and log₂ ratios and a
+concordance with the word in an aligned column, sortable by left or right
+context, with a strip showing where it occurs; sentence lengths show their
+distribution first; TF-IDF draws its overall weights. Tables move with
+`j`/`k`, `g`/`G`, Ctrl-D/U. Fullscreen puts words, concordance and details side
+by side. The Encyclopedia and Methods open as reference (`K` for the study's
+method, `M`, or the `:` command palette). `f` hides a declared list of function
+words from the display only. With the reader's position file, "this passage"
+follows the reader and a moved result offers `R` to rerun. Engines, artifacts,
+exports and source return are unchanged.
+
+### ESSENCE catalog navigation — 24 October 2026
+
+Encyclopedia and Methods have local search by title, identifier or description,
+with shown/total counts, clear empty matches and keyboard access through `/` or
+Ctrl-F. Filtered entries keep their correct reading and configuration actions;
+genealogy links reveal destinations outside the search. Search survives screen
+changes and resize without changing saved investigation state. Below 100
+columns, a one-line study selector gives source settings two more lines; full
+study labels and guidance remain in the wide sidebar and hover descriptions.
+
+### ESSENCE results and method workflow — 24 October 2026
+
+Results opens with compact totals and an `i Details` disclosure for the existing
+study summary, scope, formulas, exclusions and saved-artifact status; its badge
+counts existing method/source notes. `/` or Ctrl-F filters normalized word spellings before the
+display limit, Enter returns to the table, and Escape clears the filter. Sort
+and filter keep source rows aligned; the occurrence panel names its word.
+Counts, saved studies and full CSV/TSV exports retain the complete input.
+Methods offers Use this method for the shipped interactive studies, preserving
+form values; CLI-only operations remain labeled. Compact windows give tables
+more space and retain full comparison headings at 80 columns.
+
+### ESSENCE panel redesign — 24 October 2026
+
+ESSENCE has a new rounded-panel layout inspired by Posting: a compact masthead,
+numbered navigation, titled catalog/detail panes, a study sidebar with contextual
+guidance, framed source/settings controls and distinct summary, measurements and
+source-context panels. Catalogs and setup use columns in wide windows and stack
+inside reader splits; focus accents follow the reader's theme. Empty Results
+offers a keyboard-accessible route to choosing a study. Tables fold columns to
+fit their framed viewport, and browsing/form state survives layout changes.
+### Declared function-word vocabulary — 24 October 2026
+
+Bundle the original, categorized `english-closed-class-v1` list and dependency-free
+loader for the optional, off-by-default Hide function words presentation choice;
+keep logical determinations `being`, `other`, `one`, `many`, `beyond` and `itself`
+visible. Retain the unreleased list id/version. Counts, denominators, artifacts
+and exports are unchanged.
+The interface switch will be wired separately.
+### ESSENCE follows the reader — 24 October 2026
+
+BEING publishes fresh CORE-captured passage positions through an owner-only,
+atomic `<context>.position` exchange while ESSENCE is open. Passage/section
+changes follow promptly; cursor and selection changes within a passage do not
+write positions or occupy the Python request channel. The reader passes
+`--position-file` alongside `--theme-file`; this requires Claude's companion
+ESSENCE workspace PR #121 before merging.
+- Reader: keep wrapped help descriptions aligned at 40 columns, and compact the status line before its mode, search count and quit hint are clipped.
+- Reader: an ESSENCE process finishing in the background keeps focus and typing in the reader panel already in use.
+
+- Reader: resizing an open note keeps its draft and returns to Normal mode, so reading keys remain usable.
+
+- Reader: preserve `E` typed while ESSENCE is closing and reopen it after a successful exit.
+
+- Reader: resizing ESSENCE keeps keyboard focus in its terminal. Shrinking a split while reading hides ESSENCE instead of covering the focused reader.
+- Launcher: report unusable/disappearing Neovim executables and sol-window font-cache/process failures without tracebacks; correct the window help's workspace option. Keep the opening animation inside a 40-column terminal.
+- Reader: detect equivalent source/destination key names in keys.json before applying remappings, warn and keep default controls instead of crashing startup or silently overwriting an action.
+- Reader outline: keep the close hint visible at 40 columns, retain current-section markers with wide Unicode titles, and bound deep indentation to avoid invalid highlight columns.
+- sol read: escape terminal controls and bidi characters in refused-input/runtime diagnostics, consistently with the main launcher; successful text/JSON output and exit codes are unchanged.
+### ESSENCE sentence scope validation — 25 October 2026
+
+The sentence CLI refuses empty and unknown reader paths, instead of measuring
+the whole corpus or silently returning an empty result. Malformed saved v1
+scopes return typed refusals instead of tracebacks. Existing v1 empty studies
+remain checkable.
+- Refuse excessively nested ESSENCE launch JSON without a traceback, and report
+  context serialization failures as input errors before creating any file; reject
+  nonfinite numbers and escaped surrogates consistently on read and write.
+
+### ESSENCE context transport — 25 October 2026
+
+Context loading refuses FIFOs without blocking and checks the actual byte count
+after reading. Writers enforce the same UTF-8 size bound before creating a file
+and remove partial contexts after failed writes. Context versions require integers.
+### Sentence suffix performance — 25 October 2026
+
+Both punctuation segmenters avoid repeated rescans on long word suffixes,
+abbreviation sequences, leading padding and attached period chains. The
+optimizations preserve existing boundaries and method IDs.
+- ESSENCE exits quietly when a downstream pipe closes, reports truncated saved
+  JSON accurately, and refuses unresolvable home-directory paths without a
+  traceback. Added deterministic Unicode/count/rate/TF-IDF property coverage.
+
+### ESSENCE input refusals and saved artifacts — 25 October 2026
+
+Malformed scoped sentence checks now validate before accessing scope fields;
+invalid or interrupted sentence saves leave no empty/partial artifact. Missing
+independent file references ask for --reference-file; invalid TF-IDF limits name
+top_n and its range. The encyclopedia acknowledges TF-IDF in Experiment.
+- Reject inconsistent legacy sentence-study totals, histograms, positional statistics,
+  longest rankings and per-passage counts during decoding and encoding; valid v1
+  encodings remain unchanged.
+
+### Legacy sentence method isolation — 25 October 2026
+
+Returned v1 sentence studies own their method metadata. Editing an artifact’s
+abbreviation list cannot alter the engine’s declared method or later studies,
+and checking rejects the edited method. Existing artifact bytes are unchanged.
+- Refuse word and embedded TF-IDF studies as soon as their distinct vocabulary
+  cannot fit the existing 16 MiB result limit, before allocating the full frequency
+  table. Valid receipts, repeated words and scoped inputs remain unchanged.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary

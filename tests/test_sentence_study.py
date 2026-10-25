@@ -150,6 +150,18 @@ class SentenceStudyTests(unittest.TestCase):
         with self.assertRaises(SentenceStudyError):
             analyze_sentences(self.snapshot, scope={"kind": "passages", "ids": ["not-in-this-corpus"]})
 
+    def test_malformed_saved_scopes_are_typed_refusals(self):
+        original = analyze_sentences(self.snapshot)
+        for scope in ({"kind": []}, {"kind": {}},
+                      {"kind": "passages", "ids": [{}]},
+                      {"kind": "passages", "ids": [[]]}):
+            altered = copy.deepcopy(original)
+            altered["scope"] = scope
+            with self.subTest(scope=scope):
+                with self.assertRaises(SentenceStudyError) as caught:
+                    decode_sentence_result(json.dumps(altered))
+                self.assertEqual(caught.exception.code, "invalid_scope")
+
     def test_check_recomputes_and_refuses_tampering_or_a_changed_corpus(self):
         result = analyze_sentences(self.snapshot)
         decoded = decode_sentence_result(encode_sentence_result(result))
@@ -176,6 +188,24 @@ class SentenceStudyTests(unittest.TestCase):
                                  capture_output=True, text=True, check=True).stdout
         self.assertIn("Verified against the current corpus generation.", checked)
         self.assertIn("4 sentences, 18 tokens in 2 passages.", checked)
+
+    def test_returned_method_metadata_cannot_change_later_studies(self):
+        from sol.essence.essence_as_reflection_within_itself import sentences as engine
+
+        declared = engine._METHOD["abbreviations"]
+        original = list(declared)
+        result = analyze_sentences(self.snapshot)
+        before = encode_sentence_result(result)
+        try:
+            result["method"]["abbreviations"].append("invented-sentinel")
+            with self.subTest(effect="later study"):
+                self.assertEqual(encode_sentence_result(analyze_sentences(self.snapshot)), before)
+            with self.subTest(effect="checking tampered method"):
+                with self.assertRaises(SentenceStudyError):
+                    check_sentence_result(self.snapshot, result)
+        finally:
+            # Keep even the failing pre-fix regression from poisoning other tests.
+            declared[:] = original
 
 
 if __name__ == "__main__":

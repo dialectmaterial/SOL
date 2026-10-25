@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 
 from sol.essence.essence_as_reflection_within_itself.word_inputs import CoreProvider, FileProvider, WordStudyError
-from sol.essence.essence_as_reflection_within_itself.words import (MAX_RESULT_BYTES, _decode_result, _integer, _json,
+from sol.essence.essence_as_reflection_within_itself.words import (MAX_RESULT_BYTES, _decode_result, _json,
                                _json_value, _keys, _validate as validate_words,
                                analyze_words, check_word_result)
 
@@ -24,8 +24,7 @@ _METHOD = {
 
 
 def _top_n(value):
-    _integer(value, 1)
-    if value > 1000:
+    if type(value) is not int or not 1 <= value <= 1000:
         raise WordStudyError("top_n must be between 1 and 1000", code="invalid_number")
 
 

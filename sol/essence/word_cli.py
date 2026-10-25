@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
-from sol.essence.essence_as_reflection_within_itself.word_inputs import CoreProvider, FileProvider, WordStudyError, _read_file
+from sol.essence.essence_as_reflection_within_itself.word_inputs import CoreProvider, FileProvider, WordStudyError, _expanduser, _read_file
 from sol.essence.essence_as_reflection_within_itself.words import MAX_RESULT_BYTES, analyze_words, check_word_result, decode_word_result, encode_word_result
 
 
@@ -37,7 +37,7 @@ def read_artifact(filename):
     """Bounded transport without importing CORE or following artifact paths."""
     if filename != "-":
         try:
-            return _read_file(Path(filename).expanduser(), MAX_RESULT_BYTES)
+            return _read_file(_expanduser(filename), MAX_RESULT_BYTES)
         except WordStudyError as error:
             # Transport refusals retain the legacy check command's status;
             # freshness refusals belong to the study verifier.
@@ -52,6 +52,15 @@ def read_artifact(filename):
     if len(data.encode("utf-8") if isinstance(data, str) else data) > MAX_RESULT_BYTES:
         raise WordStudyError("Artifact exceeds 16 MiB", code="size_limit")
     return data
+
+
+def _discover_corpus(directory):
+    from sol import core
+
+    try:
+        return core.discover_corpus(directory)
+    except RuntimeError as error:
+        raise WordStudyError("Cannot determine the home directory for the corpus path", code="invalid_file") from error
 
 
 def _provider(options, *, reference=False, saved=None, target=None):
@@ -90,7 +99,7 @@ def _provider(options, *, reference=False, saved=None, target=None):
     if reference and corpus is None and isinstance(target, CoreProvider):
         snapshot = target.snapshot
     else:
-        directory = core.discover_corpus(corpus)
+        directory = _discover_corpus(corpus)
         if directory is None:
             raise WordStudyError("No canonical corpus configured; use --corpus DIRECTORY", code="missing_corpus")
         snapshot = core.load_snapshot(directory)
@@ -132,6 +141,11 @@ def _providers(options, result=None):
     requested = options.compare or any(getattr(options, "reference_" + name) is not None
                                       for name in ("provider", "file", "corpus", "within", "passage", "span"))
     saved_reference = result["reference"] if result else None
+    # Reuse the target path only for the same saved file-byte binding.
+    if (saved_reference is not None and saved_reference["provider"] == "file"
+            and options.reference_file is None and options.reference_provider in (None, "file")
+            and options.reference_corpus is None and saved_reference["binding"] != result["target"]["binding"]):
+        raise WordStudyError("Independent file references require --reference-file", code="missing_file")
     reference = _provider(options, reference=True, saved=saved_reference, target=target) if requested or saved_reference is not None else None
     return target, reference
 

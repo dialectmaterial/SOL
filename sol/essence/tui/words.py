@@ -224,10 +224,27 @@ def sources(count, index, limit=None):
                 opens = None
                 if part["provider"] == "core":
                     opens = {"id": item["id"], "start": begin, "content_sha256": item["content_sha256"]}
+                # Where in the scope it falls, from 0 to 1: its input, then its place in that input.
+                first, last = item.get("span", (begin, begin))
+                position = (input_index + (begin - first) / max(1, last - first)) / len(part["inputs"])
                 found.append({"side": side, "count": occurrences, "number": number if len(spans) > 1 else None,
                               "label": label or f"text file, at character {begin:,}", "open": opens,
-                              "context": _context(text, begin, finish)})
+                              "context": _context(text, begin, finish), "position": position})
     return found
+
+
+def positions(count, index):
+    """Every target occurrence of row `index`'s word, at its input's middle, from 0 to 1.
+
+    The study saves how often the word occurs in each input, so this needs no text
+    and covers occurrences beyond those listed.
+    """
+    inputs = len(count.study["target"].get("inputs") or ())
+    if not inputs:
+        return []
+    return [(input_index + 0.5) / inputs
+            for input_index, occurrences, _, _ in count.study["frequencies"][index]["target"]["locations"]
+            for _ in range(occurrences)]
 
 
 OCCURRENCE_LIMIT = 1000  # entries listed for one word; a very common word lists its first ones
