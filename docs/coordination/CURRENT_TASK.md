@@ -66,7 +66,7 @@ suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 ## Codex B: legacy sentence receipt invariants (round 2)
 
 **Status:** In review
-**Branch:** `codex/sentence-receipt-invariants`
+**Branch:** `codex/sentence-receipt-invariants` · [PR #134](https://github.com/dialectmaterial/SOL/pull/134)
 **Requested:** 25 October 2026, by the maintainer
 **Scope:** Validate legacy sentence totals, distributions, rankings and per-passage
 counts against their rows. Authority: [ESSENCE §8](../ESSENCE.md#8-developer-acceptance-and-prohibitions).

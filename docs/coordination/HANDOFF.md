@@ -12,7 +12,7 @@ valid v1 fixture encodings remain byte-identical. No method/schema/flag changes,
 private corpus material, TUI changes or dependencies. Full suite: 1,316 tests OK
 (29 skipped, 4 expected failures); docs and diff checks pass. Read-only real-corpus
 CLI at 86×48, provider/legacy save → check and comparison CSV/TSV round trips
-at 190×50; no corpus/export material is in Git. PR pending.
+at 190×50; no corpus/export material is in Git. [PR #134](https://github.com/dialectmaterial/SOL/pull/134).
 
 Claude Code adds one report per completed task, newest first, so a reviewer can
 judge the work from GitHub alone: the report says what to look at, the pull
