@@ -17,7 +17,7 @@ Full suite: 1,329 tests OK (29 skipped, 4 expected failures); docs/diff checks p
 Tmux checks at 86×48, 190×50, 80×24 and 40×24, theme changes and rapid screen keys;
 private launch context and captures stay outside Git. The CLI refusals are clean
 at 40×24, including unknown-home source/reference/artifact and environment paths.
-PR pending. Previous round-2 batch is [#134](https://github.com/dialectmaterial/SOL/pull/134), stacked on #132.
+[PR #136](https://github.com/dialectmaterial/SOL/pull/136). Previous round-2 batch is [#134](https://github.com/dialectmaterial/SOL/pull/134), stacked on #132.
 
 Claude Code adds one report per completed task, newest first, so a reviewer can
 judge the work from GitHub alone: the report says what to look at, the pull

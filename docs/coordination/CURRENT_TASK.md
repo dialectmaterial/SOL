@@ -66,7 +66,7 @@ suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 ## Codex B: ESSENCE CLI diagnostics and measurement properties (round 2)
 
 **Status:** In review
-**Branch:** `codex/essence-cli-diagnostics`
+**Branch:** `codex/essence-cli-diagnostics` · [PR #136](https://github.com/dialectmaterial/SOL/pull/136)
 **Requested:** 25 October 2026, by the maintainer
 **Scope:** Quiet closed pipes, accurate truncated-JSON diagnostics, clean refusals
 for unknown-home paths; deterministic Unicode counting, comparison, sentence
