@@ -122,6 +122,10 @@ and remove partial contexts after failed writes. Context versions require intege
 Both punctuation segmenters avoid repeated rescans on long word suffixes,
 abbreviation sequences, leading padding and attached period chains. The
 optimizations preserve existing boundaries and method IDs.
+- ESSENCE exits quietly when a downstream pipe closes, reports truncated saved
+  JSON accurately, and refuses unresolvable home-directory paths without a
+  traceback. Added deterministic Unicode/count/rate/TF-IDF property coverage.
+
 ### ESSENCE input refusals and saved artifacts — 25 October 2026
 
 Malformed scoped sentence checks now validate before accessing scope fields;
