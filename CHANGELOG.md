@@ -117,6 +117,11 @@ remain checkable.
 Context loading refuses FIFOs without blocking and checks the actual byte count
 after reading. Writers enforce the same UTF-8 size bound before creating a file
 and remove partial contexts after failed writes. Context versions require integers.
+### Sentence suffix performance — 25 October 2026
+
+Both punctuation segmenters avoid repeated rescans on long word suffixes,
+abbreviation sequences, leading padding and attached period chains. The
+optimizations preserve existing boundaries and method IDs.
 
 ### Sentence segmentation audit — 23 October 2026
 

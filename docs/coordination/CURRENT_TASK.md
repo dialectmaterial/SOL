@@ -245,6 +245,20 @@ all focused and real-corpus round trips pass. Corpus binding/generation unchange
 Earlier round-2 batches: [#134](https://github.com/dialectmaterial/SOL/pull/134)
 (on #132), [#136](https://github.com/dialectmaterial/SOL/pull/136) (on #130),
 [#137](https://github.com/dialectmaterial/SOL/pull/137) (main).
+## Codex B: sentence suffix performance
+
+**Status:** In review
+**Branch:** `codex/sentence-suffix-performance` · [PR #128](https://github.com/dialectmaterial/SOL/pull/128)
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** Eliminate the sentence segmenters' quadratic suffix-regex slow path
+without changing either method's boundaries or artifacts. Authority:
+[ESSENCE §8](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
+**Constraints:** No private text, dependencies, contracts, TUI or SPECULATIVE edits.
+Base `origin/main`; do not merge own PR.
+**Acceptance:** Failing timeout regression; suffix equivalence and unchanged
+real-corpus boundary digests; full suite/docs; commit, push, PR and HANDOFF.
+Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123),
+[#125](https://github.com/dialectmaterial/SOL/pull/125).
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
