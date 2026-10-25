@@ -1132,3 +1132,19 @@ initial timing probe, so use the clean medians above for outcome claims.
 - **(reserved; proposal only)** Consider separately approving action-scoped fingerprint batching with a mandatory final verification before persistence/output and explicit semantics for edits during an action. This would change CORE's per-reference fingerprint policy and needs its own design/tests and maintainer approval. The current policy remains unchanged; this PR does not implement or depend on that proposal.
 
 Earlier reports are in Git history (trimmed 21 October 2026).
+
+## Codex A — outline widths and deep branches, 25 October 2026
+
+Branch `codex/reader-outline-width`; PR link follows publication. Fixed the
+43-cell outline hint clipped at 40×24; wide Unicode titles losing their current
+marker through over-truncation; and deep branches failing with invalid highlight
+columns after truncating their indentation. Compact hint, bounded indentation
+and display-cell prefix fitting keep markers/pages intact. New native checks
+failed first, including an actual Invalid col error on an invented 24-level
+outline. Native suite: 58 passed; full suite: 1,314 tests OK (7 skipped, 4
+expected failures); docs/diff checks OK. Read-only configured corpus in tmux:
+standalone depth-6 outline at 40×24, compact hint rechecked, folds/motions/resizes
+through 80×24, 86×48 and 190×50, Esc exits. No private contents in Git, no public
+contracts, dependencies, palettes or sol/essence changes. Previous PRs #124,
+#126, #127, #129. One final confirmed issue: sol read errors can echo raw terminal
+control sequences from an invalid path; fixing separately in sol/app.

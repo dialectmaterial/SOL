@@ -514,6 +514,60 @@ end
         # Pages sit at the right edge of the panel.
         self.assertTrue(all(len(line) == width for line in paged), paged)
 
+    def test_outline_hint_fits_at_40_columns_with_its_close_key_visible(self):
+        report = self.run_lua(r'''
+  local module = assert(loadfile(vim.fn.fnamemodify(vim.env.SOL_NVIM_ADAPTER, ':h') .. '/neovim_tree.lua'))()
+  report.sizes = {}
+  for _, columns in ipairs({40, 80, 86, 190}) do
+    vim.o.columns, vim.o.lines = columns, 24
+    local tree = module.open({nodes = {{key = '/', title = 'Invented book', children = {}, page = '7'}},
+      current = '/', depth = 1}, {close = function() end, choose = function() end})
+    local hint = vim.api.nvim_buf_get_lines(tree.buffer, 0, 1, false)[1]
+    local width = vim.api.nvim_win_get_width(tree.window)
+    report.sizes[#report.sizes + 1] = {hint = hint, width = width, cells = vim.fn.strdisplaywidth(hint)}
+    tree.dispose()
+  end
+''')
+        for case in report["sizes"]:
+            self.assertLessEqual(case["cells"], case["width"], case)
+            self.assertIn("Esc", case["hint"])
+
+    def test_deep_outline_and_wide_titles_keep_valid_marks_and_fit_the_panel(self):
+        report = self.run_lua(r'''
+  vim.o.columns, vim.o.lines = 40, 24
+  local module = assert(loadfile(vim.fn.fnamemodify(vim.env.SOL_NVIM_ADAPTER, ':h') .. '/neovim_tree.lua'))()
+  report.cases = {}
+  for _, depth in ipairs({1, 24}) do
+    local nodes, key = {}, '/'
+    for level = 0, depth do
+      local next_key = key .. 'section/'
+      nodes[#nodes + 1] = {key = key, parent = level > 0 and nodes[#nodes].key or nil,
+        title = string.rep('界', 40) .. ' invented section',
+        children = level < depth and {next_key} or {}, page = '123'}
+      key = next_key
+    end
+    local ok, tree = pcall(module.open, {nodes = nodes, current = nodes[#nodes].key, depth = 1},
+      {close = function() end, choose = function() end})
+    local case = {opened = ok, problem = ok and '' or tostring(tree)}
+    if ok then
+      case.width = vim.api.nvim_win_get_width(tree.window)
+      local lines = vim.api.nvim_buf_get_lines(tree.buffer, 2, -1, false)
+      case.rows, case.current = {}, 0
+      for _, line in ipairs(lines) do
+        case.rows[#case.rows + 1] = vim.fn.strdisplaywidth(line)
+        if line:find('●', 1, true) then case.current = case.current + 1 end
+      end
+      tree.dispose()
+    end
+    report.cases[#report.cases + 1] = case
+  end
+''')
+        for index, case in enumerate(report["cases"]):
+            with self.subTest(index=index):
+                self.assertTrue(case["opened"], case)
+                self.assertEqual(case["current"], 1, case)
+                self.assertTrue(all(width <= case["width"] for width in case["rows"]), case)
+
     def test_missing_clipboard_provider_retains_register_but_refuses_success(self):
         report = self.run_lua(r'''
   local original = vim.fn.has

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reader outline: keep the close hint visible at 40 columns, retain current-section markers with wide Unicode titles, and bound deep indentation to avoid invalid highlight columns.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary
