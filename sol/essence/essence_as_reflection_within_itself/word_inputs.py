@@ -89,6 +89,13 @@ def _scope(value, provider):
     return value
 
 
+def _expanduser(path):
+    try:
+        return Path(path).expanduser()
+    except RuntimeError as error:
+        raise WordStudyError("Cannot determine the home directory for the input path", code="invalid_file") from error
+
+
 def _read_file(path, maximum=MAX_INPUT_BYTES):
     """Bounded stable regular-file read, refusing symlinks and special files."""
     def state(info):
@@ -114,7 +121,7 @@ def _read_file(path, maximum=MAX_INPUT_BYTES):
 
 def _file(provider):
     scope = _scope(provider.scope, "file")
-    path = Path(provider.path).expanduser().absolute()
+    path = _expanduser(provider.path).absolute()
     raw = _read_file(path)
     try:
         text = raw.decode("utf-8")

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- ESSENCE exits quietly when a downstream pipe closes, reports truncated saved
+  JSON accurately, and refuses unresolvable home-directory paths without a
+  traceback. Added deterministic Unicode/count/rate/TF-IDF property coverage.
+
 ### ESSENCE input refusals and saved artifacts — 25 October 2026
 
 Malformed scoped sentence checks now validate before accessing scope fields;

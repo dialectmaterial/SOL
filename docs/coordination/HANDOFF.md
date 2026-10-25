@@ -1,5 +1,24 @@
 # Handoff reports
 
+## Codex B round 2 — CLI diagnostics and measurement properties — 25 October 2026
+
+Branch `codex/essence-cli-diagnostics`, based on #130's
+`codex/essence-input-refusals` because the CLI files overlap. Fix early-closing
+pipes (spurious error or interpreter flush warning), truncated saved JSON
+(misreported as an unsupported protocol), and unknown-home paths (uncaught
+RuntimeError). Regressions failed before changes. Explicit file inputs and
+artifact paths use a typed expansion refusal; corpus discovery translates its
+home-resolution failure. Both CLI entry points flush inside quiet pipe handling.
+Added deterministic properties over invented combining marks, apostrophes, CJK,
+RTL, soft hyphens and ligatures: counts, sentence token totals, rates/log ratios,
+every small span, declared boundary exceptions, independent TF-IDF formulas,
+L2 norms and encode/decode/check. No methods/schemas/flags/dependencies changed.
+Full suite: 1,329 tests OK (29 skipped, 4 expected failures); docs/diff checks pass.
+Tmux checks at 86×48, 190×50, 80×24 and 40×24, theme changes and rapid screen keys;
+private launch context and captures stay outside Git. The CLI refusals are clean
+at 40×24, including unknown-home source/reference/artifact and environment paths.
+PR pending. Previous round-2 batch is [#134](https://github.com/dialectmaterial/SOL/pull/134), stacked on #132.
+
 Claude Code adds one report per completed task, newest first, so a reviewer can
 judge the work from GitHub alone: the report says what to look at, the pull
 request shows the diff. Reports describe; they do not change what the five

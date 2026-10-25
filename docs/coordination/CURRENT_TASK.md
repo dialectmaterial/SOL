@@ -63,22 +63,22 @@ lanes' slots unchanged; do not merge own PR.
 **Acceptance:** `restructuring/SENTENCE_AUDIT.md`, ESSENCE and CHANGELOG; full
 suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 
-## Codex B: ESSENCE input refusals and saved artifacts
+## Codex B: ESSENCE CLI diagnostics and measurement properties (round 2)
 
 **Status:** In review
-**Branch:** `codex/essence-input-refusals` · [PR #130](https://github.com/dialectmaterial/SOL/pull/130)
+**Branch:** `codex/essence-cli-diagnostics`
 **Requested:** 25 October 2026, by the maintainer
-**Scope:** Validate malformed sentence checks before scope access; avoid orphaned
-sentence saves; explain missing file references and invalid TF-IDF limits; correct
-stale encyclopedia support guidance. Authority:
+**Scope:** Quiet closed pipes, accurate truncated-JSON diagnostics, clean refusals
+for unknown-home paths; deterministic Unicode counting, comparison, sentence
+exception and TF-IDF invariant coverage. Authority:
 [ESSENCE §8](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
-**Constraints:** No private text, dependencies, contracts, TUI or SPECULATIVE edits.
-Base `origin/main`; do not merge own PR.
-**Acceptance:** Failing invented regressions; full suite/docs; real tmux checks;
-commit, push, PR and HANDOFF. Prior batches:
-[#123](https://github.com/dialectmaterial/SOL/pull/123),
-[#125](https://github.com/dialectmaterial/SOL/pull/125),
-[#128](https://github.com/dialectmaterial/SOL/pull/128).
+**Base:** `codex/essence-input-refusals` ([#130](https://github.com/dialectmaterial/SOL/pull/130)); overlapping CLI code.
+**Constraints:** No private text, dependencies, public contract, TUI or SPECULATIVE changes.
+**Acceptance:** Failing diagnostics regressions; property and round-trip checks;
+full suite/docs; commit, push, PR and handoff.
+**Validation:** 1,329 tests OK (29 skipped, 4 expected failures), docs/diff checks pass.
+Earlier round-2 batch:
+[#134](https://github.com/dialectmaterial/SOL/pull/134), stacked on #132.
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
