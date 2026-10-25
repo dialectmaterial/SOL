@@ -1153,7 +1153,7 @@ failures, invalid help example, narrow opening animation.
 
 **Branch:** `codex/reader-essence-handoff`, based on the unmerged
 `codex/reader-essence-resize-focus` (#126), whose host file it extends.
-**Status:** ready for review; author does not merge.
+**PR:** [#135](https://github.com/dialectmaterial/SOL/pull/135), in review; author does not merge.
 
 - Confirmed on the configured read-only corpus in tmux: a rapid `q`, `E` loses
   the reopen request while ESSENCE is still shutting down. Track the final typed
