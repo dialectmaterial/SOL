@@ -111,7 +111,7 @@ class ReaderSurfaceNeovimTests(unittest.TestCase):
         self.input, self.output = self.root / "input.json", self.root / "selection.json"
         self.result = self.root / "report.json"
 
-    def run_lua(self, scenario, *, restore=None, automatic_quit=True, theme=None):
+    def run_lua(self, scenario, *, restore=None, automatic_quit=True, theme=None, event_loop=False):
         from sol.being.neovim.host import build_payload
         from sol.presentation.theme import theme_payload
 
@@ -151,8 +151,9 @@ end
 ''' + ("vim.cmd('qa!')\n" if automatic_quit else "")
         script = self.root / "scenario.lua"
         script.write_text(program, encoding="utf-8")
+        script_args = ["-c", "luafile " + str(script)] if event_loop else ["-l", str(script)]
         completed = subprocess.run([shutil.which("nvim"), "-u", "NONE", "--noplugin", "-i", "NONE",
-            "-n", "--headless", "-l", str(script)], cwd=self.root, env=environment,
+            "-n", "--headless", *script_args], cwd=self.root, env=environment,
             capture_output=True, text=True, timeout=15)
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
         self.assertEqual(self.before, {path.name: path.read_bytes() for path in self.corpus.iterdir()})
@@ -987,6 +988,79 @@ end
         self.assertIn("Your notes   1 · a add · e edit · r versions", context)
         self.assertIn("  Invented reader · 17 Oct 2026, 12:00 · revision 1\n  A thought\n  on two lines", context)
         self.assertIn("notes need a workspace", report["temporary"])
+
+    def test_resizing_a_note_editor_returns_to_normal_reading_and_keeps_its_draft(self):
+        report = self.run_lua(r'''
+  vim.o.columns, vim.o.lines = 80, 24
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function() error('resizing must not save a note') end}}
+  local payload = vim.deepcopy(data)
+  payload.personal = {persistent = true, notes = vim.empty_dict()}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(payload)
+  reader = SOLNvimReader
+  local origin = reader.capture()
+  local draft = 'An invented unfinished note.'
+  local sizes = {{40, 24}, {86, 48}, {190, 50}}
+  report.cases = {}
+  -- -c returns to Neovim's event loop, allowing startinsert/stopinsert to
+  -- complete between callbacks. -l alone cannot exercise actual Insert mode.
+  local function later(action)
+    vim.defer_fn(function()
+      local ok, problem = xpcall(action, debug.traceback)
+      if not ok then io.stderr:write(problem .. '\n'); vim.cmd('cquit 1') end
+    end, 50)
+  end
+  local function resize(index)
+    if index > #sizes then write_report(); vim.cmd('qa!'); return end
+    reader.note()
+    local body = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), '\n')
+    if index > 1 then assert(body == draft, 'the draft was lost') end
+    vim.api.nvim_buf_set_lines(0, 0, -1, false, {draft})
+    local editor = vim.api.nvim_get_current_buf()
+    later(function()
+      local case = {before = vim.fn.mode(1)}
+      assert(case.before == 'i', 'the note editor never entered Insert mode')
+      assert(vim.api.nvim_get_current_buf() == editor, 'the note closed before the resize')
+      assert(table.concat(vim.api.nvim_buf_get_lines(editor, 0, -1, false), '\n') == draft, 'note body missing before resize')
+      vim.o.columns, vim.o.lines = unpack(sizes[index])
+      vim.api.nvim_exec_autocmds('VimResized', {})
+      later(function()
+        case.after = vim.fn.mode(1)
+        assert(not vim.api.nvim_buf_is_valid(editor), 'the note editor stayed open')
+        case.reader = vim.api.nvim_get_current_win() == reader.window
+        assert(case.after == 'n', 'resize left the read-only reader in Insert mode')
+        case.position = vim.deep_equal(reader.capture(), origin)
+        report.cases[#report.cases + 1] = case
+        resize(index + 1)
+      end)
+    end)
+  end
+  resize(1)
+''', automatic_quit=False, event_loop=True)
+        self.assertEqual(report["cases"], [{"before": "i", "after": "n", "reader": True,
+                                             "position": True}] * 3)
+
+    def test_note_resize_runs_draft_recovery_even_inside_the_resize_autocmd(self):
+        report = self.run_lua(r'''
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function() error('resizing must not save a note') end}}
+  local payload = vim.deepcopy(data)
+  payload.personal = {persistent = true, notes = vim.empty_dict()}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(payload)
+  reader = SOLNvimReader
+  local id = reader.capture().reference.reference.target_id
+  reader.note()
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, {'An invented draft before resizing.'})
+  vim.defer_fn(function()
+    vim.api.nvim_exec_autocmds('VimResized', {})
+    vim.defer_fn(function()
+      report.draft = SOLReaderChannel.drafts[id] or ''
+      write_report()
+      vim.cmd('qa!')
+    end, 50)
+  end, 50)
+''', automatic_quit=False, event_loop=True)
+        self.assertEqual(report["draft"], "An invented draft before resizing.")
 
     def test_context_edits_the_note_under_the_cursor_and_shows_its_versions(self):
         report = self.run_lua(r'''
