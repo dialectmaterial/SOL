@@ -33,6 +33,28 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## Legacy sentence method isolation — 25 October 2026
+
+**Task:** Codex B, maintainer's bounded bug hunt; CURRENT_TASK.md.
+**Branch / PR:** `codex/sentence-method-isolation` · PR pending publication. Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123), [#125](https://github.com/dialectmaterial/SOL/pull/125), [#128](https://github.com/dialectmaterial/SOL/pull/128), [#130](https://github.com/dialectmaterial/SOL/pull/130).
+**Last implementation commit:** `35048a560c7716d3ab8dd4b74dee024b26e121db`.
+
+### Changed files
+- Sentence engine: return the existing validator's detached result instead of the shallow method copy. One-line production fix prevents caller mutations from changing the declared method or defeating checking.
+- `tests/test_sentence_study.py` — invented mutation regression fails twice before the fix: later encodings change and tampered method checking succeeds. Restores globals even on failure. CHANGELOG and this lane's slot record the batch.
+
+### Tests performed
+- Full suite: **1,313 OK**, 7 skipped, 4 expected failures, 156.856 s; isolated XDG paths. Focused sentence suite: 51 OK (4 expected failures), including all four original v1 compatibility fixtures. Docs and diff checks pass.
+- Read-only real CORE snapshot with an invented empty scope reproduces both pre-fix failures and confirms isolation/refusal after the fix. Combined probes confirm word, TF-IDF and both sentence provider versions also refuse method tampering without poisoning later studies.
+- All five proposed code patches applied to `/tmp/sol-b-final-review`; 102 focused combined tests pass. Combined full suite is running; its final result will be added before completion.
+
+### Outstanding issues
+No further observed in-lane defect remains after these batches. Frozen segmentation limitations require a separately adopted method to change; 40-column TUI navigation clipping belongs to Claude's lane. Publication clone: `/tmp/sol-codex-b-hunt`; no private text/artifacts committed.
+
+### Decisions requiring approval
+None reserved. No dependencies, flags, schemas, method IDs or saved bytes changed.
+
+
 ## Sentence segmentation audit — 23 October 2026
 
 **Task:** [Codex A: sentence segmentation audit](https://github.com/dialectmaterial/SOL/blob/da675a9e02b98a96fdf531ca89c382e55f0a24f1/docs/coordination/CURRENT_TASK.md), assigned directly by the maintainer.

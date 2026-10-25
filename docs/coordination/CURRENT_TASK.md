@@ -65,7 +65,7 @@ suite and `scripts/check_docs.py`; commit, push, PR and HANDOFF report.
 
 ## Codex B: legacy sentence method isolation
 
-**Status:** In progress
+**Status:** In review
 **Branch:** `codex/sentence-method-isolation`
 **Requested:** 25 October 2026, by the maintainer
 **Scope:** Detach v1 sentence result metadata from the engine's declared method,
