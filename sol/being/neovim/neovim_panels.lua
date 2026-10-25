@@ -20,7 +20,7 @@ return function(reader)
     panels.window, panels.context_open, panels.return_packet = nil, false, nil
     if closing and api.nvim_win_is_valid(closing) then api.nvim_win_close(closing, true) end
     reader.view.set_side(0)
-    if api.nvim_win_is_valid(window) then api.nvim_set_current_win(window) end
+    if (closing or packet) and api.nvim_win_is_valid(window) then api.nvim_set_current_win(window) end
     if packet then restore(packet) end
   end
   -- Where a panel goes beside the page, moving the page left to make room;

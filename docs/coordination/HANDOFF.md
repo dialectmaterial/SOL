@@ -1417,3 +1417,18 @@ passed, docs check and diff check passed. Full suite: 1,314 tests, OK (7 skipped
 corpus text, workspaces, PDFs or exports in Git. No contracts/dependencies/palette
 changes. Do not merge own PR. Next: reader-side ESSENCE focus on resize and
 launcher failure paths.
+## Codex A — ESSENCE resize focus, 25 October 2026
+
+Branch `codex/reader-essence-resize-focus`; [PR #126](https://github.com/dialectmaterial/SOL/pull/126).
+Fixed resizing stealing focus from ESSENCE (closing a nonexistent popup always
+focused the reader), and shrinking a reader-focused split covering that reader
+with fullscreen ESSENCE. Popup cleanup now changes focus only for an actual
+popup; a too-narrow inactive ESSENCE split hides until E reopens its process.
+Native regression failed first; final native suite: 57 passed. Full suite:
+1,313 tests OK (7 skipped, 4 expected failures). Docs and diff checks passed.
+Real-corpus read-only tmux: E, Alt-F, Alt-R, q, repeated theme/mode/movement keys,
+190×50 → 86×48 → 40×24; verified reader focus/hidden layout after Alt-R and
+shrinking, and q reaching ESSENCE after active resize. Captures outside Git;
+no private text/PDF/workspaces/exports, sol/essence edits, palette changes,
+contracts or dependencies. Previous batch: PR #124. Next: clean launcher
+failures, invalid help example, narrow opening animation.

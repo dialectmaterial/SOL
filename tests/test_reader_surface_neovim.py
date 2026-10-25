@@ -1269,6 +1269,55 @@ end
         self.assertTrue(report["failure"]["window"])
         self.assertTrue(report["failure"]["focused_reader"])
 
+    def test_resizing_keeps_essence_focus_and_does_not_cover_the_focused_reader(self):
+        stub = self.root / "essence_stub.py"
+        stub.write_text("import sys\nprint('ESSENCE STUB READY', flush=True)\nsys.stdin.readline()\n", encoding="utf-8")
+        paths = f"local PYTHON, STUB = {json.dumps(sys.executable)}, {json.dumps(str(stub))}\n"
+        report = self.run_lua(paths + r'''
+  vim.o.columns, vim.o.lines = 190, 50
+  local sent = {}
+  _G.SOLReaderChannel = {serial = 0, pending = {}, incoming = '',
+    writer = {write = function(_, line) sent[#sent + 1] = vim.json.decode(line) end}}
+  assert(loadfile(os.getenv('SOL_NVIM_ADAPTER')))(vim.deepcopy(data))
+  reader = SOLNvimReader
+  local before = reader.capture()
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  _G.SOLReaderChannel.pending[sent[1].id]({essence = {command = {PYTHON, STUB}}})
+  local essence = SOLEssence
+  local function resize(columns, lines)
+    vim.o.columns, vim.o.lines = columns, lines
+    vim.api.nvim_exec_autocmds('VimResized', {})
+  end
+  report.active = {}
+  for _, size in ipairs({{180, 48}, {86, 48}, {80, 24}, {40, 24}, {190, 50}}) do
+    resize(size[1], size[2])
+    report.active[#report.active + 1] = {layout = essence.layout,
+      focused = vim.api.nvim_get_current_win() == essence.window}
+  end
+  essence.back_to_reader()
+  report.reader = {}
+  for _, size in ipairs({{86, 48}, {80, 24}, {40, 24}, {190, 50}}) do
+    resize(size[1], size[2])
+    report.reader[#report.reader + 1] = {layout = essence.layout,
+      focused = vim.api.nvim_get_current_win() == reader.window,
+      hidden = vim.api.nvim_win_get_config(essence.window).hide}
+  end
+  -- E brings the same terminal back; returning and resizing preserves position.
+  vim.api.nvim_feedkeys('E', 'xt', false)
+  report.reopened = {layout = essence.layout, focused = vim.api.nvim_get_current_win() == essence.window,
+    requests = #sent}
+  essence.back_to_reader()
+  report.unchanged = vim.deep_equal(reader.capture(), before)
+  vim.fn.jobstop(essence.job)
+  assert(vim.wait(5000, function() return SOLEssence.window == nil end, 10))
+''')
+        self.assertTrue(all(case["focused"] for case in report["active"]), report)
+        self.assertEqual([case["layout"] for case in report["active"]], ["split", "full", "full", "full", "full"])
+        self.assertTrue(all(case["focused"] and case["hidden"] and case["layout"] == "hidden"
+                            for case in report["reader"]), report)
+        self.assertEqual(report["reopened"], {"layout": "split", "focused": True, "requests": 1})
+        self.assertTrue(report["unchanged"])
+
     def test_copying_reaches_the_clipboard_from_keys_and_the_mouse(self):
         texts = [passage.text for passage in self.sample.passages]
         report = self.run_lua(r'''

@@ -94,6 +94,19 @@ lanes' slots unchanged; do not merge own PR.
 installed-wheel tests; ESSENCE and CHANGELOG; docs check and full suite; commit,
 push, PR and HANDOFF report.
 ## Codex A: narrow reader layout bugs
+## Codex A: ESSENCE resize focus from the reader
+
+**Status:** In review
+**Branch:** `codex/reader-essence-resize-focus`
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** Reader-owned ESSENCE window layout and popup lifecycle under
+[BEING §2](../BEING.md#2-what-is-implemented). Preserve keyboard focus on resize;
+when the reader has focus, shrinking a split must keep the reader visible.
+Previous batch: [PR #124](https://github.com/dialectmaterial/SOL/pull/124).
+**Constraints:** no sol/essence edits, private corpus data, palette changes,
+dependencies, public-contract changes or SPECULATIVE edits.
+**Acceptance:** failing native regressions first; tmux real-corpus resize/key
+checks, full suite and docs check; commit, push, PR and HANDOFF; no self-merge.
 
 **Status:** In review
 **Branch:** `codex/reader-panel-resize`
