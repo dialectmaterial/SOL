@@ -224,9 +224,12 @@ def sources(count, index, limit=None):
                 opens = None
                 if part["provider"] == "core":
                     opens = {"id": item["id"], "start": begin, "content_sha256": item["content_sha256"]}
+                # Where in the scope it falls, from 0 to 1: its input, then its place in that input.
+                first, last = item.get("span", (begin, begin))
+                position = (input_index + (begin - first) / max(1, last - first)) / len(part["inputs"])
                 found.append({"side": side, "count": occurrences, "number": number if len(spans) > 1 else None,
                               "label": label or f"text file, at character {begin:,}", "open": opens,
-                              "context": _context(text, begin, finish)})
+                              "context": _context(text, begin, finish), "position": position})
     return found
 
 

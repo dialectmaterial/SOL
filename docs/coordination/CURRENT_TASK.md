@@ -38,13 +38,18 @@ steps 5–7). Rules for all three lanes:
    the PR, update module paths in ARCHITECTURE §2 and the component document,
    and add a CHANGELOG line.
 
-## Claude Code: measure reader latency on screen
+## Claude Code: ESSENCE workspace
 
-**Status:** Done (#115)
-**Branch:** `claude/section-keys-use-channel`
-**Scope:** reader backlog item "measured navigation latency": time from key to
-readable text in a real terminal. The measurement found `]c`/`[c` restarting
-Neovim for every section; fixed. Previous task (sections prepared ahead) done: #112.
+**Status:** In review
+**Branch:** `claude/essence-workspace` (stacked on #118)
+**Requested:** 24 October 2026, by the maintainer, after the ESSENCE visual
+audit: "work on it", approving all five decisions (now in
+[ESSENCE §4](../ESSENCE.md#4-interaction-model-and-inquiry-contract)).
+**Scope:** `sol/essence/tui/` and its tests: a result-first workspace, a
+one-key study menu, drawn results (bars, concordance, dispersion), the
+catalogs as reference, vim motions and a command palette, the function-word
+display switch (list from Codex A, #119) and following the reader (position
+file from Codex B, #120). No engine, artifact, export or dependency change.
 
 ## Codex A: ESSENCE catalog navigation
 

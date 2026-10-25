@@ -24,22 +24,23 @@ class PanelLayoutTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
 
         app = EssenceApp(context(), theme="night")
         async with app.run_test(size=(120, 40)) as pilot:
-            await pilot.press("2", "down", "down")
-            listing = app.query_one("#methods-list")
-            detail = app.query_one("#methods-detail")
+            await pilot.press("M", "2", "down", "down")
+            screen = app.screen
+            listing = screen.query_one("#methods-list")
+            detail = screen.query_one("#methods-detail")
             selected = listing.highlighted
-            entry = app.query_one("#methods-entry").source
+            entry = screen.query_one("#methods-entry").source
             for width, height in ((80, 24), (40, 24), (120, 40)):
                 await pilot.resize_terminal(width, height)
                 await pilot.pause()
                 self.assertIs(app.focused, listing)
                 self.assertEqual(listing.highlighted, selected)
-                self.assertEqual(app.query_one("#methods-entry").source, entry)
+                self.assertEqual(screen.query_one("#methods-entry").source, entry)
                 for widget in (listing, detail):
                     self.assertGreater(widget.content_region.height, 0)
                     self.assertGreater(widget.content_region.width, 0)
                     self.assertLessEqual(widget.region.right, width)
-                    self.assertLessEqual(widget.region.bottom, app.query_one("#layout-hint").region.y)
+                    self.assertLessEqual(widget.region.bottom, height - 1)
                 if width >= 100:
                     self.assertLessEqual(listing.region.right, detail.region.x)
                 else:
@@ -50,48 +51,53 @@ class PanelLayoutTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 self.assertIs(app.focused, listing)
             app.exit()
 
-    async def test_form_reflow_keeps_choices_and_fields_reachable_in_a_reader_split(self):
+    async def test_menu_reflow_keeps_choices_and_fields_reachable_in_a_reader_split(self):
         from sol.essence.tui.app import EssenceApp
 
         app = EssenceApp(context(), theme="paper")
         async with app.run_test(size=(120, 40)) as pilot:
-            await pilot.press("3", "down", "down", "enter")
-            app.query_one("#target").focus()
-            await pilot.press("down", "down", "down", "enter")
+            await pilot.press("t", "f")
+            menu = app.query_one("#menu")
             app.query_one("#target-file").value = "/invented/a long source name.txt"
             app.query_one("#top-n").value = "37"
-            for width, height in ((80, 24), (40, 24), (120, 40)):
+            for width, height in ((86, 48), (80, 24), (40, 24), (120, 40)):
                 await pilot.resize_terminal(width, height)
                 await pilot.pause()
-                self.assertEqual(app.choice("study"), "tfidf")
-                self.assertEqual(app.choice("target"), "file")
+                self.assertEqual((menu.study, menu.target, menu.reference), ("tfidf", "file", "none"))
                 self.assertEqual(app.query_one("#target-file").value, "/invented/a long source name.txt")
                 self.assertEqual(app.query_one("#top-n").value, "37")
-                self.assertFalse(app.query_one("#reference-group").display)
-                for selector in ("#target-file", "#top-n", "#run"):
+                self.assertNotIn("Compare with", str(app.query_one("#menu-choices").render()))
+                for selector in ("#target-file", "#top-n"):
                     widget = app.query_one(selector)
                     widget.focus()
-                    widget.scroll_visible(animate=False)
                     await pilot.pause()
                     self.assertIs(app.focused, widget)
                     self.assertGreater(widget.region.width, 0)
-                    self.assertGreaterEqual(widget.region.y, app.query_one("#experiment-body").content_region.y)
-                    self.assertLessEqual(widget.region.bottom, app.query_one("#experiment-body").content_region.bottom)
+                    self.assertLessEqual(widget.region.bottom, app.query_one("#result-status").region.y)
                     self.assertLessEqual(widget.region.right, width)
+                # Narrow menus stack their groups; every choice stays readable.
+                choices = str(app.query_one("#menu-choices").render())
+                self.assertIn("TF-IDF", choices)
+                self.assertIn("a text file", choices)
             app.exit()
 
-    async def test_empty_results_offer_a_keyboard_route_to_configuration(self):
+    async def test_opening_shows_the_menu_with_an_explanation(self):
         from sol.essence.tui.app import EssenceApp
 
         app = EssenceApp(context())
-        async with app.run_test(size=(60, 24)) as pilot:
-            await pilot.press("4")
-            self.assertTrue(app.query_one("#empty-results").display)
-            self.assertFalse(app.query_one("#results-workspace").display)
-            self.assertIs(app.focused, app.query_one("#configure"))
-            await pilot.press("enter")
-            self.assertEqual(app.query_one("#screens").active, "experiment")
-            self.assertIs(app.focused, app.query_one("#study"))
+        async with app.run_test(size=(86, 48)) as pilot:
+            await pilot.pause()
+            self.assertTrue(app.query_one("#intro").display)
+            # A short window gives the menu the intro's lines.
+            await pilot.resize_terminal(60, 24)
+            await pilot.pause()
+            self.assertFalse(app.query_one("#intro").display)
+            self.assertFalse(app.query_one("#results").display)
+            self.assertIs(app.focused, app.query_one("#menu"))
+            self.assertIn("Will count the words of this passage", str(app.query_one("#menu-summary").render()))
+            # Escape before any result keeps the menu: there is nothing to return to.
+            await pilot.press("escape")
+            self.assertTrue(app.query_one("#menu").display)
             app.exit()
 
     async def test_each_result_keeps_all_columns_inside_narrow_frames(self):
@@ -112,25 +118,24 @@ class PanelLayoutTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 for count in counts:
                     original = json.dumps(count.study, sort_keys=True)
                     app.show_result(count, None)
-                    for width in (40, 60, 120):
+                    view = app.result_view(count)
+                    for width in (40, 60, 86, 120, 190):
                         await pilot.resize_terminal(width, 24 if width < 100 else 40)
                         await pilot.pause()
-                        table = app.query_one("#frequencies")
-                        self.assertEqual(table.max_scroll_x, 0)
-                        self.assertGreater(table.content_region.height, 1)
-                        self.assertFalse(app.query_one("#empty-results").display)
-                        for selector in ("#frequencies", "#sources", "#overall"):
-                            widget = app.query_one(selector)
-                            if widget.display:
-                                self.assertEqual(widget.max_scroll_x, 0)
+                        await pilot.pause()
+                        self.assertFalse(app.query_one("#intro").display)
+                        for widget in view.query("VimTable"):
+                            if widget.display and widget.region.height:
+                                self.assertEqual(widget.max_scroll_x, 0, (widget.id, width))
                                 self.assertLessEqual(widget.region.right, width)
-                                self.assertLessEqual(widget.region.bottom, app.query_one("#layout-hint").region.y)
+                                self.assertLessEqual(widget.region.bottom, app.query_one("#result-status").region.y)
                         self.assertEqual(json.dumps(count.study, sort_keys=True), original)
                 app.exit()
 
     async def test_resize_with_sort_menu_open_also_reflows_the_workspace(self):
         from sol.essence.tui import words
-        from sol.essence.tui.app import EssenceApp, WordSort
+        from sol.essence.tui.app import EssenceApp
+        from sol.essence.tui.results import WordSort
 
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "invented.txt"
@@ -144,10 +149,10 @@ class PanelLayoutTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
                 await pilot.resize_terminal(80, 24)
                 await pilot.pause()
                 self.assertIsInstance(app.screen, WordSort)
-                await pilot.press("escape", "2")
+                await pilot.press("escape")
                 await pilot.pause()
-                listing = app.query_one("#methods-list")
-                detail = app.query_one("#methods-detail")
-                self.assertLessEqual(listing.region.bottom, detail.region.y)
-                self.assertIs(app.focused, listing)
+                table = app.query_one("#frequencies")
+                self.assertIs(app.focused, table)
+                self.assertEqual(table.max_scroll_x, 0)
+                self.assertLessEqual(table.region.right, 80)
                 app.exit()

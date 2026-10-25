@@ -33,6 +33,39 @@ Write "None." rather than deleting a heading.
 -->
 
 
+## ESSENCE workspace — 24 October 2026
+
+**Task:** [Claude Code: ESSENCE workspace](https://github.com/dialectmaterial/SOL/blob/claude/essence-workspace/docs/coordination/CURRENT_TASK.md), requested by the maintainer after the ESSENCE visual audit, with all five decisions approved.
+**Branch / PR:** `claude/essence-workspace`, stacked on #118 (Codex's unpublished ESSENCE stack, published by Claude) · PR linked below.
+**Last implementation commit:** `50cf51d` (review fixes; this report is updated after it)
+
+### Changed files
+- `sol/essence/tui/views.py` (new) — bars, diverging log-ratio bars, dispersion strips, concordance lines and context sort keys in block characters; pure functions.
+- `sol/essence/tui/results.py` (new) — one view per study (words with concordance, sentences with distribution first, TF-IDF with weight bars), stacked beside the reader and side by side from 150 columns; tables size themselves from their pane and drop bars, then rates, before scrolling sideways.
+- `sol/essence/tui/menu.py` (new) — the Transient-style study menu (`w s t`, `p c b f`, `0 C B F`, `n`, Enter).
+- `sol/essence/tui/reference.py` (new) — the Encyclopedia and Methods browsers moved unchanged into one session-long screen over the study.
+- `sol/essence/tui/app.py` — the workspace: header, intro, menu, result views, status line, footer; `K`/`M` reference, `:` palette with ESSENCE's own commands, `R` rerun, `?` keys, `--position-file` following, function-word switch via `load_function_words()` when installed. Workers, count ordering, cancellation, saving, export and the source-return OSC are kept.
+- `sol/essence/tui/words.py` — each listed occurrence's place in its scope (display only); `__main__.py` — `--position-file`.
+- Tests: the six ESSENCE interface test files rewritten for the workspace, keeping each protected behaviour; `tests/test_essence_views.py` (new) for drawings, the function-word switch and following the reader.
+- `docs/ESSENCE.md` §4 — the maintainer's decisions of 24 October and the implemented workspace; `CHANGELOG.md`; this slot in `CURRENT_TASK.md`.
+
+### Tests performed
+- `.venv/bin/python -B -m unittest discover -s tests` — **1,339 tests OK** (7 skipped, 4 expected failures), 193 s, after the review fixes.
+- Codex's review found four faults, now fixed with regression tests that fail without the fix: Escape taken by a path field or the concordance instead of cancelling a count; `R` rerunning unrun menu edits; a palette Encyclopedia command landing on the wrong topic under a search; a second export starting while the first ran.
+- `.venv/bin/python -B scripts/check_docs.py` — OK.
+- Real terminal: the reader from this checkout in tmux (190×50, `sol -n`), `E` on p. 345 of the book: menu, `c B Enter` counted the section (5,711 tokens) against the book (312,481) with bars, log ratios and the concordance; Alt-F gave the three fullscreen panes; Enter on an occurrence moved the reader to p. 341. No book text is in Git or this report.
+- Installed into `~/.local/share/sol-app` (the `sol`/`sol-window` launchers) with `pip install --no-deps --force-reinstall`; all 114 package files match the wheel; `pip check` clean; an isolated-mode pilot smoke test from `/tmp` ran a comparison, the concordance, `K`, a sentence study and fullscreen on the installed code.
+
+### Outstanding issues
+- An ESSENCE already open keeps its old code: leave with `q` and press `E` again.
+- `f` works once #119 is merged (until then it says the list is not installed); following the reader works once #120 is merged. Merge order: #118, then this PR, then #119 and #120.
+- Saved studies are not yet listed or reopened from ESSENCE (`S` in the audit); reopening needs the providers rebuilt from a saved artifact and is left for a follow-up.
+- SVG previews render bold runs slightly wider than terminals; the real-terminal check above is the reference.
+
+### Decisions requiring approval
+- None reserved. Defaults: fullscreen panes from 150 columns; the difference column only fullscreen; Ctrl-P unbound and the palette on `:` without Textual's theme/quit commands; the function-word switch resets to off each session; a moved reading marks only passage and section results stale.
+
+
 ## ESSENCE catalog navigation — 24 October 2026
 
 **Task:** [Codex A: ESSENCE catalog navigation](https://github.com/dialectmaterial/SOL/blob/e6e0fdc918baead91ce29b2b7a71b0bcbb5cacae/docs/coordination/CURRENT_TASK.md), requested directly by the maintainer: keep improving the interface.
@@ -315,7 +348,7 @@ None reserved. Defaults: `r` renames, `o` toggles order; an unchanged name is a 
 
 ## Reader latency on screen; section keys use the channel — 23 October 2026
 
-**Task:** [Claude Code: measure reader latency on screen](CURRENT_TASK.md#claude-code-measure-reader-latency-on-screen).
+**Task:** [Claude Code: measure reader latency on screen](https://github.com/dialectmaterial/SOL/blob/e6e0fdc918baead91ce29b2b7a71b0bcbb5cacae/docs/coordination/CURRENT_TASK.md).
 **Branch / PR:** `claude/section-keys-use-channel` · pull request from this branch.
 **Last implementation commit:** the commit before this report.
 
