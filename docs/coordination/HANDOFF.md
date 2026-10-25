@@ -391,6 +391,27 @@ Saved-study refusal/failed-save diagnostics and stale TF-IDF encyclopedia guidan
 
 ### Decisions requiring approval
 None. No dependencies, schemas, flags, method IDs or segmentation results changed.
+## ESSENCE input refusals and saved artifacts — 25 October 2026
+
+**Task:** Codex B, maintainer's bounded bug hunt; CURRENT_TASK.md.
+**Branch / PR:** `codex/essence-input-refusals` · [#130](https://github.com/dialectmaterial/SOL/pull/130). Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123), [#125](https://github.com/dialectmaterial/SOL/pull/125), [#128](https://github.com/dialectmaterial/SOL/pull/128).
+**Last implementation commit:** `a1c65a9effc1a3cb9eea62f8f9e42efd2649de1e`.
+
+### Changed files
+- Sentence engine: validate scoped check envelopes before field access; encode before save-side mutations; remove partial artifacts on write errors/interrupts.
+- Word CLI: missing independent file references ask for `--reference-file`, preserving same-file reuse. TF-IDF: invalid limits consistently name top_n and 1–1000, retaining `invalid_number`.
+- Encyclopedia: correct stale “TUI integration pending” SOL note; quotations and attribution unchanged. Eight invented-input tests, CHANGELOG and this lane's coordination slot cover the batch.
+
+### Tests performed
+- Full suite: **1,320 OK**, 7 skipped, 4 expected failures, 175.273 s; isolated XDG paths. Eight new tests pass; focused comparison 17, TF-IDF 11 and sentences 50 (4 expected failures) pass. Docs and diff checks pass.
+- Reproduced defect regressions before fixes. Save tests cover OSError and KeyboardInterrupt cleanup plus unchanged valid encoding/permissions. CLI diagnostics used in tmux at 40×24; corrected catalog note observed in actual reader/ESSENCE split. Real corpus index hash unchanged; no private text/artifacts committed.
+- All four proposed code patches also applied cleanly to a temporary review checkout; 101 focused combined tests pass. Combined full validation follows the final batch.
+
+### Outstanding issues
+A final API probe found a legacy sentence method-list alias: mutating a returned abbreviation list changes later studies' method metadata. Isolated for the next batch. Frozen segmentation limitations and out-of-lane narrow TUI clipping remain. Clone: `/tmp/sol-codex-b-hunt`.
+
+### Decisions requiring approval
+None. No dependencies, flags, formats, method IDs or measurement changes.
 
 
 ## Sentence segmentation audit — 23 October 2026

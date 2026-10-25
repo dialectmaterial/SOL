@@ -113,7 +113,7 @@
       "article_title": "tf–idf",
       "article_url": "https://en.wikipedia.org/wiki/Tf%E2%80%93idf",
       "quote": "The tf–idf is the product of two statistics, term frequency and inverse document frequency.",
-      "essence": "Runs in ESSENCE: engine and CLI, sol essence tfidf (TUI integration pending). The versioned tfidf-v1 method uses raw-count TF, smoothed natural-log IDF ln((1+N)/(1+df))+1 and document L2 normalization. Documents are word-provider passages, or one whole file; overall weights average all normalized document vectors. See Methods for scopes, limits and verification.",
+      "essence": "Runs in ESSENCE: engine, CLI (sol essence tfidf) and the Experiment screen. The versioned tfidf-v1 method uses raw-count TF, smoothed natural-log IDF ln((1+N)/(1+df))+1 and document L2 normalization. Documents are word-provider passages, or one whole file; overall weights average all normalized document vectors. See Methods for scopes, limits and verification.",
       "further": [
         {
           "title": "Term frequency and weighting",

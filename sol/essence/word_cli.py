@@ -132,6 +132,11 @@ def _providers(options, result=None):
     requested = options.compare or any(getattr(options, "reference_" + name) is not None
                                       for name in ("provider", "file", "corpus", "within", "passage", "span"))
     saved_reference = result["reference"] if result else None
+    # Reuse the target path only for the same saved file-byte binding.
+    if (saved_reference is not None and saved_reference["provider"] == "file"
+            and options.reference_file is None and options.reference_provider in (None, "file")
+            and options.reference_corpus is None and saved_reference["binding"] != result["target"]["binding"]):
+        raise WordStudyError("Independent file references require --reference-file", code="missing_file")
     reference = _provider(options, reference=True, saved=saved_reference, target=target) if requested or saved_reference is not None else None
     return target, reference
 

@@ -259,6 +259,22 @@ Base `origin/main`; do not merge own PR.
 real-corpus boundary digests; full suite/docs; commit, push, PR and HANDOFF.
 Prior batches: [#123](https://github.com/dialectmaterial/SOL/pull/123),
 [#125](https://github.com/dialectmaterial/SOL/pull/125).
+## Codex B: ESSENCE input refusals and saved artifacts
+
+**Status:** In review
+**Branch:** `codex/essence-input-refusals` · [PR #130](https://github.com/dialectmaterial/SOL/pull/130)
+**Requested:** 25 October 2026, by the maintainer
+**Scope:** Validate malformed sentence checks before scope access; avoid orphaned
+sentence saves; explain missing file references and invalid TF-IDF limits; correct
+stale encyclopedia support guidance. Authority:
+[ESSENCE §8](../ESSENCE.md#8-developer-acceptance-and-prohibitions).
+**Constraints:** No private text, dependencies, contracts, TUI or SPECULATIVE edits.
+Base `origin/main`; do not merge own PR.
+**Acceptance:** Failing invented regressions; full suite/docs; real tmux checks;
+commit, push, PR and HANDOFF. Prior batches:
+[#123](https://github.com/dialectmaterial/SOL/pull/123),
+[#125](https://github.com/dialectmaterial/SOL/pull/125),
+[#128](https://github.com/dialectmaterial/SOL/pull/128).
 
 <!--
 Template for a next task — copy into the agent's slot and fill in.
