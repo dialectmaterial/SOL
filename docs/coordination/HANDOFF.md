@@ -1175,8 +1175,8 @@ failures, invalid help example, narrow opening animation.
 
 ## Codex A — note editor resize mode and draft recovery — 25 October 2026
 
-**Branch:** `codex/reader-note-resize-mode`, based on unmerged #135 (and #126's
-popup cleanup); author does not merge.
+**Branch / PR:** `codex/reader-note-resize-mode` / [#138](https://github.com/dialectmaterial/SOL/pull/138),
+based on unmerged #135 (and #126's popup cleanup); author does not merge.
 
 - Real-corpus tmux reproduction: resizing a note editor returns to the read-only
   page still in Insert mode; the next reading key raises E21. Stop Insert mode
