@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 
 from sol.core.files import _path_argument, resolve_file_path
+from sol.presentation.text import safe_output
 
 
 def _records(book, value):
@@ -68,13 +69,12 @@ def main(arguments):
             else:
                 text = _text(selection, records, options.plain)
                 if sys.stdout.isatty():
-                    from sol.presentation.text import safe_output
                     text = safe_output(text)
                 print(text)
             return 0
     except ValueError as error:
-        print(f"sol: {error}", file=sys.stderr)
+        print("sol: " + safe_output(error), file=sys.stderr)
         return 2
     except RuntimeError as error:
-        print(f"sol: {error}", file=sys.stderr)
+        print("sol: " + safe_output(error), file=sys.stderr)
         return 1

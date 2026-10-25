@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- sol read: escape terminal controls and bidi characters in refused-input/runtime diagnostics, consistently with the main launcher; successful text/JSON output and exit codes are unchanged.
+
 ### Sentence segmentation audit — 23 October 2026
 
 A reproducible, read-only, 60-passage private-corpus audit reports v1 boundary

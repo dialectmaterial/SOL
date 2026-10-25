@@ -76,6 +76,24 @@ class NativeCommandsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("Not a canonical Markdown file", result.stderr)
 
+    def test_read_errors_show_controls_visibly_without_changing_the_terminal(self):
+        result = self.run_cli(["read", "/invented-missing-\x1b[31m-\u202e-\x07.txt"])
+        self.assertEqual(result.returncode, 2)
+        self.assertFalse(result.stdout)
+        for control in ("\x1b", "\u202e", "\x07"):
+            self.assertNotIn(control, result.stderr)
+        for visible in (r"\x1b[31m", r"\u202e", r"\x07"):
+            self.assertIn(visible, result.stderr)
+
+    def test_read_runtime_diagnostics_use_the_same_visible_control_policy(self):
+        error = StringIO()
+        with patch("sol.app.commands._records", side_effect=RuntimeError("Invented failure: \x1b[31m")), \
+                redirect_stderr(error):
+            status = app.main(["read", "sample.md", "--corpus", str(self.corpus)])
+        self.assertEqual(status, 1)
+        self.assertNotIn("\x1b", error.getvalue())
+        self.assertIn(r"\x1b[31m", error.getvalue())
+
     def test_real_zsh_pipeline_redirection_and_current_directory(self):
         zsh = shutil.which("zsh")
         if not zsh or not shutil.which("rg"):

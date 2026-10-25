@@ -1132,3 +1132,35 @@ initial timing probe, so use the clean medians above for outcome claims.
 - **(reserved; proposal only)** Consider separately approving action-scoped fingerprint batching with a mandatory final verification before persistence/output and explicit semantics for edits during an action. This would change CORE's per-reference fingerprint policy and needs its own design/tests and maintainer approval. The current policy remains unchanged; this PR does not implement or depend on that proposal.
 
 Earlier reports are in Git history (trimmed 21 October 2026).
+
+## Codex A — sol read diagnostics and audit closeout, 25 October 2026
+
+Branch `codex/read-command-diagnostics`; PR link follows publication. sol read's
+separate dispatcher interpolated raw exception strings, unlike the main
+launcher: an invented invalid path with an ANSI colour sequence changed the
+terminal, and bidi/bell characters were also echoed. Use the existing safe_output
+policy for both input/runtime errors; stdout and exit codes remain unchanged.
+Both regressions failed first; 9 native command checks OK (1 external Zsh check
+skipped), full suite: 1,314 tests OK (7 skipped, 4 expected failures), docs and
+diff checks OK. Real-corpus read-only tmux repro/recheck shows the invented ANSI
+sequence visibly after the fix, rather than applying it.
+
+All lane A batches from origin/main, published for review without self-merging:
+[#124](https://github.com/dialectmaterial/SOL/pull/124) narrow help/status;
+[#126](https://github.com/dialectmaterial/SOL/pull/126) reader/ESSENCE resize focus;
+[#127](https://github.com/dialectmaterial/SOL/pull/127) startup failures/splash;
+[#129](https://github.com/dialectmaterial/SOL/pull/129) key aliases;
+[#131](https://github.com/dialectmaterial/SOL/pull/131) outline widths; this batch
+finishes the command diagnostic issue. Each branch has its own task slot update,
+HANDOFF, failing-first regressions, docs check and full-suite pass.
+
+Audit used the configured corpus read-only in tmux at 86×48, 190×50, 80×24 and
+40×24: navigation, search/no matches, panels/outline, theme/mode keys, E/Alt-F/
+Alt-R, missing paths, malformed key config, and interrupted startup (canonical
+input and echo restored). guide/read/reference capture/check smoke checks passed.
+No further confirmed lane A bugs remain from this pass. The four baseline
+sentence-segmentation expected failures belong to ESSENCE and remain untouched;
+GUI/sustained human reading acceptance is not claimed. No public-contract or
+palette changes, dependencies, sol/essence or SPECULATIVE edits. All fixtures
+invented, captures outside Git, no private text/PDF/workspaces/exports committed.
+Work/publication clone: /tmp/sol-lane-a-hunt (original checkout Git is read-only).
