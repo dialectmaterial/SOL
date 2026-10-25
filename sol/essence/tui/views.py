@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import math
 
+from rich.cells import cell_len
+
 EIGHTHS = " ▏▎▍▌▋▊▉█"
 SPARKS = "▁▂▃▄▅▆▇█"
 EMPTY = "·"  # a dispersion cell with no occurrence
@@ -109,3 +111,30 @@ def histogram(rows, width):
 
 def plural(number, noun):
     return f"{number:,} {noun}" + ("" if number == 1 else "s")
+
+
+def clip(text, cells):
+    """`text` in at most `cells` columns, ending with "…" when cut."""
+    if cell_len(text) <= cells:
+        return text
+    out = ""
+    for character in text:
+        if cell_len(out + character) > cells - 1:
+            break
+        out += character
+    return out.rstrip() + "…"
+
+
+def wrap_items(items, cells, separator):
+    """Lines of at most `cells` columns, breaking only between items; each break keeps
+    the separator at the line's end. An item wider than a line is clipped."""
+    lines, line = [], ""
+    for item in items:
+        item = clip(item, cells)
+        joined = line + separator + item if line else item
+        if line and cell_len(joined + separator.rstrip()) > cells:
+            lines.append(line + separator.rstrip())
+            line = item
+        else:
+            line = joined
+    return lines + [line] if line else lines

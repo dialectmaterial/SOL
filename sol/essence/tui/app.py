@@ -27,7 +27,7 @@ from sol.essence.tui import sentences, tfidf, words
 from sol.essence.tui.context import load_state, save_state
 from sol.essence.tui.menu import STUDIES, SCOPES, StudyMenu
 from sol.essence.tui.reference import METHOD_STUDIES, ReferenceScreen
-from sol.essence.tui.results import OpenSource, SentencesView, Status, TfidfView, WordsView, WIDE
+from sol.essence.tui.results import OpenSource, SentencesView, Status, TfidfView, WordsView, WIDE, focus_now
 from sol.presentation.theme import BACKGROUNDS, DEFAULT_READER_THEME, READER_THEMES, reader_palette
 
 TEXTUAL_THEMES = {name: f"sol-{name}" for name in READER_THEMES if name != "terminal"} | {"terminal": "ansi-dark"}
@@ -133,7 +133,7 @@ class EssenceApp(App):
     ResultView { height: 1fr; padding: 0 1; }
     .metrics-row { height: 1; }
     #result-metrics, #sentence-metrics, #tfidf-metrics { width: 1fr; text-wrap: nowrap; text-overflow: ellipsis; }
-    #details-hint, .details-hint { width: auto; color: $text-muted; }
+    #details-hint, .details-hint { width: auto; padding-left: 2; color: $text-muted; }
     #word-filter { height: 1; border: none; padding: 0 1; background: $surface; }
     #sort-status { height: 1; color: $text-muted; text-wrap: nowrap; text-overflow: ellipsis; }
     .result-layout { height: 1fr; layout: vertical; }
@@ -286,7 +286,7 @@ class EssenceApp(App):
             self.set_interval(0.5, self.follow_reader_theme)
         if self.position_file:
             self.set_interval(0.5, self.follow_reader_position)
-        self.query_one("#menu").focus()
+        focus_now(self.query_one("#menu"))
         view = VIEWS.get(self.state.get("screen"), "workspace")
         if view != "workspace":
             self.action_reference(view)
@@ -330,7 +330,7 @@ class EssenceApp(App):
     def action_menu(self):
         menu = self.query_one("#menu", StudyMenu)
         menu.display = True
-        menu.focus()
+        focus_now(menu)
 
     def on_study_menu_close(self, event):
         if self.counting:
@@ -351,7 +351,7 @@ class EssenceApp(App):
                 top_n = 0  # Also refuse values beyond Python's integer-string limit.
             if not 1 <= top_n <= 1000:
                 status.update("Not counted: top_n must be an integer from 1 to 1,000.")
-                menu.query_one("#top-n", Input).focus()
+                focus_now(menu.query_one("#top-n", Input))
                 return
         self.run_study(menu.study, menu.target, menu.reference, menu.query_one("#target-file", Input).value,
                        menu.query_one("#reference-file", Input).value, top_n)
@@ -452,7 +452,7 @@ class EssenceApp(App):
             return
         first = {"words-view": "#frequencies", "sentences-view": "#longest", "tfidf-view": "#passages"}
         view = self.result_view(self.last_count)
-        view.query_one(first[view.id]).focus()
+        focus_now(view.query_one(first[view.id]))
 
     # Messages from the result views -----------------------------------------------------
     def on_open_source(self, message: OpenSource):
@@ -567,7 +567,7 @@ class EssenceApp(App):
 
     def restore_focus(self):
         if self.query_one("#menu").display:
-            self.query_one("#menu").focus()
+            focus_now(self.query_one("#menu"))
         else:
             self.focus_result()
 

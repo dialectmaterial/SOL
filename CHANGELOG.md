@@ -14,6 +14,12 @@ follow theme changes. Before the first result, the chosen study's method
 fills the space below the menu, and the header follows the menu's study;
 `M Encyclopedia` is always in the footer; the Encyclopedia's contents list
 shows every entry, and its frame no longer repeats the entry's title.
+Keys typed in a burst (as the reader's terminal delivers them) reach the
+widget the previous key focused: `r s Enter` no longer opened a passage from
+the result behind the menu. Word counts keep a space before them at five
+digits; the metrics line reads target ⇄ reference; the occurrence strip and
+TF-IDF passage labels fit their columns; TF-IDF terms wrap between terms;
+sentences list their hundred longest.
 
 ### ESSENCE workspace — 24 October 2026
 

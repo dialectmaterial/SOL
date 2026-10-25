@@ -17,6 +17,7 @@ from textual.widgets.option_list import Option
 
 from sol.essence.encyclopedia import entry_markdown, genealogy_rows
 from sol.essence.methods import method_markdown
+from sol.essence.tui.results import focus_now
 
 # Screens that browse a bundled catalog, with their one-line help.
 BROWSERS = {
@@ -117,7 +118,7 @@ class ReferenceScreen(Screen):
     def action_tab(self, name):
         self.set_focus(None)
         self.query_one("#catalogs", TabbedContent).active = name
-        self.query_one(f"#{name}-list").focus()
+        focus_now(self.query_one(f"#{name}-list"))
 
     def action_back(self):
         self.dismiss(None)
@@ -231,15 +232,15 @@ class ReferenceScreen(Screen):
                 self.filter_browser("encyclopedia")
                 self.query_one("#encyclopedia-list", OptionList).highlighted = ids.index(entry) + 1
                 self.update_browser("encyclopedia")
-                self.query_one("#encyclopedia-detail").focus()
+                focus_now(self.query_one("#encyclopedia-detail"))
             return
         name = (event.option_list.id or "").removesuffix("-list")
         if name not in BROWSERS or event.option_id != str(self.browser_index(name)):
             return
         if name == "encyclopedia" and self.browser_index(name) == 0:
-            self.query_one("#genealogy-map", OptionList).focus()
+            focus_now(self.query_one("#genealogy-map", OptionList))
         else:
-            self.query_one(f"#{name}-detail").focus()
+            focus_now(self.query_one(f"#{name}-detail"))
 
     def on_input_changed(self, event):
         name = (event.input.id or "").removesuffix("-search")
@@ -249,7 +250,7 @@ class ReferenceScreen(Screen):
     def on_input_submitted(self, event):
         name = (event.input.id or "").removesuffix("-search")
         if name in BROWSERS and self.browser_index(name) is not None:
-            self.query_one(f"#{name}-list").focus()
+            focus_now(self.query_one(f"#{name}-list"))
 
     def on_button_pressed(self, event):
         if event.button.id == "use-method":
@@ -268,16 +269,16 @@ class ReferenceScreen(Screen):
                 if field.value:
                     field.value = ""
                 else:
-                    listing.focus()
+                    focus_now(listing)
                 event.stop()
                 event.prevent_default()
             return
         if event.key in ("slash", "/", "ctrl+f"):
-            field.focus()
+            focus_now(field)
             event.stop()
             event.prevent_default()
         elif event.key == "escape" and self.focused is not listing:
             # From an entry or the map, Escape returns to the list first.
-            listing.focus()
+            focus_now(listing)
             event.stop()
             event.prevent_default()

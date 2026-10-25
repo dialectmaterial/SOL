@@ -152,6 +152,29 @@ class EssenceAppTests(UIEventLoop, unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.screen.query_one("#encyclopedia-detail").border_title, "Encyclopedia")
             await pilot.press("q")
 
+    async def test_keys_typed_in_a_burst_reach_the_menu_r_just_opened(self):
+        from textual import events
+        from sol.essence.tui import words
+        from sol.essence.tui.app import EssenceApp
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invented.txt"
+            path.write_text("Being is nothing. Nothing is being.", encoding="utf-8")
+            count = words.run(context(), "file", "none", target_file=path)
+        app = EssenceApp(context())
+        async with app.run_test(size=(86, 48)) as pilot:
+            app.last_run = ("words", "file", "none", str(path), "", 20)
+            app.show_result(count, None)
+            await pilot.pause()
+            # The reader's terminal delivers `r s c` at once, before any refresh.
+            for key in ("r", "s", "c"):
+                app.post_message(events.Key(key, key))
+            await pilot.pause()
+            menu = app.query_one("#menu")
+            self.assertIs(app.focused, menu)
+            self.assertEqual((menu.study, menu.target), ("sentences", "section"))
+            await pilot.press("q")
+
     async def test_methods_screen_browses_every_method(self):
         from textual.widgets import Markdown, OptionList
         from sol.essence.tui.app import EssenceApp

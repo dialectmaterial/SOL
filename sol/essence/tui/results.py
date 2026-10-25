@@ -66,6 +66,15 @@ class VimTable(DataTable):
         super().__init__(**options)
 
 
+def focus_now(widget):
+    """Focus `widget` before any key already waiting.
+
+    Widget.focus() waits behind queued messages; the reader's terminal delivers
+    typed keys in a burst, so `r w Enter` reached the result instead of the menu.
+    """
+    widget.screen.set_focus(widget)
+
+
 def right(value):
     return Text(value, justify="right")
 
@@ -108,7 +117,7 @@ class WordSort(ModalScreen):
     def on_mount(self):
         options = self.query_one(OptionList)
         options.highlighted = self.choices.index(self.current)
-        options.focus()
+        focus_now(options)
 
     def on_option_list_option_selected(self, event):
         self.dismiss(self.choices[event.option_index])
@@ -248,10 +257,13 @@ class WordsView(ResultView):
     def metrics(self):
         study = self.count.study
         target = study["target"]["summary"]
-        line = f"target {target['token_count']:,} tokens"
-        if self.count.reference is not None:
-            line += f" · reference {study['reference']['summary']['token_count']:,} tokens"
-        line += f" · {target['type_count']:,} distinct words"
+        if self.count.reference is None:
+            line = f"{target['token_count']:,} tokens · {target['type_count']:,} distinct words"
+        else:
+            # Target ⇄ reference, in the header's order; short enough beside the reader.
+            reference = study["reference"]["summary"]
+            line = (f"{target['token_count']:,} ⇄ {reference['token_count']:,} tokens · "
+                    f"{target['type_count']:,} ⇄ {reference['type_count']:,} distinct words")
         content = Text(line)
         # The following space stays in the bold run so SVG previews keep it.
         content.highlight_regex(r"\d[\d,]*(?:\s|$)", "bold")
@@ -318,9 +330,13 @@ class WordsView(ResultView):
         sides_count = 2 if reference else 1
         difference = comparison and self.wide()
         word_width = max(4, min(longest + 1, 16))
+        # A count column holds its widest figure and a space, so a bar never touches it.
+        counted = max((len(f"{row[side]['count']:,}") for row in shown for side in ("target", "reference")
+                       if row.get(side)), default=1)
+        count_width = max(6, counted + 2)
         layouts = [(True, True), (True, False), (False, False)] if comparison else [(True, True), (False, False)]
         for show_rates, log_bar in layouts:
-            fixed = sides_count * (6 + (8 if show_rates else 0)) + \
+            fixed = sides_count * (count_width + (8 if show_rates else 0)) + \
                 ((16 if log_bar else 10) if comparison else 0) + (11 if difference else 0)
             if min(word_width, 8) + fixed <= budget:
                 break
@@ -333,11 +349,11 @@ class WordsView(ResultView):
         table.add_column("word", width=word_width)
         sides = [("target", "target")] + ([("reference", "reference")] if reference else [])
         for side, label in sides:
-            table.add_column(right("n"), width=6)
+            table.add_column(right("n"), width=count_width)
             if show_rates:
                 table.add_column(right("/10k"), width=8)
             if bars:
-                table.add_column(" " + label, width=bars + 1)
+                table.add_column(" " + (label if len(label) <= bars else label[:3] + "."), width=bars + 1)
         difference = comparison and self.wide()
         if difference:
             table.add_column(right("difference"), width=11)
@@ -413,9 +429,13 @@ class WordsView(ResultView):
         sides = [f"{row[side]['count']:,} in {side}" for side in ("target", "reference") if row[side] is not None]
         head = f" {row['word']} · " + " · ".join(sides) + " "
         order = {"left": " · sorted by left context", "right": " · sorted by right context"}.get(self.context_sort, "")
-        strip_width = max(0, min(30, budget - len(head) - len(order) - 10))
-        strip = views.dispersion(positions, strip_width) if positions and strip_width >= 6 else ""
         listing = "" if len(found) == total else f" · listing {len(found):,} of {total:,}"
+        # The strip, two spaces and " where" must fit after everything else, or it is cut off.
+        room = budget - len(head) - len(order) - 8
+        if room - len(listing) < 12 and listing:
+            listing = f" · {len(found):,} of {total:,}"
+        strip_width = max(0, min(30, room - len(listing)))
+        strip = views.dispersion(positions, strip_width) if positions and strip_width >= 6 else ""
         title = Text.assemble((head, "bold"), (listing + order, "dim"))
         if strip:
             title.append("  ")
@@ -435,7 +455,7 @@ class WordsView(ResultView):
     def on_data_table_row_selected(self, event):
         event.stop()
         if event.data_table.id == "frequencies":
-            self.query_one("#sources").focus()
+            focus_now(self.query_one("#sources"))
             return
         if not 0 <= event.cursor_row < len(self.shown_sources):
             return
@@ -459,7 +479,7 @@ class WordsView(ResultView):
     def on_input_submitted(self, event):
         if event.input.id == "word-filter":
             event.stop()
-            self.query_one("#frequencies").focus()
+            focus_now(self.query_one("#frequencies"))
 
     def on_key(self, event):
         field = self.query_one("#word-filter", Input)
@@ -470,11 +490,11 @@ class WordsView(ResultView):
                 field.value = ""
             else:
                 field.display = False
-                self.query_one("#frequencies").focus()
+                focus_now(self.query_one("#frequencies"))
         elif self.app.focused is self.query_one("#sources"):
-            self.query_one("#frequencies").focus()
+            focus_now(self.query_one("#frequencies"))
         elif self.app.focused is self.query_one("#summary-box"):
-            self.query_one("#frequencies").focus()
+            focus_now(self.query_one("#frequencies"))
         elif field.value:
             field.value = ""
             field.display = False
@@ -487,7 +507,7 @@ class WordsView(ResultView):
     def action_filter(self):
         field = self.query_one("#word-filter", Input)
         field.display = True
-        field.focus()
+        focus_now(field)
 
     def action_sort(self):
         if self.count is not None and self.count.comparison is not None:
@@ -503,22 +523,22 @@ class WordsView(ResultView):
     def action_sort_context(self, side):
         self.context_sort = None if self.context_sort == side else side
         self.show_sources(self.selected_word())
-        self.query_one("#sources").focus()
+        focus_now(self.query_one("#sources"))
 
     def action_details(self):
         if self.wide():
-            self.query_one("#summary-box").focus()
+            focus_now(self.query_one("#summary-box"))
             return
         self.show_details()
         box = self.query_one("#summary-box")
-        (box if box.display else self.query_one("#frequencies")).focus()
+        focus_now(box if box.display else self.query_one("#frequencies"))
 
     def action_pane(self, step):
         panes = [self.query_one(selector) for selector in ("#frequencies", "#sources", "#summary-box")
                  if self.query_one(selector).display]
         focused = self.app.focused
         position = panes.index(focused) if focused in panes else 0
-        panes[(position + step) % len(panes)].focus()
+        focus_now(panes[(position + step) % len(panes)])
 
     def action_export(self, table_format):
         self.app.export(table_format)
@@ -535,7 +555,7 @@ class WordsView(ResultView):
         focused = self.app.focused
         self.rebuild(self.selected_word(), source_row)
         if focused is not None and focused.display:
-            focused.focus()
+            focus_now(focused)
 
 
 def normalized(value):
@@ -636,7 +656,7 @@ class SentencesView(ResultView):
 
     def on_data_table_row_selected(self, event):
         event.stop()
-        if not 0 <= event.cursor_row < len(self.count.study["longest"][:sentences.ROW_LIMIT]):
+        if not 0 <= event.cursor_row < len(sentences.longest(self.count.study)):
             return
         source = sentences.source(self.count, event.cursor_row)
         if source is None:
@@ -646,16 +666,16 @@ class SentencesView(ResultView):
 
     def on_key(self, event):
         if event.key == "escape" and self.app.focused is self.query_one("#sentence-details"):
-            self.query_one("#longest").focus()
+            focus_now(self.query_one("#longest"))
             event.stop()
 
     def action_details(self):
         if self.wide():
-            self.query_one("#sentence-details").focus()
+            focus_now(self.query_one("#sentence-details"))
             return
         self.show_details()
         box = self.query_one("#sentence-details")
-        (box if box.display else self.query_one("#longest")).focus()
+        focus_now(box if box.display else self.query_one("#longest"))
 
     def reflow(self):
         if self.count is None:
@@ -666,7 +686,7 @@ class SentencesView(ResultView):
         if table.row_count:
             table.move_cursor(row=min(row, table.row_count - 1), animate=False)
         if focused is not None and focused.display:
-            focused.focus()
+            focus_now(focused)
 
 
 class TfidfView(ResultView):
@@ -719,26 +739,30 @@ class TfidfView(ResultView):
         table.clear(columns=True)
         label_width = min(30, max(12, passages_width // 3))
         table.add_column(" passage", width=label_width)
-        table.add_column(" top terms · weight", width=max(10, passages_width - label_width))
+        terms_width = max(10, passages_width - label_width)
+        table.add_column(" top terms · weight", width=terms_width)
         for label, terms in tfidf.rows(self.count):
-            table.add_row(Text(" " + label.replace("\n", " · "), overflow="fold"),
-                          Text(" " + terms, overflow="fold"), height=None)
+            # Each line of the label indented alike: the heading, cut to fit, then its page.
+            lines = [" " + views.clip(line, label_width - 2) for line in label.split("\n")]
+            wrapped = views.wrap_items(terms.split(" · "), terms_width - 2, " · ")
+            table.add_row(Text("\n".join(lines)), Text("\n".join(" " + line for line in wrapped)), height=None)
         self.query_one("#passages-label", Static).update(
             Text.assemble(("terms by passage", "bold"), (" · Enter opens a passage", "dim")))
         overall = self.query_one("#overall", VimTable)
         overall.clear(columns=True)
         rows = study["overall"]
         peak = max((row["score"] for row in rows), default=0)
-        bar_width = max(0, min(30, overall_width - 16 - 9))
-        term_width = overall_width - 9 - bar_width
+        bar_width = max(0, min(30, overall_width - 16 - 9 - 1))
+        term_width = overall_width - 9 - (bar_width + 1 if bar_width >= 3 else 0)
         overall.add_column(" term", width=min(term_width, 24))
         overall.add_column(right("weight"), width=9)
         if bar_width >= 3:
-            overall.add_column("", width=bar_width)
+            overall.add_column("", width=bar_width + 1)
         for row in rows:
-            cells = [Text(" " + row["word"], overflow="fold"), right(f"{row['score']:.4f} ")]
+            cells = [Text(" " + row["word"], overflow="fold"), right(f"{row['score']:.4f}")]
             if bar_width >= 3:
-                cells.append(Text(views.bar(row["score"], peak, bar_width), style="bold"))
+                # The space is the bar's own: right-justified text drops its trailing spaces.
+                cells.append(Text(" " + views.bar(row["score"], peak, bar_width), style="bold"))
             overall.add_row(*cells, height=None)
         self.query_one("#overall-label", Static).update(
             Text.assemble(("overall", "bold"), (" · mean passage weights", "dim")))
@@ -759,23 +783,23 @@ class TfidfView(ResultView):
 
     def on_key(self, event):
         if event.key == "escape" and self.app.focused in (self.query_one("#tfidf-details"), self.query_one("#overall")):
-            self.query_one("#passages").focus()
+            focus_now(self.query_one("#passages"))
             event.stop()
 
     def action_details(self):
         if self.wide():
-            self.query_one("#tfidf-details").focus()
+            focus_now(self.query_one("#tfidf-details"))
             return
         self.show_details()
         box = self.query_one("#tfidf-details")
-        (box if box.display else self.query_one("#passages")).focus()
+        focus_now(box if box.display else self.query_one("#passages"))
 
     def action_pane(self, step):
         panes = [self.query_one(selector) for selector in ("#passages", "#overall", "#tfidf-details")
                  if self.query_one(selector).display]
         focused = self.app.focused
         position = panes.index(focused) if focused in panes else 0
-        panes[(position + step) % len(panes)].focus()
+        focus_now(panes[(position + step) % len(panes)])
 
     def reflow(self):
         if self.count is None:
@@ -786,4 +810,4 @@ class TfidfView(ResultView):
         if table.row_count:
             table.move_cursor(row=min(row, table.row_count - 1), animate=False)
         if focused is not None and focused.display:
-            focused.focus()
+            focus_now(focused)
