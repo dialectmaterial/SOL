@@ -1,7 +1,7 @@
 """Stage D dependency guard: parse sources; never import the inspected packages.
 
 Authority: ARCHITECTURE §2 (dependency direction), §9 (placement register),
-CORE §§4/8, and coordination/CURRENT_TASK's stage D rules. Dependencies within
+CORE §§4/8. Dependencies within
 BEING or ESSENCE subdivisions are deliberately not ordered. External libraries
 and subprocess command strings are outside this SOL-package import guard.
 """
