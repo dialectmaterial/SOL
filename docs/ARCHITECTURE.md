@@ -111,7 +111,7 @@ Risks to watch ([SPECULATIVE §9](SPECULATIVE.md#9-risks-and-criteria-of-success
 
 **C. First complete inquiry.** From a passage, launch a study in ESSENCE, produce a versioned source-bound artifact, inspect it and return to the source without losing the prior location. *Status:* implemented for word frequencies, sentence lengths and TF-IDF (`E`, Enter on a result, Alt-Left back). Syntactic (POS/dependency) annotation and a human-checked segmentation sample remain open.
 
-**D. ESSENCE interface, then breadth.** Interface shell, word frequencies, comparison and the encyclopedia (with its genealogy) are implemented; model adapters (stage 5, including embeddings for the Embedding Projector) are **deferred by the maintainer** until the interface has improved further. A stage-5 proposal is kept as an open PR for reference.
+**D. ESSENCE interface, then breadth.** Interface shell, word frequencies, comparison and the encyclopedia (with its genealogy) are implemented; model adapters (stage 5, including embeddings for the Embedding Projector) are **deferred by the maintainer** until the interface has improved further. The stage-5 proposal remains on closed PR [#76](https://github.com/dialectmaterial/SOL/pull/76), tracked by [#144](https://github.com/dialectmaterial/SOL/issues/144).
 
 **E. Later.** Richer annotation spans, research-context restoration, a typeset-reader decision, persistent investigations, additional NLP methods, multilingual and edition handling, CONCEPT, and eventually reproducible Nix-based environment composition. No operating-system distribution in this cycle.
 
