@@ -1,6 +1,6 @@
 # SOL ESSENCE — Computational Inquiry and Reproducible Experiments
 
-**Status:** implemented foundation and bounded research roadmap, 17 October 2026; interface and encyclopedia scope revised 20 October 2026 (supporting research: [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf)); framed by the leading [SPECULATIVE](SPECULATIVE.md) document on 21 October 2026.  
+**Status:** implemented foundation and bounded research roadmap, 17 October 2026; interface and encyclopedia scope revised 20 October 2026 (supporting research: [ESSENCE interface brief](https://github.com/dialectmaterial/SOL/blob/96cf945e6b4603626928e77cd37e595943257f2b/docs/coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf)); framed by the leading [SPECULATIVE](SPECULATIVE.md) document on 21 October 2026.  
 **Companions:** [SPECULATIVE](SPECULATIVE.md) (leading) · [Architecture](ARCHITECTURE.md) · [BEING](BEING.md) · [CORE](CORE.md).  
 **Original adoption:** 17 October 2026 at `main` `1d200e4`.
 
@@ -187,7 +187,7 @@ when ESSENCE closes, and the reader removes the file with its private context
 directory at exit. The opening context stays available as a separate return
 anchor.
 
-**Decisions (maintainer, 18 October 2026)**, from the [ESSENCE interface brief](coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf). They direct the work; how far each is implemented is recorded below and in the dated sections that follow.
+**Decisions (maintainer, 18 October 2026)**, from the [ESSENCE interface brief](https://github.com/dialectmaterial/SOL/blob/96cf945e6b4603626928e77cd37e595943257f2b/docs/coordination/proposals/ESSENCE_INTERFACE_BRIEF_2026-10-18.pdf). They direct the work; how far each is implemented is recorded below and in the dated sections that follow.
 
 1. **Hybrid surfaces.** Neovim remains the persistent BEING reader. ESSENCE gets its own interactive application, built with **Textual**, launched only when ESSENCE is requested. **Textual is an optional extra** (`sol-organizes-logic[essence]`, decided 18 October 2026): the reader installs and runs without it, and ESSENCE explains how to install it when it is missing.
 2. **On-demand lifecycle.** No Textual process exists while the reader is idle. Entering ESSENCE starts it in a Neovim terminal buffer; leaving ESSENCE saves the investigation state and ends the process. ESSENCE remains an ordinary application inside a terminal Neovim provides, not a terminal emulator.
@@ -383,7 +383,7 @@ They are not the reader's search unit: whole-word search in BEING bounds a
 literal match by Unicode letters, digits and underscore, so it finds numbers
 and the parts of `can’t`, and it keeps the source's curly apostrophe. On the
 book's 1,757 analysed passages the two differ at 633 places, almost all curly
-apostrophes and numbers ([WORD_UNIT](coordination/restructuring/WORD_UNIT.md)).
+apostrophes and numbers ([WORD_UNIT](https://github.com/dialectmaterial/SOL/blob/96cf945e6b4603626928e77cd37e595943257f2b/docs/coordination/restructuring/WORD_UNIT.md)).
 Both are kept for now; whether to align them is a maintainer decision.
 
 The interface-facing function is
@@ -613,7 +613,7 @@ recorded method; old snapshot and provider artifacts remain valid.
 
 #### Sentence-boundary audit — 23 October 2026
 
-The [counts-only audit](coordination/restructuring/SENTENCE_AUDIT.md) documents a
+The [counts-only audit](https://github.com/dialectmaterial/SOL/blob/96cf945e6b4603626928e77cd37e595943257f2b/docs/coordination/restructuring/SENTENCE_AUDIT.md) documents a
 fixed-seed random sample of 60 eligible private-corpus passages, complete
 hand-style boundary rules and coverage by error type. The single-agent review
 found 282 internal gold boundaries: v1 has 281 TP, 5 FP and 1 FN (**98.25%
